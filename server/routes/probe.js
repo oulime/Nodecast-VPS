@@ -29,6 +29,7 @@ const RANGE_CHECK_TIMEOUT_MS = readPositiveNumberEnv('PROBE_RANGE_TIMEOUT_MS', 3
 // Browser-compatible codecs
 const BROWSER_VIDEO_CODECS = ['h264', 'avc', 'avc1'];
 const BROWSER_AUDIO_CODECS = ['aac', 'mp3', 'opus', 'vorbis'];
+const HEVC_VIDEO_MARKERS = ['hevc', 'h265', 'h.265', 'hev1', 'hvc1'];
 
 function readPositiveNumberEnv(name, fallback) {
     const value = Number(process.env[name]);
@@ -43,6 +44,18 @@ function resolveUserAgent(ua, settings = {}) {
         return ua;
     }
     return db.getUserAgent(settings);
+}
+
+function codecSignature(...values) {
+    return values
+        .filter(v => v !== null && v !== undefined)
+        .map(v => String(v).toLowerCase())
+        .join(' ');
+}
+
+function isHevcVideoCodec(...values) {
+    const signature = codecSignature(...values);
+    return HEVC_VIDEO_MARKERS.some(marker => signature.includes(marker));
 }
 
 async function checkRangeSeekable(url, userAgent) {
@@ -144,12 +157,18 @@ function analyzeProbeResult(probeResult, url, rangeInfo = {}) {
     const videoStream = streams.find(s => s.codec_type === 'video');
     const audioStream = streams.find(s => s.codec_type === 'audio');
 
-    const videoCodec = videoStream?.codec_name?.toLowerCase() || 'unknown';
+    const rawVideoCodec = videoStream?.codec_name?.toLowerCase() || 'unknown';
+    const videoCodecTag = videoStream?.codec_tag_string?.toLowerCase() || '';
+    const videoCodecLongName = videoStream?.codec_long_name?.toLowerCase() || '';
+    const videoCodec = rawVideoCodec === 'unknown' && isHevcVideoCodec(videoCodecTag, videoCodecLongName)
+        ? 'hevc'
+        : rawVideoCodec;
     const audioCodec = audioStream?.codec_name?.toLowerCase() || 'unknown';
     const container = format.format_name?.toLowerCase() || 'unknown';
+    const isHevcVideo = isHevcVideoCodec(videoCodec, videoCodecTag, videoCodecLongName);
 
     // Check codec compatibility
-    const videoOk = BROWSER_VIDEO_CODECS.some(c => videoCodec.includes(c));
+    const videoOk = !isHevcVideo && BROWSER_VIDEO_CODECS.some(c => videoCodec.includes(c));
     const audioOk = BROWSER_AUDIO_CODECS.some(c => audioCodec.includes(c));
 
     // Browser-safe containers
@@ -178,7 +197,7 @@ function analyzeProbeResult(probeResult, url, rangeInfo = {}) {
     const isMkv = container.includes('matroska') || container.includes('webm') || url.endsWith('.mkv');
 
     // 1. Incompatible audio/video OR MKV -> Transcode (or HLS Copy)
-    const needsTranscode = !audioOk || !videoOk || isMkv;
+    const needsTranscode = isHevcVideo || !audioOk || !videoOk || isMkv;
 
     // 2. Compatible audio/video but incompatible container (non-MKV) -> Remux (fMP4 pipe)
     const needsRemux = !needsTranscode && (!containerOk || isRawTs);
@@ -187,6 +206,9 @@ function analyzeProbeResult(probeResult, url, rangeInfo = {}) {
 
     return {
         video: videoCodec,
+        videoCodecTag,
+        videoCodecLongName,
+        isHevcVideo,
         audio: audioCodec,
         width: videoStream?.width || 0,
         height: videoStream?.height || 0,

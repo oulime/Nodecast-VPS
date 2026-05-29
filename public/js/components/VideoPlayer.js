@@ -848,6 +848,22 @@ class VideoPlayer {
         }
     }
 
+    isHevcVideo(info = {}) {
+        const signature = [
+            info.video,
+            info.videoCodecTag,
+            info.videoCodecLongName
+        ].filter(Boolean).join(' ').toLowerCase();
+        return /hevc|h265|h\.265|hev1|hvc1/.test(signature);
+    }
+
+    shouldEncodeVideo(info = {}, upscaleEnabled = false) {
+        if (upscaleEnabled) return true;
+        if (this.isHevcVideo(info)) return true;
+        const video = String(info.video || '').toLowerCase();
+        return !(video.includes('h264') || video.includes('avc') || video.includes('avc1'));
+    }
+
     /**
      * Play a channel
      */
@@ -878,7 +894,7 @@ class VideoPlayer {
                 try {
                     const probeRes = await fetch(`/api/probe?url=${encodeURIComponent(streamUrl)}`);
                     const info = await probeRes.json();
-                    console.log(`[Player] Probe result: video=${info.video}, audio=${info.audio}, ${info.width}x${info.height}, compatible=${info.compatible}`);
+                    console.log('[Player] Probe result:', info);
 
                     // Store probe result for quality badge display
                     this.currentStreamInfo = info;
@@ -912,17 +928,25 @@ class VideoPlayer {
 
                         // Heuristic: If video is h264, it's likely compatible, so only copy video (audio transcode only)
                         // BUT: If upscaling is enabled, we MUST encode.
-                        const videoMode = (info.video && info.video.includes('h264') && !this.settings.upscaleEnabled) ? 'copy' : 'encode';
+                        const videoMode = this.shouldEncodeVideo(info, this.settings.upscaleEnabled) ? 'encode' : 'copy';
                         const statusText = videoMode === 'copy' ? 'Transcoding (Audio)' : (this.settings.upscaleEnabled ? 'Upscaling' : 'Transcoding (Video)');
                         const statusMode = this.settings.upscaleEnabled ? 'upscaling' : 'transcoding';
 
+                        console.log('[Player] Playback decision:', {
+                            mode: 'transcode-session',
+                            videoMode,
+                            reason: this.isHevcVideo(info) ? 'hevc-video' : (videoMode === 'copy' ? 'audio-or-container' : 'video-incompatible'),
+                            playlistSource: streamUrl
+                        });
                         this.updateTranscodeStatus(statusMode, statusText);
                         const playlistUrl = await this.startTranscodeSession(streamUrl, {
+                            mode: 'live',
                             videoMode,
                             videoCodec: info.video,
                             audioCodec: info.audio,
                             audioChannels: info.audioChannels
                         });
+                        console.log('[Player] Transcode playlist URL:', playlistUrl);
                         this.currentUrl = playlistUrl; // Update currentUrl for HLS reload
 
                         this.playHls(playlistUrl);
@@ -949,7 +973,7 @@ class VideoPlayer {
                         return;
                     }
                     // Compatible - fall through to normal HLS.js path
-                    console.log('[Player] Auto: Using HLS.js (compatible)');
+                    console.log('[Player] Playback decision:', { mode: 'direct-hls-compatible', url: streamUrl });
                 } catch (err) {
                     console.warn('[Player] Probe failed, using normal playback:', err.message);
                     // Continue with normal playback on probe failure
@@ -962,7 +986,9 @@ class VideoPlayer {
                 const statusMode = this.settings.upscaleEnabled ? 'upscaling' : 'transcoding';
                 console.log(`[Player] ${statusText} enabled. Starting session (encode)...`);
                 this.updateTranscodeStatus(statusMode, statusText);
-                const playlistUrl = await this.startTranscodeSession(streamUrl, { videoMode: 'encode' });
+                console.log('[Player] Playback decision:', { mode: 'force-video-transcode', videoMode: 'encode', url: streamUrl });
+                const playlistUrl = await this.startTranscodeSession(streamUrl, { mode: 'live', videoMode: 'encode' });
+                console.log('[Player] Transcode playlist URL:', playlistUrl);
                 this.currentUrl = playlistUrl;
 
                 // Load HLS
@@ -1013,7 +1039,9 @@ class VideoPlayer {
                     videoCodec = info.video;
                 } catch (e) { console.warn('Probe failed for force audio, assuming h264'); }
 
-                const playlistUrl = await this.startTranscodeSession(streamUrl, { videoMode: 'copy', videoCodec });
+                console.log('[Player] Playback decision:', { mode: 'force-audio-transcode', videoMode: 'copy', videoCodec, url: streamUrl });
+                const playlistUrl = await this.startTranscodeSession(streamUrl, { mode: 'live', videoMode: 'copy', videoCodec });
+                console.log('[Player] Transcode playlist URL:', playlistUrl);
                 this.currentUrl = playlistUrl;
 
                 console.log('[Player] Playing transcoded HLS stream:', playlistUrl);
@@ -1084,6 +1112,7 @@ class VideoPlayer {
             // Priority 1: Use HLS.js for HLS streams on browsers that support it
             if (looksLikeHls && Hls.isSupported()) {
                 this.updateTranscodeStatus('direct', 'Direct HLS');
+                console.log('[Player] Playback decision:', { mode: 'direct-hls', url: finalUrl, proxied: needsProxy });
 
                 // Use playHls helper logic here (or extract it)
                 // For now, let's just use existing logic but wrapped/modularized if possible?
@@ -1102,6 +1131,7 @@ class VideoPlayer {
 
                 // Re-attach error handler for the new Hls instance
                 this.hls.on(Hls.Events.ERROR, (event, data) => {
+                    console.warn('[Player] HLS error:', data);
                     if (data.fatal) {
                         const isCorsLikely = data.type === Hls.ErrorTypes.NETWORK_ERROR ||
                             (data.type === Hls.ErrorTypes.MEDIA_ERROR && data.details === 'fragParsingError');
@@ -1132,8 +1162,13 @@ class VideoPlayer {
 
                 // Detect discontinuity changes (ad transitions) for logging only
                 this.lastDiscontinuity = -1;
+                this.hls.on(Hls.Events.FRAG_LOADED, (event, data) => {
+                    const frag = data.frag;
+                    console.log(`[HLS] FRAG_LOADED: sn=${frag?.sn}, cc=${frag?.cc}, level=${frag?.level}, url=${frag?.url}`);
+                });
                 this.hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
                     const frag = data.frag;
+                    console.log(`[HLS] FRAG_CHANGED: sn=${frag?.sn}, cc=${frag?.cc}, level=${frag?.level}`);
                     if (frag && frag.sn !== 'initSegment') {
                         // Log discontinuity changes for debugging
                         if (frag.cc !== undefined && frag.cc !== this.lastDiscontinuity) {
@@ -1195,6 +1230,7 @@ class VideoPlayer {
             this.hls.destroy();
         }
 
+        console.log('[Player] Loading HLS URL:', url);
         this.hls = new Hls(this.getHlsConfig());
         this.hls.loadSource(url);
         this.hls.attachMedia(this.video);
@@ -1206,11 +1242,22 @@ class VideoPlayer {
         });
 
         this.hls.on(Hls.Events.ERROR, (event, data) => {
+            console.warn('[Player] HLS error:', data);
             if (data.fatal) {
                 // Simple error handling for forced HLS/transcode modes
                 console.error('Fatal HLS error in transcode mode:', data);
                 this.hls.destroy();
             }
+        });
+
+        this.hls.on(Hls.Events.FRAG_LOADED, (event, data) => {
+            const frag = data.frag;
+            console.log(`[Player] FRAG_LOADED: sn=${frag?.sn}, cc=${frag?.cc}, level=${frag?.level}, url=${frag?.url}`);
+        });
+
+        this.hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
+            const frag = data.frag;
+            console.log(`[Player] FRAG_CHANGED: sn=${frag?.sn}, cc=${frag?.cc}, level=${frag?.level}`);
         });
     }
 

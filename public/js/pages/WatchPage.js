@@ -482,6 +482,22 @@ class WatchPage {
         }
     }
 
+    isHevcVideo(info = {}) {
+        const signature = [
+            info.video,
+            info.videoCodecTag,
+            info.videoCodecLongName
+        ].filter(Boolean).join(' ').toLowerCase();
+        return /hevc|h265|h\.265|hev1|hvc1/.test(signature);
+    }
+
+    shouldEncodeVideo(info = {}, upscaleEnabled = false) {
+        if (upscaleEnabled) return true;
+        if (this.isHevcVideo(info)) return true;
+        const video = String(info.video || '').toLowerCase();
+        return !(video.includes('h264') || video.includes('avc') || video.includes('avc1'));
+    }
+
     async loadVideo(url) {
         // Store the URL for copy functionality
         this.currentUrl = url;
@@ -521,7 +537,7 @@ class WatchPage {
                 const ua = settings.userAgentPreset === 'custom' ? settings.userAgentCustom : settings.userAgentPreset;
                 const probeRes = await fetch(`/api/probe?url=${encodeURIComponent(url)}&ua=${encodeURIComponent(ua || '')}`);
                 const info = await probeRes.json();
-                console.log(`[WatchPage] Probe result: video=${info.video}, audio=${info.audio}, ${info.width}x${info.height}, compatible=${info.compatible}`);
+                console.log('[WatchPage] Probe result:', info);
 
                 // Store early probe info for quality display
                 this.currentStreamInfo = info;
@@ -532,10 +548,16 @@ class WatchPage {
 
                     // Heuristic: If video is h264/compat, copy video. Usage: Audio fix. 
                     // BUT: If upscaling is enabled, we MUST encode.
-                    const videoMode = (info.video && info.video.includes('h264') && !settings.upscaleEnabled) ? 'copy' : 'encode';
+                    const videoMode = this.shouldEncodeVideo(info, settings.upscaleEnabled) ? 'encode' : 'copy';
                     const statusText = videoMode === 'copy' ? 'Transcoding (Audio)' : (settings.upscaleEnabled ? 'Upscaling' : 'Transcoding (Video)');
                     const statusMode = settings.upscaleEnabled ? 'upscaling' : 'transcoding';
 
+                    console.log('[WatchPage] Playback decision:', {
+                        mode: 'transcode-session',
+                        videoMode,
+                        reason: this.isHevcVideo(info) ? 'hevc-video' : (videoMode === 'copy' ? 'audio-or-container' : 'video-incompatible'),
+                        playlistSource: url
+                    });
                     this.updateTranscodeStatus(statusMode, statusText);
                     this.currentVideoMode = videoMode;
                     this.currentVideoCodec = info.video;
@@ -555,6 +577,7 @@ class WatchPage {
                     if (this.durationSeconds === null || !this.seekableTranscode) {
                         this.showLimitedSeekingMessage();
                     }
+                    console.log('[WatchPage] Transcode playlist URL:', session.playlistUrl);
                     this.playHls(session.playlistUrl);
                     this.setVolumeFromStorage();
                     return;
@@ -574,6 +597,7 @@ class WatchPage {
                 // Compatible codecs but non-seekable direct source: prefer seekable transcode session for VOD.
                 if (!info.seekable) {
                     console.log('[WatchPage] Auto: compatible codec but non-seekable source, using VOD transcode session');
+                    console.log('[WatchPage] Playback decision:', { mode: 'seekable-copy-session', videoMode: 'copy', url });
                     this.currentVideoMode = 'copy';
                     this.currentVideoCodec = info.video;
                     this.currentAudioCodec = info.audio;
@@ -592,13 +616,14 @@ class WatchPage {
                     if (this.durationSeconds === null || !this.seekableTranscode) {
                         this.showLimitedSeekingMessage();
                     }
+                    console.log('[WatchPage] Transcode playlist URL:', session.playlistUrl);
                     this.playHls(session.playlistUrl);
                     this.setVolumeFromStorage();
                     return;
                 }
 
                 // Compatible + seekable - fall through to normal playback
-                console.log('[WatchPage] Auto: Using normal playback (compatible)');
+                console.log('[WatchPage] Playback decision:', { mode: 'normal-compatible', url });
             } catch (err) {
                 console.warn('[WatchPage] Probe failed, using normal playback:', err.message);
                 // Continue with normal playback on probe failure
@@ -610,6 +635,7 @@ class WatchPage {
             const statusText = settings.upscaleEnabled ? 'Upscaling' : 'Transcoding (Video)';
             const statusMode = settings.upscaleEnabled ? 'upscaling' : 'transcoding';
             console.log(`[WatchPage] ${statusText} enabled. Starting session (encode)...`);
+            console.log('[WatchPage] Playback decision:', { mode: 'force-video-transcode', videoMode: 'encode', url });
             this.updateTranscodeStatus(statusMode, statusText);
             this.currentVideoMode = 'encode';
             const session = await this.startTranscodeSession(url, {
@@ -623,6 +649,7 @@ class WatchPage {
             if (this.durationSeconds === null || !this.seekableTranscode) {
                 this.showLimitedSeekingMessage();
             }
+            console.log('[WatchPage] Transcode playlist URL:', session.playlistUrl);
             this.playHls(session.playlistUrl);
             this.setVolumeFromStorage();
             return;
@@ -630,6 +657,7 @@ class WatchPage {
 
         if (settings.forceTranscode) {
             console.log('[WatchPage] Force Audio Transcode enabled. Starting session (copy)...');
+            console.log('[WatchPage] Playback decision:', { mode: 'force-audio-transcode', videoMode: 'copy', url });
             this.updateTranscodeStatus('transcoding', 'Transcoding (Audio)');
 
             // Probe to get video codec for HEVC tag handling
@@ -655,6 +683,7 @@ class WatchPage {
             if (this.durationSeconds === null || !this.seekableTranscode) {
                 this.showLimitedSeekingMessage();
             }
+            console.log('[WatchPage] Transcode playlist URL:', session.playlistUrl);
             this.playHls(session.playlistUrl);
             this.setVolumeFromStorage();
             return;
@@ -683,10 +712,12 @@ class WatchPage {
         // Use HLS.js for HLS streams
         if (looksLikeHls && Hls.isSupported()) {
             this.updateTranscodeStatus('direct', 'Direct HLS');
+            console.log('[WatchPage] Playback decision:', { mode: 'direct-hls', url: finalUrl, proxied: needsProxy });
             this.playHls(finalUrl);
         } else {
             // Direct playback for mp4/mkv/avi
             this.updateTranscodeStatus('direct', 'Direct Play');
+            console.log('[WatchPage] Playback decision:', { mode: 'direct-play', url: finalUrl, proxied: needsProxy });
             this.video.src = finalUrl;
             this.video.play().catch(e => {
                 if (e.name !== 'AbortError') console.error('[WatchPage] Autoplay error:', e);
@@ -704,6 +735,7 @@ class WatchPage {
             this.hls.destroy();
         }
 
+        console.log('[WatchPage] Loading HLS URL:', url);
         this.hls = new Hls({
             maxBufferLength: 30,
             maxMaxBufferLength: 60,
@@ -732,6 +764,7 @@ class WatchPage {
         });
 
         this.hls.on(Hls.Events.ERROR, (event, data) => {
+            console.warn('[WatchPage] HLS error:', data);
             if (data.fatal) {
                 console.error('[WatchPage] HLS fatal error:', data);
                 // Try proxy on CORS error (only if not already proxied/transcoded)
@@ -743,6 +776,16 @@ class WatchPage {
                     this.hls.destroy();
                 }
             }
+        });
+
+        this.hls.on(Hls.Events.FRAG_LOADED, (event, data) => {
+            const frag = data.frag;
+            console.log(`[WatchPage] FRAG_LOADED: sn=${frag?.sn}, cc=${frag?.cc}, level=${frag?.level}, url=${frag?.url}`);
+        });
+
+        this.hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
+            const frag = data.frag;
+            console.log(`[WatchPage] FRAG_CHANGED: sn=${frag?.sn}, cc=${frag?.cc}, level=${frag?.level}`);
         });
     }
 

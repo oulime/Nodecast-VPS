@@ -274,8 +274,17 @@ router.post('/session', async (req, res) => {
                 const minInitialSegments = isVodMode
                     ? transcodeSession.INITIAL_VOD_SEGMENTS
                     : transcodeSession.INITIAL_LIVE_SEGMENTS;
-                const ready = await session.waitForPlaylist(15000, minInitialSegments);
-                if (!ready) throw new Error('Playlist not generated in time');
+                const playlistReadyTimeoutMs = isVodMode
+                    ? 15000
+                    : transcodeSession.LIVE_PLAYLIST_READY_TIMEOUT_MS;
+                const ready = await session.waitForPlaylist(playlistReadyTimeoutMs, minInitialSegments);
+                if (!ready) {
+                    const hasFallbackLiveSegment = !isVodMode && await session.isPlaylistReadyForSegments(1);
+                    if (!hasFallbackLiveSegment) {
+                        throw new Error('Playlist not generated in time');
+                    }
+                    console.warn('[Transcode] Live playlist returned with 1 initial segment after preferred segment wait timed out');
+                }
                 return session;
             } catch (err) {
                 await transcodeSession.removeSession(session.id).catch(() => { });

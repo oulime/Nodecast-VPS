@@ -288,11 +288,13 @@ class TranscodeSession extends EventEmitter {
         const mode = String(this.options.mode || '').toLowerCase();
         const isVodMode = ['vod', 'movie', 'series', 'episode'].includes(mode);
         const hlsFlags = isVodMode ? 'independent_segments' : 'independent_segments+append_list';
+        const livePlaylistTypeArgs = isVodMode ? [] : ['-hls_playlist_type', 'event'];
         args.push(
             '-f', 'hls',
             '-hls_time', String(SEGMENT_DURATION),
             '-hls_list_size', '0', // Keep all segments in playlist
             '-hls_flags', hlsFlags,
+            ...livePlaylistTypeArgs,
             '-hls_segment_type', 'mpegts',
             '-hls_segment_filename', path.join(this.dir, 'seg%04d.ts'),
             this.playlistPath

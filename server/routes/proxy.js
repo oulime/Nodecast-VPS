@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { sources } = require('../db');
+const db = require('../db');
+const { sources } = db;
 const { getDb } = require('../db/sqlite'); // Import SQLite
 const xtreamApi = require('../services/xtreamApi');
 const epgParser = require('../services/epgParser');
@@ -857,9 +858,11 @@ router.get('/stream', async (req, res) => {
             // Pluto TV uses multiple domains for content delivery
             const plutoDomains = ['pluto.tv', 'pluto.io', 'plutotv.net', 'siloh.pluto.tv', 'service-stitcher'];
             const isPluto = plutoDomains.some(domain => url.includes(domain));
+            const settings = await db.settings.get();
+            const userAgent = db.getUserAgent(settings);
 
             const headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'User-Agent': userAgent,
                 'Accept': '*/*',
                 'Accept-Language': 'en-US,en;q=0.9',
                 // Using https and matching the origin of the request

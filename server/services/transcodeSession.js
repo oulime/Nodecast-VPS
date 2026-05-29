@@ -186,6 +186,8 @@ class TranscodeSession extends EventEmitter {
     buildFFmpegArgs() {
         const segmentPattern = path.join(this.dir, 'seg%04d.m4s');
         const videoMode = this.options.videoMode || 'encode';
+        const mode = String(this.options.mode || '').toLowerCase();
+        const isVodMode = ['vod', 'movie', 'series', 'episode'].includes(mode);
 
         // Resolve 'auto' encoder to detected hardware, fallback to software
         let encoder = this.options.hwEncoder || 'software';
@@ -216,6 +218,10 @@ class TranscodeSession extends EventEmitter {
             '-reconnect_streamed', '1',
             '-reconnect_delay_max', '3'
         );
+
+        if (!isVodMode) {
+            args.push('-re');
+        }
 
         // Fast input seeking for VOD/session restart seeks.
         // Keep live behavior unchanged by only applying when a positive seek offset is requested.
@@ -285,8 +291,6 @@ class TranscodeSession extends EventEmitter {
         }
 
         // HLS output options
-        const mode = String(this.options.mode || '').toLowerCase();
-        const isVodMode = ['vod', 'movie', 'series', 'episode'].includes(mode);
         const hlsFlags = isVodMode ? 'independent_segments' : 'independent_segments+append_list';
         const livePlaylistTypeArgs = isVodMode ? [] : ['-hls_playlist_type', 'event'];
         args.push(

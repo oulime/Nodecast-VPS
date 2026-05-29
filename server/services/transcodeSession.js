@@ -25,11 +25,23 @@ const sessions = new Map();
 // Cache directory for transcoded segments
 const CACHE_DIR = path.join(process.cwd(), 'transcode-cache');
 
+function readPositiveNumberEnv(name, fallback) {
+    const value = Number(process.env[name]);
+    return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function readPositiveIntegerEnv(name, fallback) {
+    return Math.max(1, Math.floor(readPositiveNumberEnv(name, fallback)));
+}
+
 // Session settings
-const SESSION_TIMEOUT_MS = Number(process.env.TRANSCODE_SESSION_TIMEOUT_MINUTES || 30) * 60 * 1000;
-const SEGMENT_DURATION = 4; // seconds per HLS segment
+const SESSION_TIMEOUT_MS = readPositiveNumberEnv('TRANSCODE_SESSION_TIMEOUT_MINUTES', 30) * 60 * 1000;
+const SEGMENT_DURATION = readPositiveNumberEnv('TRANSCODE_HLS_SEGMENT_SECONDS', 2);
+const INITIAL_VOD_SEGMENTS = readPositiveIntegerEnv('TRANSCODE_INITIAL_VOD_SEGMENTS', 1);
+const INITIAL_LIVE_SEGMENTS = readPositiveIntegerEnv('TRANSCODE_INITIAL_LIVE_SEGMENTS', 2);
+const SEGMENT_WAIT_TIMEOUT_MS = readPositiveNumberEnv('TRANSCODE_SEGMENT_WAIT_TIMEOUT_MS', 12000);
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
-const ORPHAN_SESSION_MAX_AGE_MS = Number(process.env.TRANSCODE_ORPHAN_MAX_AGE_MINUTES || 60) * 60 * 1000;
+const ORPHAN_SESSION_MAX_AGE_MS = readPositiveNumberEnv('TRANSCODE_ORPHAN_MAX_AGE_MINUTES', 60) * 60 * 1000;
 
 /**
  * Generate a unique session ID
@@ -230,6 +242,7 @@ class TranscodeSession extends EventEmitter {
             }
         } else {
             this.addVideoEncoderArgs(args, encoder);
+            args.push('-force_key_frames', `expr:gte(t,n_forced*${SEGMENT_DURATION})`);
         }
 
         // Audio: Apply mix preset
@@ -553,13 +566,31 @@ class TranscodeSession extends EventEmitter {
         }
     }
 
+    countReadySegmentsFromPlaylist(content) {
+        return content
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line && !line.startsWith('#') && line.endsWith('.ts'))
+            .length;
+    }
+
+    async isPlaylistReadyForSegments(minSegments = 1) {
+        try {
+            await fs.access(this.playlistPath);
+            const content = await fs.readFile(this.playlistPath, 'utf8');
+            return this.countReadySegmentsFromPlaylist(content) >= Math.max(1, minSegments);
+        } catch {
+            return false;
+        }
+    }
+
     /**
      * Wait for playlist to be ready (with timeout)
      */
-    async waitForPlaylist(timeoutMs = 10000) {
+    async waitForPlaylist(timeoutMs = 10000, minSegments = 1) {
         const startTime = Date.now();
         while (Date.now() - startTime < timeoutMs) {
-            if (await this.isPlaylistReady()) {
+            if (await this.isPlaylistReadyForSegments(minSegments)) {
                 return true;
             }
             await new Promise(resolve => setTimeout(resolve, 200));
@@ -591,6 +622,21 @@ class TranscodeSession extends EventEmitter {
         } catch {
             return null;
         }
+    }
+
+    async waitForSegment(segmentName, timeoutMs = SEGMENT_WAIT_TIMEOUT_MS) {
+        const startTime = Date.now();
+        while (Date.now() - startTime < timeoutMs) {
+            const segmentPath = await this.getSegment(segmentName);
+            if (segmentPath) return segmentPath;
+
+            if (!['pending', 'starting', 'running'].includes(this.status)) {
+                return null;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 150));
+        }
+        return null;
     }
 
     /**
@@ -834,5 +880,8 @@ module.exports = {
     CACHE_DIR,
     SESSION_TIMEOUT_MS,
     ORPHAN_SESSION_MAX_AGE_MS,
-    SEGMENT_DURATION
+    SEGMENT_DURATION,
+    INITIAL_VOD_SEGMENTS,
+    INITIAL_LIVE_SEGMENTS,
+    SEGMENT_WAIT_TIMEOUT_MS
 };

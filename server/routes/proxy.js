@@ -935,7 +935,14 @@ router.get('/stream', async (req, res) => {
 
             // Peek at first bytes to check for HLS manifest ({ #EXTM3U })
             const textPrefix = firstChunk.subarray(0, 7).toString('utf8');
-            const contentLooksLikeHls = textPrefix === '#EXTM3U';
+            const responseUrl = response.url || url;
+            const responseUrlObj = new URL(responseUrl);
+            const responseUrlPath = responseUrlObj.pathname + responseUrlObj.search;
+            const contentLooksLikeHls =
+                textPrefix === '#EXTM3U' ||
+                firstChunk.toString('utf8', 0, Math.min(firstChunk.length, 32)).trimStart().startsWith('#EXTM3U') ||
+                contentType.toLowerCase().includes('mpegurl') ||
+                /\.m3u8(\?|$)/i.test(responseUrlPath);
 
             if (contentLooksLikeHls) {
                 // HLS Manifest: We must read the WHOLE manifest to rewrite it

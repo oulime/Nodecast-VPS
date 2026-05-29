@@ -7,6 +7,12 @@ const db = require('../db');
 const transcodeSession = require('../services/transcodeSession');
 const DURATION_CACHE_TTL_MS = 15 * 60 * 1000;
 const durationCache = new Map();
+const durationProbePromises = new Map();
+const ENCODER_FAILURE_COOLDOWN_MS = (() => {
+    const value = Number(process.env.TRANSCODE_ENCODER_FAILURE_COOLDOWN_MS);
+    return Number.isFinite(value) && value > 0 ? value : 10 * 60 * 1000;
+})();
+const encoderFailureUntil = new Map();
 
 function resolveSelectedEncoder(settings, detectedEncoder) {
     const hardwareMode = settings.transcodeHardwareMode || 'auto';
@@ -145,6 +151,48 @@ async function getDurationSeconds(url, ffprobePath, userAgent, metadata = {}) {
     return probed;
 }
 
+function getKnownDurationSeconds(url, metadata = {}) {
+    const metadataDuration = tryExtractDurationFromMetadata(metadata);
+    if (metadataDuration !== null) return { value: metadataDuration, pending: false };
+
+    const cached = durationCache.get(url);
+    const now = Date.now();
+    if (cached && (now - cached.timestamp) < DURATION_CACHE_TTL_MS) {
+        return { value: cached.value, pending: false };
+    }
+
+    return { value: null, pending: true };
+}
+
+function warmDurationCache(url, ffprobePath, userAgent) {
+    if (!ffprobePath || durationProbePromises.has(url)) return;
+
+    const promise = probeDurationSeconds(url, ffprobePath, userAgent)
+        .then((value) => {
+            durationCache.set(url, { value, timestamp: Date.now() });
+            return value;
+        })
+        .catch(() => null)
+        .finally(() => {
+            durationProbePromises.delete(url);
+        });
+
+    durationProbePromises.set(url, promise);
+}
+
+function isEncoderInCooldown(encoder) {
+    const until = encoderFailureUntil.get(encoder);
+    if (!until) return false;
+    if (Date.now() < until) return true;
+    encoderFailureUntil.delete(encoder);
+    return false;
+}
+
+function markEncoderFailure(encoder) {
+    if (!encoder || encoder === 'software') return;
+    encoderFailureUntil.set(encoder, Date.now() + ENCODER_FAILURE_COOLDOWN_MS);
+}
+
 /**
  * Transcode Routes
  * 
@@ -223,7 +271,10 @@ router.post('/session', async (req, res) => {
             });
             try {
                 await session.start();
-                const ready = await session.waitForPlaylist(15000);
+                const minInitialSegments = isVodMode
+                    ? transcodeSession.INITIAL_VOD_SEGMENTS
+                    : transcodeSession.INITIAL_LIVE_SEGMENTS;
+                const ready = await session.waitForPlaylist(15000, minInitialSegments);
                 if (!ready) throw new Error('Playlist not generated in time');
                 return session;
             } catch (err) {
@@ -233,7 +284,8 @@ router.post('/session', async (req, res) => {
         };
 
         let didFallbackToSoftware = false;
-        let selectedEncoder = preferredEncoder;
+        let selectedEncoder = isEncoderInCooldown(preferredEncoder) ? 'software' : preferredEncoder;
+        const skippedEncoder = selectedEncoder === 'software' && preferredEncoder !== 'software' ? preferredEncoder : null;
         let ffmpegExitCode = null;
         let session;
 
@@ -245,6 +297,7 @@ router.post('/session', async (req, res) => {
 
             if (selectedEncoder !== 'software') {
                 console.warn('[Transcode] Hardware transcode failed, retrying with software encoder');
+                markEncoderFailure(selectedEncoder);
                 didFallbackToSoftware = true;
                 selectedEncoder = 'software';
                 session = await startSessionWithEncoder('software');
@@ -253,9 +306,13 @@ router.post('/session', async (req, res) => {
             }
         }
 
-        const durationSeconds = isVodMode
-            ? await getDurationSeconds(url, ffprobePath, userAgent, metadata || {})
-            : null;
+        const durationInfo = isVodMode
+            ? getKnownDurationSeconds(url, metadata || {})
+            : { value: null, pending: false };
+
+        if (isVodMode && durationInfo.pending) {
+            warmDurationCache(url, ffprobePath, userAgent);
+        }
 
         res.json({
             sessionId: session.id,
@@ -263,12 +320,14 @@ router.post('/session', async (req, res) => {
             status: session.status,
             startAt: effectiveSeekOffset,
             seekOffset: effectiveSeekOffset,
-            durationSeconds: durationSeconds ?? null,
+            durationSeconds: durationInfo.value ?? null,
+            durationPending: !!durationInfo.pending,
             seekable: !!isVodMode,
             mode: normalizedMode || 'unknown',
             hardwareMode,
             detectedEncoder,
             selectedEncoder,
+            skippedEncoder,
             didFallbackToSoftware,
             ffmpegExitCode
         });
@@ -318,7 +377,7 @@ router.get('/:sessionId/:segment', async (req, res) => {
         return res.status(404).json({ error: 'Session not found' });
     }
 
-    const segmentPath = await session.getSegment(segment);
+    const segmentPath = await session.waitForSegment(segment);
     if (!segmentPath) {
         return res.status(404).json({ error: 'Segment not found' });
     }
@@ -469,4 +528,3 @@ router.get('/', async (req, res) => {
 });
 
 module.exports = router;
-

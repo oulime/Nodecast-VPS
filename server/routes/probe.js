@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { spawn } = require('child_process');
+const db = require('../db');
 
 /**
  * Probe endpoint - detects stream codecs and container
@@ -19,16 +20,38 @@ const { spawn } = require('child_process');
 
 // Probe cache (URL → result)
 const probeCache = new Map();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const PROBE_SIZE = process.env.PROBE_SIZE || '2000000';
+const PROBE_ANALYZE_DURATION = process.env.PROBE_ANALYZE_DURATION || '2000000';
+const PROBE_TIMEOUT_MS = readPositiveNumberEnv('PROBE_TIMEOUT_MS', 7000);
+const RANGE_CHECK_TIMEOUT_MS = readPositiveNumberEnv('PROBE_RANGE_TIMEOUT_MS', 3000);
 
 // Browser-compatible codecs
 const BROWSER_VIDEO_CODECS = ['h264', 'avc', 'avc1'];
 const BROWSER_AUDIO_CODECS = ['aac', 'mp3', 'opus', 'vorbis'];
 
+function readPositiveNumberEnv(name, fallback) {
+    const value = Number(process.env[name]);
+    return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function resolveUserAgent(ua, settings = {}) {
+    if (ua && db.USER_AGENT_PRESETS?.[ua]) {
+        return db.USER_AGENT_PRESETS[ua];
+    }
+    if (ua && String(ua).trim()) {
+        return ua;
+    }
+    return db.getUserAgent(settings);
+}
+
 async function checkRangeSeekable(url, userAgent) {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), RANGE_CHECK_TIMEOUT_MS);
     try {
         const response = await fetch(url, {
             method: 'GET',
+            signal: ac.signal,
             headers: {
                 'User-Agent': userAgent || 'Mozilla/5.0',
                 'Range': 'bytes=0-1',
@@ -57,13 +80,15 @@ async function checkRangeSeekable(url, userAgent) {
             contentRange: null,
             rangeStatus: null
         };
+    } finally {
+        clearTimeout(timer);
     }
 }
 
 /**
  * Probe stream with ffprobe
  */
-function probeStream(url, ffprobePath, userAgent = null, timeout = 15000) {
+function probeStream(url, ffprobePath, userAgent = null, timeout = PROBE_TIMEOUT_MS) {
     return new Promise((resolve, reject) => {
         const args = [
             '-v', 'error',
@@ -71,8 +96,8 @@ function probeStream(url, ffprobePath, userAgent = null, timeout = 15000) {
             '-print_format', 'json',
             '-show_streams',
             '-show_format',
-            '-probesize', '5000000',
-            '-analyzeduration', '5000000',
+            '-probesize', PROBE_SIZE,
+            '-analyzeduration', PROBE_ANALYZE_DURATION,
             url
         ];
 
@@ -188,6 +213,17 @@ router.get('/', async (req, res) => {
     }
 
     const ffprobePath = req.app.locals.ffprobePath;
+    let settings = {};
+    try {
+        settings = await db.settings.get();
+    } catch (err) {
+        console.warn('[Probe] Failed to load settings, using defaults:', err.message);
+    }
+    const userAgent = resolveUserAgent(ua, settings);
+    const cacheTtlSeconds = Number(settings.probeCacheTTL);
+    const cacheTtlMs = Number.isFinite(cacheTtlSeconds) && cacheTtlSeconds > 0
+        ? cacheTtlSeconds * 1000
+        : DEFAULT_CACHE_TTL_MS;
     const cacheKey = `${url}${ua ? `|${ua}` : ''}`;
 
     if (!ffprobePath) {
@@ -205,7 +241,7 @@ router.get('/', async (req, res) => {
 
     // Check cache
     const cached = probeCache.get(cacheKey);
-    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+    if (cached && (Date.now() - cached.timestamp < cacheTtlMs)) {
         console.log(`[Probe] Cache hit for: ${url.substring(0, 50)}...`);
         return res.json(cached.result);
     }
@@ -213,8 +249,10 @@ router.get('/', async (req, res) => {
     console.log(`[Probe] Probing: ${url.substring(0, 80)}... ${ua ? `(UA: ${ua})` : ''}`);
 
     try {
-        const probeResult = await probeStream(url, ffprobePath, ua);
-        const rangeInfo = await checkRangeSeekable(url, ua);
+        const [probeResult, rangeInfo] = await Promise.all([
+            probeStream(url, ffprobePath, userAgent),
+            checkRangeSeekable(url, userAgent)
+        ]);
         const analysis = analyzeProbeResult(probeResult, url, rangeInfo);
 
         // Cache result

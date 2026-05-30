@@ -91,7 +91,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="/assets/main-CrMzlKFX.js"></script>
+    <script type="module" crossorigin src="/assets/main-Bh8Gv13c.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css">
   </head>
   <body class="vite-autoconnect">
@@ -197,6 +197,18 @@
               tabindex="-1"
             >
               Cache
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="settings-tab-btn-nodecast"
+              class="settings-tabs__tab"
+              data-settings-tab="nodecast"
+              aria-selected="false"
+              aria-controls="settings-tab-nodecast"
+              tabindex="-1"
+            >
+              Nodecast
             </button>
           </div>
 
@@ -454,6 +466,25 @@
               class="countries-admin-empty"
               style="white-space: pre-wrap; margin-top: 1rem"
             ></pre>
+          </section>
+
+          <section
+            id="settings-tab-nodecast"
+            class="settings-tab-panel panel countries-admin-form hidden"
+            role="tabpanel"
+            aria-labelledby="settings-tab-btn-nodecast"
+            data-settings-tab="nodecast"
+            hidden
+          >
+            <h2>Nodecast backend</h2>
+            <p class="countries-admin-intro" style="margin-top: 0">
+              Sources, transcodage, proxy, remux et parametres backend Nodecast.
+            </p>
+            <iframe
+              src="/nodecast-admin/"
+              title="Nodecast backend settings"
+              style="width: 100%; min-height: 78vh; border: 1px solid rgba(255,255,255,0.16); border-radius: 12px; background: #090812"
+            ></iframe>
           </section>
           </div>
         </main>

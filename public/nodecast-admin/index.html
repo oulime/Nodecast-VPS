@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Nodecast Backend</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, Arial, sans-serif; background: #090812; color: #f6f0ff; }
+    body { margin: 0; padding: 18px; background: #090812; }
+    h1 { margin: 0 0 14px; font-size: 24px; }
+    h2 { margin: 20px 0 10px; font-size: 18px; }
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .tab { border: 1px solid rgba(181, 97, 255, .45); background: rgba(95, 38, 157, .28); color: #fff; border-radius: 9px; padding: 9px 13px; cursor: pointer; font-weight: 800; }
+    .tab.active { background: linear-gradient(135deg, #7c3aed, #d946ef); }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+    label { display: grid; gap: 5px; font-size: 12px; color: #cfc2e8; font-weight: 800; }
+    input, select { width: 100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,.14); background: #151022; color: #fff; border-radius: 8px; padding: 9px; }
+    input[type="checkbox"] { width: auto; }
+    .check { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.10); padding: 10px; border-radius: 8px; }
+    button { border: 0; background: #8b5cf6; color: white; padding: 10px 14px; border-radius: 8px; font-weight: 900; cursor: pointer; }
+    button.secondary { background: #272036; }
+    button.danger { background: #be123c; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { border-bottom: 1px solid rgba(255,255,255,.1); padding: 9px; text-align: left; vertical-align: top; }
+    .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .status { min-height: 20px; margin: 10px 0; color: #a7f3d0; }
+  </style>
+</head>
+<body>
+  <h1>Nodecast Backend</h1>
+  <div class="tabs">
+    <button class="tab active" data-tab="settings">Transcodage</button>
+    <button class="tab" data-tab="sources">Sources</button>
+    <button class="tab" data-tab="hardware">Hardware</button>
+  </div>
+  <p id="status" class="status"></p>
+
+  <section id="panel-settings" class="panel active">
+    <h2>Lecture et transcodage</h2>
+    <div class="grid" id="settings-checks"></div>
+    <div class="grid" style="margin-top:12px">
+      <label>User-Agent
+        <select id="userAgentPreset">
+          <option value="chrome">Chrome</option><option value="vlc">VLC</option><option value="tivimate">TiviMate</option><option value="custom">Custom</option>
+        </select>
+      </label>
+      <label>User-Agent custom <input id="userAgentCustom"></label>
+      <label>Hardware mode
+        <select id="transcodeHardwareMode"><option value="auto">Auto</option><option value="software">Software</option><option value="hardware">Hardware</option></select>
+      </label>
+      <label>Encoder
+        <select id="hwEncoder"><option value="auto">Auto</option><option value="software">Software</option><option value="nvenc">NVENC</option><option value="qsv">QSV</option><option value="vaapi">VAAPI</option><option value="amf">AMF</option></select>
+      </label>
+      <label>Resolution max
+        <select id="maxResolution"><option value="4k">4K</option><option value="1080p">1080p</option><option value="720p">720p</option><option value="480p">480p</option></select>
+      </label>
+      <label>Qualite
+        <select id="quality"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+      </label>
+      <label>Audio mix
+        <select id="audioMixPreset"><option value="auto">Auto</option><option value="itu">ITU stereo</option><option value="night">Night</option><option value="cinematic">Cinematic</option><option value="passthrough">Passthrough</option></select>
+      </label>
+      <label>Format stream
+        <select id="streamFormat"><option value="m3u8">HLS m3u8</option><option value="ts">TS</option></select>
+      </label>
+    </div>
+    <p style="margin-top:14px"><button id="save-settings">Enregistrer</button> <button id="reset-settings" class="secondary">Reset defaults</button></p>
+  </section>
+
+  <section id="panel-sources" class="panel">
+    <h2>Sources</h2>
+    <div class="grid">
+      <label>Type <select id="src-type"><option value="xtream">Xtream</option><option value="m3u">M3U</option><option value="epg">EPG</option></select></label>
+      <label>Nom <input id="src-name"></label>
+      <label>URL <input id="src-url"></label>
+      <label>Username <input id="src-user"></label>
+      <label>Password <input id="src-pass" type="password"></label>
+    </div>
+    <p><button id="add-source">Ajouter source</button></p>
+    <table>
+      <thead><tr><th>Nom</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody id="sources-body"></tbody>
+    </table>
+  </section>
+
+  <section id="panel-hardware" class="panel">
+    <h2>Hardware</h2>
+    <pre id="hardware-info"></pre>
+    <button id="refresh-hw">Refresh hardware</button>
+  </section>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const status = (msg, bad=false) => { $('status').textContent = msg; $('status').style.color = bad ? '#fecaca' : '#a7f3d0'; };
+    const checks = ['forceProxy','autoTranscode','forceTranscode','forceVideoTranscode','forceRemux','upscaleEnabled'];
+    let currentSettings = {};
+
+    document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b === btn));
+      document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === `panel-${btn.dataset.tab}`));
+      if (btn.dataset.tab === 'sources') loadSources();
+      if (btn.dataset.tab === 'hardware') loadHardware();
+    }));
+
+    async function api(path, opts = {}) {
+      const r = await fetch(`/api${path}`, { headers: { 'content-type': 'application/json' }, ...opts });
+      const text = await r.text();
+      const body = text ? JSON.parse(text) : null;
+      if (!r.ok) throw new Error(body?.error || r.statusText);
+      return body;
+    }
+
+    function renderChecks(settings) {
+      $('settings-checks').innerHTML = checks.map(k =>
+        `<label class="check"><input type="checkbox" id="${k}" ${settings[k] ? 'checked' : ''}> ${k}</label>`
+      ).join('');
+    }
+
+    async function loadSettings() {
+      currentSettings = await api('/settings');
+      renderChecks(currentSettings);
+      ['userAgentPreset','userAgentCustom','transcodeHardwareMode','hwEncoder','maxResolution','quality','audioMixPreset','streamFormat'].forEach(k => {
+        if ($(k)) $(k).value = currentSettings[k] ?? '';
+      });
+    }
+
+    $('save-settings').onclick = async () => {
+      const payload = {};
+      checks.forEach(k => payload[k] = $(k).checked);
+      ['userAgentPreset','userAgentCustom','transcodeHardwareMode','hwEncoder','maxResolution','quality','audioMixPreset','streamFormat'].forEach(k => payload[k] = $(k).value);
+      await api('/settings', { method: 'PUT', body: JSON.stringify(payload) });
+      status('Parametres Nodecast enregistres.');
+      await loadSettings();
+    };
+
+    $('reset-settings').onclick = async () => {
+      if (!confirm('Reset Nodecast settings?')) return;
+      await api('/settings', { method: 'DELETE' });
+      status('Parametres reset.');
+      await loadSettings();
+    };
+
+    async function loadSources() {
+      const [sources, states] = await Promise.all([api('/sources'), api('/sources/status').catch(() => [])]);
+      const byId = new Map(states.map(s => [String(s.source_id ?? s.sourceId ?? s.id), s]));
+      $('sources-body').innerHTML = sources.map(s => {
+        const st = byId.get(String(s.id));
+        return `<tr><td>${s.name}</td><td>${s.type}</td><td>${s.enabled ? 'on' : 'off'} ${st?.status || ''}</td><td class="row-actions">
+          <button onclick="toggleSource(${s.id})">${s.enabled ? 'Disable' : 'Enable'}</button>
+          <button onclick="syncSource(${s.id})">Sync</button>
+          <button class="danger" onclick="deleteSource(${s.id})">Delete</button>
+        </td></tr>`;
+      }).join('');
+    }
+
+    $('add-source').onclick = async () => {
+      await api('/sources', { method: 'POST', body: JSON.stringify({
+        type: $('src-type').value, name: $('src-name').value, url: $('src-url').value, username: $('src-user').value, password: $('src-pass').value
+      })});
+      status('Source ajoutee. Sync demarree.');
+      await loadSources();
+    };
+    window.toggleSource = async id => { await api(`/sources/${id}/toggle`, { method: 'POST' }); await loadSources(); };
+    window.syncSource = async id => { await api(`/sources/${id}/sync`, { method: 'POST' }); status('Sync demarree.'); await loadSources(); };
+    window.deleteSource = async id => { if (confirm('Delete source?')) { await api(`/sources/${id}`, { method: 'DELETE' }); await loadSources(); } };
+
+    async function loadHardware() { $('hardware-info').textContent = JSON.stringify(await api('/settings/hw-info'), null, 2); }
+    $('refresh-hw').onclick = async () => { $('hardware-info').textContent = JSON.stringify(await api('/settings/hw-info/refresh', { method: 'POST' }), null, 2); };
+
+    loadSettings().catch(e => status(e.message, true));
+  </script>
+</body>
+</html>

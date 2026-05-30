@@ -197,6 +197,7 @@ async function buildSnapshot(reason) {
         running: true,
         reason,
         startedAt: new Date().toISOString(),
+        completedAt: null,
         error: null
     };
     writeStatus();

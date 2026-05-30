@@ -8,6 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 const { getDb } = require('../db/sqlite');
 const { sources } = require('../db');
 
@@ -57,6 +58,16 @@ function writeJsonAtomic(filePath, data) {
     const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
     fs.writeFileSync(tmpPath, JSON.stringify(data));
     fs.renameSync(tmpPath, filePath);
+}
+
+function writeSnapshotAtomic(filePath, data) {
+    const json = JSON.stringify(data);
+    const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+    const tmpGzipPath = `${filePath}.gz.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(tmpPath, json);
+    fs.writeFileSync(tmpGzipPath, zlib.gzipSync(json, { level: 6 }));
+    fs.renameSync(tmpPath, filePath);
+    fs.renameSync(tmpGzipPath, `${filePath}.gz`);
 }
 
 function writeStatus() {
@@ -162,12 +173,53 @@ function loadSnapshotFromDisk() {
     return currentSnapshot;
 }
 
+function getSnapshotFilePath(action, gzip = false) {
+    const snapshotVersion = status.snapshotVersion;
+    if (!snapshotVersion || !ACTIONS.includes(action)) return null;
+    const filePath = path.join(snapshotsDir, snapshotVersion, `${action}.json${gzip ? '.gz' : ''}`);
+    return fs.existsSync(filePath) ? filePath : null;
+}
+
 function getSnapshot(action, categoryId = null) {
     const snapshot = loadSnapshotFromDisk();
     if (!snapshot || !Array.isArray(snapshot[action])) return null;
     const data = snapshot[action];
     if (!categoryId || action.endsWith('_categories')) return data;
     return data.filter(item => String(item.category_id) === String(categoryId));
+}
+
+function sendSnapshotResponse(req, res, action, categoryId = null) {
+    if (categoryId) {
+        const data = getSnapshot(action, categoryId);
+        if (!data) return false;
+        res.set('X-Velora-Catalog-Cache', 'vps-local');
+        res.set('Cache-Control', 'private, max-age=60');
+        res.json(data);
+        return true;
+    }
+
+    const acceptsGzip = /\bgzip\b/i.test(String(req.headers['accept-encoding'] || ''));
+    const gzipPath = acceptsGzip ? getSnapshotFilePath(action, true) : null;
+    const plainPath = getSnapshotFilePath(action, false);
+    const filePath = gzipPath || plainPath;
+    if (!filePath) {
+        const data = getSnapshot(action);
+        if (!data) return false;
+        res.set('X-Velora-Catalog-Cache', 'vps-local');
+        res.set('Cache-Control', 'private, max-age=60');
+        res.json(data);
+        return true;
+    }
+
+    res.set('Content-Type', 'application/json; charset=utf-8');
+    res.set('X-Velora-Catalog-Cache', 'vps-local');
+    res.set('Cache-Control', 'private, max-age=60');
+    if (gzipPath) {
+        res.set('Content-Encoding', 'gzip');
+        res.set('Vary', 'Accept-Encoding');
+    }
+    res.sendFile(filePath);
+    return true;
 }
 
 function getStatus() {
@@ -226,7 +278,7 @@ async function buildSnapshot(reason) {
     const versionDir = path.join(snapshotsDir, version);
     fs.mkdirSync(versionDir, { recursive: true });
     for (const action of ACTIONS) {
-        writeJsonAtomic(path.join(versionDir, `${action}.json`), snapshot[action]);
+        writeSnapshotAtomic(path.join(versionDir, `${action}.json`), snapshot[action]);
     }
 
     currentSnapshot = snapshot;
@@ -291,6 +343,7 @@ function startAutoWarmTimer() {
 module.exports = {
     getSnapshot,
     getStatus,
+    sendSnapshotResponse,
     startAutoWarmTimer,
     startWarm,
     warm

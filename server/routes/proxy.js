@@ -252,11 +252,7 @@ router.get('/xtream/all/:action', async (req, res) => {
         }
 
         if (!includeHidden) {
-            const snapshot = veloraCatalogCache.getSnapshot(action, categoryId);
-            if (snapshot) {
-                res.set('X-Velora-Catalog-Cache', 'vps-local');
-                return res.json(snapshot);
-            }
+            if (veloraCatalogCache.sendSnapshotResponse(req, res, action, categoryId)) return;
         }
 
         const sourceIds = await getEnabledPlaylistSourceIds();

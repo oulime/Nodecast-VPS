@@ -3,6 +3,7 @@ const { sources, settings } = require('../db'); // For source config and setting
 const xtreamApi = require('./xtreamApi');
 const m3uParser = require('./m3uParser');
 const epgParser = require('./epgParser');
+const veloraCatalogCache = require('./veloraCatalogCache');
 
 // Sync tracking
 const activeSyncs = new Set(); // sourceId
@@ -97,6 +98,7 @@ class SyncService {
             }
             this.lastSyncTime = new Date();
             console.log('[Sync] Global sync completed at', this.lastSyncTime.toISOString());
+            await veloraCatalogCache.warm({ reason: 'source-sync' });
         } catch (err) {
             console.error('[Sync] Global sync failed:', err);
         }

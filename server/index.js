@@ -3,6 +3,7 @@ require('dotenv').config();
 const path = require('path');
 const passport = require('passport');
 const syncService = require('./services/syncService');
+const veloraCatalogCache = require('./services/veloraCatalogCache');
 
 // Initialize database
 require('./db');
@@ -184,6 +185,7 @@ app.use('/api/probe', require('./routes/probe'));
 app.use('/api/subtitle', require('./routes/subtitle'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/history', require('./routes/history'));
+app.use('/api/velora/catalog', require('./routes/veloraCatalog'));
 app.use('/api', require('./routes/veloraTrialProxy'));
 
 // Version endpoint
@@ -210,6 +212,9 @@ app.listen(PORT, async () => {
     await loadPlugins().catch(err => {
         console.error('Plugin initialization failed:', err);
     });
+
+    veloraCatalogCache.startAutoWarmTimer();
+    veloraCatalogCache.startWarm({ reason: 'startup' }).promise.catch(console.error);
 
     // Trigger background sync with delay to allow server to settle
     setTimeout(async () => {

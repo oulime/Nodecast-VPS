@@ -6,6 +6,7 @@ const { getDb } = require('../db/sqlite'); // Import SQLite
 const xtreamApi = require('../services/xtreamApi');
 const epgParser = require('../services/epgParser');
 const cache = require('../services/cache');
+const veloraCatalogCache = require('../services/veloraCatalogCache');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -16,6 +17,7 @@ const { Readable } = require('stream');
 
 // Default cache max age in hours
 const DEFAULT_MAX_AGE_HOURS = 24;
+const MEDIA_INFO_CACHE_MS = Math.max(1, parseInt(process.env.VELORA_MEDIA_INFO_CACHE_HOURS, 10) || 168) * 60 * 60 * 1000;
 
 function encodeGlobalId(sourceId, itemId) {
     return Buffer.from(`${sourceId}:${itemId}`).toString('base64url');
@@ -249,6 +251,14 @@ router.get('/xtream/all/:action', async (req, res) => {
             return res.status(400).json({ error: 'Unknown action for all sources' });
         }
 
+        if (!includeHidden) {
+            const snapshot = veloraCatalogCache.getSnapshot(action, categoryId);
+            if (snapshot) {
+                res.set('X-Velora-Catalog-Cache', 'vps-local');
+                return res.json(snapshot);
+            }
+        }
+
         const sourceIds = await getEnabledPlaylistSourceIds();
         const data = action.endsWith('_categories')
             ? getCategoriesFromDbForSources(sourceIds, type, includeHidden)
@@ -433,7 +443,7 @@ router.get('/xtream/:sourceId/series_info', async (req, res) => {
         if (!seriesId) return res.status(400).send('series_id required');
 
         const cacheKey = `series_info_${seriesId}`;
-        const cached = cache.get('xtream', source.id, cacheKey, 3600000);
+        const cached = cache.get('xtream', source.id, cacheKey, MEDIA_INFO_CACHE_MS);
         if (cached) return res.json(cached);
 
         const api = xtreamApi.createFromSource(source);
@@ -455,7 +465,7 @@ router.get('/xtream/:sourceId/vod_info', async (req, res) => {
         if (!vodId) return res.status(400).send('vod_id required');
 
         const cacheKey = `vod_info_${vodId}`;
-        const cached = cache.get('xtream', source.id, cacheKey, 3600000);
+        const cached = cache.get('xtream', source.id, cacheKey, MEDIA_INFO_CACHE_MS);
         if (cached) return res.json(cached);
 
         const api = xtreamApi.createFromSource(source);

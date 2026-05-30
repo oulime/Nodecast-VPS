@@ -27,7 +27,9 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-app.use(express.static(path.join(__dirname, '..', 'public')));
+const publicDir = path.join(__dirname, '..', 'public');
+
+app.use(express.static(publicDir));
 
 // FFMPEG Configuration (optional - for transcoding support)
 // Priority: 1. System FFmpeg (better Docker DNS support), 2. ffmpeg-static npm package
@@ -182,6 +184,7 @@ app.use('/api/probe', require('./routes/probe'));
 app.use('/api/subtitle', require('./routes/subtitle'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/history', require('./routes/history'));
+app.use('/api', require('./routes/veloraTrialProxy'));
 
 // Version endpoint
 app.get('/api/version', (req, res) => {
@@ -189,9 +192,9 @@ app.get('/api/version', (req, res) => {
     res.json({ version: pkg.version });
 });
 
-// SPA fallback - serve index.html for all non-API routes
+// SPA fallback - Velora is the public frontend; Nodecast remains the backend/API engine.
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+    res.sendFile(path.join(publicDir, 'index.html'));
 });
 
 // Error handling

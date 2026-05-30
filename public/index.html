@@ -91,7 +91,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="/assets/main-CqLn3OZ8.js"></script>
+    <script type="module" crossorigin src="/assets/main-Dx0LrQaZ.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css">
   </head>
   <body class="vite-autoconnect">
@@ -450,15 +450,15 @@
           >
             <h2>Cache catalogue</h2>
             <p class="countries-admin-intro" style="margin-top: 0">
-              Lance manuellement le rechauffement du catalogue R2. Cela recharge les categories et les listes depuis
-              Nodecast, puis les sauvegarde dans le cache comme le cron quotidien.
+              Actualise manuellement le catalogue. Sur Nodecast integre, cela synchronise les sources dans SQLite.
+              Sur le deploiement Vercel historique, cela recharge et sauvegarde le cache R2.
             </p>
             <p id="cache-warm-status" class="status" aria-live="polite">
               Pret.
             </p>
             <div class="actions" style="flex-wrap: wrap; gap: 0.5rem">
               <button type="button" id="cache-warm-run" class="primary">
-                Rechauffer le cache catalogue
+                Actualiser le cache catalogue
               </button>
             </div>
             <pre

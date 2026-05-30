@@ -25,6 +25,7 @@ const ACTIONS = [
     'series_categories',
     'series'
 ];
+const CATEGORY_ACTIONS = ['live_streams', 'vod_streams', 'series'];
 
 let currentSnapshot = null;
 let activeWarm = null;
@@ -68,6 +69,10 @@ function writeSnapshotAtomic(filePath, data) {
     fs.writeFileSync(tmpGzipPath, zlib.gzipSync(json, { level: 6 }));
     fs.renameSync(tmpPath, filePath);
     fs.renameSync(tmpGzipPath, `${filePath}.gz`);
+}
+
+function safePathPart(value) {
+    return Buffer.from(String(value ?? ''), 'utf8').toString('base64url');
 }
 
 function writeStatus() {
@@ -180,6 +185,14 @@ function getSnapshotFilePath(action, gzip = false) {
     return fs.existsSync(filePath) ? filePath : null;
 }
 
+function getCategorySnapshotFilePath(action, sourceId, categoryId, gzip = false) {
+    const snapshotVersion = status.snapshotVersion;
+    if (!snapshotVersion || !CATEGORY_ACTIONS.includes(action)) return null;
+    const fileName = `${safePathPart(sourceId)}_${safePathPart(categoryId)}.json${gzip ? '.gz' : ''}`;
+    const filePath = path.join(snapshotsDir, snapshotVersion, 'by-category', action, fileName);
+    return fs.existsSync(filePath) ? filePath : null;
+}
+
 function getSnapshot(action, categoryId = null) {
     const snapshot = loadSnapshotFromDisk();
     if (!snapshot || !Array.isArray(snapshot[action])) return null;
@@ -222,6 +235,24 @@ function sendSnapshotResponse(req, res, action, categoryId = null) {
     return true;
 }
 
+function sendCategorySnapshotResponse(req, res, action, sourceId, categoryId) {
+    const acceptsGzip = /\bgzip\b/i.test(String(req.headers['accept-encoding'] || ''));
+    const gzipPath = acceptsGzip ? getCategorySnapshotFilePath(action, sourceId, categoryId, true) : null;
+    const plainPath = getCategorySnapshotFilePath(action, sourceId, categoryId, false);
+    const filePath = gzipPath || plainPath;
+    if (!filePath) return false;
+
+    res.set('Content-Type', 'application/json; charset=utf-8');
+    res.set('X-Velora-Catalog-Cache', 'vps-local-category');
+    res.set('Cache-Control', 'private, max-age=60');
+    if (gzipPath) {
+        res.set('Content-Encoding', 'gzip');
+        res.set('Vary', 'Accept-Encoding');
+    }
+    res.sendFile(filePath);
+    return true;
+}
+
 function getStatus() {
     return {
         ...status,
@@ -229,6 +260,20 @@ function getStatus() {
         cacheDir,
         autoWarmHours: AUTO_WARM_HOURS
     };
+}
+
+function hasReadySnapshot() {
+    const snapshotVersion = status.snapshotVersion;
+    if (!status.ready || !snapshotVersion) return false;
+    const snapshotDir = path.join(snapshotsDir, snapshotVersion);
+    const requiredFiles = [
+        path.join(snapshotDir, 'live_categories.json'),
+        path.join(snapshotDir, 'live_streams.json.gz'),
+        path.join(snapshotDir, 'vod_categories.json'),
+        path.join(snapshotDir, 'series_categories.json'),
+        path.join(snapshotDir, 'by-category')
+    ];
+    return requiredFiles.every(filePath => fs.existsSync(filePath));
 }
 
 function cleanupOldSnapshots(keepVersion) {
@@ -239,6 +284,29 @@ function cleanupOldSnapshots(keepVersion) {
         }
     } catch (err) {
         console.warn('[Velora cache] Old snapshot cleanup failed:', err.message);
+    }
+}
+
+function writeCategorySnapshotFiles(versionDir, snapshot) {
+    for (const action of CATEGORY_ACTIONS) {
+        const grouped = new Map();
+        for (const item of snapshot[action]) {
+            const sourceId = String(item.source_id ?? '').trim();
+            const categoryId = String(item.raw_category_id ?? item.category_id ?? '').trim();
+            if (!sourceId || !categoryId) continue;
+            const key = `${sourceId}\u0000${categoryId}`;
+            const existing = grouped.get(key);
+            if (existing) existing.push(item);
+            else grouped.set(key, [item]);
+        }
+
+        const outDir = path.join(versionDir, 'by-category', action);
+        fs.mkdirSync(outDir, { recursive: true });
+        for (const [key, rows] of grouped.entries()) {
+            const [sourceId, categoryId] = key.split('\u0000');
+            const filePath = path.join(outDir, `${safePathPart(sourceId)}_${safePathPart(categoryId)}.json`);
+            writeSnapshotAtomic(filePath, rows);
+        }
     }
 }
 
@@ -280,6 +348,7 @@ async function buildSnapshot(reason) {
     for (const action of ACTIONS) {
         writeSnapshotAtomic(path.join(versionDir, `${action}.json`), snapshot[action]);
     }
+    writeCategorySnapshotFiles(versionDir, snapshot);
 
     currentSnapshot = snapshot;
     status = {
@@ -343,6 +412,8 @@ function startAutoWarmTimer() {
 module.exports = {
     getSnapshot,
     getStatus,
+    hasReadySnapshot,
+    sendCategorySnapshotResponse,
     sendSnapshotResponse,
     startAutoWarmTimer,
     startWarm,

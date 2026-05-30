@@ -235,6 +235,10 @@ function getContentTypeForAction(action) {
     }
 }
 
+function sendCachedSourceCategory(req, res, action, sourceId, categoryId, includeHidden) {
+    if (includeHidden || !categoryId) return false;
+    return veloraCatalogCache.sendCategorySnapshotResponse(req, res, action, sourceId, categoryId);
+}
 
 // --- Xtream Codes Proxy API --- //
 
@@ -366,7 +370,21 @@ router.get('/xtream/:sourceId/live_streams', async (req, res) => {
         const sourceId = parseInt(req.params.sourceId);
         const categoryId = req.query.category_id;
         const includeHidden = req.query.includeHidden === 'true';
+        if (sendCachedSourceCategory(req, res, 'live_streams', sourceId, categoryId, includeHidden)) return;
         const streams = getStreamsFromDb(sourceId, 'live', categoryId, includeHidden);
+        res.json(streams);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
+router.get('/xtream/:sourceId/live_streams/:categoryId', async (req, res) => {
+    try {
+        const sourceId = parseInt(req.params.sourceId);
+        const includeHidden = req.query.includeHidden === 'true';
+        if (sendCachedSourceCategory(req, res, 'live_streams', sourceId, req.params.categoryId, includeHidden)) return;
+        const streams = getStreamsFromDb(sourceId, 'live', req.params.categoryId, includeHidden);
         res.json(streams);
     } catch (err) {
         console.error(err);
@@ -393,7 +411,21 @@ router.get('/xtream/:sourceId/vod_streams', async (req, res) => {
         const sourceId = parseInt(req.params.sourceId);
         const categoryId = req.query.category_id;
         const includeHidden = req.query.includeHidden === 'true';
+        if (sendCachedSourceCategory(req, res, 'vod_streams', sourceId, categoryId, includeHidden)) return;
         const streams = getStreamsFromDb(sourceId, 'movie', categoryId, includeHidden);
+        res.json(streams);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
+router.get('/xtream/:sourceId/vod_streams/:categoryId', async (req, res) => {
+    try {
+        const sourceId = parseInt(req.params.sourceId);
+        const includeHidden = req.query.includeHidden === 'true';
+        if (sendCachedSourceCategory(req, res, 'vod_streams', sourceId, req.params.categoryId, includeHidden)) return;
+        const streams = getStreamsFromDb(sourceId, 'movie', req.params.categoryId, includeHidden);
         res.json(streams);
     } catch (err) {
         console.error(err);
@@ -420,7 +452,21 @@ router.get('/xtream/:sourceId/series', async (req, res) => {
         const sourceId = parseInt(req.params.sourceId);
         const categoryId = req.query.category_id;
         const includeHidden = req.query.includeHidden === 'true';
+        if (sendCachedSourceCategory(req, res, 'series', sourceId, categoryId, includeHidden)) return;
         const streams = getStreamsFromDb(sourceId, 'series', categoryId, includeHidden);
+        res.json(streams);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
+router.get('/xtream/:sourceId/series/:categoryId', async (req, res) => {
+    try {
+        const sourceId = parseInt(req.params.sourceId);
+        const includeHidden = req.query.includeHidden === 'true';
+        if (sendCachedSourceCategory(req, res, 'series', sourceId, req.params.categoryId, includeHidden)) return;
+        const streams = getStreamsFromDb(sourceId, 'series', req.params.categoryId, includeHidden);
         res.json(streams);
     } catch (err) {
         console.error(err);

@@ -214,11 +214,20 @@ app.listen(PORT, async () => {
     });
 
     veloraCatalogCache.startAutoWarmTimer();
-    veloraCatalogCache.startWarm({ reason: 'startup' }).promise.catch(console.error);
+    const hasReadyVeloraSnapshot = veloraCatalogCache.hasReadySnapshot();
+    if (hasReadyVeloraSnapshot) {
+        console.log('[Velora cache] Ready local snapshot found, skipping startup rebuild');
+    } else {
+        veloraCatalogCache.startWarm({ reason: 'startup' }).promise.catch(console.error);
+    }
 
     // Trigger background sync with delay to allow server to settle
     setTimeout(async () => {
-        await syncService.syncAll().catch(console.error);
+        if (hasReadyVeloraSnapshot) {
+            console.log('[Sync] Ready Velora cache found, skipping heavy startup source sync');
+        } else {
+            await syncService.syncAll().catch(console.error);
+        }
         // Start the server-side sync timer after initial sync
         await syncService.startSyncTimer().catch(console.error);
 

@@ -146,3 +146,109 @@
     transform: none !important;
   }
 }
+
+/*
+  TV browsers are much weaker than desktop Chrome. Keep the Velora look, but
+  replace expensive live canvas/backdrop animation with static GPU-cheap layers
+  only for TV/coarse-pointer screens.
+*/
+@media (min-width: 1024px) and (pointer: coarse), (min-width: 1024px) and (hover: none) {
+  .main--velora {
+    background-image:
+      radial-gradient(ellipse 70% 42% at 50% -8%, rgba(138, 43, 226, 0.18), transparent 68%),
+      radial-gradient(ellipse 46% 34% at 100% 20%, rgba(56, 189, 248, 0.1), transparent 70%),
+      linear-gradient(180deg, var(--vel-bg, #06050a), color-mix(in srgb, var(--vel-bg, #06050a) 88%, #101729));
+    background-attachment: fixed;
+  }
+
+  .vel-futuristic-bg,
+  .main--velora .grid.vel-packages::before,
+  .main--velora .vel-package-card::before,
+  .main--velora .vel-package-card::after,
+  .main--velora .vel-vod-movie-card::before,
+  .main--velora .vel-vod-movie-card::after,
+  .main--velora .media-item::before,
+  .main--velora .media-item::after,
+  .main--velora .vel-media-item-row::before,
+  .main--velora .vel-media-item-row::after {
+    display: none !important;
+  }
+
+  .main--velora *,
+  .main--velora *::before,
+  .main--velora *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+
+  .main--velora .vel-package-card,
+  .main--velora .vel-vod-movie-card__media,
+  .main--velora .media-item,
+  .main--velora .vel-media-item-row,
+  .main--velora .cat-pill,
+  .main--velora .vel-sticky-top,
+  .main--velora .vel-package-toolbar-sticky,
+  .main--velora .vel-content-toolbar,
+  .main--velora .vel-header__country .country-select,
+  .main--velora .vel-header__country .country-select-trigger,
+  .velora-country-select-menu,
+  .velora-tv-select-menu {
+    background-image: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    filter: none !important;
+  }
+
+  .main--velora .vel-package-card:hover,
+  .main--velora .vel-package-card:focus-visible,
+  .main--velora .vel-package-card.velora-tv-focus,
+  .main--velora .vel-vod-movie-card:hover,
+  .main--velora .vel-vod-movie-card:focus-visible,
+  .main--velora .vel-vod-movie-card.velora-tv-focus,
+  .main--velora .media-item:hover,
+  .main--velora .media-item:focus-visible,
+  .main--velora .media-item.velora-tv-focus,
+  .main--velora .vel-media-item-row:hover,
+  .main--velora .vel-media-item-row.velora-tv-focus,
+  .main--velora .cat-pill:hover,
+  .main--velora .cat-pill:focus-visible,
+  .main--velora .cat-pill.velora-tv-focus {
+    transform: none !important;
+    filter: none !important;
+  }
+
+  .main--velora img {
+    will-change: auto !important;
+  }
+}
+
+body.velora-tv-mode .main--velora {
+  background-image:
+    radial-gradient(ellipse 70% 42% at 50% -8%, rgba(138, 43, 226, 0.18), transparent 68%),
+    radial-gradient(ellipse 46% 34% at 100% 20%, rgba(56, 189, 248, 0.1), transparent 70%),
+    linear-gradient(180deg, var(--vel-bg, #06050a), color-mix(in srgb, var(--vel-bg, #06050a) 88%, #101729));
+  background-attachment: fixed;
+}
+
+body.velora-tv-mode .vel-futuristic-bg,
+body.velora-tv-mode .main--velora .grid.vel-packages::before,
+body.velora-tv-mode .main--velora .vel-package-card::before,
+body.velora-tv-mode .main--velora .vel-package-card::after,
+body.velora-tv-mode .main--velora .vel-vod-movie-card::before,
+body.velora-tv-mode .main--velora .vel-vod-movie-card::after,
+body.velora-tv-mode .main--velora .media-item::before,
+body.velora-tv-mode .main--velora .media-item::after,
+body.velora-tv-mode .main--velora .vel-media-item-row::before,
+body.velora-tv-mode .main--velora .vel-media-item-row::after {
+  display: none !important;
+}
+
+body.velora-tv-mode .main--velora *,
+body.velora-tv-mode .main--velora *::before,
+body.velora-tv-mode .main--velora *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}

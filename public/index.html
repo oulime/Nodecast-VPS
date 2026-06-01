@@ -78,6 +78,63 @@
         display: block !important;
         visibility: visible !important;
       }
+      body.velora-tv-start-blocked {
+        overflow: hidden !important;
+      }
+      .velora-tv-start-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        color: #f8f7ff;
+        background:
+          radial-gradient(circle at 50% 18%, rgba(168, 85, 247, 0.24), transparent 34%),
+          radial-gradient(circle at 76% 66%, rgba(34, 211, 238, 0.15), transparent 34%),
+          rgba(2, 2, 11, 0.86);
+      }
+      .velora-tv-start-card {
+        width: min(92vw, 460px);
+        padding: 26px 24px 22px;
+        border: 1px solid rgba(168, 85, 247, 0.55);
+        border-radius: 20px;
+        background: linear-gradient(180deg, rgba(16, 14, 30, 0.98), rgba(7, 6, 16, 0.98));
+        box-shadow: 0 28px 90px rgba(0, 0, 0, 0.72), 0 0 36px rgba(168, 85, 247, 0.26);
+        text-align: center;
+        font-family: Inter, "Segoe UI", system-ui, sans-serif;
+      }
+      .velora-tv-start-title {
+        margin: 0 0 10px;
+        font-size: clamp(1.6rem, 3.4vw, 2.35rem);
+        line-height: 1.1;
+        font-weight: 900;
+      }
+      .velora-tv-start-text {
+        margin: 0 0 22px;
+        color: rgba(239, 235, 255, 0.82);
+        font-size: clamp(1rem, 1.8vw, 1.18rem);
+        line-height: 1.45;
+      }
+      .velora-tv-start-btn {
+        width: 100%;
+        min-height: 56px;
+        border: 0;
+        border-radius: 15px;
+        color: #fff;
+        background: linear-gradient(135deg, #8a2be2, #c026d3 52%, #22d3ee);
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1), 0 16px 34px rgba(138, 43, 226, 0.36);
+        font: inherit;
+        font-size: clamp(1.05rem, 2vw, 1.25rem);
+        font-weight: 900;
+        cursor: pointer;
+      }
+      .velora-tv-start-btn:focus-visible,
+      .velora-tv-start-btn:focus {
+        outline: 3px solid #ffd166;
+        outline-offset: 4px;
+      }
     </style>
     <link rel="icon" href="/logos/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" sizes="32x32" href="/logos/favicon-32x32.png" />
@@ -1277,5 +1334,105 @@
       </div>
     </dialog>
 
+    <script>
+      (function () {
+        try {
+          var params = new URLSearchParams(window.location.search || "");
+          if (params.get("tv") !== "1") return;
+
+          var closeOverlay = function (overlay) {
+            document.body.classList.remove("velora-tv-start-blocked");
+            overlay.remove();
+            window.scrollTo(0, 0);
+            var main = document.querySelector(".main--velora");
+            if (main) main.scrollTop = 0;
+          };
+
+          var requestFullscreen = function () {
+            var root = document.documentElement;
+            var fn = root.requestFullscreen || root.webkitRequestFullscreen || root.msRequestFullscreen;
+            if (!fn || document.fullscreenElement) return Promise.resolve();
+            try {
+              var result = fn.call(root);
+              return result && typeof result.then === "function" ? result : Promise.resolve();
+            } catch (error) {
+              return Promise.resolve();
+            }
+          };
+
+          var showTvStartOverlay = function () {
+            if (!document.body || document.getElementById("velora-tv-start-overlay")) return;
+
+            var overlay = document.createElement("div");
+            overlay.id = "velora-tv-start-overlay";
+            overlay.className = "velora-tv-start-overlay";
+            overlay.setAttribute("role", "dialog");
+            overlay.setAttribute("aria-modal", "true");
+            overlay.setAttribute("aria-labelledby", "velora-tv-start-title");
+
+            var card = document.createElement("div");
+            card.className = "velora-tv-start-card";
+
+            var title = document.createElement("h1");
+            title.id = "velora-tv-start-title";
+            title.className = "velora-tv-start-title";
+            title.textContent = "Mode TV pret";
+
+            var text = document.createElement("p");
+            text.className = "velora-tv-start-text";
+            text.textContent = "Appuyez sur OK pour lancer Velora en plein ecran.";
+
+            var button = document.createElement("button");
+            button.type = "button";
+            button.className = "velora-tv-start-btn";
+            button.setAttribute("data-tv-focusable", "true");
+            button.textContent = "Commencer";
+
+            button.addEventListener("click", function (event) {
+              event.preventDefault();
+              requestFullscreen()
+                .catch(function () {
+                  return null;
+                })
+                .then(function () {
+                  closeOverlay(overlay);
+                });
+            });
+
+            overlay.addEventListener("keydown", function (event) {
+              if (
+                event.key !== "Enter" &&
+                event.key !== "NumpadEnter" &&
+                event.key !== " " &&
+                event.key !== "Spacebar"
+              ) {
+                return;
+              }
+              event.preventDefault();
+              button.click();
+            });
+
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(button);
+            overlay.appendChild(card);
+            document.body.classList.add("velora-tv-start-blocked");
+            document.body.appendChild(overlay);
+            window.setTimeout(function () {
+              button.focus({ preventScroll: true });
+            }, 0);
+          };
+
+          if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", showTvStartOverlay, { once: true });
+          } else {
+            showTvStartOverlay();
+          }
+        } catch (error) {
+          /* TV fullscreen prompt is best-effort. */
+        }
+      })();
+    </script>
+
   </body>
 </html>

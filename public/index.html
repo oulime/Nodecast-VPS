@@ -1434,5 +1434,87 @@
       })();
     </script>
 
+    <script>
+      (function () {
+        var edgeDirection = null;
+        var edgeStartTimer = null;
+        var edgeRepeatTimer = null;
+        var edgeSize = 18;
+        var edgeStartDelay = 360;
+        var edgeRepeatDelay = 240;
+
+        var tvModeActive = function () {
+          return (
+            document.documentElement.classList.contains("velora-tv-mode") &&
+            !document.getElementById("velora-tv-start-overlay")
+          );
+        };
+
+        var stopEdgeRepeat = function () {
+          edgeDirection = null;
+          if (edgeStartTimer != null) window.clearTimeout(edgeStartTimer);
+          if (edgeRepeatTimer != null) window.clearInterval(edgeRepeatTimer);
+          edgeStartTimer = null;
+          edgeRepeatTimer = null;
+        };
+
+        var sendDirection = function () {
+          if (!edgeDirection || !tvModeActive()) {
+            stopEdgeRepeat();
+            return;
+          }
+          var key =
+            edgeDirection === "up"
+              ? "ArrowUp"
+              : edgeDirection === "down"
+                ? "ArrowDown"
+                : edgeDirection === "left"
+                  ? "ArrowLeft"
+                  : "ArrowRight";
+          window.dispatchEvent(new KeyboardEvent("keydown", { key: key, code: key, bubbles: true }));
+          window.dispatchEvent(new KeyboardEvent("keyup", { key: key, code: key, bubbles: true }));
+        };
+
+        var startEdgeRepeat = function (direction) {
+          if (!direction || direction === edgeDirection || !tvModeActive()) return;
+          stopEdgeRepeat();
+          edgeDirection = direction;
+          edgeStartTimer = window.setTimeout(function () {
+            edgeStartTimer = null;
+            sendDirection();
+            edgeRepeatTimer = window.setInterval(sendDirection, edgeRepeatDelay);
+          }, edgeStartDelay);
+        };
+
+        var directionFromPoint = function (x, y) {
+          if (y >= window.innerHeight - edgeSize) return "down";
+          if (y <= edgeSize) return "up";
+          if (x >= window.innerWidth - edgeSize) return "right";
+          if (x <= edgeSize) return "left";
+          return null;
+        };
+
+        var handlePointerMove = function (event) {
+          if (!tvModeActive()) {
+            stopEdgeRepeat();
+            return;
+          }
+          var direction = directionFromPoint(event.clientX, event.clientY);
+          if (!direction) {
+            stopEdgeRepeat();
+            return;
+          }
+          startEdgeRepeat(direction);
+        };
+
+        window.addEventListener("mousemove", handlePointerMove, true);
+        window.addEventListener("pointermove", handlePointerMove, true);
+        window.addEventListener("blur", stopEdgeRepeat, true);
+        document.addEventListener("visibilitychange", function () {
+          if (document.hidden) stopEdgeRepeat();
+        });
+      })();
+    </script>
+
   </body>
 </html>

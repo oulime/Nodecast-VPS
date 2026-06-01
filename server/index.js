@@ -186,6 +186,7 @@ app.use('/api/subtitle', require('./routes/subtitle'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/history', require('./routes/history'));
 app.use('/api/velora/catalog', require('./routes/veloraCatalog'));
+app.use('/api', require('./routes/packageCovers'));
 app.use('/api', require('./routes/veloraTrialProxy'));
 
 // Version endpoint

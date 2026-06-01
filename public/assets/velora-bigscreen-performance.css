@@ -8,29 +8,16 @@
     text-rendering: optimizeSpeed;
   }
 
-  .main--velora .vel-package-card,
-  .main--velora .vel-vod-movie-card,
-  .main--velora .vel-vod-movie-card__media,
-  .main--velora .media-item,
-  .main--velora .vel-media-item-row,
-  .main--velora .media-item__thumb,
-  .main--velora .channel-card {
-    contain: layout paint style;
-    content-visibility: auto;
+  .main--velora .vel-futuristic-bg,
+  .main--velora.main--velora-scrolling .vel-futuristic-bg {
+    opacity: 0.92 !important;
   }
 
-  .main--velora .vel-package-card {
-    contain-intrinsic-size: 196px 196px;
-  }
-
-  .main--velora .vel-vod-movie-card {
-    contain-intrinsic-size: 180px 300px;
-  }
-
-  .main--velora .media-item,
-  .main--velora .vel-media-item-row,
-  .main--velora .channel-card {
-    contain-intrinsic-size: 96px 96px;
+  .main--velora .grid.vel-packages::before,
+  .main--velora.main--velora-scrolling .grid.vel-packages::before {
+    opacity: 0.72 !important;
+    animation: none !important;
+    transition: none !important;
   }
 
   .main--velora .player-container,
@@ -41,6 +28,8 @@
   .main--velora .vel-package-card,
   .main--velora .vel-package-card::before,
   .main--velora .vel-package-card::after,
+  .main--velora .vel-package-card__title,
+  .main--velora .vel-package-card__art,
   .main--velora .vel-vod-movie-card,
   .main--velora .vel-vod-movie-card::before,
   .main--velora .vel-vod-movie-card::after,
@@ -50,6 +39,7 @@
   .main--velora .media-item::before,
   .main--velora .media-item::after,
   .main--velora .media-item__thumb,
+  .main--velora .media-info h4,
   .main--velora .vel-media-item-row,
   .main--velora .vel-media-item-row::before,
   .main--velora .vel-media-item-row::after,
@@ -105,45 +95,21 @@
     filter: none !important;
   }
 
-  .main--velora.main--velora-scrolling .grid.vel-packages::before {
-    animation: none !important;
-    transition: none !important;
-  }
+}
 
-  .main--velora.main--velora-scrolling .vel-package-card,
-  .main--velora.main--velora-scrolling .vel-package-card::before,
-  .main--velora.main--velora-scrolling .vel-package-card::after,
-  .main--velora.main--velora-scrolling .vel-package-card__title,
-  .main--velora.main--velora-scrolling .vel-package-card__art,
-  .main--velora.main--velora-scrolling .vel-vod-movie-card,
-  .main--velora.main--velora-scrolling .vel-vod-movie-card::before,
-  .main--velora.main--velora-scrolling .vel-vod-movie-card::after,
-  .main--velora.main--velora-scrolling .vel-vod-movie-card__media,
-  .main--velora.main--velora-scrolling .vel-vod-movie-card__poster img,
-  .main--velora.main--velora-scrolling .vel-media-item-row,
-  .main--velora.main--velora-scrolling .media-item,
-  .main--velora.main--velora-scrolling .media-item::before,
-  .main--velora.main--velora-scrolling .media-item::after,
-  .main--velora.main--velora-scrolling .media-item__thumb,
-  .main--velora.main--velora-scrolling .media-info h4,
-  .main--velora.main--velora-scrolling .cat-pill,
-  .main--velora.main--velora-scrolling .vel-sticky-top {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    box-shadow: none !important;
-    filter: none !important;
-    text-shadow: none !important;
-    animation: none !important;
-    transition: none !important;
-  }
-
-  .main--velora.main--velora-scrolling .vel-package-card:hover,
-  .main--velora.main--velora-scrolling .vel-package-card:focus-visible,
-  .main--velora.main--velora-scrolling .vel-vod-movie-card:hover,
-  .main--velora.main--velora-scrolling .media-item:hover,
-  .main--velora.main--velora-scrolling .media-item:focus-visible,
-  .main--velora.main--velora-scrolling .vel-media-item-row:hover {
-    transform: none !important;
+/*
+  Desktop browsers repaint auto-virtualized tiles while scrolling large grids.
+  Keep the full tile tree mounted on pointer-driven PC screens to avoid blink.
+*/
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .main--velora .vel-package-card,
+  .main--velora .vel-vod-movie-card,
+  .main--velora .media-item,
+  .main--velora .vel-media-item-row,
+  .main--velora .channel-card {
+    contain: none !important;
+    content-visibility: visible !important;
+    contain-intrinsic-size: auto !important;
   }
 }
 

@@ -1439,15 +1439,61 @@
         var edgeDirection = null;
         var edgeStartTimer = null;
         var edgeRepeatTimer = null;
+        var pointerLastX = null;
+        var pointerLastY = null;
+        var pointerAccumX = 0;
+        var pointerAccumY = 0;
+        var pointerLastMoveAt = 0;
+        var clickLastAt = 0;
+        var controlShield = null;
         var edgeSize = 18;
         var edgeStartDelay = 360;
         var edgeRepeatDelay = 240;
+        var pointerThreshold = 18;
+        var pointerMoveCooldown = 125;
+        var focusSelector = [
+          "button",
+          "a[href]",
+          "select",
+          "textarea",
+          "input:not([type='hidden'])",
+          "[role='button']",
+          "[role='tab']",
+          "[role='slider']",
+          "[tabindex]",
+          "[data-tv-focusable='true']"
+        ].join(",");
+        var hiddenCursor =
+          "url(\"data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==\") 0 0, none";
 
         var tvModeActive = function () {
           return (
             document.documentElement.classList.contains("velora-tv-mode") &&
             !document.getElementById("velora-tv-start-overlay")
           );
+        };
+
+        var ensureControlShield = function () {
+          if (!tvModeActive()) return null;
+          var parent = document.fullscreenElement instanceof HTMLElement ? document.fullscreenElement : document.body;
+          if (!parent) return null;
+          if (!controlShield || !controlShield.isConnected) {
+            controlShield = document.createElement("div");
+            controlShield.id = "velora-tv-edge-input-shield";
+            controlShield.setAttribute("aria-hidden", "true");
+            controlShield.tabIndex = -1;
+          }
+          controlShield.style.cssText =
+            "position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;" +
+            "z-index:2147483646!important;cursor:" + hiddenCursor + "!important;pointer-events:auto!important;" +
+            "touch-action:none!important;background:rgba(0,0,0,0.001)!important;opacity:1!important;" +
+            "display:block!important;visibility:visible!important;";
+          if (controlShield.parentElement !== parent || controlShield !== parent.lastElementChild) {
+            parent.appendChild(controlShield);
+          }
+          document.documentElement.style.setProperty("cursor", hiddenCursor, "important");
+          document.body.style.setProperty("cursor", hiddenCursor, "important");
+          return controlShield;
         };
 
         var stopEdgeRepeat = function () {
@@ -1458,17 +1504,24 @@
           edgeRepeatTimer = null;
         };
 
-        var sendDirection = function () {
-          if (!edgeDirection || !tvModeActive()) {
+        var stopPointerEvent = function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          event.stopImmediatePropagation();
+        };
+
+        var sendDirection = function (direction) {
+          var action = direction || edgeDirection;
+          if (!action || !tvModeActive()) {
             stopEdgeRepeat();
             return;
           }
           var key =
-            edgeDirection === "up"
+            action === "up"
               ? "ArrowUp"
-              : edgeDirection === "down"
+              : action === "down"
                 ? "ArrowDown"
-                : edgeDirection === "left"
+                : action === "left"
                   ? "ArrowLeft"
                   : "ArrowRight";
           window.dispatchEvent(new KeyboardEvent("keydown", { key: key, code: key, bubbles: true }));
@@ -1481,7 +1534,7 @@
           edgeDirection = direction;
           edgeStartTimer = window.setTimeout(function () {
             edgeStartTimer = null;
-            sendDirection();
+            sendDirection(edgeDirection);
             edgeRepeatTimer = window.setInterval(sendDirection, edgeRepeatDelay);
           }, edgeStartDelay);
         };
@@ -1494,25 +1547,131 @@
           return null;
         };
 
+        var isVisibleFocusable = function (el) {
+          if (!el || !(el instanceof HTMLElement)) return false;
+          if (el.closest("[hidden], .hidden, [inert], [aria-hidden='true']")) return false;
+          if ((el.matches("button,input,select,textarea") && el.disabled) || el.tabIndex < -1) return false;
+          var style = window.getComputedStyle(el);
+          if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+          var rect = el.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        };
+
+        var focusableFromPoint = function (x, y) {
+          var stack = document.elementsFromPoint(x, y);
+          for (var i = 0; i < stack.length; i += 1) {
+            var raw = stack[i];
+            if (!(raw instanceof Element)) continue;
+            if (raw.id === "velora-tv-edge-input-shield" || raw.id === "velora-tv-pointer-shield") continue;
+            var focusable = raw.closest(focusSelector);
+            if (isVisibleFocusable(focusable)) return focusable;
+          }
+          return null;
+        };
+
+        var currentFocus = function () {
+          var active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          if (isVisibleFocusable(active) && active.classList.contains("velora-tv-focus")) return active;
+          var marked = document.querySelector(".velora-tv-focus");
+          return isVisibleFocusable(marked) ? marked : null;
+        };
+
+        var setTvFocus = function (el, shouldScroll) {
+          if (!isVisibleFocusable(el)) return;
+          document.querySelectorAll(".velora-tv-focus").forEach(function (node) {
+            node.classList.remove("velora-tv-focus");
+          });
+          el.classList.add("velora-tv-focus");
+          if (!el.hasAttribute("tabindex")) el.tabIndex = 0;
+          el.focus({ preventScroll: true });
+          if (shouldScroll) el.scrollIntoView({ block: "center", inline: "nearest", behavior: "auto" });
+        };
+
+        var clickCurrentFocus = function () {
+          var focused = currentFocus();
+          if (!focused) return;
+          focused.click();
+        };
+
+        var moveFromPointerDelta = function (dx, dy) {
+          pointerAccumX += dx;
+          pointerAccumY += dy;
+          var absX = Math.abs(pointerAccumX);
+          var absY = Math.abs(pointerAccumY);
+          var now = Date.now();
+          if (Math.max(absX, absY) < pointerThreshold || now - pointerLastMoveAt < pointerMoveCooldown) return;
+          pointerLastMoveAt = now;
+          var direction =
+            absX >= absY
+              ? pointerAccumX > 0
+                ? "right"
+                : "left"
+              : pointerAccumY > 0
+                ? "down"
+                : "up";
+          pointerAccumX = 0;
+          pointerAccumY = 0;
+          sendDirection(direction);
+        };
+
         var handlePointerMove = function (event) {
           if (!tvModeActive()) {
             stopEdgeRepeat();
             return;
           }
+          ensureControlShield();
+          stopPointerEvent(event);
           var direction = directionFromPoint(event.clientX, event.clientY);
-          if (!direction) {
+          if (direction) {
+            startEdgeRepeat(direction);
+          } else {
             stopEdgeRepeat();
+          }
+          if (pointerLastX == null || pointerLastY == null) {
+            pointerLastX = event.clientX;
+            pointerLastY = event.clientY;
+            if (!currentFocus()) setTvFocus(focusableFromPoint(event.clientX, event.clientY), false);
             return;
           }
-          startEdgeRepeat(direction);
+          var dx = event.clientX - pointerLastX;
+          var dy = event.clientY - pointerLastY;
+          pointerLastX = event.clientX;
+          pointerLastY = event.clientY;
+          moveFromPointerDelta(dx, dy);
+        };
+
+        var handlePointerClick = function (event) {
+          if (!tvModeActive()) return;
+          if (event.type === "click" && event.isTrusted === false) return;
+          ensureControlShield();
+          stopPointerEvent(event);
+          if (event.type !== "click") return;
+          var now = Date.now();
+          if (now - clickLastAt < 260) return;
+          clickLastAt = now;
+          clickCurrentFocus();
         };
 
         window.addEventListener("mousemove", handlePointerMove, true);
         window.addEventListener("pointermove", handlePointerMove, true);
+        document.addEventListener("mousemove", handlePointerMove, true);
+        document.addEventListener("pointermove", handlePointerMove, true);
+        window.addEventListener("pointerdown", handlePointerClick, true);
+        window.addEventListener("pointerup", handlePointerClick, true);
+        window.addEventListener("mousedown", handlePointerClick, true);
+        window.addEventListener("mouseup", handlePointerClick, true);
+        window.addEventListener("click", handlePointerClick, true);
+        document.addEventListener("pointerdown", handlePointerClick, true);
+        document.addEventListener("pointerup", handlePointerClick, true);
+        document.addEventListener("mousedown", handlePointerClick, true);
+        document.addEventListener("mouseup", handlePointerClick, true);
+        document.addEventListener("click", handlePointerClick, true);
+        document.addEventListener("fullscreenchange", ensureControlShield);
         window.addEventListener("blur", stopEdgeRepeat, true);
         document.addEventListener("visibilitychange", function () {
           if (document.hidden) stopEdgeRepeat();
         });
+        window.setInterval(ensureControlShield, 120);
       })();
     </script>
 

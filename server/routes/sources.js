@@ -4,7 +4,24 @@ const { sources } = require('../db');
 const { getDb } = require('../db/sqlite');
 const xtreamApi = require('../services/xtreamApi');
 const syncService = require('../services/syncService');
+const veloraCatalogCache = require('../services/veloraCatalogCache');
 const m3uParser = require('../services/m3uParser');
+
+function warmVeloraCatalog(reason) {
+    const job = veloraCatalogCache.startWarm({ reason });
+    job.promise.catch(err => {
+        console.error('[Sources] Velora catalog warm-up failed:', err);
+    });
+    return job;
+}
+
+function syncSourceAndWarm(sourceId, reason) {
+    syncService.syncSource(sourceId)
+        .then(() => warmVeloraCatalog(reason).promise)
+        .catch(err => {
+            console.error('[Sources] Source sync failed:', err);
+        });
+}
 
 // Get all sources
 router.get('/', async (req, res) => {
@@ -74,8 +91,8 @@ router.post('/', async (req, res) => {
         }
 
         const source = await sources.create({ type, name, url, username, password });
-        // Trigger Sync
-        syncService.syncSource(source.id).catch(console.error);
+        // Trigger Nodecast sync, then rebuild the Velora local catalog snapshot.
+        syncSourceAndWarm(source.id, 'source-create');
         res.status(201).json(source);
     } catch (err) {
         console.error('Error creating source:', err);
@@ -99,7 +116,7 @@ router.put('/:id', async (req, res) => {
             password: password !== undefined ? password : existing.password
         });
         // Trigger Sync (if critical fields changed? safely just trigger it)
-        syncService.syncSource(parseInt(req.params.id)).catch(console.error);
+        syncSourceAndWarm(parseInt(req.params.id), 'source-update');
         res.json(updated);
     } catch (err) {
         console.error('Error updating source:', err);
@@ -132,6 +149,7 @@ router.delete('/:id', async (req, res) => {
 
         // Delete source config and related hidden items (favorites handled by db.js)
         await sources.delete(sourceId);
+        warmVeloraCatalog('source-delete');
 
         res.json({ success: true });
     } catch (err) {
@@ -150,7 +168,9 @@ router.post('/:id/toggle', async (req, res) => {
 
         // If enabled, trigger sync
         if (updated.enabled) {
-            syncService.syncSource(parseInt(req.params.id)).catch(console.error);
+            syncSourceAndWarm(parseInt(req.params.id), 'source-enable');
+        } else {
+            warmVeloraCatalog('source-disable');
         }
 
         res.json(updated);
@@ -167,8 +187,8 @@ router.post('/:id/sync', async (req, res) => {
         const source = await sources.getById(id);
         if (!source) return res.status(404).json({ error: 'Source not found' });
 
-        // Trigger sync (async)
-        syncService.syncSource(id).catch(console.error);
+        // Trigger sync (async), then rebuild the Velora local catalog snapshot.
+        syncSourceAndWarm(id, 'source-manual-sync');
 
         res.json({ success: true, message: 'Sync started' });
     } catch (err) {
@@ -278,4 +298,3 @@ router.post('/sync-all', async (req, res) => {
 });
 
 module.exports = router;
-

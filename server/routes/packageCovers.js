@@ -206,6 +206,27 @@ async function safeUnlink(filePath) {
     }
 }
 
+async function removeOldPackageCovers(packageSlug, keepFileName) {
+    let entries;
+    try {
+        entries = await fsp.readdir(UPLOAD_DIR, { withFileTypes: true });
+    } catch {
+        return;
+    }
+
+    const prefix = `${packageSlug}-`;
+    const allowedExts = new Set(Object.keys(IMAGE_TYPES));
+
+    await Promise.all(entries.map(async entry => {
+        if (!entry.isFile() || entry.name === keepFileName || !entry.name.startsWith(prefix)) return;
+
+        const ext = path.extname(entry.name).slice(1).toLowerCase();
+        if (!allowedExts.has(ext)) return;
+
+        await safeUnlink(path.join(UPLOAD_DIR, entry.name));
+    }));
+}
+
 router.post('/r2-package-cover', async (req, res) => {
     const boundary = getBoundary(req.headers['content-type']);
     if (!boundary) {
@@ -227,7 +248,7 @@ router.post('/r2-package-cover', async (req, res) => {
 
         const detected = sniffImage(file.data);
         if (!detected || !Object.values(IMAGE_TYPES).includes(detected.mime)) {
-            return res.status(415).json({ error: 'Format image non supporté.' });
+            return res.status(415).json({ error: 'Format image non supporte.' });
         }
 
         await fsp.mkdir(TMP_DIR, { recursive: true });
@@ -251,6 +272,7 @@ router.post('/r2-package-cover', async (req, res) => {
         await fsp.rename(useWebp ? webpPath : inputPath, finalPath);
         inputPath = useWebp ? inputPath : null;
         webpPath = useWebp ? null : webpPath;
+        await removeOldPackageCovers(packageSlug, finalName);
 
         return res.json({
             ok: true,
@@ -262,7 +284,7 @@ router.post('/r2-package-cover', async (req, res) => {
     } catch (err) {
         const status = err.statusCode || 500;
         console.error('[package-cover] upload failed:', err);
-        return res.status(status).json({ error: status === 500 ? 'Échec upload package cover.' : err.message });
+        return res.status(status).json({ error: status === 500 ? 'Echec upload package cover.' : err.message });
     } finally {
         if (inputPath) await safeUnlink(inputPath);
         if (webpPath) await safeUnlink(webpPath);

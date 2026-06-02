@@ -218,3 +218,16 @@ body.velora-tv-mode .main--velora *::after {
   transition: none !important;
   scroll-behavior: auto !important;
 }
+
+/*
+  iOS Safari can skip descendants when nested live rows both use
+  content-visibility:auto. Keep mobile channel contents mounted.
+*/
+@media (max-width: 1023.98px) {
+  .main--velora-live-package .vel-media-item-row,
+  .main--velora-live-package .media-item {
+    contain: none !important;
+    content-visibility: visible !important;
+    contain-intrinsic-size: auto !important;
+  }
+}

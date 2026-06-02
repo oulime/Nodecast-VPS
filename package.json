@@ -8,7 +8,8 @@
         "start": "node server/index.js",
         "dev": "node --watch server/index.js",
         "clean:transcode-cache": "node scripts/clean-transcode-cache.js",
-        "migrate:package-covers": "node scripts/migrate-package-covers-to-vps.js"
+        "migrate:package-covers": "node scripts/migrate-package-covers-to-vps.js",
+        "sync:package-covers-local": "node scripts/sync-package-covers-local.js"
     },
     "dependencies": {
         "@ffprobe-installer/ffprobe": "^2.1.2",

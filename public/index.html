@@ -151,6 +151,73 @@
     <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=package-cover-scope-20260602"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css">
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css">
+    <style>
+      .player-container:fullscreen,
+      .video-wrapper:fullscreen,
+      #video:fullscreen,
+      #video-vod:fullscreen {
+        width: 100vw !important;
+        height: 100vh !important;
+        max-width: none !important;
+        max-height: none !important;
+        background: #000 !important;
+      }
+
+      .player-container:fullscreen .video-wrapper,
+      .video-wrapper:fullscreen,
+      .player-container:fullscreen #video,
+      .player-container:fullscreen #video-vod,
+      .video-wrapper:fullscreen #video,
+      .video-wrapper:fullscreen #video-vod,
+      #video:fullscreen,
+      #video-vod:fullscreen {
+        width: 100vw !important;
+        height: 100vh !important;
+      }
+
+      .player-container:fullscreen #video,
+      .player-container:fullscreen #video-vod,
+      .video-wrapper:fullscreen #video,
+      .video-wrapper:fullscreen #video-vod,
+      #video:fullscreen,
+      #video-vod:fullscreen {
+        object-fit: cover !important;
+        background: #000 !important;
+      }
+
+      .player-container:-webkit-full-screen,
+      .video-wrapper:-webkit-full-screen,
+      #video:-webkit-full-screen,
+      #video-vod:-webkit-full-screen {
+        width: 100vw !important;
+        height: 100vh !important;
+        max-width: none !important;
+        max-height: none !important;
+        background: #000 !important;
+      }
+
+      .player-container:-webkit-full-screen .video-wrapper,
+      .video-wrapper:-webkit-full-screen,
+      .player-container:-webkit-full-screen #video,
+      .player-container:-webkit-full-screen #video-vod,
+      .video-wrapper:-webkit-full-screen #video,
+      .video-wrapper:-webkit-full-screen #video-vod,
+      #video:-webkit-full-screen,
+      #video-vod:-webkit-full-screen {
+        width: 100vw !important;
+        height: 100vh !important;
+      }
+
+      .player-container:-webkit-full-screen #video,
+      .player-container:-webkit-full-screen #video-vod,
+      .video-wrapper:-webkit-full-screen #video,
+      .video-wrapper:-webkit-full-screen #video-vod,
+      #video:-webkit-full-screen,
+      #video-vod:-webkit-full-screen {
+        object-fit: cover !important;
+        background: #000 !important;
+      }
+    </style>
   </head>
   <body class="vite-autoconnect">
     <div id="settings-shell" class="settings-shell countries-admin-page hidden" aria-hidden="true">

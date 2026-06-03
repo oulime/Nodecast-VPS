@@ -217,6 +217,57 @@
         object-fit: cover !important;
         background: #000 !important;
       }
+
+      body.trial-locked #velora-tv-pointer-shield,
+      body.trial-locked #velora-tv-edge-input-shield {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+
+      .trial-offer-overlay.trial-modal-overlay {
+        z-index: 2147483647 !important;
+        background:
+          radial-gradient(ellipse 90% 52% at 50% 0%, rgba(29, 78, 216, 0.12), transparent 60%),
+          #02020b !important;
+      }
+
+      .trial-offer-overlay .bg,
+      .trial-offer-overlay .bg-gradient,
+      .trial-offer-overlay .orb,
+      .trial-offer-overlay .stars,
+      .trial-offer-overlay .beams {
+        display: none !important;
+      }
+
+      .trial-offer-home-bg {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        width: 100vw;
+        height: 100dvh;
+        min-height: 100dvh;
+        pointer-events: none;
+        opacity: 0.92;
+      }
+
+      .trial-offer-overlay .grain {
+        z-index: 1 !important;
+        pointer-events: none !important;
+      }
+
+      .trial-offer-page,
+      .trial-offer-card {
+        position: relative;
+      }
+
+      .trial-offer-page {
+        z-index: 2;
+      }
+
+      .trial-offer-card {
+        z-index: 3;
+      }
     </style>
   </head>
   <body class="vite-autoconnect">
@@ -1739,6 +1790,294 @@
           if (document.hidden) stopEdgeRepeat();
         });
         window.setInterval(ensureControlShield, 120);
+      })();
+    </script>
+
+    <script>
+      (function () {
+        var canvas = null;
+        var ctx = null;
+        var animating = false;
+        var lastFrame = 0;
+        var stars = [];
+        var beams = [];
+        var dots = [];
+        var palette = [
+          ["#24f8ff", "#3b82ff", "#b15cff"],
+          ["#ff4fd8", "#9b5cff", "#18e4ff"],
+          ["#2cffb1", "#38bdf8", "#8b5cff"],
+          ["#ffb23e", "#ff3d8b", "#a855f7"]
+        ];
+        var paletteIndex = 0;
+        var nextPaletteIndex = 1;
+        var paletteMix = 0;
+        var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)");
+
+        function isOfferVisible() {
+          var overlay = document.querySelector(".trial-offer-overlay.trial-modal-overlay");
+          return !!(
+            overlay &&
+            document.body &&
+            document.body.classList.contains("trial-locked") &&
+            !overlay.classList.contains("trial-modal-overlay--hidden")
+          );
+        }
+
+        function removeFullscreenShields() {
+          var shield = document.getElementById("velora-tv-pointer-shield");
+          var edge = document.getElementById("velora-tv-edge-input-shield");
+          if (shield) shield.remove();
+          if (edge) edge.remove();
+        }
+
+        function exitFullscreenForOffer() {
+          try {
+            var doc = document;
+            if (doc.fullscreenElement && doc.exitFullscreen) {
+              Promise.resolve(doc.exitFullscreen()).catch(function () {});
+            } else if (doc.webkitFullscreenElement && doc.webkitExitFullscreen) {
+              doc.webkitExitFullscreen();
+            }
+          } catch (error) {}
+
+          for (var i = 0; i < document.querySelectorAll("video").length; i += 1) {
+            var video = document.querySelectorAll("video")[i];
+            try {
+              if (video.webkitDisplayingFullscreen && video.webkitExitFullscreen) video.webkitExitFullscreen();
+            } catch (error) {}
+            try {
+              if (typeof video.webkitSetPresentationMode === "function" && video.webkitPresentationMode === "fullscreen") {
+                video.webkitSetPresentationMode("inline");
+              }
+            } catch (error) {}
+          }
+          removeFullscreenShields();
+        }
+
+        function hexToRgb(hex) {
+          var n = parseInt(hex.slice(1), 16);
+          return [n >> 16 & 255, n >> 8 & 255, n & 255];
+        }
+
+        function mixHex(a, b, t) {
+          var ar = hexToRgb(a);
+          var br = hexToRgb(b);
+          return "rgb(" +
+            Math.round(ar[0] + (br[0] - ar[0]) * t) + "," +
+            Math.round(ar[1] + (br[1] - ar[1]) * t) + "," +
+            Math.round(ar[2] + (br[2] - ar[2]) * t) + ")";
+        }
+
+        function rgba(rgb, alpha) {
+          return rgb.replace("rgb(", "rgba(").replace(")", "," + alpha + ")");
+        }
+
+        function currentPalette() {
+          return palette[paletteIndex].map(function (color, i) {
+            return mixHex(color, palette[nextPaletteIndex][i], paletteMix);
+          });
+        }
+
+        function ensureCanvas() {
+          var page = document.querySelector(".trial-offer-page");
+          if (!page) return null;
+          if (!canvas || !canvas.isConnected) {
+            canvas = document.createElement("canvas");
+            canvas.className = "trial-offer-home-bg";
+            canvas.setAttribute("aria-hidden", "true");
+            page.insertBefore(canvas, page.firstChild);
+            ctx = canvas.getContext("2d", { alpha: false });
+            stars = Array.from({ length: 90 }, function () {
+              return {
+                x: Math.random(),
+                y: Math.random(),
+                r: Math.random() * 1.8 + 0.35,
+                speed: Math.random() * 0.0007 + 0.00018,
+                twinkle: Math.random() * Math.PI * 2,
+                twinkleSpeed: Math.random() * 0.052 + 0.018,
+                color: Math.floor(Math.random() * 3)
+              };
+            });
+            beams = Array.from({ length: 7 }, function (_, i) {
+              return {
+                y: Math.random(),
+                speed: (Math.random() * 0.0019 + 0.00075) * (Math.random() < 0.5 ? 1 : -1),
+                width: Math.random() * 0.55 + 0.14,
+                alpha: Math.random() * 0.3 + 0.18,
+                color: i % 3
+              };
+            });
+            dots = Array.from({ length: 36 }, function () {
+              return {
+                x: Math.random(),
+                y: Math.random(),
+                vx: (Math.random() - 0.5) * 0.0012,
+                vy: (Math.random() - 0.5) * 0.0012,
+                r: Math.random() * 2.4 + 0.55,
+                alpha: Math.random() * 0.42 + 0.34,
+                color: Math.floor(Math.random() * 3)
+              };
+            });
+          }
+          return canvas;
+        }
+
+        function resizeCanvas() {
+          if (!canvas || !ctx) return { width: 0, height: 0 };
+          var ratio = Math.min(window.devicePixelRatio || 1, 1.5);
+          var width = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1);
+          var height = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1);
+          var pixelWidth = Math.floor(width * ratio);
+          var pixelHeight = Math.floor(height * ratio);
+          canvas.style.width = width + "px";
+          canvas.style.height = height + "px";
+          if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+            canvas.width = pixelWidth;
+            canvas.height = pixelHeight;
+            ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+          }
+          return { width: width, height: height };
+        }
+
+        function draw(now) {
+          if (!isOfferVisible() || !ctx || !canvas) {
+            animating = false;
+            return;
+          }
+          window.requestAnimationFrame(draw);
+          var reduced = reduceMotion && reduceMotion.matches;
+          if (!reduced && now - lastFrame < 66) return;
+          lastFrame = now;
+
+          var size = resizeCanvas();
+          var width = size.width;
+          var height = size.height;
+          if (!width || !height) return;
+
+          if (!reduced) {
+            paletteMix += 0.004;
+            if (paletteMix >= 1) {
+              paletteMix = 0;
+              paletteIndex = nextPaletteIndex;
+              nextPaletteIndex = (nextPaletteIndex + 1) % palette.length;
+            }
+          }
+
+          var colors = currentPalette();
+          var bg = ctx.createRadialGradient(width * 0.5, height * 0.36, 0, width * 0.5, height * 0.5, Math.max(width, height) * 0.78);
+          bg.addColorStop(0, rgba(colors[1], 0.22));
+          bg.addColorStop(0.38, "rgba(5,5,24,1)");
+          bg.addColorStop(0.74, rgba(colors[2], 0.14));
+          bg.addColorStop(1, "rgba(0,0,6,1)");
+          ctx.fillStyle = bg;
+          ctx.fillRect(0, 0, width, height);
+
+          var topOrb = ctx.createRadialGradient(width * 0.12, height * 0.22, 0, width * 0.12, height * 0.22, Math.max(width, height) * 0.55);
+          topOrb.addColorStop(0, rgba(colors[0], 0.18));
+          topOrb.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.fillStyle = topOrb;
+          ctx.fillRect(0, 0, width, height);
+
+          ctx.save();
+          ctx.strokeStyle = rgba(colors[0], 0.13);
+          ctx.lineWidth = 0.75;
+          var grid = 12;
+          var cellW = width / grid;
+          var cellH = height / grid;
+          var drift = reduced ? 0 : now * 0.052;
+          for (var g = -1; g <= grid + 1; g += 1) {
+            ctx.beginPath();
+            ctx.moveTo(drift % cellW + g * cellW, 0);
+            ctx.lineTo(drift % cellW + g * cellW, height);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(0, drift * 0.6 % cellH + g * cellH);
+            ctx.lineTo(width, drift * 0.6 % cellH + g * cellH);
+            ctx.stroke();
+          }
+          ctx.restore();
+
+          stars.forEach(function (star) {
+            if (!reduced) {
+              star.y -= star.speed;
+              if (star.y < 0) {
+                star.y = 1;
+                star.x = Math.random();
+              }
+              star.twinkle += star.twinkleSpeed;
+            }
+            var shine = 0.35 + 0.5 * Math.abs(Math.sin(star.twinkle));
+            ctx.beginPath();
+            ctx.arc(star.x * width, star.y * height, star.r, 0, Math.PI * 2);
+            ctx.fillStyle = rgba(colors[star.color], Math.min(0.95, shine + 0.12));
+            ctx.fill();
+          });
+
+          beams.forEach(function (beam) {
+            if (!reduced) {
+              beam.y += beam.speed;
+              if (beam.y > 1) beam.y = 0;
+              if (beam.y < 0) beam.y = 1;
+            }
+            var grad = ctx.createLinearGradient(width * (0.5 - beam.width / 2), 0, width * (0.5 + beam.width / 2), 0);
+            grad.addColorStop(0, "transparent");
+            grad.addColorStop(0.5, rgba(colors[beam.color], beam.alpha + 0.12));
+            grad.addColorStop(1, "transparent");
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = 1.8;
+            ctx.beginPath();
+            ctx.moveTo(width * (0.5 - beam.width / 2), beam.y * height);
+            ctx.lineTo(width * (0.5 + beam.width / 2), beam.y * height);
+            ctx.stroke();
+          });
+
+          dots.forEach(function (dot) {
+            if (!reduced) {
+              dot.x += dot.vx;
+              dot.y += dot.vy;
+              if (dot.x < 0) dot.x = 1;
+              if (dot.x > 1) dot.x = 0;
+              if (dot.y < 0) dot.y = 1;
+              if (dot.y > 1) dot.y = 0;
+            }
+            ctx.beginPath();
+            ctx.arc(dot.x * width, dot.y * height, dot.r, 0, Math.PI * 2);
+            ctx.fillStyle = rgba(colors[dot.color], dot.alpha);
+            ctx.fill();
+          });
+        }
+
+        function syncTrialOfferState() {
+          if (!isOfferVisible()) return;
+          exitFullscreenForOffer();
+          ensureCanvas();
+          resizeCanvas();
+          if (!animating) {
+            animating = true;
+            window.requestAnimationFrame(draw);
+          }
+        }
+
+        function start() {
+          syncTrialOfferState();
+          new MutationObserver(syncTrialOfferState).observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ["class", "style", "open", "aria-hidden"]
+          });
+          document.addEventListener("fullscreenchange", syncTrialOfferState, true);
+          document.addEventListener("webkitfullscreenchange", syncTrialOfferState, true);
+          window.addEventListener("resize", function () {
+            if (isOfferVisible()) resizeCanvas();
+          });
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", start, { once: true });
+        } else {
+          start();
+        }
       })();
     </script>
 

@@ -17,7 +17,21 @@ function warmVeloraCatalog(reason) {
 
 function syncSourceAndWarm(sourceId, reason) {
     syncService.syncSource(sourceId)
-        .then(() => warmVeloraCatalog(reason).promise)
+        .then(async () => {
+            const row = getDb()
+                .prepare("SELECT status FROM sync_status WHERE source_id = ? AND type = 'all'")
+                .get(sourceId);
+            if (row?.status === 'error') return;
+
+            syncService.updateSyncStatus(sourceId, 'all', 'warming');
+            try {
+                await warmVeloraCatalog(reason).promise;
+                syncService.updateSyncStatus(sourceId, 'all', 'success');
+            } catch (err) {
+                syncService.updateSyncStatus(sourceId, 'all', 'error', err.message);
+                throw err;
+            }
+        })
         .catch(err => {
             console.error('[Sources] Source sync failed:', err);
         });

@@ -268,6 +268,294 @@
       .trial-offer-card {
         z-index: 3;
       }
+
+      .vel-analytics-panel {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(139, 92, 246, 0.28);
+        background:
+          radial-gradient(circle at 8% 0%, rgba(34, 211, 238, 0.14), transparent 28%),
+          radial-gradient(circle at 92% 8%, rgba(168, 85, 247, 0.18), transparent 34%),
+          linear-gradient(180deg, rgba(12, 10, 24, 0.94), rgba(6, 6, 16, 0.96));
+      }
+
+      .vel-analytics-hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 1rem;
+        align-items: center;
+        margin-bottom: 1.2rem;
+      }
+
+      .vel-analytics-title {
+        margin: 0;
+        font-size: clamp(1.35rem, 2.8vw, 2rem);
+        line-height: 1.05;
+        font-weight: 900;
+        letter-spacing: -0.04em;
+        background: linear-gradient(120deg, #f8fbff, #93c5fd 45%, #c4b5fd);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+
+      .vel-analytics-subtitle {
+        margin: 0.45rem 0 0;
+        color: rgba(226, 232, 240, 0.78);
+        line-height: 1.5;
+      }
+
+      .vel-analytics-refresh {
+        min-height: 2.6rem;
+        padding: 0 1rem;
+        border-radius: 999px;
+        border: 1px solid rgba(147, 197, 253, 0.36);
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.42), rgba(168, 85, 247, 0.34));
+        color: #fff;
+        font-weight: 800;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.26), 0 0 22px rgba(96, 165, 250, 0.18);
+      }
+
+      .vel-analytics-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.8rem;
+        margin-bottom: 1rem;
+      }
+
+      .vel-analytics-card,
+      .vel-analytics-box {
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 18px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.035));
+        box-shadow: inset 0 1px rgba(255, 255, 255, 0.12), 0 12px 30px rgba(0, 0, 0, 0.28);
+      }
+
+      .vel-analytics-card {
+        padding: 1rem;
+      }
+
+      .vel-analytics-card__label {
+        display: block;
+        color: rgba(203, 213, 225, 0.76);
+        font-size: 0.74rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .vel-analytics-card__value {
+        display: block;
+        margin-top: 0.35rem;
+        color: #fff;
+        font-size: clamp(1.5rem, 3.4vw, 2.15rem);
+        font-weight: 950;
+        line-height: 1;
+      }
+
+      .vel-analytics-card__hint {
+        display: block;
+        margin-top: 0.35rem;
+        color: rgba(148, 163, 184, 0.82);
+        font-size: 0.78rem;
+      }
+
+      .vel-analytics-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+        gap: 1rem;
+      }
+
+      .vel-analytics-box {
+        min-width: 0;
+        padding: 1rem;
+      }
+
+      .vel-analytics-box--wide {
+        grid-column: 1 / -1;
+      }
+
+      .vel-analytics-box h3 {
+        margin: 0 0 0.75rem;
+        color: #f8fafc;
+        font-size: 1rem;
+        font-weight: 850;
+      }
+
+      .vel-analytics-list {
+        display: grid;
+        gap: 0.55rem;
+      }
+
+      .vel-analytics-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.7rem;
+        align-items: center;
+        padding: 0.62rem 0.7rem;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        background: rgba(2, 6, 23, 0.32);
+      }
+
+      .vel-analytics-row__main {
+        min-width: 0;
+      }
+
+      .vel-analytics-row__title {
+        overflow: hidden;
+        color: #f8fafc;
+        font-weight: 750;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .vel-analytics-row__meta {
+        margin-top: 0.18rem;
+        overflow: hidden;
+        color: rgba(203, 213, 225, 0.7);
+        font-size: 0.78rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .vel-analytics-row__stat {
+        padding: 0.25rem 0.55rem;
+        border-radius: 999px;
+        background: rgba(56, 189, 248, 0.13);
+        color: #bae6fd;
+        font-size: 0.78rem;
+        font-weight: 850;
+        white-space: nowrap;
+      }
+
+      .vel-analytics-live-dot {
+        display: inline-block;
+        width: 0.5rem;
+        height: 0.5rem;
+        margin-right: 0.35rem;
+        border-radius: 999px;
+        background: #22c55e;
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.58);
+        animation: vel-analytics-pulse 1.6s ease-out infinite;
+      }
+
+      @keyframes vel-analytics-pulse {
+        0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.58); }
+        70% { box-shadow: 0 0 0 9px rgba(34, 197, 94, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+      }
+
+      .vel-analytics-empty {
+        margin: 0;
+        padding: 1rem;
+        border: 1px dashed rgba(148, 163, 184, 0.24);
+        border-radius: 14px;
+        color: rgba(203, 213, 225, 0.74);
+        background: rgba(15, 23, 42, 0.26);
+      }
+
+      .vel-analytics-status {
+        margin: 0 0 0.8rem;
+        color: rgba(203, 213, 225, 0.8);
+        font-size: 0.86rem;
+      }
+
+      .vel-analytics-status.error {
+        color: #fca5a5;
+      }
+
+      .vel-analytics-visitor {
+        display: grid;
+        gap: 0.55rem;
+        padding: 0.8rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0.58), rgba(15, 23, 42, 0.32));
+      }
+
+      .vel-analytics-visitor__top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+      }
+
+      .vel-analytics-visitor__ip {
+        color: #f8fafc;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-weight: 850;
+      }
+
+      .vel-analytics-visitor__badge {
+        padding: 0.22rem 0.5rem;
+        border-radius: 999px;
+        background: rgba(34, 197, 94, 0.13);
+        color: #bbf7d0;
+        font-size: 0.72rem;
+        font-weight: 850;
+      }
+
+      .vel-analytics-visitor__watching {
+        color: #fff;
+        font-size: 0.95rem;
+        font-weight: 850;
+        line-height: 1.3;
+      }
+
+      .vel-analytics-visitor__meta {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.45rem;
+      }
+
+      .vel-analytics-pill {
+        min-width: 0;
+        padding: 0.5rem 0.58rem;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 12px;
+        background: rgba(2, 6, 23, 0.28);
+      }
+
+      .vel-analytics-pill span {
+        display: block;
+        color: rgba(203, 213, 225, 0.66);
+        font-size: 0.66rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .vel-analytics-pill strong {
+        display: block;
+        margin-top: 0.14rem;
+        overflow: hidden;
+        color: #f8fafc;
+        font-size: 0.82rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      @media (max-width: 900px) {
+        .vel-analytics-hero,
+        .vel-analytics-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .vel-analytics-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 520px) {
+        .vel-analytics-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .vel-analytics-visitor__meta {
+          grid-template-columns: 1fr;
+        }
+      }
     </style>
   </head>
   <body class="vite-autoconnect">
@@ -657,10 +945,21 @@
               Sources, transcodage, proxy, remux et parametres backend Nodecast.
             </p>
             <iframe
+              id="nodecast-admin-frame"
               src="/nodecast-admin/"
               title="Nodecast backend settings"
-              style="width: 100%; min-height: 78vh; border: 1px solid rgba(255,255,255,0.16); border-radius: 12px; background: #090812"
+              scrolling="no"
+              style="width: 100%; height: 760px; border: 1px solid rgba(255,255,255,0.16); border-radius: 12px; background: #090812; overflow: hidden"
             ></iframe>
+            <script>
+              window.addEventListener('message', function (event) {
+                if (event.origin !== window.location.origin) return;
+                if (!event.data || event.data.type !== 'nodecast-admin-height') return;
+                var frame = document.getElementById('nodecast-admin-frame');
+                var height = Math.max(520, Math.min(Number(event.data.height) || 760, 3000));
+                if (frame) frame.style.height = height + 'px';
+              });
+            </script>
           </section>
           </div>
         </main>
@@ -1790,6 +2089,557 @@
           if (document.hidden) stopEdgeRepeat();
         });
         window.setInterval(ensureControlShield, 120);
+      })();
+    </script>
+
+    <script>
+      (function () {
+        var SESSION_KEY = "velora_analytics_session_id";
+        var HEARTBEAT_MS = 30000;
+        var WATCH_PROGRESS_MS = 30000;
+        var sessionId = getSessionId();
+        var currentPackage = { id: "", name: "" };
+        var currentMedia = { type: "", id: "", title: "" };
+        var lastPage = "";
+        var refreshTimer = null;
+        var watchState = new WeakMap();
+        var mutationTickPending = false;
+        var trialStartedAt = getTrialStartedAt();
+
+        function getSessionId() {
+          try {
+            var existing = localStorage.getItem(SESSION_KEY);
+            if (existing) return existing;
+            var value = "va_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 12);
+            localStorage.setItem(SESSION_KEY, value);
+            return value;
+          } catch (error) {
+            return "va_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 12);
+          }
+        }
+
+        function getTrialStartedAt() {
+          try {
+            var key = "velora_analytics_trial_started_at";
+            var existing = sessionStorage.getItem(key) || localStorage.getItem(key);
+            if (existing) return existing;
+            var value = new Date().toISOString();
+            sessionStorage.setItem(key, value);
+            localStorage.setItem(key, value);
+            return value;
+          } catch (error) {
+            return new Date().toISOString();
+          }
+        }
+
+        function text(el) {
+          return (el && el.textContent ? el.textContent : "").replace(/\s+/g, " ").trim().slice(0, 220);
+        }
+
+        function isVisible(el) {
+          if (!el || el.classList.contains("hidden") || el.hidden || el.getAttribute("aria-hidden") === "true") return false;
+          var style = window.getComputedStyle(el);
+          return style.display !== "none" && style.visibility !== "hidden" && Number(style.opacity || 1) !== 0;
+        }
+
+        function isAdminOpen() {
+          var shell = document.getElementById("settings-shell");
+          return isVisible(shell);
+        }
+
+        function shouldSkipTracking(target) {
+          if (isAdminOpen()) return true;
+          if (target && target.closest && target.closest("#settings-shell, dialog, .admin-add-package-dialog, .admin-channel-assign-dialog")) {
+            return true;
+          }
+          return false;
+        }
+
+        function activeSection() {
+          var tab = document.querySelector("#main-tabs .tab.active");
+          if (tab && tab.dataset.tab) return tab.dataset.tab;
+          if (document.body.classList.contains("trial-locked")) return "trial";
+          return "unknown";
+        }
+
+        function selectedCountry() {
+          var select = document.getElementById("country-select");
+          if (!select) return "";
+          var option = select.options[select.selectedIndex];
+          return option ? text(option) || select.value : select.value;
+        }
+
+        function inferPage() {
+          if (document.body.classList.contains("trial-locked")) return "trial_offer";
+          var main = document.getElementById("main");
+          if (!main || main.classList.contains("hidden")) return "login";
+          var packages = document.getElementById("packages-view");
+          var content = document.getElementById("content-view");
+          var section = activeSection();
+          if (packages && isVisible(packages)) return section + "_packages";
+          if (content && isVisible(content)) return section + "_content";
+          return section || "home";
+        }
+
+        function deviceInfo() {
+          return {
+            width: window.innerWidth,
+            height: window.innerHeight,
+            language: navigator.language || "",
+            platform: navigator.platform || "",
+            touch: navigator.maxTouchPoints || 0
+          };
+        }
+
+        function parseTimeText(value) {
+          var textValue = String(value || "").trim();
+          var match = /^(\d{1,3}):(\d{2})$/.exec(textValue);
+          if (match) return Number(match[1]) * 60 + Number(match[2]);
+          var numeric = Number(textValue);
+          return Number.isFinite(numeric) ? numeric : undefined;
+        }
+
+        function trialInfo() {
+          var remaining;
+          var minEl = document.getElementById("vel-promo-minutes");
+          var secEl = document.getElementById("vel-promo-seconds");
+          if (minEl && secEl) {
+            var m = Number(minEl.textContent || 0);
+            var s = Number(secEl.textContent || 0);
+            if (Number.isFinite(m) && Number.isFinite(s)) remaining = Math.max(0, m * 60 + s);
+          }
+          if (remaining === undefined) {
+            var timer = document.querySelector(".trial-countdown__time, .trial-timer-root__count");
+            remaining = timer ? parseTimeText(timer.textContent) : undefined;
+          }
+          var limit = 60;
+          var used = remaining === undefined ? undefined : Math.max(0, limit - remaining);
+          return {
+            trialStartedAt: trialStartedAt,
+            trialSecondsUsed: used,
+            trialSecondsRemaining: remaining,
+            trialLimitSeconds: limit
+          };
+        }
+
+        function basePayload(type, extra) {
+          return Object.assign({
+            type: type,
+            sessionId: sessionId,
+            path: location.pathname + location.search,
+            referrer: document.referrer || "",
+            page: inferPage(),
+            section: activeSection(),
+            country: selectedCountry(),
+            packageId: currentPackage.id || undefined,
+            packageName: currentPackage.name || undefined,
+            mediaType: currentMedia.type || undefined,
+            mediaId: currentMedia.id || undefined,
+            mediaTitle: currentMedia.title || undefined,
+            channelName: currentMedia.type === "live" ? currentMedia.title : undefined,
+            device: deviceInfo()
+          }, trialInfo(), extra || {});
+        }
+
+        function send(type, extra) {
+          if (shouldSkipTracking(document.activeElement)) return;
+          var payload = basePayload(type, extra);
+          var body = JSON.stringify(payload);
+          try {
+            if (navigator.sendBeacon) {
+              var blob = new Blob([body], { type: "application/json" });
+              if (navigator.sendBeacon("/api/analytics/event", blob)) return;
+            }
+          } catch (error) {}
+          try {
+            fetch("/api/analytics/event", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: body,
+              keepalive: true
+            }).catch(function () {});
+          } catch (error) {}
+        }
+
+        function trackPageIfChanged() {
+          if (shouldSkipTracking()) return;
+          var page = inferPage();
+          if (page === lastPage) return;
+          lastPage = page;
+          send("page_view");
+        }
+
+        function titleFromPackage(card) {
+          return text(card.querySelector(".vel-package-card__title")) || text(card);
+        }
+
+        function mediaFromElement(el) {
+          var title =
+            text(el.querySelector(".media-info h4")) ||
+            text(el.querySelector(".vel-vod-movie-card__title")) ||
+            text(el.querySelector(".vel-media-item-row__title")) ||
+            text(el.querySelector(".vel-vod-detail__episode-title")) ||
+            text(el);
+          return {
+            type: activeSection() === "movies" ? "movie" : activeSection() === "series" ? "series" : "live",
+            id: el.dataset.streamId || el.dataset.episodeStreamId || el.dataset.mediaId || el.dataset.id || "",
+            title: title
+          };
+        }
+
+        function onDocumentClick(event) {
+          var target = event.target;
+          if (!target || !target.closest || shouldSkipTracking(target)) return;
+
+          var tab = target.closest("#main-tabs .tab, .vel-adult-tab");
+          if (tab) {
+            send("tab_open", { section: tab.dataset.tab || tab.dataset.adultTab || text(tab) });
+            window.setTimeout(trackPageIfChanged, 80);
+            return;
+          }
+
+          var country = target.closest("#country-select");
+          if (country) {
+            window.setTimeout(function () {
+              send("country_change", { country: selectedCountry() });
+            }, 60);
+            return;
+          }
+
+          var pkg = target.closest(".vel-package-card[data-package-id]");
+          if (pkg) {
+            currentPackage = {
+              id: pkg.dataset.packageId || "",
+              name: titleFromPackage(pkg)
+            };
+            send("package_open", {
+              packageId: currentPackage.id,
+              packageName: currentPackage.name
+            });
+            window.setTimeout(trackPageIfChanged, 120);
+            return;
+          }
+
+          var media = target.closest(".media-item, .vel-media-item-row, .vel-vod-movie-card, .vel-vod-detail__watch, .vel-vod-detail__episode");
+          if (media) {
+            currentMedia = mediaFromElement(media);
+            send("media_open", {
+              mediaType: currentMedia.type,
+              mediaId: currentMedia.id,
+              mediaTitle: currentMedia.title,
+              channelName: currentMedia.type === "live" ? currentMedia.title : undefined
+            });
+          }
+
+          if (target.closest("#vel-promo-offer-open, .trial-offer-button, .trial-offer-highlight")) {
+            send("trial_offer_open", { page: "trial_offer" });
+          }
+        }
+
+        function nowPlayingTitle(video) {
+          var id = video && video.id === "video-vod" ? "now-playing-vod" : "now-playing";
+          return text(document.getElementById(id)) || currentMedia.title || "";
+        }
+
+        function bindVideo(video, mediaType) {
+          if (!video || watchState.has(video)) return;
+          watchState.set(video, { startedAt: 0, lastProgressAt: 0, lastReportedSeconds: 0, title: "" });
+
+          video.addEventListener("play", function () {
+            var state = watchState.get(video);
+            state.startedAt = Date.now();
+            state.lastProgressAt = Date.now();
+            state.lastReportedSeconds = 0;
+            state.title = nowPlayingTitle(video);
+            if (state.title) {
+              currentMedia = {
+                type: mediaType,
+                id: currentMedia.id || "",
+                title: state.title
+              };
+            }
+            send("video_start", {
+              mediaType: mediaType,
+              mediaTitle: state.title,
+              channelName: mediaType === "live" ? state.title : undefined,
+              currentTime: video.currentTime || 0
+            });
+          });
+
+          video.addEventListener("timeupdate", function () {
+            var state = watchState.get(video);
+            if (!state || !state.startedAt || video.paused) return;
+            var now = Date.now();
+            if (now - state.lastProgressAt < WATCH_PROGRESS_MS) return;
+            state.lastProgressAt = now;
+            var watchedSeconds = Math.max(0, Math.round((now - state.startedAt) / 1000));
+            var delta = Math.max(0, watchedSeconds - (state.lastReportedSeconds || 0));
+            state.lastReportedSeconds = watchedSeconds;
+            send("video_progress", {
+              mediaType: mediaType,
+              mediaTitle: state.title || nowPlayingTitle(video),
+              channelName: mediaType === "live" ? (state.title || nowPlayingTitle(video)) : undefined,
+              watchedSeconds: watchedSeconds,
+              watchDeltaSeconds: delta,
+              currentTime: video.currentTime || 0
+            });
+          });
+
+          function finish(type) {
+            var state = watchState.get(video);
+            if (!state || !state.startedAt) return;
+            var watchedSeconds = Math.max(0, Math.round((Date.now() - state.startedAt) / 1000));
+            var delta = Math.max(0, watchedSeconds - (state.lastReportedSeconds || 0));
+            state.lastReportedSeconds = watchedSeconds;
+            send(type, {
+              mediaType: mediaType,
+              mediaTitle: state.title || nowPlayingTitle(video),
+              channelName: mediaType === "live" ? (state.title || nowPlayingTitle(video)) : undefined,
+              watchedSeconds: watchedSeconds,
+              watchDeltaSeconds: delta,
+              currentTime: video.currentTime || 0
+            });
+            state.startedAt = 0;
+          }
+
+          video.addEventListener("pause", function () { finish("video_stop"); });
+          video.addEventListener("ended", function () { finish("video_end"); });
+        }
+
+        function adminHeaders() {
+          return { Accept: "application/json" };
+        }
+
+        function escapeHtml(value) {
+          return String(value == null ? "" : value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+        }
+
+        function formatDuration(seconds) {
+          var s = Math.max(0, Math.round(Number(seconds) || 0));
+          var h = Math.floor(s / 3600);
+          var m = Math.floor((s % 3600) / 60);
+          if (h > 0) return h + "h " + String(m).padStart(2, "0") + "m";
+          if (m > 0) return m + "m";
+          return s + "s";
+        }
+
+        function row(title, meta, stat, live) {
+          return [
+            '<div class="vel-analytics-row">',
+            '<div class="vel-analytics-row__main">',
+            '<div class="vel-analytics-row__title">' + (live ? '<span class="vel-analytics-live-dot"></span>' : '') + escapeHtml(title || "Inconnu") + '</div>',
+            '<div class="vel-analytics-row__meta">' + escapeHtml(meta || "") + '</div>',
+            '</div>',
+            '<div class="vel-analytics-row__stat">' + escapeHtml(stat || "") + '</div>',
+            '</div>'
+          ].join("");
+        }
+
+        function visitorCard(item) {
+          var watching = item.channelName || item.mediaTitle || item.packageName || item.page || "Browsing";
+          var trialRemaining = item.trialSecondsRemaining == null ? "n/a" : formatDuration(item.trialSecondsRemaining);
+          var trialUsed = item.trialSecondsUsed == null ? "n/a" : formatDuration(item.trialSecondsUsed);
+          var started = item.trialStartedAt ? new Date(item.trialStartedAt).toLocaleTimeString() : "n/a";
+          var watch = formatDuration(item.totalWatchSeconds || 0);
+          return [
+            '<div class="vel-analytics-visitor">',
+            '<div class="vel-analytics-visitor__top">',
+            '<div class="vel-analytics-visitor__ip"><span class="vel-analytics-live-dot"></span>' + escapeHtml(item.ip || "Unknown IP") + '</div>',
+            '<div class="vel-analytics-visitor__badge">' + escapeHtml(item.lastEventType || "active") + '</div>',
+            '</div>',
+            '<div class="vel-analytics-visitor__watching">' + escapeHtml(watching) + '</div>',
+            '<div class="vel-analytics-visitor__meta">',
+            '<div class="vel-analytics-pill"><span>Package</span><strong>' + escapeHtml(item.packageName || "n/a") + '</strong></div>',
+            '<div class="vel-analytics-pill"><span>Page</span><strong>' + escapeHtml(item.page || "n/a") + '</strong></div>',
+            '<div class="vel-analytics-pill"><span>Trial started</span><strong>' + escapeHtml(started) + '</strong></div>',
+            '<div class="vel-analytics-pill"><span>Trial used / left</span><strong>' + escapeHtml(trialUsed + " / " + trialRemaining) + '</strong></div>',
+            '<div class="vel-analytics-pill"><span>Watched now</span><strong>' + escapeHtml(watch) + '</strong></div>',
+            '<div class="vel-analytics-pill"><span>Device</span><strong>' + escapeHtml(item.device && item.device.width ? item.device.width + "x" + item.device.height : "n/a") + '</strong></div>',
+            '</div>',
+            '</div>'
+          ].join("");
+        }
+
+        function list(items, mapper) {
+          if (!items || !items.length) return '<p class="vel-analytics-empty">Pas encore de donnees.</p>';
+          return '<div class="vel-analytics-list">' + items.map(mapper).join("") + '</div>';
+        }
+
+        function ensureAnalyticsPanel() {
+          var tabs = document.getElementById("settings-tabs");
+          var panels = document.querySelector(".settings-tab-panels");
+          if (!tabs || !panels) return null;
+
+          var btn = document.getElementById("settings-tab-btn-analytics");
+          if (!btn) {
+            btn = document.createElement("button");
+            btn.type = "button";
+            btn.role = "tab";
+            btn.id = "settings-tab-btn-analytics";
+            btn.className = "settings-tabs__tab";
+            btn.dataset.settingsTab = "analytics";
+            btn.setAttribute("aria-selected", "false");
+            btn.setAttribute("aria-controls", "settings-tab-analytics");
+            btn.tabIndex = -1;
+            btn.textContent = "Analytics";
+            tabs.appendChild(btn);
+            btn.addEventListener("click", function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              showAnalyticsTab();
+            }, true);
+          }
+
+          var panel = document.getElementById("settings-tab-analytics");
+          if (!panel) {
+            panel = document.createElement("section");
+            panel.id = "settings-tab-analytics";
+            panel.className = "settings-tab-panel panel countries-admin-form vel-analytics-panel hidden";
+            panel.role = "tabpanel";
+            panel.dataset.settingsTab = "analytics";
+            panel.setAttribute("aria-labelledby", "settings-tab-btn-analytics");
+            panel.hidden = true;
+            panel.innerHTML = [
+              '<div class="vel-analytics-hero">',
+              '<div>',
+              '<h2 class="vel-analytics-title">Visitor analytics</h2>',
+              '<p class="vel-analytics-subtitle">Live visitors, pages, packages and watched channels. Saved locally on this Nodecast machine.</p>',
+              '</div>',
+              '<button type="button" id="vel-analytics-refresh" class="vel-analytics-refresh">Refresh</button>',
+              '</div>',
+              '<p id="vel-analytics-status" class="vel-analytics-status">Loading...</p>',
+              '<div class="vel-analytics-grid">',
+              '<div class="vel-analytics-card"><span class="vel-analytics-card__label">Live now</span><span id="va-live" class="vel-analytics-card__value">0</span><span class="vel-analytics-card__hint">last 90 seconds</span></div>',
+              '<div class="vel-analytics-card"><span class="vel-analytics-card__label">Visitors</span><span id="va-visitors" class="vel-analytics-card__value">0</span><span class="vel-analytics-card__hint">unique sessions</span></div>',
+              '<div class="vel-analytics-card"><span class="vel-analytics-card__label">IPs</span><span id="va-ips" class="vel-analytics-card__value">0</span><span class="vel-analytics-card__hint">unique addresses</span></div>',
+              '<div class="vel-analytics-card"><span class="vel-analytics-card__label">Watch time</span><span id="va-watch" class="vel-analytics-card__value">0s</span><span class="vel-analytics-card__hint">tracked total</span></div>',
+              '</div>',
+              '<div class="vel-analytics-layout">',
+              '<div class="vel-analytics-box"><h3>Visitors right now</h3><div id="va-live-list"></div></div>',
+              '<div class="vel-analytics-box"><h3>Most watched channels</h3><div id="va-channels"></div></div>',
+              '<div class="vel-analytics-box"><h3>Popular packages</h3><div id="va-packages"></div></div>',
+              '<div class="vel-analytics-box"><h3>Top pages</h3><div id="va-pages"></div></div>',
+              '<div class="vel-analytics-box vel-analytics-box--wide"><h3>Recent activity</h3><div id="va-events"></div></div>',
+              '</div>'
+            ].join("");
+            panels.appendChild(panel);
+            panel.querySelector("#vel-analytics-refresh").addEventListener("click", loadAnalytics);
+          }
+          return panel;
+        }
+
+        function showAnalyticsTab() {
+          var panel = ensureAnalyticsPanel();
+          if (!panel) return;
+          document.querySelectorAll("#settings-tabs [role='tab']").forEach(function (tab) {
+            var active = tab.dataset.settingsTab === "analytics";
+            tab.classList.toggle("settings-tabs__tab--active", active);
+            tab.setAttribute("aria-selected", active ? "true" : "false");
+            tab.tabIndex = active ? 0 : -1;
+          });
+          document.querySelectorAll(".settings-tab-panel").forEach(function (p) {
+            var active = p.dataset.settingsTab === "analytics";
+            p.classList.toggle("hidden", !active);
+            p.hidden = !active;
+          });
+          loadAnalytics();
+          if (refreshTimer) window.clearInterval(refreshTimer);
+          refreshTimer = window.setInterval(function () {
+            if (!panel.hidden && isVisible(panel)) loadAnalytics();
+          }, 15000);
+        }
+
+        function setStatus(text, error) {
+          var el = document.getElementById("vel-analytics-status");
+          if (!el) return;
+          el.textContent = text;
+          el.classList.toggle("error", !!error);
+        }
+
+        async function fetchJson(url) {
+          var res = await fetch(url, { headers: adminHeaders(), cache: "no-store" });
+          var data = await res.json().catch(function () { return {}; });
+          if (!res.ok) throw new Error(data.error || "HTTP " + res.status);
+          return data;
+        }
+
+        async function loadAnalytics() {
+          ensureAnalyticsPanel();
+          setStatus("Loading analytics...");
+          try {
+            var results = await Promise.all([
+              fetchJson("/api/analytics/admin/live"),
+              fetchJson("/api/analytics/admin/summary?days=7")
+            ]);
+            var live = results[0];
+            var summary = results[1];
+            document.getElementById("va-live").textContent = String(live.total || 0);
+            document.getElementById("va-visitors").textContent = String(summary.uniqueVisitors || 0);
+            document.getElementById("va-ips").textContent = String(summary.uniqueIps || 0);
+            document.getElementById("va-watch").textContent = formatDuration(summary.totalWatchSeconds || 0);
+
+            document.getElementById("va-live-list").innerHTML = list(live.visitors || [], function (item) {
+              return visitorCard(item);
+            });
+            document.getElementById("va-channels").innerHTML = list(summary.topChannels || [], function (item) {
+              return row(item.name, (item.count || 0) + " watch events", formatDuration(item.seconds || 0));
+            });
+            document.getElementById("va-packages").innerHTML = list(summary.topPackages || [], function (item) {
+              return row(item.name, "package opens / activity", String(item.count || 0));
+            });
+            document.getElementById("va-pages").innerHTML = list(summary.topPages || [], function (item) {
+              return row(item.name, "page views / activity", String(item.count || 0));
+            });
+            document.getElementById("va-events").innerHTML = list(summary.recentEvents || [], function (event) {
+              var title = event.mediaTitle || event.channelName || event.packageName || event.page || event.type;
+              var meta = [event.type, event.ip, event.page, event.ts].filter(Boolean).join(" • ");
+              return row(title, meta, event.watchedSeconds ? formatDuration(event.watchedSeconds) : "");
+            });
+            setStatus("Updated " + new Date().toLocaleTimeString());
+          } catch (error) {
+            setStatus("Analytics unavailable: " + (error && error.message ? error.message : String(error)), true);
+          }
+        }
+
+        function start() {
+          bindVideo(document.getElementById("video"), "live");
+          bindVideo(document.getElementById("video-vod"), "vod");
+          document.addEventListener("click", onDocumentClick, true);
+          document.addEventListener("change", function (event) {
+            if (event.target && event.target.id === "country-select" && !shouldSkipTracking(event.target)) {
+              send("country_change", { country: selectedCountry() });
+            }
+          }, true);
+          window.addEventListener("pagehide", function () {
+            if (!shouldSkipTracking()) send("session_end");
+          });
+          window.setInterval(function () {
+            trackPageIfChanged();
+            if (!shouldSkipTracking()) send("heartbeat");
+          }, HEARTBEAT_MS);
+          new MutationObserver(function () {
+            if (mutationTickPending) return;
+            mutationTickPending = true;
+            window.requestAnimationFrame(function () {
+              mutationTickPending = false;
+              ensureAnalyticsPanel();
+              trackPageIfChanged();
+            });
+          }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "hidden", "aria-hidden"] });
+          ensureAnalyticsPanel();
+          send("session_start");
+          trackPageIfChanged();
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", start, { once: true });
+        } else {
+          start();
+        }
       })();
     </script>
 

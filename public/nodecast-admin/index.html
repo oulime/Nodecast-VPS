@@ -4,38 +4,101 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Nodecast Backend</title>
+  <script>
+    if (window.parent !== window) document.documentElement.classList.add('embedded');
+  </script>
   <style>
     :root { color-scheme: dark; font-family: Inter, Arial, sans-serif; background: #090812; color: #f6f0ff; }
-    body { margin: 0; padding: 18px; background: #090812; }
-    h1 { margin: 0 0 14px; font-size: 24px; }
+    html { overflow-x: hidden; }
+    html.embedded, html.embedded body { overflow: hidden; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: auto;
+      padding: 16px;
+      overflow-x: hidden;
+      background:
+        radial-gradient(circle at 15% 0%, rgba(124, 58, 237, .22), transparent 28%),
+        linear-gradient(180deg, #110d24 0%, #090812 62%, #070611 100%);
+    }
+    .shell { max-width: 1180px; margin: 0 auto; }
+    .hero {
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 22px;
+      padding: 18px;
+      background: linear-gradient(135deg, rgba(255,255,255,.10), rgba(255,255,255,.035));
+      box-shadow: 0 14px 34px rgba(0,0,0,.18);
+    }
+    h1 { margin: 0; font-size: clamp(26px, 4vw, 38px); letter-spacing: -.04em; }
     h2 { margin: 20px 0 10px; font-size: 18px; }
-    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
-    .tab { border: 1px solid rgba(181, 97, 255, .45); background: rgba(95, 38, 157, .28); color: #fff; border-radius: 9px; padding: 9px 13px; cursor: pointer; font-weight: 800; }
+    .subtle { margin: 8px 0 0; color: #cfc2e8; font-weight: 700; }
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0 12px; }
+    .tab { border: 1px solid rgba(181, 97, 255, .45); background: rgba(95, 38, 157, .28); color: #fff; border-radius: 999px; padding: 10px 15px; cursor: pointer; font-weight: 900; }
     .tab.active { background: linear-gradient(135deg, #7c3aed, #d946ef); }
-    .panel { display: none; }
+    .panel { display: none; margin-top: 14px; border: 1px solid rgba(255,255,255,.10); border-radius: 20px; padding: 16px; background: rgba(10, 8, 20, .78); }
     .panel.active { display: block; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
-    label { display: grid; gap: 5px; font-size: 12px; color: #cfc2e8; font-weight: 800; }
-    input, select { width: 100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,.14); background: #151022; color: #fff; border-radius: 8px; padding: 9px; }
+    label { display: grid; gap: 6px; font-size: 12px; color: #cfc2e8; font-weight: 900; letter-spacing: .02em; }
+    input, select { width: 100%; border: 1px solid rgba(255,255,255,.14); background: rgba(13, 10, 27, .9); color: #fff; border-radius: 12px; padding: 11px 12px; outline: none; }
+    input:focus, select:focus { border-color: rgba(217, 70, 239, .7); box-shadow: 0 0 0 3px rgba(217, 70, 239, .12); }
     input[type="checkbox"] { width: auto; }
     .check { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.10); padding: 10px; border-radius: 8px; }
-    button { border: 0; background: #8b5cf6; color: white; padding: 10px 14px; border-radius: 8px; font-weight: 900; cursor: pointer; }
-    button.secondary { background: #272036; }
-    button.danger { background: #be123c; }
-    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-    th, td { border-bottom: 1px solid rgba(255,255,255,.1); padding: 9px; text-align: left; vertical-align: top; }
-    .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-    .status { min-height: 20px; margin: 10px 0; color: #a7f3d0; }
+    button { border: 0; background: linear-gradient(135deg, #8b5cf6, #d946ef); color: white; padding: 10px 14px; border-radius: 12px; font-weight: 900; cursor: pointer; }
+    button:hover { filter: brightness(1.07); }
+    button.secondary { background: rgba(255,255,255,.10); box-shadow: none; }
+    button.danger { background: linear-gradient(135deg, #be123c, #fb7185); }
+    .source-list { display: grid; gap: 12px; margin-top: 14px; }
+    .source-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      padding: 14px;
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 18px;
+      background: rgba(255,255,255,.055);
+    }
+    .source-row-main { min-width: 0; }
+    .source-row-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .source-row-status { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .row-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; min-width: 170px; }
+    .status { min-height: 20px; margin: 10px 0 0; color: #a7f3d0; font-weight: 800; }
+    .source-card { margin-bottom: 16px; padding: 16px; border: 1px solid rgba(255,255,255,.10); border-radius: 18px; background: rgba(255,255,255,.055); }
+    .source-card h2 { margin-top: 0; }
+    .source-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+    .source-hint { color: #bfb3db; font-size: 13px; line-height: 1.5; }
+    .source-name { font-weight: 950; }
+    .source-meta { color: #bfb3db; font-size: 12px; margin-top: 4px; }
+    .pill { display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; padding: 7px 10px; font-size: 12px; font-weight: 950; border: 1px solid rgba(255,255,255,.10); }
+    .pill-on { color: #bbf7d0; background: rgba(34,197,94,.14); }
+    .pill-off { color: #fecaca; background: rgba(244,63,94,.13); }
+    .pill-syncing, .pill-warming { color: #fde68a; background: rgba(245,158,11,.14); }
+    .pill-success { color: #bbf7d0; background: rgba(34,197,94,.14); }
+    .pill-error { color: #fecaca; background: rgba(244,63,94,.16); }
+    .dot { width: 8px; height: 8px; border-radius: 999px; background: currentColor; box-shadow: 0 0 14px currentColor; }
+    .spin { animation: spin 1s linear infinite; border: 2px solid rgba(255,255,255,.22); border-top-color: currentColor; }
+    .empty { padding: 22px; border: 1px dashed rgba(255,255,255,.14); border-radius: 16px; color: #cfc2e8; text-align: center; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (max-width: 720px) {
+      body { padding: 10px; }
+      .hero, .panel { border-radius: 16px; padding: 12px; }
+      .source-row { grid-template-columns: 1fr; }
+      .row-actions { justify-content: flex-start; min-width: 0; }
+    }
   </style>
 </head>
 <body>
-  <h1>Nodecast Backend</h1>
-  <div class="tabs">
-    <button class="tab active" data-tab="settings">Transcodage</button>
-    <button class="tab" data-tab="sources">Sources</button>
-    <button class="tab" data-tab="hardware">Hardware</button>
+  <main class="shell">
+  <div class="hero">
+    <h1>Nodecast Backend</h1>
+    <p class="subtle">Controle VPS pour sources, transcodage et snapshot Velora.</p>
+    <div class="tabs">
+      <button class="tab active" data-tab="settings">Transcodage</button>
+      <button class="tab" data-tab="sources">Sources</button>
+      <button class="tab" data-tab="hardware">Hardware</button>
+    </div>
+    <p id="status" class="status"></p>
   </div>
-  <p id="status" class="status"></p>
 
   <section id="panel-settings" class="panel active">
     <h2>Lecture et transcodage</h2>
@@ -70,19 +133,25 @@
   </section>
 
   <section id="panel-sources" class="panel">
-    <h2>Sources</h2>
-    <div class="grid">
-      <label>Type <select id="src-type"><option value="xtream">Xtream</option><option value="m3u">M3U</option><option value="epg">EPG</option></select></label>
-      <label>Nom <input id="src-name"></label>
-      <label>URL <input id="src-url"></label>
-      <label>Username <input id="src-user"></label>
-      <label>Password <input id="src-pass" type="password"></label>
+    <div class="source-head">
+      <div>
+        <h2>Sources</h2>
+        <div class="source-hint">Apres ajout ou sync manuel, cette page suit automatiquement: syncing, warming Velora, puis success.</div>
+      </div>
+      <button id="refresh-sources" class="secondary">Refresh</button>
     </div>
-    <p><button id="add-source">Ajouter source</button></p>
-    <table>
-      <thead><tr><th>Nom</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead>
-      <tbody id="sources-body"></tbody>
-    </table>
+    <div class="source-card">
+      <h2>Ajouter une source</h2>
+      <div class="grid">
+        <label>Type <select id="src-type"><option value="xtream">Xtream</option><option value="m3u">M3U</option><option value="epg">EPG</option></select></label>
+        <label>Nom <input id="src-name" placeholder="Nom visible admin"></label>
+        <label>URL <input id="src-url" placeholder="https://..."></label>
+        <label>Username <input id="src-user" autocomplete="off"></label>
+        <label>Password <input id="src-pass" type="password" autocomplete="new-password"></label>
+      </div>
+      <p><button id="add-source">Ajouter source</button></p>
+    </div>
+    <div id="sources-body" class="source-list"></div>
   </section>
 
   <section id="panel-hardware" class="panel">
@@ -90,18 +159,37 @@
     <pre id="hardware-info"></pre>
     <button id="refresh-hw">Refresh hardware</button>
   </section>
+  </main>
 
   <script>
     const $ = (id) => document.getElementById(id);
     const status = (msg, bad=false) => { $('status').textContent = msg; $('status').style.color = bad ? '#fecaca' : '#a7f3d0'; };
     const checks = ['forceProxy','autoTranscode','forceTranscode','forceVideoTranscode','forceRemux','upscaleEnabled'];
     let currentSettings = {};
+    let sourcePollTimer = null;
+    let sourcePollUntil = 0;
+    let sourcePollMinimumUntil = 0;
+    let resizeTimer = null;
+
+    function notifyParentHeight() {
+      if (window.parent === window) return;
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        window.parent.postMessage({
+          type: 'nodecast-admin-height',
+          height: Math.ceil(document.documentElement.scrollHeight)
+        }, window.location.origin);
+      }, 80);
+    }
+
+    window.addEventListener('load', notifyParentHeight);
 
     document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => {
       document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b === btn));
       document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === `panel-${btn.dataset.tab}`));
       if (btn.dataset.tab === 'sources') loadSources();
       if (btn.dataset.tab === 'hardware') loadHardware();
+      notifyParentHeight();
     }));
 
     async function api(path, opts = {}) {
@@ -116,6 +204,7 @@
       $('settings-checks').innerHTML = checks.map(k =>
         `<label class="check"><input type="checkbox" id="${k}" ${settings[k] ? 'checked' : ''}> ${k}</label>`
       ).join('');
+      notifyParentHeight();
     }
 
     async function loadSettings() {
@@ -142,31 +231,110 @@
       await loadSettings();
     };
 
-    async function loadSources() {
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[ch]));
+    }
+
+    function formatTime(value) {
+      if (!value) return 'Jamais';
+      const ms = Number(value);
+      const date = Number.isFinite(ms) ? new Date(ms) : new Date(value);
+      return Number.isNaN(date.getTime()) ? 'Jamais' : date.toLocaleString();
+    }
+
+    function statusPill(rawStatus) {
+      const value = String(rawStatus || 'idle').toLowerCase();
+      const labels = {
+        syncing: 'Syncing',
+        warming: 'Warming Velora',
+        success: 'Success',
+        error: 'Error',
+        idle: 'Not synced yet'
+      };
+      const spin = value === 'syncing' || value === 'warming';
+      return `<span class="pill pill-${escapeHtml(value)}"><span class="dot ${spin ? 'spin' : ''}"></span>${labels[value] || escapeHtml(value)}</span>`;
+    }
+
+    function enabledPill(enabled) {
+      return `<span class="pill ${enabled ? 'pill-on' : 'pill-off'}"><span class="dot"></span>${enabled ? 'Enabled' : 'Disabled'}</span>`;
+    }
+
+    function sourceStatusBadges(source, state) {
+      const error = state?.error ? `<div class="source-meta" style="color:#fecaca">${escapeHtml(state.error)}</div>` : '';
+      return `${enabledPill(Boolean(source.enabled))}
+        ${statusPill(state?.status)}
+        <div class="source-meta">Last update: ${escapeHtml(formatTime(state?.last_sync))}</div>
+        ${error}`;
+    }
+
+    function stopSourcePolling(message) {
+      if (sourcePollTimer) {
+        clearInterval(sourcePollTimer);
+        sourcePollTimer = null;
+      }
+      if (message) status(message);
+    }
+
+    function startSourcePolling(message) {
+      sourcePollUntil = Date.now() + 30 * 60 * 1000;
+      sourcePollMinimumUntil = Date.now() + 10000;
+      if (message) status(message);
+      if (!sourcePollTimer) {
+        sourcePollTimer = setInterval(() => loadSources({ fromPoll: true }).catch(e => status(e.message, true)), 2500);
+      }
+      loadSources({ fromPoll: true }).catch(e => status(e.message, true));
+    }
+
+    async function loadSources(options = {}) {
       const [sources, states] = await Promise.all([api('/sources'), api('/sources/status').catch(() => [])]);
       const byId = new Map(states.map(s => [String(s.source_id ?? s.sourceId ?? s.id), s]));
-      $('sources-body').innerHTML = sources.map(s => {
+      const hasRunning = states.some(s => ['syncing', 'warming'].includes(String(s.status || '').toLowerCase()));
+      $('sources-body').innerHTML = sources.length ? sources.map(s => {
         const st = byId.get(String(s.id));
-        return `<tr><td>${s.name}</td><td>${s.type}</td><td>${s.enabled ? 'on' : 'off'} ${st?.status || ''}</td><td class="row-actions">
-          <button onclick="toggleSource(${s.id})">${s.enabled ? 'Disable' : 'Enable'}</button>
-          <button onclick="syncSource(${s.id})">Sync</button>
-          <button class="danger" onclick="deleteSource(${s.id})">Delete</button>
-        </td></tr>`;
-      }).join('');
+        return `<article class="source-row">
+          <div class="source-row-main">
+            <div class="source-row-top">
+              <div class="source-name">${escapeHtml(s.name)}</div>
+              <span class="pill">${escapeHtml(s.type)}</span>
+              <span class="source-meta">ID ${escapeHtml(s.id)}</span>
+            </div>
+            <div class="source-row-status">${sourceStatusBadges(s, st)}</div>
+          </div>
+          <div class="row-actions">
+            <button onclick="toggleSource(${s.id})">${s.enabled ? 'Disable' : 'Enable'}</button>
+            <button onclick="syncSource(${s.id})">Sync</button>
+            <button class="danger" onclick="deleteSource(${s.id})">Delete</button>
+          </div>
+        </article>`;
+      }).join('') : '<div class="empty">Aucune source ajoutee pour le moment.</div>';
+      notifyParentHeight();
+
+      if (hasRunning) {
+        const warming = states.some(s => String(s.status || '').toLowerCase() === 'warming');
+        status(warming ? 'Sync terminee. Velora catalogue warming en cours...' : 'Sync source en cours...');
+        return;
+      }
+      if (sourcePollTimer && (Date.now() > sourcePollMinimumUntil || Date.now() > sourcePollUntil)) {
+        stopSourcePolling('Sync terminee. Status success mis a jour automatiquement.');
+      }
     }
 
     $('add-source').onclick = async () => {
-      await api('/sources', { method: 'POST', body: JSON.stringify({
+      const created = await api('/sources', { method: 'POST', body: JSON.stringify({
         type: $('src-type').value, name: $('src-name').value, url: $('src-url').value, username: $('src-user').value, password: $('src-pass').value
       })});
-      status('Source ajoutee. Sync demarree.');
+      ['src-name','src-url','src-user','src-pass'].forEach(id => $(id).value = '');
       await loadSources();
+      startSourcePolling(`Source ajoutee: ${created?.name || 'nouvelle source'}. Sync demarree, suivi automatique active.`);
     };
-    window.toggleSource = async id => { await api(`/sources/${id}/toggle`, { method: 'POST' }); await loadSources(); };
-    window.syncSource = async id => { await api(`/sources/${id}/sync`, { method: 'POST' }); status('Sync demarree.'); await loadSources(); };
-    window.deleteSource = async id => { if (confirm('Delete source?')) { await api(`/sources/${id}`, { method: 'DELETE' }); await loadSources(); } };
+    $('refresh-sources').onclick = async () => { await loadSources(); status('Sources rechargees.'); };
+    window.toggleSource = async id => { await api(`/sources/${id}/toggle`, { method: 'POST' }); await loadSources(); startSourcePolling('Source mise a jour. Suivi automatique active.'); };
+    window.syncSource = async id => { await api(`/sources/${id}/sync`, { method: 'POST' }); await loadSources(); startSourcePolling('Sync demarree. Cette page passera a success sans refresh.'); };
+    window.deleteSource = async id => { if (confirm('Delete source?')) { await api(`/sources/${id}`, { method: 'DELETE' }); await loadSources(); status('Source supprimee.'); } };
 
-    async function loadHardware() { $('hardware-info').textContent = JSON.stringify(await api('/settings/hw-info'), null, 2); }
+    async function loadHardware() { $('hardware-info').textContent = JSON.stringify(await api('/settings/hw-info'), null, 2); notifyParentHeight(); }
     $('refresh-hw').onclick = async () => { $('hardware-info').textContent = JSON.stringify(await api('/settings/hw-info/refresh', { method: 'POST' }), null, 2); };
 
     loadSettings().catch(e => status(e.message, true));

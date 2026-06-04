@@ -30,6 +30,30 @@ function clientIp(req) {
     return normalizeIp(req.ip || req.socket?.remoteAddress || '0.0.0.0');
 }
 
+function isLocalHostName(value) {
+    const host = String(value || '').split(':')[0].trim().toLowerCase();
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
+}
+
+function isLocalIp(value) {
+    const ip = normalizeIp(value);
+    return ip === '127.0.0.1' || ip === '::1' || ip === 'localhost';
+}
+
+function shouldIgnoreLocalAnalytics(req) {
+    if (process.env.NODECAST_ANALYTICS_ALLOW_LOCAL === '1') return false;
+    return isLocalHostName(req.hostname)
+        || isLocalHostName(req.get('host'))
+        || isLocalIp(clientIp(req));
+}
+
+function isLocalEvent(event) {
+    return isLocalIp(event?.ip)
+        || isLocalHostName(event?.host)
+        || isLocalHostName(event?.origin)
+        || /^https?:\/\/(localhost|127\.0\.0\.1|\[?::1\]?)(:\d+)?\b/i.test(String(event?.referrer || ''));
+}
+
 function headerValue(req, name) {
     const value = req.get(name);
     return typeof value === 'string' ? value.trim() : '';
@@ -168,6 +192,8 @@ function publicEventFromRequest(req) {
         userAgent: cleanString(req.get('user-agent'), 220),
         device: cleanObject(body.device),
         path: cleanString(body.path || req.get('referer'), 260),
+        host: cleanString(req.get('host'), 120),
+        origin: cleanString(body.origin, 180),
         page: cleanString(body.page, 120),
         section: cleanString(body.section, 80),
         country: cleanString(body.country, 120),
@@ -248,6 +274,7 @@ function countBy(events, keyFn, { limit = 12, seconds = false } = {}) {
 }
 
 function summarize(events) {
+    events = events.filter((event) => !isLocalEvent(event));
     const visitors = new Set(events.map((event) => event.sessionId).filter(Boolean));
     const ips = new Set(events.map((event) => event.ip).filter(Boolean));
     const watchEvents = events.filter((event) => ['video_progress', 'video_stop', 'video_end'].includes(event.type));
@@ -271,6 +298,10 @@ function summarize(events) {
 
 router.post('/event', async (req, res) => {
     try {
+        if (shouldIgnoreLocalAnalytics(req)) {
+            res.status(204).end();
+            return;
+        }
         const event = publicEventFromRequest(req);
         updateLiveSession(event);
         await appendEvent(event);

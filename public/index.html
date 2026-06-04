@@ -537,9 +537,99 @@
         white-space: nowrap;
       }
 
+      .vel-analytics-layout--simple {
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(18rem, 0.8fr);
+        gap: 1rem;
+        align-items: start;
+      }
+
+      .vel-analytics-box--live-table {
+        grid-column: 1 / -1;
+      }
+
+      .vel-analytics-table-wrap {
+        width: 100%;
+        overflow-x: auto;
+        border: 1px solid rgba(148, 163, 184, 0.13);
+        border-radius: 14px;
+        background: rgba(2, 6, 23, 0.2);
+      }
+
+      .vel-analytics-table {
+        width: 100%;
+        min-width: 920px;
+        border-collapse: collapse;
+      }
+
+      .vel-analytics-table th,
+      .vel-analytics-table td {
+        padding: 0.72rem 0.78rem;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+        text-align: left;
+        vertical-align: middle;
+      }
+
+      .vel-analytics-table th {
+        color: rgba(203, 213, 225, 0.72);
+        font-size: 0.68rem;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      .vel-analytics-table td {
+        color: #eef2ff;
+        font-size: 0.82rem;
+      }
+
+      .vel-analytics-table tbody tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .vel-analytics-table tbody tr:hover {
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .vel-analytics-ip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-weight: 850;
+        white-space: nowrap;
+      }
+
+      .vel-analytics-now-title {
+        max-width: 17rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 850;
+      }
+
+      .vel-analytics-muted {
+        color: rgba(203, 213, 225, 0.68);
+      }
+
+      .vel-analytics-rank {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.65rem;
+        height: 1.65rem;
+        border-radius: 999px;
+        background: rgba(56, 189, 248, 0.14);
+        color: #bae6fd;
+        font-size: 0.74rem;
+        font-weight: 950;
+      }
+
       @media (max-width: 900px) {
         .vel-analytics-hero,
-        .vel-analytics-layout {
+        .vel-analytics-layout,
+        .vel-analytics-layout--simple {
           grid-template-columns: 1fr;
         }
 
@@ -2148,7 +2238,13 @@
           return isVisible(shell);
         }
 
+        function isLocalAnalyticsHost() {
+          var host = String(location.hostname || "").toLowerCase();
+          return host === "localhost" || host === "127.0.0.1" || host === "::1";
+        }
+
         function shouldSkipTracking(target) {
+          if (isLocalAnalyticsHost()) return true;
           if (isAdminOpen()) return true;
           if (target && target.closest && target.closest("#settings-shell, dialog, .admin-add-package-dialog, .admin-channel-assign-dialog")) {
             return true;
@@ -2228,6 +2324,7 @@
             type: type,
             sessionId: sessionId,
             path: location.pathname + location.search,
+            origin: location.origin,
             referrer: document.referrer || "",
             page: inferPage(),
             section: activeSection(),
@@ -2440,34 +2537,64 @@
           ].join("");
         }
 
-        function visitorCard(item) {
-          var watching = item.channelName || item.mediaTitle || item.packageName || item.page || "Browsing";
-          var trialRemaining = item.trialSecondsRemaining == null ? "n/a" : formatDuration(item.trialSecondsRemaining);
-          var trialUsed = item.trialSecondsUsed == null ? "n/a" : formatDuration(item.trialSecondsUsed);
-          var started = item.trialStartedAt ? new Date(item.trialStartedAt).toLocaleTimeString() : "n/a";
-          var watch = formatDuration(item.totalWatchSeconds || 0);
-          return [
-            '<div class="vel-analytics-visitor">',
-            '<div class="vel-analytics-visitor__top">',
-            '<div class="vel-analytics-visitor__ip"><span class="vel-analytics-live-dot"></span>' + escapeHtml(item.ip || "Unknown IP") + '</div>',
-            '<div class="vel-analytics-visitor__badge">' + escapeHtml(item.lastEventType || "active") + '</div>',
-            '</div>',
-            '<div class="vel-analytics-visitor__watching">' + escapeHtml(watching) + '</div>',
-            '<div class="vel-analytics-visitor__meta">',
-            '<div class="vel-analytics-pill"><span>Package</span><strong>' + escapeHtml(item.packageName || "n/a") + '</strong></div>',
-            '<div class="vel-analytics-pill"><span>Page</span><strong>' + escapeHtml(item.page || "n/a") + '</strong></div>',
-            '<div class="vel-analytics-pill"><span>Trial started</span><strong>' + escapeHtml(started) + '</strong></div>',
-            '<div class="vel-analytics-pill"><span>Trial used / left</span><strong>' + escapeHtml(trialUsed + " / " + trialRemaining) + '</strong></div>',
-            '<div class="vel-analytics-pill"><span>Watched now</span><strong>' + escapeHtml(watch) + '</strong></div>',
-            '<div class="vel-analytics-pill"><span>Device</span><strong>' + escapeHtml(item.device && item.device.width ? item.device.width + "x" + item.device.height : "n/a") + '</strong></div>',
-            '</div>',
-            '</div>'
-          ].join("");
+        function formatTime(value) {
+          if (!value) return "n/a";
+          var d = new Date(value);
+          return Number.isNaN(d.getTime()) ? "n/a" : d.toLocaleTimeString();
         }
 
         function list(items, mapper) {
           if (!items || !items.length) return '<p class="vel-analytics-empty">Pas encore de donnees.</p>';
           return '<div class="vel-analytics-list">' + items.map(mapper).join("") + '</div>';
+        }
+
+        function visitorsTable(items) {
+          if (!items || !items.length) return '<p class="vel-analytics-empty">No live visitors right now.</p>';
+          return [
+            '<div class="vel-analytics-table-wrap">',
+            '<table class="vel-analytics-table">',
+            '<thead><tr><th>IP</th><th>Watching now</th><th>Package</th><th>Page</th><th>Trial started</th><th>Watched</th><th>Left</th><th>Last seen</th></tr></thead><tbody>',
+            items.map(function (item) {
+              var watching = item.channelName || item.mediaTitle || item.packageName || item.page || "Browsing";
+              var trialRemaining = item.trialSecondsRemaining == null ? "n/a" : formatDuration(item.trialSecondsRemaining);
+              var watch = formatDuration(item.totalWatchSeconds || item.trialSecondsUsed || 0);
+              return [
+                '<tr>',
+                '<td><span class="vel-analytics-ip"><span class="vel-analytics-live-dot"></span>' + escapeHtml(item.ip || "Unknown") + '</span></td>',
+                '<td><div class="vel-analytics-now-title">' + escapeHtml(watching) + '</div></td>',
+                '<td>' + escapeHtml(item.packageName || "n/a") + '</td>',
+                '<td class="vel-analytics-muted">' + escapeHtml(item.page || "n/a") + '</td>',
+                '<td>' + escapeHtml(formatTime(item.trialStartedAt)) + '</td>',
+                '<td>' + escapeHtml(watch) + '</td>',
+                '<td>' + escapeHtml(trialRemaining) + '</td>',
+                '<td class="vel-analytics-muted">' + escapeHtml(formatTime(item.lastSeen)) + '</td>',
+                '</tr>'
+              ].join("");
+            }).join(""),
+            '</tbody></table>',
+            '</div>'
+          ].join("");
+        }
+
+        function channelsTable(items) {
+          if (!items || !items.length) return '<p class="vel-analytics-empty">No watched channels yet.</p>';
+          return [
+            '<div class="vel-analytics-table-wrap">',
+            '<table class="vel-analytics-table">',
+            '<thead><tr><th>#</th><th>Channel</th><th>Total watch time</th><th>Events</th></tr></thead><tbody>',
+            items.map(function (item, index) {
+              return [
+                '<tr>',
+                '<td><span class="vel-analytics-rank">' + (index + 1) + '</span></td>',
+                '<td><div class="vel-analytics-now-title">' + escapeHtml(item.name || "Unknown") + '</div></td>',
+                '<td>' + escapeHtml(formatDuration(item.seconds || 0)) + '</td>',
+                '<td class="vel-analytics-muted">' + escapeHtml(String(item.count || 0)) + '</td>',
+                '</tr>'
+              ].join("");
+            }).join(""),
+            '</tbody></table>',
+            '</div>'
+          ].join("");
         }
 
         function ensureAnalyticsPanel() {
@@ -2519,12 +2646,9 @@
               '<div class="vel-analytics-card"><span class="vel-analytics-card__label">IPs</span><span id="va-ips" class="vel-analytics-card__value">0</span><span class="vel-analytics-card__hint">unique addresses</span></div>',
               '<div class="vel-analytics-card"><span class="vel-analytics-card__label">Watch time</span><span id="va-watch" class="vel-analytics-card__value">0s</span><span class="vel-analytics-card__hint">tracked total</span></div>',
               '</div>',
-              '<div class="vel-analytics-layout">',
-              '<div class="vel-analytics-box"><h3>Visitors right now</h3><div id="va-live-list"></div></div>',
-              '<div class="vel-analytics-box"><h3>Most watched channels</h3><div id="va-channels"></div></div>',
-              '<div class="vel-analytics-box"><h3>Popular packages</h3><div id="va-packages"></div></div>',
-              '<div class="vel-analytics-box"><h3>Top pages</h3><div id="va-pages"></div></div>',
-              '<div class="vel-analytics-box vel-analytics-box--wide"><h3>Recent activity</h3><div id="va-events"></div></div>',
+              '<div class="vel-analytics-layout vel-analytics-layout--simple">',
+              '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>Visitors right now</h3><div id="va-live-list"></div></div>',
+              '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>Most watched channels</h3><div id="va-channels"></div></div>',
               '</div>'
             ].join("");
             panels.appendChild(panel);
@@ -2583,23 +2707,8 @@
             document.getElementById("va-ips").textContent = String(summary.uniqueIps || 0);
             document.getElementById("va-watch").textContent = formatDuration(summary.totalWatchSeconds || 0);
 
-            document.getElementById("va-live-list").innerHTML = list(live.visitors || [], function (item) {
-              return visitorCard(item);
-            });
-            document.getElementById("va-channels").innerHTML = list(summary.topChannels || [], function (item) {
-              return row(item.name, (item.count || 0) + " watch events", formatDuration(item.seconds || 0));
-            });
-            document.getElementById("va-packages").innerHTML = list(summary.topPackages || [], function (item) {
-              return row(item.name, "package opens / activity", String(item.count || 0));
-            });
-            document.getElementById("va-pages").innerHTML = list(summary.topPages || [], function (item) {
-              return row(item.name, "page views / activity", String(item.count || 0));
-            });
-            document.getElementById("va-events").innerHTML = list(summary.recentEvents || [], function (event) {
-              var title = event.mediaTitle || event.channelName || event.packageName || event.page || event.type;
-              var meta = [event.type, event.ip, event.page, event.ts].filter(Boolean).join(" • ");
-              return row(title, meta, event.watchedSeconds ? formatDuration(event.watchedSeconds) : "");
-            });
+            document.getElementById("va-live-list").innerHTML = visitorsTable(live.visitors || []);
+            document.getElementById("va-channels").innerHTML = channelsTable(summary.topChannels || []);
             setStatus("Updated " + new Date().toLocaleTimeString());
           } catch (error) {
             setStatus("Analytics unavailable: " + (error && error.message ? error.message : String(error)), true);

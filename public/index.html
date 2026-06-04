@@ -2267,6 +2267,7 @@
         var currentMedia = { type: "", id: "", title: "" };
         var lastPage = "";
         var lastPackageCapture = { key: "", at: 0 };
+        var sessionClosed = false;
         var refreshTimer = null;
         var watchState = new WeakMap();
         var mutationTickPending = false;
@@ -2424,6 +2425,7 @@
 
         function send(type, extra) {
           if (shouldSkipTracking(document.activeElement)) return;
+          if (sessionClosed && type !== "session_start" && type !== "session_resume" && type !== "session_end") return;
           var payload = basePayload(type, extra);
           var body = JSON.stringify(payload);
           try {
@@ -2444,6 +2446,7 @@
 
         function trackPageIfChanged() {
           if (shouldSkipTracking()) return;
+          if (sessionClosed) return;
           syncAnalyticsContext();
           var page = inferPage();
           if (page === lastPage) return;
@@ -2634,6 +2637,19 @@
           packages.addEventListener("pointerup", capture, true);
           packages.addEventListener("touchend", capture, true);
           packages.addEventListener("click", capture, true);
+        }
+
+        function closeAnalyticsSession(reason) {
+          if (sessionClosed || shouldSkipTracking()) return;
+          sessionClosed = true;
+          send("session_end", { endReason: reason || "closed" });
+        }
+
+        function resumeAnalyticsSession() {
+          if (!sessionClosed || shouldSkipTracking()) return;
+          sessionClosed = false;
+          send("session_resume");
+          trackPageIfChanged();
         }
 
         function adminHeaders() {
@@ -2895,7 +2911,23 @@
             }
           }, true);
           window.addEventListener("pagehide", function () {
-            if (!shouldSkipTracking()) send("session_end");
+            closeAnalyticsSession("pagehide");
+          });
+          window.addEventListener("beforeunload", function () {
+            closeAnalyticsSession("beforeunload");
+          });
+          document.addEventListener("visibilitychange", function () {
+            if (document.hidden) closeAnalyticsSession("hidden");
+            else resumeAnalyticsSession();
+          });
+          window.addEventListener("pageshow", function () {
+            resumeAnalyticsSession();
+          });
+          window.addEventListener("focus", function () {
+            resumeAnalyticsSession();
+          });
+          document.addEventListener("freeze", function () {
+            closeAnalyticsSession("freeze");
           });
           window.setInterval(function () {
             trackPageIfChanged();

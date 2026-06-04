@@ -5,7 +5,8 @@ const path = require('path');
 
 const router = express.Router();
 
-const ACTIVE_WINDOW_MS = 90 * 1000;
+const ACTIVE_WINDOW_MS = 45 * 1000;
+const WATCHING_WINDOW_MS = 45 * 1000;
 const MAX_STRING_LENGTH = 260;
 const MAX_EVENTS_FOR_SUMMARY = 50000;
 const liveSessions = new Map();
@@ -148,6 +149,8 @@ function updateLiveSession(event) {
     const existing = liveSessions.get(sessionId);
     const watchDeltaSeconds = Math.max(0, Number(event.watchDeltaSeconds) || 0);
     const totalWatchSeconds = Math.max(0, Number(existing?.totalWatchSeconds) || 0) + watchDeltaSeconds;
+    const isWatchingEvent = ['video_start', 'video_progress'].includes(event.type);
+    const isStoppedWatchingEvent = ['video_stop', 'video_end'].includes(event.type);
     liveSessions.set(sessionId, {
         sessionId,
         ip: event.ip,
@@ -158,9 +161,10 @@ function updateLiveSession(event) {
         country: event.country || existing?.country,
         packageName: event.packageName || existing?.packageName,
         packageId: event.packageId || existing?.packageId,
-        mediaType: event.mediaType || existing?.mediaType,
-        mediaTitle: event.mediaTitle || existing?.mediaTitle,
-        channelName: event.channelName || existing?.channelName,
+        mediaType: isStoppedWatchingEvent ? undefined : isWatchingEvent ? event.mediaType || existing?.mediaType : existing?.mediaType,
+        mediaTitle: isStoppedWatchingEvent ? undefined : isWatchingEvent ? event.mediaTitle || existing?.mediaTitle : existing?.mediaTitle,
+        channelName: isStoppedWatchingEvent ? undefined : isWatchingEvent ? event.channelName || existing?.channelName : existing?.channelName,
+        lastWatchingAtMs: isWatchingEvent ? now : existing?.lastWatchingAtMs,
         trialStartedAt: event.trialStartedAt || existing?.trialStartedAt,
         trialSecondsUsed: event.trialSecondsUsed ?? existing?.trialSecondsUsed,
         trialSecondsRemaining: event.trialSecondsRemaining ?? existing?.trialSecondsRemaining,
@@ -175,8 +179,17 @@ function updateLiveSession(event) {
 
 function pruneLiveSessions() {
     const cutoff = Date.now() - ACTIVE_WINDOW_MS;
+    const watchingCutoff = Date.now() - WATCHING_WINDOW_MS;
     for (const [sessionId, session] of liveSessions.entries()) {
-        if ((session.lastSeenMs || 0) < cutoff) liveSessions.delete(sessionId);
+        if ((session.lastSeenMs || 0) < cutoff) {
+            liveSessions.delete(sessionId);
+            continue;
+        }
+        if ((session.lastWatchingAtMs || 0) < watchingCutoff) {
+            session.mediaTitle = undefined;
+            session.channelName = undefined;
+            session.mediaType = undefined;
+        }
     }
 }
 

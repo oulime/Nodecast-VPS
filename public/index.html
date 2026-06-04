@@ -2266,6 +2266,7 @@
         var currentPackage = { id: "", name: "" };
         var currentMedia = { type: "", id: "", title: "" };
         var lastPage = "";
+        var lastPackageCapture = { key: "", at: 0 };
         var refreshTimer = null;
         var watchState = new WeakMap();
         var mutationTickPending = false;
@@ -2401,6 +2402,7 @@
         }
 
         function basePayload(type, extra) {
+          if (type !== "package_open") syncAnalyticsContext();
           return Object.assign({
             type: type,
             sessionId: sessionId,
@@ -2442,6 +2444,7 @@
 
         function trackPageIfChanged() {
           if (shouldSkipTracking()) return;
+          syncAnalyticsContext();
           var page = inferPage();
           if (page === lastPage) return;
           lastPage = page;
@@ -2450,6 +2453,44 @@
 
         function titleFromPackage(card) {
           return text(card.querySelector(".vel-package-card__title")) || text(card);
+        }
+
+        function setCurrentPackageFromCard(card, sendOpen) {
+          if (!card) return false;
+          var id = card.dataset.packageId || "";
+          var name = titleFromPackage(card);
+          if (!id && !name) return false;
+          currentPackage = { id: id, name: name };
+          currentMedia = { type: "", id: "", title: "" };
+          if (sendOpen && !shouldSkipTracking(card)) {
+            var key = id + "|" + name;
+            var now = Date.now();
+            if (lastPackageCapture.key !== key || now - lastPackageCapture.at > 900) {
+              lastPackageCapture = { key: key, at: now };
+              send("package_open", {
+                packageId: currentPackage.id,
+                packageName: currentPackage.name
+              });
+            }
+          }
+          window.setTimeout(trackPageIfChanged, 180);
+          window.setTimeout(trackPageIfChanged, 450);
+          return true;
+        }
+
+        function syncAnalyticsContext() {
+          var packages = document.getElementById("packages-view");
+          var content = document.getElementById("content-view");
+          if (packages && isVisible(packages)) {
+            if (Date.now() - (lastPackageCapture.at || 0) < 1200) return;
+            currentPackage = { id: "", name: "" };
+            currentMedia = { type: "", id: "", title: "" };
+            return;
+          }
+          if (content && isVisible(content) && !currentPackage.name) {
+            var selected = document.querySelector(".vel-package-card[data-package-id][aria-current='true'], .vel-package-card[data-package-id].active, .vel-package-card[data-package-id].selected");
+            if (selected) setCurrentPackageFromCard(selected, false);
+          }
         }
 
         function mediaFromElement(el) {
@@ -2487,15 +2528,7 @@
 
           var pkg = target.closest(".vel-package-card[data-package-id]");
           if (pkg) {
-            currentPackage = {
-              id: pkg.dataset.packageId || "",
-              name: titleFromPackage(pkg)
-            };
-            send("package_open", {
-              packageId: currentPackage.id,
-              packageName: currentPackage.name
-            });
-            window.setTimeout(trackPageIfChanged, 120);
+            setCurrentPackageFromCard(pkg, true);
             return;
           }
 
@@ -2583,6 +2616,24 @@
 
           video.addEventListener("pause", function () { finish("video_stop"); });
           video.addEventListener("ended", function () { finish("video_end"); });
+        }
+
+        function bindPackageCapture() {
+          var packages = document.getElementById("packages-view");
+          if (!packages || packages.dataset.analyticsPackageCapture === "1") return;
+          packages.dataset.analyticsPackageCapture = "1";
+          var capture = function (event) {
+            var target = event.target;
+            if (!target || !target.closest) return;
+            var pkg = target.closest(".vel-package-card[data-package-id]");
+            if (!pkg || !packages.contains(pkg)) return;
+            if (target.closest(".admin-pkg-edit-sb, .admin-pkg-del-sb, .vel-package-drag-handle")) return;
+            setCurrentPackageFromCard(pkg, true);
+          };
+          packages.addEventListener("pointerdown", capture, true);
+          packages.addEventListener("pointerup", capture, true);
+          packages.addEventListener("touchend", capture, true);
+          packages.addEventListener("click", capture, true);
         }
 
         function adminHeaders() {
@@ -2836,6 +2887,7 @@
         function start() {
           bindVideo(document.getElementById("video"), "live");
           bindVideo(document.getElementById("video-vod"), "vod");
+          bindPackageCapture();
           document.addEventListener("click", onDocumentClick, true);
           document.addEventListener("change", function (event) {
             if (event.target && event.target.id === "country-select" && !shouldSkipTracking(event.target)) {
@@ -2855,6 +2907,7 @@
             window.requestAnimationFrame(function () {
               mutationTickPending = false;
               ensureAnalyticsPanel();
+              bindPackageCapture();
               trackPageIfChanged();
             });
           }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "hidden", "aria-hidden"] });

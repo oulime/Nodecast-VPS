@@ -562,6 +562,35 @@
         border-collapse: collapse;
       }
 
+      .vel-analytics-table--visitors th:nth-child(1),
+      .vel-analytics-table--visitors td:nth-child(1) {
+        width: 19%;
+      }
+
+      .vel-analytics-table--visitors th:nth-child(2),
+      .vel-analytics-table--visitors td:nth-child(2) {
+        width: 25%;
+      }
+
+      .vel-analytics-table--visitors th:nth-child(3),
+      .vel-analytics-table--visitors td:nth-child(3) {
+        width: 25%;
+      }
+
+      .vel-analytics-table--visitors th:nth-child(4),
+      .vel-analytics-table--visitors td:nth-child(4),
+      .vel-analytics-table--visitors th:nth-child(5),
+      .vel-analytics-table--visitors td:nth-child(5),
+      .vel-analytics-table--visitors th:nth-child(6),
+      .vel-analytics-table--visitors td:nth-child(6) {
+        width: 10.33%;
+      }
+
+      .vel-analytics-table--channels th:nth-child(1),
+      .vel-analytics-table--channels td:nth-child(1) {
+        width: 4rem;
+      }
+
       .vel-analytics-table th,
       .vel-analytics-table td {
         padding: 0.72rem 0.78rem;
@@ -606,6 +635,14 @@
         min-width: 0;
         font-weight: 850;
         line-height: 1.25;
+      }
+
+      .vel-analytics-subline {
+        display: block;
+        margin-top: 0.18rem;
+        color: rgba(203, 213, 225, 0.62);
+        font-size: 0.74rem;
+        font-weight: 650;
       }
 
       .vel-analytics-muted {
@@ -2613,10 +2650,15 @@
           return page || section || "Browsing";
         }
 
-        function locationLabel(item) {
-          var page = pageLabel(item.page, item.section);
-          var country = cleanCountryName(item.country);
-          return country ? page + " - " + country : page;
+        function packageDisplay(item) {
+          var page = String(item.page || "").toLowerCase();
+          var section = String(item.section || "").toLowerCase();
+          var name = item.packageName || "";
+          if (name) return name;
+          if (page === "live_packages" || section === "live") return "Home Live";
+          if (page === "movies_packages" || section === "movies") return "Home Films";
+          if (page === "series_packages" || section === "series") return "Home Series";
+          return pageLabel(item.page, item.section);
         }
 
         function list(items, mapper) {
@@ -2628,23 +2670,22 @@
           if (!items || !items.length) return '<p class="vel-analytics-empty">No live visitors right now.</p>';
           return [
             '<div class="vel-analytics-table-wrap">',
-            '<table class="vel-analytics-table">',
-            '<thead><tr><th>IP</th><th>Where</th><th>Package</th><th>Watching now</th><th>Trial</th><th>Watched</th><th>Left</th><th>Last seen</th></tr></thead><tbody>',
+            '<table class="vel-analytics-table vel-analytics-table--visitors">',
+            '<thead><tr><th>IP</th><th>Package</th><th>Watching now</th><th>Trial</th><th>Watched</th><th>Left</th></tr></thead><tbody>',
             items.map(function (item) {
-              var watching = item.channelName || item.mediaTitle || item.packageName || item.page || "Browsing";
+              var watching = item.channelName || item.mediaTitle || "-";
               var trialRemaining = item.trialSecondsRemaining == null ? "n/a" : formatDuration(item.trialSecondsRemaining);
               var watch = formatDuration(item.totalWatchSeconds || item.trialSecondsUsed || 0);
-              var packageName = item.packageName || (String(item.page || "").indexOf("_packages") > -1 ? "Choosing package" : "n/a");
+              var packageName = packageDisplay(item);
+              var country = cleanCountryName(item.country);
               return [
                 '<tr>',
                 '<td data-label="IP"><span class="vel-analytics-ip"><span class="vel-analytics-live-dot"></span>' + escapeHtml(item.ip || "Unknown") + '</span></td>',
-                '<td data-label="Where"><div class="vel-analytics-now-title">' + escapeHtml(locationLabel(item)) + '</div></td>',
-                '<td data-label="Package">' + escapeHtml(packageName) + '</td>',
+                '<td data-label="Package"><div class="vel-analytics-now-title">' + escapeHtml(packageName) + (country ? '<span class="vel-analytics-subline">' + escapeHtml(country) + '</span>' : '') + '</div></td>',
                 '<td data-label="Watching"><div class="vel-analytics-now-title">' + escapeHtml(watching) + '</div></td>',
                 '<td data-label="Trial">' + escapeHtml(formatTime(item.trialStartedAt)) + '</td>',
                 '<td data-label="Watched">' + escapeHtml(watch) + '</td>',
                 '<td data-label="Left">' + escapeHtml(trialRemaining) + '</td>',
-                '<td data-label="Last seen" class="vel-analytics-muted">' + escapeHtml(formatTime(item.lastSeen)) + '</td>',
                 '</tr>'
               ].join("");
             }).join(""),
@@ -2657,7 +2698,7 @@
           if (!items || !items.length) return '<p class="vel-analytics-empty">No watched channels yet.</p>';
           return [
             '<div class="vel-analytics-table-wrap">',
-            '<table class="vel-analytics-table">',
+            '<table class="vel-analytics-table vel-analytics-table--channels">',
             '<thead><tr><th>#</th><th>Channel</th><th>Total watch time</th><th>Events</th></tr></thead><tbody>',
             items.map(function (item, index) {
               return [

@@ -155,6 +155,7 @@ function updateLiveSession(event) {
         device: Object.keys(event.device || {}).length ? event.device : existing?.device || {},
         page: event.page || event.path || existing?.page || '/',
         section: event.section || existing?.section,
+        country: event.country || existing?.country,
         packageName: event.packageName || existing?.packageName,
         packageId: event.packageId || existing?.packageId,
         mediaType: event.mediaType || existing?.mediaType,

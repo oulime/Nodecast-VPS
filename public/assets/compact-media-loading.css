@@ -1,0 +1,202 @@
+/* Compact Films/Series package loading */
+.vel-package-grid-leaving {
+  animation: vel-media-package-leave .18s ease both;
+}
+
+body.vel-media-package-sweeping::after,
+.vel-media-package-sweeping-fullscreen::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 100vh;
+  z-index: 2147482000;
+  pointer-events: none;
+  background:
+    linear-gradient(102deg, transparent 0%, color-mix(in srgb, var(--vel-media-package-accent, #38bdf8) 16%, transparent) 34%, color-mix(in srgb, var(--vel-media-package-accent, #38bdf8) 42%, transparent) 50%, color-mix(in srgb, var(--vel-media-package-accent, #38bdf8) 16%, transparent) 66%, transparent 100%) 0 0 / 190% 100% no-repeat,
+    radial-gradient(circle at 50% 36%, color-mix(in srgb, var(--vel-media-package-accent, #38bdf8) 42%, transparent) 0%, transparent 44%),
+    radial-gradient(circle at 18% 78%, var(--vel-media-package-glow, rgba(56, 189, 248, .34)) 0%, transparent 48%),
+    radial-gradient(circle at 86% 18%, var(--vel-media-package-glow, rgba(56, 189, 248, .28)) 0%, transparent 44%),
+    linear-gradient(180deg, color-mix(in srgb, var(--vel-media-package-accent, #38bdf8) 28%, rgba(14, 12, 24, .92)), color-mix(in srgb, var(--vel-media-package-accent, #38bdf8) 18%, rgba(3, 3, 10, .96)));
+  filter: saturate(1.18) blur(.08rem);
+  mix-blend-mode: screen;
+  opacity: .88;
+  animation:
+    vel-media-package-sweep-in .16s ease both,
+    vel-media-package-sweep-light 1.15s linear infinite;
+}
+
+body.vel-media-package-sweeping.vel-media-package-sweeping-leaving::after,
+.vel-media-package-sweeping-fullscreen.vel-media-package-sweeping-leaving::after {
+  animation: vel-media-package-sweep-out .28s ease both;
+}
+
+.main--media-package-sweeping > :not(.vel-futuristic-bg) {
+  position: relative;
+}
+
+.item-list.item-list--media-loading {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: none;
+  min-height: clamp(14rem, calc(100dvh - var(--vel-promo-banner-h, 0px) - 13rem), 28rem);
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1.25rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.vel-media-package-loader {
+  --vel-loader-accent: var(--vel-media-package-accent, #38bdf8);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .72rem;
+  color: #f8f7ff;
+  font-family: Inter, var(--font);
+  font-size: clamp(.9rem, 2.8vw, 1rem);
+  font-weight: 850;
+  letter-spacing: -.01em;
+  text-align: center;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, .45);
+  animation: vel-media-loader-in .18s ease both;
+}
+
+.vel-media-package-loader--series {
+  --vel-loader-accent: var(--vel-media-package-accent, #f59e0b);
+}
+
+.vel-media-package-loader__dots {
+  display: inline-flex;
+  align-items: center;
+  gap: .28rem;
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--vel-loader-accent) 62%, transparent));
+}
+
+.vel-media-package-loader__dots i {
+  width: .45rem;
+  height: .45rem;
+  border-radius: 999px;
+  background: var(--vel-loader-accent);
+  box-shadow: 0 0 15px color-mix(in srgb, var(--vel-loader-accent) 72%, transparent);
+  animation: vel-media-loader-dot .9s ease-in-out infinite;
+}
+
+.vel-media-package-loader__dots i:nth-child(2) {
+  animation-delay: .12s;
+}
+
+.vel-media-package-loader__dots i:nth-child(3) {
+  animation-delay: .24s;
+}
+
+.vel-media-package-loader__text {
+  white-space: normal;
+}
+
+.item-list.item-list--vod-vertical.item-list--media-ready > .vel-category-heading,
+.item-list.item-list--vod-vertical.item-list--media-ready > .vel-vod-movie-card,
+.item-list.item-list--vod-vertical.item-list--media-ready > .vel-vod-load-more,
+.item-list.item-list--vod-vertical.item-list--media-ready > .vel-empty-msg {
+  animation: vel-media-content-in .2s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+@keyframes vel-media-package-leave {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: .72;
+  }
+}
+
+@keyframes vel-media-package-sweep-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: .88;
+  }
+}
+
+@keyframes vel-media-package-sweep-out {
+  0% {
+    opacity: .74;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes vel-media-package-sweep-light {
+  0% {
+    background-position: -65% 0, center, center, center, center;
+  }
+  100% {
+    background-position: 165% 0, center, center, center, center;
+  }
+}
+
+@keyframes vel-media-loader-in {
+  from {
+    opacity: 0;
+    transform: translateY(.3rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes vel-media-loader-dot {
+  0%, 75%, 100% {
+    opacity: .42;
+    transform: translateY(0) scale(.86);
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(-.22rem) scale(1);
+  }
+}
+
+@keyframes vel-media-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 520px) {
+  .item-list.item-list--media-loading {
+    min-height: clamp(13rem, calc(100dvh - var(--vel-promo-banner-h, 0px) - 11rem), 24rem);
+    padding-inline: max(.85rem, env(safe-area-inset-left));
+  }
+
+  .vel-media-package-loader {
+    gap: .6rem;
+    font-size: .92rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vel-package-grid-leaving,
+  body.vel-media-package-sweeping::after,
+  body.vel-media-package-sweeping.vel-media-package-sweeping-leaving::after,
+  .vel-media-package-sweeping-fullscreen::after,
+  .vel-media-package-sweeping-fullscreen.vel-media-package-sweeping-leaving::after,
+  .vel-media-package-loader,
+  .vel-media-package-loader__dots i,
+  .item-list.item-list--vod-vertical.item-list--media-ready > .vel-category-heading,
+  .item-list.item-list--vod-vertical.item-list--media-ready > .vel-vod-movie-card,
+  .item-list.item-list--vod-vertical.item-list--media-ready > .vel-vod-load-more,
+  .item-list.item-list--vod-vertical.item-list--media-ready > .vel-empty-msg {
+    animation: none !important;
+  }
+}

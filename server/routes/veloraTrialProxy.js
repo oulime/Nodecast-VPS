@@ -14,6 +14,14 @@ function trialApiBase() {
     return (process.env.VELORA_TRIAL_API_BASE || process.env.VELORA_API_BASE || '').trim().replace(/\/+$/, '');
 }
 
+function shouldUseRemoteTrialAdmin() {
+    return /^(1|true|yes)$/i.test(String(process.env.VELORA_TRIAL_REMOTE_ADMIN || '').trim());
+}
+
+function shouldUseRemoteTrialApi() {
+    return /^(1|true|yes)$/i.test(String(process.env.VELORA_TRIAL_REMOTE_API || '').trim());
+}
+
 function trialLimitSeconds() {
     const seconds = Number(process.env.TRIAL_SECONDS || process.env.VITE_TRIAL_SECONDS || process.env.TRIAL_LIMIT_SECONDS || 60);
     if (!Number.isFinite(seconds) || seconds <= 0) return 60;
@@ -106,16 +114,10 @@ async function isLocallyWhitelisted(req) {
     return items.some((item) => canonicalIpForWhitelist(item.ipAddress) === ip);
 }
 
-function userAgentHash(req) {
-    const ua = req.get('user-agent') || '';
-    return crypto.createHash('sha256').update(ua).digest('hex');
-}
-
 function trialIdentityKeys(req, deviceId) {
     return [
         `ip:${clientIp(req)}`,
-        `device:${deviceId}`,
-        `ua:${userAgentHash(req)}`
+        `device:${deviceId}`
     ];
 }
 
@@ -285,7 +287,7 @@ async function handleLocalAdminTrialReset(req, res) {
 }
 
 async function forwardVeloraApiRequest(req, res, path, options = {}) {
-    const base = trialApiBase();
+    const base = shouldUseRemoteTrialApi() ? trialApiBase() : '';
     if (!base) {
         if (options.localFallback) {
             try {
@@ -339,7 +341,7 @@ router.post('/trial-increment', (req, res) => {
 
 router.get('/admin/my-ip', (req, res) => {
     const base = trialApiBase();
-    if (!base) {
+    if (!base || !shouldUseRemoteTrialAdmin()) {
         if (!requireLocalAdmin(req, res)) return;
         res.status(200).json({ ipAddress: clientIp(req) });
         return;
@@ -348,7 +350,7 @@ router.get('/admin/my-ip', (req, res) => {
 });
 
 router.all('/admin/trial-whitelist', (req, res) => {
-    if (!trialApiBase()) {
+    if (!trialApiBase() || !shouldUseRemoteTrialAdmin()) {
         void handleLocalAdminTrialWhitelist(req, res).catch((err) => {
             res.status(500).json({ error: err?.message || 'Local trial whitelist failed' });
         });
@@ -358,7 +360,7 @@ router.all('/admin/trial-whitelist', (req, res) => {
 });
 
 router.post('/admin/trial-reset', (req, res) => {
-    if (!trialApiBase()) {
+    if (!trialApiBase() || !shouldUseRemoteTrialAdmin()) {
         void handleLocalAdminTrialReset(req, res).catch((err) => {
             res.status(500).json({ error: err?.message || 'Local trial reset failed' });
         });

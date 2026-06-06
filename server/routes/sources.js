@@ -5,6 +5,7 @@ const { getDb } = require('../db/sqlite');
 const xtreamApi = require('../services/xtreamApi');
 const syncService = require('../services/syncService');
 const veloraCatalogCache = require('../services/veloraCatalogCache');
+const fileCache = require('../services/cache');
 const m3uParser = require('../services/m3uParser');
 
 function warmVeloraCatalog(reason) {
@@ -160,6 +161,8 @@ router.delete('/:id', async (req, res) => {
         deleteSyncStatus.run(sourceId);
 
         console.log(`[Source] Cascade delete for source ${sourceId}: ${catResult.changes} categories, ${itemResult.changes} items, ${epgResult.changes} EPG programs`);
+
+        fileCache.clearSource(sourceId);
 
         // Delete source config and related hidden items (favorites handled by db.js)
         await sources.delete(sourceId);

@@ -29,6 +29,7 @@ const CATEGORY_ACTIONS = ['live_streams', 'vod_streams', 'series'];
 
 let currentSnapshot = null;
 let activeWarm = null;
+let pendingWarmReason = null;
 let autoWarmTimer = null;
 let status = readJson(statusPath) || {
     running: false,
@@ -373,9 +374,22 @@ async function buildSnapshot(reason) {
 }
 
 async function warm(options = {}) {
-    if (activeWarm) return activeWarm;
     const reason = options.reason || 'manual';
-    activeWarm = buildSnapshot(reason)
+    if (activeWarm) {
+        pendingWarmReason = reason;
+        return activeWarm;
+    }
+
+    activeWarm = (async () => {
+        let nextReason = reason;
+        let result = null;
+        while (nextReason) {
+            pendingWarmReason = null;
+            result = await buildSnapshot(nextReason);
+            nextReason = pendingWarmReason;
+        }
+        return result;
+    })()
         .catch(err => {
             status = {
                 ...status,
@@ -395,8 +409,9 @@ async function warm(options = {}) {
 
 function startWarm(options = {}) {
     const started = !activeWarm;
+    const queued = Boolean(activeWarm);
     const promise = warm(options);
-    return { started, promise, status: getStatus() };
+    return { started, queued, promise, status: getStatus() };
 }
 
 function startAutoWarmTimer() {

@@ -148,7 +148,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=package-cover-scope-20260602"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=package-cover-country-scope-20260606"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css">
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css">
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css">
@@ -226,6 +226,16 @@
         pointer-events: none !important;
       }
 
+      body.trial-locked .app {
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+
+      body.trial-locked .trial-offer-overlay {
+        visibility: visible !important;
+        pointer-events: auto !important;
+      }
+
       .trial-offer-overlay.trial-modal-overlay {
         z-index: 2147483647 !important;
         background:
@@ -250,11 +260,88 @@
         min-height: 100dvh;
         pointer-events: none;
         opacity: 0.92;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 18% 18%, rgba(36, 248, 255, 0.18), transparent 30%),
+          radial-gradient(circle at 82% 24%, rgba(177, 92, 255, 0.22), transparent 34%),
+          radial-gradient(circle at 50% 82%, rgba(255, 79, 216, 0.12), transparent 42%),
+          linear-gradient(145deg, #02040d, #070413 48%, #100611);
+        transform: translateZ(0);
+        contain: paint;
+      }
+
+      .trial-offer-home-bg::before,
+      .trial-offer-home-bg::after {
+        content: "";
+        position: absolute;
+        inset: -18%;
+        pointer-events: none;
+        transform: translateZ(0);
+        will-change: transform, opacity;
+      }
+
+      .trial-offer-home-bg::before {
+        opacity: 0.34;
+        background:
+          linear-gradient(rgba(36, 248, 255, 0.07) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(177, 92, 255, 0.055) 1px, transparent 1px);
+        background-size: 54px 54px;
+        transform: perspective(760px) rotateX(62deg) translate3d(0, 8%, 0);
+        transform-origin: center bottom;
+      }
+
+      .trial-offer-home-bg::after {
+        opacity: 0.72;
+        background:
+          radial-gradient(circle at 12% 24%, rgba(36, 248, 255, 0.2) 0 1px, transparent 2px),
+          radial-gradient(circle at 35% 62%, rgba(255, 255, 255, 0.22) 0 1px, transparent 2px),
+          radial-gradient(circle at 72% 34%, rgba(177, 92, 255, 0.2) 0 1px, transparent 2px),
+          radial-gradient(circle at 84% 72%, rgba(255, 79, 216, 0.18) 0 1px, transparent 2px),
+          linear-gradient(105deg, transparent 0 40%, rgba(36, 248, 255, 0.12) 48%, transparent 58%),
+          linear-gradient(75deg, transparent 0 45%, rgba(177, 92, 255, 0.14) 52%, transparent 62%);
+        background-size: 180px 180px, 220px 220px, 260px 260px, 210px 210px, 100% 100%, 100% 100%;
+        animation: trial-offer-bg-drift 9s ease-in-out infinite alternate;
+      }
+
+      @keyframes trial-offer-bg-breathe {
+        from {
+          filter: saturate(1) brightness(0.95);
+        }
+        to {
+          filter: saturate(1.16) brightness(1.04);
+        }
+      }
+
+      @keyframes trial-offer-bg-grid {
+        from {
+          transform: perspective(760px) rotateX(62deg) translate3d(0, 8%, 0);
+        }
+        to {
+          transform: perspective(760px) rotateX(62deg) translate3d(32px, 12%, 0);
+        }
+      }
+
+      @keyframes trial-offer-bg-drift {
+        from {
+          transform: translate3d(-2%, -1%, 0) scale(1.02);
+          opacity: 0.6;
+        }
+        to {
+          transform: translate3d(2%, 1.5%, 0) scale(1.05);
+          opacity: 0.82;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .trial-offer-home-bg,
+        .trial-offer-home-bg::before,
+        .trial-offer-home-bg::after {
+          animation: none !important;
+        }
       }
 
       .trial-offer-overlay .grain {
-        z-index: 1 !important;
-        pointer-events: none !important;
+        display: none !important;
       }
 
       .trial-offer-page,
@@ -268,6 +355,40 @@
 
       .trial-offer-card {
         z-index: 3;
+      }
+
+      .trial-offer-card.trial-modal-card,
+      .trial-offer-highlight,
+      .trial-offer-devices {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+      }
+
+      .trial-offer-card.trial-modal-card {
+        background: linear-gradient(165deg, rgba(255, 255, 255, 0.08), rgba(14, 12, 22, 0.92) 42%, rgba(10, 8, 16, 0.96)) !important;
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.62), inset 0 1px rgba(255, 255, 255, 0.1) !important;
+        animation: none !important;
+      }
+
+      .trial-offer-highlight {
+        background: linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(88, 28, 135, 0.16) 45%, rgba(15, 23, 42, 0.72)), rgba(12, 10, 22, 0.86) !important;
+        box-shadow: inset 0 1px rgba(255, 255, 255, 0.08), 0 10px 22px rgba(0, 0, 0, 0.46) !important;
+      }
+
+      .trial-offer-discount {
+        filter: none !important;
+      }
+
+      .trial-offer-button.trial-modal-button,
+      .trial-offer-badge,
+      .trial-offer-benefit::before {
+        box-shadow: none !important;
+        animation: none !important;
+      }
+
+      .trial-offer-button.trial-modal-button:hover {
+        transform: none !important;
+        filter: brightness(1.04) !important;
       }
 
       .vel-analytics-panel {
@@ -2962,6 +3083,10 @@
         var ctx = null;
         var animating = false;
         var lastFrame = 0;
+        var lastCanvasWidth = 0;
+        var lastCanvasHeight = 0;
+        var lastCanvasRatio = 0;
+        var syncQueued = false;
         var stars = [];
         var beams = [];
         var dots = [];
@@ -3041,16 +3166,41 @@
           });
         }
 
+        function useLiteOfferAnimation() {
+          return window.matchMedia && window.matchMedia("(max-width: 720px), (pointer: coarse)").matches;
+        }
+
+        function offerFrameGap() {
+          if (reduceMotion && reduceMotion.matches) return 1000;
+          return useLiteOfferAnimation() ? 110 : 66;
+        }
+
+        function offerParticleCount(type) {
+          var lite = useLiteOfferAnimation();
+          if (reduceMotion && reduceMotion.matches) {
+            if (type === "stars") return 18;
+            if (type === "beams") return 2;
+            return 8;
+          }
+          if (type === "stars") return lite ? 36 : 72;
+          if (type === "beams") return lite ? 3 : 5;
+          return lite ? 14 : 26;
+        }
+
         function ensureCanvas() {
           var page = document.querySelector(".trial-offer-page");
           if (!page) return null;
           if (!canvas || !canvas.isConnected) {
-            canvas = document.createElement("canvas");
+            canvas = document.createElement("div");
             canvas.className = "trial-offer-home-bg";
             canvas.setAttribute("aria-hidden", "true");
             page.insertBefore(canvas, page.firstChild);
-            ctx = canvas.getContext("2d", { alpha: false });
-            stars = Array.from({ length: 90 }, function () {
+            ctx = null;
+            stars = [];
+            beams = [];
+            dots = [];
+            return canvas;
+            stars = Array.from({ length: offerParticleCount("stars") }, function () {
               return {
                 x: Math.random(),
                 y: Math.random(),
@@ -3061,7 +3211,7 @@
                 color: Math.floor(Math.random() * 3)
               };
             });
-            beams = Array.from({ length: 7 }, function (_, i) {
+            beams = Array.from({ length: offerParticleCount("beams") }, function (_, i) {
               return {
                 y: Math.random(),
                 speed: (Math.random() * 0.0019 + 0.00075) * (Math.random() < 0.5 ? 1 : -1),
@@ -3070,7 +3220,7 @@
                 color: i % 3
               };
             });
-            dots = Array.from({ length: 36 }, function () {
+            dots = Array.from({ length: offerParticleCount("dots") }, function () {
               return {
                 x: Math.random(),
                 y: Math.random(),
@@ -3087,9 +3237,15 @@
 
         function resizeCanvas() {
           if (!canvas || !ctx) return { width: 0, height: 0 };
-          var ratio = Math.min(window.devicePixelRatio || 1, 1.5);
+          var ratio = Math.min(window.devicePixelRatio || 1, useLiteOfferAnimation() ? 1 : 1.25);
           var width = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1);
           var height = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1);
+          if (width === lastCanvasWidth && height === lastCanvasHeight && ratio === lastCanvasRatio) {
+            return { width: width, height: height };
+          }
+          lastCanvasWidth = width;
+          lastCanvasHeight = height;
+          lastCanvasRatio = ratio;
           var pixelWidth = Math.floor(width * ratio);
           var pixelHeight = Math.floor(height * ratio);
           canvas.style.width = width + "px";
@@ -3109,7 +3265,7 @@
           }
           window.requestAnimationFrame(draw);
           var reduced = reduceMotion && reduceMotion.matches;
-          if (!reduced && now - lastFrame < 66) return;
+          if (now - lastFrame < offerFrameGap()) return;
           lastFrame = now;
 
           var size = resizeCanvas();
@@ -3214,23 +3370,27 @@
           if (!isOfferVisible()) return;
           exitFullscreenForOffer();
           ensureCanvas();
-          resizeCanvas();
-          if (!animating) {
-            animating = true;
-            window.requestAnimationFrame(draw);
-          }
+          animating = false;
+        }
+
+        function queueTrialOfferSync() {
+          if (syncQueued) return;
+          syncQueued = true;
+          window.requestAnimationFrame(function () {
+            syncQueued = false;
+            syncTrialOfferState();
+          });
         }
 
         function start() {
           syncTrialOfferState();
-          new MutationObserver(syncTrialOfferState).observe(document.body, {
+          new MutationObserver(queueTrialOfferSync).observe(document.body, {
             childList: true,
-            subtree: true,
             attributes: true,
-            attributeFilter: ["class", "style", "open", "aria-hidden"]
+            attributeFilter: ["class"]
           });
-          document.addEventListener("fullscreenchange", syncTrialOfferState, true);
-          document.addEventListener("webkitfullscreenchange", syncTrialOfferState, true);
+          document.addEventListener("fullscreenchange", queueTrialOfferSync, true);
+          document.addEventListener("webkitfullscreenchange", queueTrialOfferSync, true);
           window.addEventListener("resize", function () {
             if (isOfferVisible()) resizeCanvas();
           });

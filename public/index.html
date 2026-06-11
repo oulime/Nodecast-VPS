@@ -135,6 +135,174 @@
         outline: 3px solid #ffd166;
         outline-offset: 4px;
       }
+
+      .vel-world-cup-entry {
+        position: relative;
+        grid-column: 1 / -1;
+        width: min(100%, 780px);
+        min-height: clamp(82px, 12vw, 118px);
+        aspect-ratio: 6.2 / 1;
+        margin: 6px auto 18px;
+        padding: 14px 18px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 214, 102, 0.72);
+        border-radius: 24px;
+        color: #fff7d6;
+        background:
+          radial-gradient(circle at 16% 50%, rgba(255, 214, 102, 0.24), transparent 34%),
+          linear-gradient(135deg, rgba(16, 10, 28, 0.98), rgba(52, 16, 72, 0.92) 48%, rgba(8, 44, 72, 0.96));
+        box-shadow:
+          0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+          0 0 28px rgba(255, 214, 102, 0.24),
+          0 18px 46px rgba(0, 0, 0, 0.42);
+        cursor: pointer;
+        isolation: isolate;
+      }
+      .vel-world-cup-entry--custom {
+        width: min(100%, 1180px);
+        min-height: 0;
+        height: auto;
+        aspect-ratio: auto;
+        padding: 3px;
+        border-color: rgba(255, 214, 102, 0.9);
+        background:
+          radial-gradient(circle at 50% 50%, rgba(255, 214, 102, 0.18), transparent 62%),
+          linear-gradient(135deg, #060611, #11071d);
+        box-shadow:
+          0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+          0 0 18px rgba(255, 214, 102, 0.42),
+          0 0 46px rgba(117, 78, 255, 0.32),
+          0 18px 50px rgba(0, 0, 0, 0.5);
+      }
+      .vel-world-cup-entry__image {
+        position: relative;
+        z-index: 2;
+        display: block;
+        width: 100%;
+        height: auto;
+        max-height: clamp(58px, 12vw, 150px);
+        object-fit: contain;
+        border-radius: 20px;
+      }
+      .vel-world-cup-entry::before {
+        content: "";
+        position: absolute;
+        inset: -42%;
+        z-index: 0;
+        background:
+          conic-gradient(from 130deg, transparent, rgba(255, 255, 255, 0.22), transparent 24%),
+          radial-gradient(circle, rgba(255, 214, 102, 0.28), transparent 58%);
+        animation: velWorldCupGlow 5.5s linear infinite;
+        opacity: 0.85;
+      }
+      .vel-world-cup-entry::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        border-radius: inherit;
+        background-image: var(--vel-world-cup-image);
+        background-position: center;
+        background-size: 100% 100%;
+        background-repeat: no-repeat;
+        background-color: rgba(3, 3, 10, 0.92);
+        opacity: 0;
+        box-shadow:
+          0 0 28px rgba(255, 214, 102, 0.26) inset,
+          0 0 70px rgba(117, 78, 255, 0.18) inset;
+      }
+      .vel-world-cup-entry--custom::after {
+        opacity: 0;
+      }
+      .vel-world-cup-entry > * {
+        position: relative;
+        z-index: 2;
+      }
+      .vel-world-cup-entry--custom .vel-world-cup-entry__copy {
+        display: none;
+      }
+      .vel-world-cup-entry__copy {
+        display: flex;
+        min-height: 74px;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 3px;
+        text-align: left;
+      }
+      .vel-world-cup-entry__eyebrow {
+        font-size: 0.72rem;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #ffd666;
+      }
+      .vel-world-cup-entry__title {
+        font-size: clamp(1.25rem, 3.7vw, 2rem);
+        font-weight: 950;
+        line-height: 1.02;
+        text-shadow: 0 2px 14px rgba(0, 0, 0, 0.6);
+      }
+      .vel-world-cup-entry__text {
+        max-width: 46rem;
+        color: rgba(255, 247, 214, 0.82);
+        font-size: clamp(0.82rem, 1.9vw, 0.98rem);
+        font-weight: 800;
+      }
+      .vel-world-cup-page {
+        width: min(100%, 1180px);
+        margin: 0 auto;
+        padding: clamp(14px, 3vw, 28px);
+      }
+      .vel-world-cup-page__head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+      .vel-world-cup-page__title {
+        margin: 0;
+        color: #fff7d6;
+        font-size: clamp(1.7rem, 5vw, 3.2rem);
+        font-weight: 950;
+        letter-spacing: -0.04em;
+        text-shadow: 0 0 24px rgba(255, 214, 102, 0.24);
+      }
+      .vel-world-cup-back {
+        border: 1px solid rgba(255, 214, 102, 0.55);
+        border-radius: 999px;
+        padding: 12px 18px;
+        color: #fff7d6;
+        background: rgba(18, 15, 28, 0.72);
+        box-shadow: 0 0 22px rgba(255, 214, 102, 0.12);
+        font: inherit;
+        font-weight: 900;
+        cursor: pointer;
+      }
+      .vel-world-cup-card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: clamp(12px, 2vw, 18px);
+      }
+      .vel-world-cup-card-grid .vel-package-card {
+        min-height: clamp(150px, 23vw, 220px);
+      }
+      .vel-world-cup-empty {
+        padding: 28px 18px;
+        border: 1px solid rgba(255, 214, 102, 0.24);
+        border-radius: 20px;
+        color: rgba(255, 247, 214, 0.82);
+        background: rgba(10, 10, 18, 0.48);
+        text-align: center;
+        font-weight: 800;
+      }
+      @keyframes velWorldCupGlow {
+        to {
+          transform: rotate(360deg);
+        }
+      }
     </style>
     <link rel="icon" href="/logos/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" sizes="32x32" href="/logos/favicon-32x32.png" />
@@ -148,8 +316,8 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=country-germany-anime-priority-20260608"></script>
-    <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css">
+    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=trial-10min-20260611"></script>
+    <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css">
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css">
     <style>
@@ -842,6 +1010,165 @@
           text-transform: uppercase;
         }
       }
+
+      #vel-world-cup-entry.vel-world-cup-entry--custom {
+        width: min(100% - 24px, 1180px) !important;
+        height: clamp(96px, 10vw, 156px) !important;
+        min-height: 0 !important;
+        margin: 10px auto 22px !important;
+        padding: 3px !important;
+        border: 1px solid rgba(255, 218, 92, 0.96) !important;
+        border-radius: 24px !important;
+        display: block !important;
+        align-self: start !important;
+        justify-self: center !important;
+        overflow: hidden !important;
+        line-height: 0 !important;
+        background:
+          linear-gradient(90deg, rgba(255, 218, 92, 0.94), rgba(115, 76, 255, 0.92), rgba(38, 214, 255, 0.94), rgba(255, 218, 92, 0.94)) border-box,
+          rgba(5, 4, 14, 0.94) padding-box !important;
+        box-shadow:
+          0 0 0 1px rgba(255, 255, 255, 0.15) inset,
+          0 0 18px rgba(255, 218, 92, 0.82),
+          0 0 38px rgba(139, 92, 246, 0.52),
+          0 0 70px rgba(34, 211, 238, 0.32),
+          0 20px 55px rgba(0, 0, 0, 0.62) !important;
+        animation: velWorldCupNeonPulse 2.7s ease-in-out infinite !important;
+      }
+
+      #vel-world-cup-entry.vel-world-cup-entry--custom::before {
+        inset: -28% !important;
+        z-index: 0 !important;
+        background:
+          linear-gradient(110deg, transparent 18%, rgba(255, 255, 255, 0.36) 34%, transparent 52%),
+          radial-gradient(circle at 20% 50%, rgba(255, 218, 92, 0.34), transparent 34%),
+          radial-gradient(circle at 82% 50%, rgba(34, 211, 238, 0.32), transparent 38%) !important;
+        opacity: 0.82 !important;
+        animation: velWorldCupLightSweep 3.2s ease-in-out infinite !important;
+      }
+
+      #vel-world-cup-entry.vel-world-cup-entry--custom::after {
+        display: none !important;
+      }
+
+      #vel-world-cup-entry .vel-world-cup-entry__image {
+        display: block !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        height: 100% !important;
+        max-width: none !important;
+        max-height: none !important;
+        object-fit: cover !important;
+        object-position: center !important;
+        border-radius: 20px !important;
+        box-shadow:
+          0 0 0 1px rgba(255, 255, 255, 0.18) inset,
+          0 0 22px rgba(255, 218, 92, 0.28) inset !important;
+      }
+
+      #vel-world-cup-entry .admin-pkg-edit-sb,
+      .vel-world-cup-card-grid .admin-pkg-edit-sb {
+        position: absolute !important;
+        top: 10px !important;
+        right: 10px !important;
+        z-index: 50 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        min-width: 42px !important;
+        height: 34px !important;
+        padding: 0 10px !important;
+        border: 1px solid rgba(255, 255, 255, 0.34) !important;
+        border-radius: 999px !important;
+        background: linear-gradient(135deg, rgba(255, 218, 92, 0.96), rgba(168, 85, 247, 0.94)) !important;
+        color: #08050f !important;
+        box-shadow: 0 0 18px rgba(255, 218, 92, 0.55), 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+        font-size: 0.72rem !important;
+        font-weight: 950 !important;
+        line-height: 1 !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+      }
+
+      .vel-world-cup-card-grid .vel-package-card {
+        position: relative !important;
+      }
+
+      @keyframes velWorldCupNeonPulse {
+        0%, 100% {
+          filter: brightness(1);
+          box-shadow:
+            0 0 0 1px rgba(255, 255, 255, 0.15) inset,
+            0 0 18px rgba(255, 218, 92, 0.74),
+            0 0 38px rgba(139, 92, 246, 0.46),
+            0 0 70px rgba(34, 211, 238, 0.27),
+            0 20px 55px rgba(0, 0, 0, 0.62);
+        }
+        50% {
+          filter: brightness(1.08);
+          box-shadow:
+            0 0 0 1px rgba(255, 255, 255, 0.24) inset,
+            0 0 26px rgba(255, 218, 92, 0.96),
+            0 0 56px rgba(139, 92, 246, 0.68),
+            0 0 92px rgba(34, 211, 238, 0.42),
+            0 24px 62px rgba(0, 0, 0, 0.68);
+        }
+      }
+
+      @keyframes velWorldCupLightSweep {
+        0%, 20% {
+          transform: translateX(-55%) skewX(-12deg);
+        }
+        58%, 100% {
+          transform: translateX(55%) skewX(-12deg);
+        }
+      }
+
+      .vel-packages .vel-package-card__title,
+      .vel-world-cup-card-grid .vel-package-card__title {
+        display: block !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        height: auto !important;
+        max-height: none !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        overflow-wrap: anywhere !important;
+        line-height: 1.05 !important;
+        -webkit-line-clamp: unset !important;
+        line-clamp: unset !important;
+        -webkit-box-orient: initial !important;
+      }
+
+      .vel-packages .vel-package-card--vod-default-art,
+      .vel-packages .vel-package-card--series-default-art {
+        overflow: hidden !important;
+        align-items: center !important;
+        justify-content: center !important;
+      }
+
+      .vel-packages .vel-package-card--vod-default-art .vel-package-card__title,
+      .vel-packages .vel-package-card--series-default-art .vel-package-card__title {
+        position: relative !important;
+        inset: auto !important;
+        transform: none !important;
+        padding: 0 10px !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex-wrap: wrap !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+      }
+
+      .vel-package-card__title::before,
+      .vel-package-card__title::after {
+        content: none !important;
+        display: none !important;
+      }
     </style>
   </head>
   <body class="vite-autoconnect">
@@ -1283,7 +1610,7 @@
           <div class="vel-promo-banner__countdown" aria-label="Temps d'essai restant">
             <span class="vel-promo-banner__countdown-text">Expire dans</span>
             <span class="vel-promo-banner__time">
-              <span class="vel-promo-banner__num" id="vel-promo-minutes">01</span><span class="vel-promo-banner__separator">:</span><span class="vel-promo-banner__num" id="vel-promo-seconds">00</span>
+              <span class="vel-promo-banner__num" id="vel-promo-minutes">10</span><span class="vel-promo-banner__separator">:</span><span class="vel-promo-banner__num" id="vel-promo-seconds">00</span>
             </span>
           </div>
 
@@ -1611,7 +1938,7 @@
                 tabindex="0"
                 data-tv-focusable="true"
               >
-                ← Retour aux bouquets
+                &larr; Retour aux bouquets
               </button>
               <div id="cat-pills-wrap" class="cat-pills-wrap vel-cat-pills-wrap hidden">
                 <div id="cat-pills" class="vel-pills" role="tablist" aria-label="Filtres"></div>
@@ -1984,7 +2311,7 @@
         class="trial-timer-root__hint hidden"
         title="Compteur local sans API Supabase (dev)"
         >Local</span>
-      <span id="trial-timer-count" class="trial-timer-root__count">1:00</span>
+      <span id="trial-timer-count" class="trial-timer-root__count">10:00</span>
     </div>
 
     <dialog id="vel-global-pkg-confirm-dialog" class="vel-global-pkg-confirm-dialog" aria-modal="true">
@@ -2513,7 +2840,7 @@
             var timer = document.querySelector(".trial-countdown__time, .trial-timer-root__count");
             remaining = timer ? parseTimeText(timer.textContent) : undefined;
           }
-          var limit = 60;
+          var limit = 600;
           var used = remaining === undefined ? undefined : Math.max(0, limit - remaining);
           return {
             trialStartedAt: trialStartedAt,

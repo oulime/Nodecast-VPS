@@ -23,8 +23,8 @@ function shouldUseRemoteTrialApi() {
 }
 
 function trialLimitSeconds() {
-    const seconds = Number(process.env.TRIAL_SECONDS || process.env.VITE_TRIAL_SECONDS || process.env.TRIAL_LIMIT_SECONDS || 60);
-    if (!Number.isFinite(seconds) || seconds <= 0) return 60;
+    const seconds = Number(process.env.TRIAL_SECONDS || process.env.VITE_TRIAL_SECONDS || process.env.TRIAL_LIMIT_SECONDS || 600);
+    if (!Number.isFinite(seconds) || seconds <= 0) return 600;
     return Math.min(Math.max(Math.floor(seconds), 1), 86400);
 }
 

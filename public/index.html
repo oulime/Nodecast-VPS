@@ -999,6 +999,38 @@
         grid-column: 1 / -1;
       }
 
+      .vel-analytics-subtabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+        margin: 0 0 0.75rem;
+        padding: 0.38rem;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 14px;
+        background: rgba(2, 6, 23, 0.28);
+      }
+
+      .vel-analytics-subtab {
+        min-height: 2.35rem;
+        padding: 0 0.9rem;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        background: transparent;
+        color: rgba(226, 232, 240, 0.72);
+        font-weight: 850;
+      }
+
+      .vel-analytics-subtab.is-active {
+        border-color: rgba(45, 212, 191, 0.38);
+        background: linear-gradient(135deg, rgba(20, 184, 166, 0.28), rgba(59, 130, 246, 0.2));
+        color: #fff;
+        box-shadow: inset 0 1px rgba(255, 255, 255, 0.1);
+      }
+
+      .vel-analytics-tabpanel {
+        min-width: 0;
+      }
+
       .vel-analytics-table-wrap {
         width: 100%;
         overflow: hidden;
@@ -1040,6 +1072,23 @@
       .vel-analytics-table--channels th:nth-child(1),
       .vel-analytics-table--channels td:nth-child(1) {
         width: 4rem;
+      }
+
+      .vel-analytics-table--button-clicks th:nth-child(1),
+      .vel-analytics-table--button-clicks td:nth-child(1) {
+        width: 46%;
+      }
+
+      .vel-analytics-table--button-clicks th:nth-child(2),
+      .vel-analytics-table--button-clicks td:nth-child(2),
+      .vel-analytics-table--button-clicks th:nth-child(3),
+      .vel-analytics-table--button-clicks td:nth-child(3) {
+        width: 14%;
+      }
+
+      .vel-analytics-table--button-clicks th:nth-child(4),
+      .vel-analytics-table--button-clicks td:nth-child(4) {
+        width: 26%;
       }
 
       .vel-analytics-table th,
@@ -3514,29 +3563,50 @@
         function eventLabel(type) {
           var raw = String(type || "").toLowerCase();
           var labels = {
-            page_view: "Page opened",
-            session_start: "Session started",
-            session_resume: "Session resumed",
-            session_end: "Session closed",
-            heartbeat: "Still online",
-            login_connect_click: "Clicked login",
-            trial_start_click: "Clicked start trial",
-            promo_banner_cta_click: "Clicked promo banner",
-            trial_offer_cta_click: "Clicked product offer",
-            trial_offer_highlight_click: "Clicked offer area",
-            trial_expired_close_click: "Closed trial ended popup",
-            external_browser_open_click: "Tried open browser",
-            external_browser_trial_resume: "Trial resumed in browser",
-            package_open: "Opened package",
-            media_open: "Opened channel/content",
-            video_start: "Started watching",
-            video_progress: "Watching",
-            video_stop: "Stopped watching",
-            video_end: "Finished watching",
-            tab_open: "Changed tab",
-            country_change: "Changed country"
+            page_view: "Page ouverte",
+            session_start: "Session démarrée",
+            session_resume: "Session reprise",
+            session_end: "Session fermée",
+            heartbeat: "Encore en ligne",
+            login_connect_click: "Connexion",
+            trial_start_click: "Commencer le test",
+            promo_banner_cta_click: "Bannière promo",
+            trial_offer_cta_click: "Bouton achat",
+            trial_offer_highlight_click: "Offre spéciale",
+            trial_expired_close_click: "Popup essai fermé",
+            external_browser_open_click: "Ouverture navigateur",
+            external_browser_trial_resume: "Test repris navigateur",
+            package_open: "Package ouvert",
+            media_open: "Chaîne ouverte",
+            video_start: "Lecture démarrée",
+            video_progress: "En lecture",
+            video_stop: "Lecture arrêtée",
+            video_end: "Lecture terminée",
+            tab_open: "Onglet changé",
+            country_change: "Pays changé"
           };
           return labels[raw] || type || "";
+        }
+
+        function clickContextLabel(item) {
+          var type = String(item && item.type || "").toLowerCase();
+          var source = String(item && item.source || "").toLowerCase();
+          var browser = String(item && item.browser || "").toLowerCase();
+          if (type === "trial_start_click") return "Bouton Commencer";
+          if (type === "trial_offer_cta_click") return "Après essai terminé";
+          if (type === "promo_banner_cta_click") return "Barre promo en haut";
+          if (type === "trial_offer_highlight_click") return "Zone offre spéciale";
+          if (type === "trial_expired_close_click") return "Bouton Compris";
+          if (type === "login_connect_click") return "Bouton Connexion";
+          if (type === "external_browser_open_click") {
+            if (source === "trial_start") return "TikTok vers navigateur - test";
+            if (source === "trial_offer_button") return "TikTok vers navigateur - achat";
+            if (source === "promo_banner") return "TikTok vers navigateur - promo";
+            if (source === "page_load") return "TikTok vers navigateur - arrivée";
+            return browser === "test" ? "Test local navigateur" : "TikTok vers navigateur";
+          }
+          if (type === "external_browser_trial_resume") return "Ouvert dans navigateur";
+          return "";
         }
 
         function packageDisplay(item) {
@@ -3613,16 +3683,16 @@
           if (!items || !items.length) return '<p class="vel-analytics-empty">No tracked button clicks in this period yet.</p>';
           return [
             '<div class="vel-analytics-table-wrap">',
-            '<table class="vel-analytics-table vel-analytics-table--channels">',
-            '<thead><tr><th>Button</th><th>Clicks</th><th>Visitors</th><th>Last click</th></tr></thead><tbody>',
+            '<table class="vel-analytics-table vel-analytics-table--button-clicks">',
+            '<thead><tr><th>Action</th><th>Clics</th><th>Visiteurs</th><th>Dernier clic</th></tr></thead><tbody>',
             items.map(function (item) {
-              var meta = [item.cta, item.source, item.browser].filter(Boolean).join(" / ");
+              var meta = clickContextLabel(item);
               return [
                 '<tr>',
-                '<td data-label="Button"><div class="vel-analytics-now-title">' + escapeHtml(eventLabel(item.type)) + (meta ? '<span class="vel-analytics-subline">' + escapeHtml(meta) + '</span>' : '') + '</div></td>',
-                '<td data-label="Clicks">' + escapeHtml(String(item.count || 0)) + '</td>',
-                '<td data-label="Visitors">' + escapeHtml(String(item.visitors || 0)) + '</td>',
-                '<td data-label="Last click">' + escapeHtml(formatTime(item.lastSeen)) + '</td>',
+                '<td data-label="Action"><div class="vel-analytics-now-title">' + escapeHtml(eventLabel(item.type)) + (meta ? '<span class="vel-analytics-subline">' + escapeHtml(meta) + '</span>' : '') + '</div></td>',
+                '<td data-label="Clics">' + escapeHtml(String(item.count || 0)) + '</td>',
+                '<td data-label="Visiteurs">' + escapeHtml(String(item.visitors || 0)) + '</td>',
+                '<td data-label="Dernier clic">' + escapeHtml(formatTime(item.lastSeen)) + '</td>',
                 '</tr>'
               ].join("");
             }).join(""),
@@ -3704,11 +3774,22 @@
               '<div class="vel-analytics-card"><span class="vel-analytics-card__label">IPs</span><span id="va-ips" class="vel-analytics-card__value">0</span><span class="vel-analytics-card__hint">unique addresses</span></div>',
               '<div class="vel-analytics-card"><span class="vel-analytics-card__label">Watch time</span><span id="va-watch" class="vel-analytics-card__value">0s</span><span class="vel-analytics-card__hint">tracked total</span></div>',
               '</div>',
+              '<div class="vel-analytics-subtabs" role="tablist" aria-label="Analytics details">',
+              '<button type="button" class="vel-analytics-subtab is-active" role="tab" aria-selected="true" aria-controls="va-panel-visitors" data-analytics-subtab="visitors">Visiteurs</button>',
+              '<button type="button" class="vel-analytics-subtab" role="tab" aria-selected="false" aria-controls="va-panel-clicks" data-analytics-subtab="clicks">Clics boutons</button>',
+              '<button type="button" class="vel-analytics-subtab" role="tab" aria-selected="false" aria-controls="va-panel-channels" data-analytics-subtab="channels">Chaînes</button>',
+              '</div>',
+              '<div id="va-panel-visitors" class="vel-analytics-tabpanel" role="tabpanel" data-analytics-panel="visitors">',
               '<div class="vel-analytics-layout vel-analytics-layout--simple">',
-              '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>Visitors right now</h3><div id="va-live-list"></div></div>',
-              '<div class="vel-analytics-box vel-analytics-box--live-table"><h3 id="va-visitors-title">Visitors today</h3><div id="va-visitors-list"></div></div>',
-              '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>Button clicks</h3><div id="va-button-clicks"></div></div>',
-              '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>Most watched channels</h3><div id="va-channels"></div></div>',
+              '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>Visiteurs en ligne</h3><div id="va-live-list"></div></div>',
+              '<div class="vel-analytics-box vel-analytics-box--live-table"><h3 id="va-visitors-title">Visiteurs aujourd’hui</h3><div id="va-visitors-list"></div></div>',
+              '</div>',
+              '</div>',
+              '<div id="va-panel-clicks" class="vel-analytics-tabpanel hidden" role="tabpanel" data-analytics-panel="clicks" hidden>',
+              '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>Clics sur les boutons</h3><div id="va-button-clicks"></div></div>',
+              '</div>',
+              '<div id="va-panel-channels" class="vel-analytics-tabpanel hidden" role="tabpanel" data-analytics-panel="channels" hidden>',
+              '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>Chaînes les plus regardées</h3><div id="va-channels"></div></div>',
               '</div>'
             ].join("");
             panels.appendChild(panel);
@@ -3717,8 +3798,29 @@
               analyticsScope = analyticsScope === "today" ? "all" : "today";
               loadAnalytics();
             });
+            panel.querySelectorAll("[data-analytics-subtab]").forEach(function (tabButton) {
+              tabButton.addEventListener("click", function () {
+                showAnalyticsSubtab(tabButton.dataset.analyticsSubtab || "visitors");
+              });
+            });
           }
           return panel;
+        }
+
+        function showAnalyticsSubtab(name) {
+          var panel = document.getElementById("settings-tab-analytics");
+          if (!panel) return;
+          var activeName = name || "visitors";
+          panel.querySelectorAll("[data-analytics-subtab]").forEach(function (button) {
+            var active = button.dataset.analyticsSubtab === activeName;
+            button.classList.toggle("is-active", active);
+            button.setAttribute("aria-selected", active ? "true" : "false");
+          });
+          panel.querySelectorAll("[data-analytics-panel]").forEach(function (section) {
+            var active = section.dataset.analyticsPanel === activeName;
+            section.classList.toggle("hidden", !active);
+            section.hidden = !active;
+          });
         }
 
         function showAnalyticsTab() {
@@ -3777,7 +3879,7 @@
                 : "Today visitors, country, package and watched channels. Saved locally on this Nodecast machine.";
             }
             if (scopeButton) scopeButton.textContent = scope === "all" ? "Show today" : "Show all time";
-            if (visitorsTitle) visitorsTitle.textContent = scope === "all" ? "Visitors all time" : "Visitors today";
+            if (visitorsTitle) visitorsTitle.textContent = scope === "all" ? "Visiteurs tout le temps" : "Visiteurs aujourd’hui";
             document.getElementById("va-live").textContent = String(live.total || 0);
             document.getElementById("va-visitors").textContent = String(summary.uniqueVisitors || 0);
             document.getElementById("va-ips").textContent = String(summary.uniqueIps || 0);

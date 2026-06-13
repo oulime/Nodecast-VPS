@@ -9,6 +9,7 @@ const ACTIVE_WINDOW_MS = 45 * 1000;
 const WATCHING_WINDOW_MS = 45 * 1000;
 const MAX_STRING_LENGTH = 260;
 const MAX_EVENTS_FOR_SUMMARY = 50000;
+const ANALYTICS_TIME_ZONE = process.env.NODECAST_ANALYTICS_TIME_ZONE || 'Africa/Casablanca';
 const liveSessions = new Map();
 let appendQueue = Promise.resolve();
 
@@ -233,6 +234,13 @@ function publicEventFromRequest(req) {
 async function listEventFiles(days = 7) {
     const dir = analyticsDir();
     await fs.mkdir(dir, { recursive: true });
+    if (days === 'all') {
+        const files = await fs.readdir(dir).catch(() => []);
+        return files
+            .filter((name) => /^events-\d{4}-\d{2}-\d{2}\.jsonl$/.test(name))
+            .sort()
+            .map((name) => path.join(dir, name));
+    }
     const maxDays = Math.min(Math.max(Number(days) || 7, 1), 30);
     const wanted = new Set();
     for (let i = 0; i < maxDays; i += 1) {
@@ -265,6 +273,37 @@ async function readEvents({ days = 7, limit = MAX_EVENTS_FOR_SUMMARY } = {}) {
         }
     }
     return events;
+}
+
+function localDateKey(value = new Date()) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    try {
+        const parts = new Intl.DateTimeFormat('en', {
+            timeZone: ANALYTICS_TIME_ZONE,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).formatToParts(date);
+        const get = (type) => parts.find((part) => part.type === type)?.value || '';
+        return `${get('year')}-${get('month')}-${get('day')}`;
+    } catch {
+        return date.toISOString().slice(0, 10);
+    }
+}
+
+function analyticsScope(req) {
+    const scope = String(req.query.scope || req.query.period || '').trim().toLowerCase();
+    if (scope === 'today') return { scope: 'today', days: 2 };
+    if (scope === 'all' || scope === 'all_time' || scope === 'all-time') return { scope: 'all', days: 'all' };
+    const days = Math.min(Math.max(Number(req.query.days) || 7, 1), 30);
+    return { scope: 'days', days };
+}
+
+function filterEventsForScope(events, scope) {
+    if (scope !== 'today') return events;
+    const today = localDateKey();
+    return events.filter((event) => localDateKey(event.ts) === today);
 }
 
 function countBy(events, keyFn, { limit = 12, seconds = false } = {}) {
@@ -302,12 +341,57 @@ function summarize(events) {
         uniqueVisitors: visitors.size,
         uniqueIps: ips.size,
         totalWatchSeconds,
+        visitors: summarizeVisitors(events),
         topPages: countBy(events, (event) => event.page || event.path),
         topPackages: countBy(events.filter((event) => event.packageName), (event) => event.packageName),
         topChannels: countBy(watchEvents, (event) => event.channelName || event.mediaTitle, { seconds: true }),
         topMedia: countBy(events.filter((event) => event.mediaTitle), (event) => event.mediaTitle),
         recentEvents: events.slice(-80).reverse()
     };
+}
+
+function summarizeVisitors(events, limit = 200) {
+    const visitors = new Map();
+    for (const event of events) {
+        const key = event.sessionId || event.ip;
+        if (!key) continue;
+        const existing = visitors.get(key) || {
+            sessionId: event.sessionId,
+            ip: event.ip,
+            userAgent: event.userAgent,
+            device: event.device || {},
+            firstSeen: event.ts,
+            lastSeen: event.ts,
+            eventCount: 0,
+            totalWatchSeconds: 0
+        };
+        existing.ip = event.ip || existing.ip;
+        existing.userAgent = event.userAgent || existing.userAgent;
+        existing.device = Object.keys(event.device || {}).length ? event.device : existing.device;
+        existing.page = event.page || event.path || existing.page;
+        existing.section = event.section || existing.section;
+        existing.country = event.country || existing.country;
+        existing.packageName = event.packageName || existing.packageName;
+        existing.packageId = event.packageId || existing.packageId;
+        existing.mediaType = event.mediaType || existing.mediaType;
+        existing.mediaTitle = event.mediaTitle || existing.mediaTitle;
+        existing.channelName = event.channelName || existing.channelName;
+        existing.trialStartedAt = event.trialStartedAt || existing.trialStartedAt;
+        existing.trialSecondsUsed = event.trialSecondsUsed ?? existing.trialSecondsUsed;
+        existing.trialSecondsRemaining = event.trialSecondsRemaining ?? existing.trialSecondsRemaining;
+        existing.trialLimitSeconds = event.trialLimitSeconds ?? existing.trialLimitSeconds;
+        existing.lastEventType = event.type || existing.lastEventType;
+        existing.lastSeen = event.ts || existing.lastSeen;
+        existing.eventCount += 1;
+        const delta = Number(event.watchDeltaSeconds);
+        existing.totalWatchSeconds += Number.isFinite(delta)
+            ? Math.max(0, delta)
+            : Math.max(0, Number(event.watchedSeconds) || 0);
+        visitors.set(key, existing);
+    }
+    return [...visitors.values()]
+        .sort((a, b) => String(b.lastSeen).localeCompare(String(a.lastSeen)))
+        .slice(0, limit);
 }
 
 router.post('/event', async (req, res) => {
@@ -339,12 +423,14 @@ router.get('/admin/live', requireAdmin, (req, res) => {
 
 router.get('/admin/summary', requireAdmin, async (req, res) => {
     try {
-        const days = Math.min(Math.max(Number(req.query.days) || 7, 1), 30);
+        const { scope, days } = analyticsScope(req);
         const events = await readEvents({ days });
         res.json({
+            scope,
             days,
+            timeZone: ANALYTICS_TIME_ZONE,
             generatedAt: new Date().toISOString(),
-            ...summarize(events)
+            ...summarize(filterEventsForScope(events, scope))
         });
     } catch (err) {
         console.error('[analytics] summary failed:', err);
@@ -354,10 +440,15 @@ router.get('/admin/summary', requireAdmin, async (req, res) => {
 
 router.get('/admin/events', requireAdmin, async (req, res) => {
     try {
-        const days = Math.min(Math.max(Number(req.query.days) || 7, 1), 30);
+        const { scope, days } = analyticsScope(req);
         const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 1000);
         const events = await readEvents({ days, limit });
-        res.json({ days, events: events.slice(-limit).reverse() });
+        res.json({
+            scope,
+            days,
+            timeZone: ANALYTICS_TIME_ZONE,
+            events: filterEventsForScope(events, scope).slice(-limit).reverse()
+        });
     } catch (err) {
         console.error('[analytics] events failed:', err);
         res.status(500).json({ error: 'Analytics events failed' });

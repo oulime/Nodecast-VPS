@@ -10,6 +10,16 @@ const WATCHING_WINDOW_MS = 45 * 1000;
 const MAX_STRING_LENGTH = 260;
 const MAX_EVENTS_FOR_SUMMARY = 50000;
 const ANALYTICS_TIME_ZONE = process.env.NODECAST_ANALYTICS_TIME_ZONE || 'Africa/Casablanca';
+const BUTTON_CLICK_TYPES = new Set([
+    'login_connect_click',
+    'trial_start_click',
+    'promo_banner_cta_click',
+    'trial_offer_cta_click',
+    'trial_offer_highlight_click',
+    'trial_expired_close_click',
+    'external_browser_open_click',
+    'external_browser_trial_resume'
+]);
 const liveSessions = new Map();
 let appendQueue = Promise.resolve();
 
@@ -226,6 +236,11 @@ function publicEventFromRequest(req) {
         trialSecondsUsed: cleanNumber(body.trialSecondsUsed),
         trialSecondsRemaining: cleanNumber(body.trialSecondsRemaining),
         trialLimitSeconds: cleanNumber(body.trialLimitSeconds),
+        cta: cleanString(body.cta, 120),
+        action: cleanString(body.action, 120),
+        source: cleanString(body.source, 120),
+        browser: cleanString(body.browser, 120),
+        targetPath: cleanString(body.targetPath, 260),
         referrer: cleanString(body.referrer, 260),
         meta: cleanObject(body.meta)
     };
@@ -342,12 +357,77 @@ function summarize(events) {
         uniqueIps: ips.size,
         totalWatchSeconds,
         visitors: summarizeVisitors(events),
+        buttonClicks: summarizeButtonClicks(events),
+        recentButtonClicks: recentButtonClicks(events),
         topPages: countBy(events, (event) => event.page || event.path),
         topPackages: countBy(events.filter((event) => event.packageName), (event) => event.packageName),
         topChannels: countBy(watchEvents, (event) => event.channelName || event.mediaTitle, { seconds: true }),
         topMedia: countBy(events.filter((event) => event.mediaTitle), (event) => event.mediaTitle),
         recentEvents: events.slice(-80).reverse()
     };
+}
+
+function summarizeButtonClicks(events, limit = 16) {
+    const clicks = new Map();
+    for (const event of events) {
+        if (!BUTTON_CLICK_TYPES.has(event.type)) continue;
+        const key = event.type;
+        const existing = clicks.get(key) || {
+            type: key,
+            count: 0,
+            visitors: new Set(),
+            ips: new Set(),
+            lastSeen: event.ts,
+            lastIp: event.ip,
+            lastPage: event.page,
+            cta: event.cta,
+            action: event.action,
+            source: event.source,
+            browser: event.browser
+        };
+        existing.count += 1;
+        if (event.sessionId) existing.visitors.add(event.sessionId);
+        if (event.ip) existing.ips.add(event.ip);
+        existing.lastSeen = event.ts || existing.lastSeen;
+        existing.lastIp = event.ip || existing.lastIp;
+        existing.lastPage = event.page || existing.lastPage;
+        existing.cta = event.cta || existing.cta;
+        existing.action = event.action || existing.action;
+        existing.source = event.source || existing.source;
+        existing.browser = event.browser || existing.browser;
+        clicks.set(key, existing);
+    }
+    return [...clicks.values()]
+        .map((item) => ({
+            ...item,
+            visitors: item.visitors.size,
+            ips: item.ips.size
+        }))
+        .sort((a, b) => b.count - a.count || String(b.lastSeen || '').localeCompare(String(a.lastSeen || '')))
+        .slice(0, limit);
+}
+
+function recentButtonClicks(events, limit = 50) {
+    return events
+        .filter((event) => BUTTON_CLICK_TYPES.has(event.type))
+        .slice(-limit)
+        .reverse()
+        .map((event) => ({
+            ts: event.ts,
+            type: event.type,
+            ip: event.ip,
+            sessionId: event.sessionId,
+            page: event.page,
+            section: event.section,
+            country: event.country,
+            packageName: event.packageName,
+            mediaTitle: event.mediaTitle,
+            channelName: event.channelName,
+            cta: event.cta,
+            action: event.action,
+            source: event.source,
+            browser: event.browser
+        }));
 }
 
 function summarizeVisitors(events, limit = 200) {

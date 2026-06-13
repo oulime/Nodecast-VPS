@@ -2937,9 +2937,12 @@
         function shouldSkipTracking(target) {
           if (isLocalAnalyticsHost()) return true;
           if (isAdminOpen()) return true;
-          if (target && target.closest && target.closest("#settings-shell, dialog, .admin-add-package-dialog, .admin-channel-assign-dialog")) {
+          if (!target || !target.closest) return false;
+          if (target.closest("#settings-shell, .admin-add-package-dialog, .admin-channel-assign-dialog")) {
             return true;
           }
+          var dialog = target.closest("dialog");
+          if (dialog && dialog.id !== "trial-expired-dialog") return true;
           return false;
         }
 
@@ -3125,9 +3128,188 @@
           };
         }
 
+        function queryParam(name) {
+          try {
+            return new URLSearchParams(location.search || "").get(name);
+          } catch (error) {
+            return null;
+          }
+        }
+
+        function isInAppBrowserTest() {
+          return queryParam("veloraInAppTest") === "1";
+        }
+
+        function isTikTokInAppBrowser() {
+          if (isInAppBrowserTest()) return true;
+          var ua = String(navigator.userAgent || "");
+          return /tiktok|musical_ly|bytedance|aweme|ttwebview|tiktokwebview/i.test(ua);
+        }
+
+        function inAppBrowserName() {
+          return isInAppBrowserTest() ? "test" : isTikTokInAppBrowser() ? "tiktok" : "";
+        }
+
+        function externalUrlForAction(action, href) {
+          var target;
+          try {
+            target = new URL(href || location.href, location.href);
+          } catch (error) {
+            target = new URL(location.href);
+          }
+          target.searchParams.delete("veloraInAppTest");
+          target.searchParams.set("externalBrowser", "1");
+          if (action === "trial_start") target.searchParams.set("startTrial", "1");
+          return target;
+        }
+
+        function sendToExternalBrowser(action, source, href) {
+          var targetUrl = externalUrlForAction(action, href);
+          send("external_browser_open_click", {
+            browser: inAppBrowserName() || "unknown",
+            action: action || "open",
+            source: source || "",
+            targetPath: targetUrl.pathname + targetUrl.search
+          });
+
+          var ua = String(navigator.userAgent || "");
+          if (/android/i.test(ua)) {
+            var scheme = targetUrl.protocol.replace(":", "") || "https";
+            var intentPath = targetUrl.host + targetUrl.pathname + targetUrl.search + targetUrl.hash;
+            location.href =
+              "intent://" +
+              intentPath +
+              "#Intent;scheme=" +
+              scheme +
+              ";package=com.android.chrome;S.browser_fallback_url=" +
+              encodeURIComponent(targetUrl.toString()) +
+              ";end";
+            return true;
+          }
+
+          if (/iphone|ipad|ipod/i.test(ua)) {
+            var chromeScheme = targetUrl.protocol === "https:" ? "googlechromes://" : "googlechrome://";
+            var chromeUrl = chromeScheme + targetUrl.href.replace(/^https?:\/\//i, "");
+            location.href = chromeUrl;
+            window.setTimeout(function () {
+              if (!document.hidden) location.href = targetUrl.toString();
+            }, 900);
+            return true;
+          }
+
+          try {
+            window.open(targetUrl.toString(), "_blank", "noopener,noreferrer");
+          } catch (error) {
+            location.href = targetUrl.toString();
+          }
+          return true;
+        }
+
+        function maybeAutoOpenExternalBrowser() {
+          if (!isTikTokInAppBrowser()) return;
+          if (queryParam("externalBrowser") === "1") return;
+          try {
+            if (sessionStorage.getItem("velora_external_browser_auto_attempted") === "1") return;
+            sessionStorage.setItem("velora_external_browser_auto_attempted", "1");
+          } catch (error) {}
+          window.setTimeout(function () {
+            sendToExternalBrowser("auto_open", "page_load");
+          }, 250);
+        }
+
+        function handoffClickToExternalBrowser(target, event) {
+          if (!isTikTokInAppBrowser()) return false;
+
+          var trialStart = target.closest("#velora-trial-start-btn");
+          var promo = target.closest("#vel-promo-offer-open");
+          var offerButton = target.closest(".trial-offer-button");
+          var offerHighlight = target.closest(".trial-offer-highlight");
+          if (!trialStart && !promo && !offerButton && !offerHighlight) return false;
+
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+          }
+
+          var source = trialStart
+            ? "trial_start"
+            : promo
+              ? "promo_banner"
+              : offerButton
+                ? "trial_offer_button"
+                : "trial_offer_highlight";
+          var action = trialStart ? "trial_start" : "trial_offer";
+          if (trialStart) {
+            send("trial_start_click", { cta: "commencer_mon_essai" });
+          } else if (promo) {
+            send("promo_banner_cta_click", { cta: "j_en_profite" });
+          } else if (offerButton) {
+            send("trial_offer_cta_click", { cta: "obtenir_ma_promo" });
+          } else if (offerHighlight) {
+            send("trial_offer_highlight_click", { cta: "offre_speciale" });
+          }
+          sendToExternalBrowser(action, source, offerButton && offerButton.href ? offerButton.href : "");
+          return true;
+        }
+
+        function resumeExternalTrialStart() {
+          if (queryParam("startTrial") !== "1" || isTikTokInAppBrowser()) return;
+          var attempts = 0;
+          var timer = window.setInterval(function () {
+            attempts += 1;
+            var button = document.getElementById("velora-trial-start-btn");
+            if (button) {
+              send("external_browser_trial_resume", { browser: "external" });
+              button.click();
+              try {
+                var clean = new URL(location.href);
+                clean.searchParams.delete("externalBrowser");
+                clean.searchParams.delete("startTrial");
+                history.replaceState(null, "", clean.pathname + clean.search + clean.hash);
+              } catch (error) {}
+              window.clearInterval(timer);
+            } else if (attempts > 80) {
+              window.clearInterval(timer);
+            }
+          }, 250);
+        }
+
         function onDocumentClick(event) {
           var target = event.target;
-          if (!target || !target.closest || shouldSkipTracking(target)) return;
+          if (!target || !target.closest) return;
+          if (handoffClickToExternalBrowser(target, event)) return;
+          if (shouldSkipTracking(target)) return;
+
+          if (target.closest("#velora-trial-start-btn")) {
+            send("trial_start_click", { cta: "commencer_mon_essai" });
+            return;
+          }
+
+          if (target.closest("#vel-promo-offer-open")) {
+            send("promo_banner_cta_click", { cta: "j_en_profite" });
+            return;
+          }
+
+          if (target.closest(".trial-offer-button")) {
+            send("trial_offer_cta_click", { cta: "obtenir_ma_promo" });
+            return;
+          }
+
+          if (target.closest(".trial-offer-highlight")) {
+            send("trial_offer_highlight_click", { cta: "offre_speciale" });
+            return;
+          }
+
+          if (target.closest("#trial-expired-close")) {
+            send("trial_expired_close_click", { cta: "compris" });
+            return;
+          }
+
+          if (target.closest("#btn-connect")) {
+            send("login_connect_click", { cta: "connexion" });
+            return;
+          }
 
           var tab = target.closest("#main-tabs .tab, .vel-adult-tab");
           if (tab) {
@@ -3161,9 +3343,6 @@
             });
           }
 
-          if (target.closest("#vel-promo-offer-open, .trial-offer-button, .trial-offer-highlight")) {
-            send("trial_offer_open", { page: "trial_offer" });
-          }
         }
 
         function nowPlayingTitle(video) {
@@ -3332,6 +3511,34 @@
           return page || section || "Browsing";
         }
 
+        function eventLabel(type) {
+          var raw = String(type || "").toLowerCase();
+          var labels = {
+            page_view: "Page opened",
+            session_start: "Session started",
+            session_resume: "Session resumed",
+            session_end: "Session closed",
+            heartbeat: "Still online",
+            login_connect_click: "Clicked login",
+            trial_start_click: "Clicked start trial",
+            promo_banner_cta_click: "Clicked promo banner",
+            trial_offer_cta_click: "Clicked product offer",
+            trial_offer_highlight_click: "Clicked offer area",
+            trial_expired_close_click: "Closed trial ended popup",
+            external_browser_open_click: "Tried open browser",
+            external_browser_trial_resume: "Trial resumed in browser",
+            package_open: "Opened package",
+            media_open: "Opened channel/content",
+            video_start: "Started watching",
+            video_progress: "Watching",
+            video_stop: "Stopped watching",
+            video_end: "Finished watching",
+            tab_open: "Changed tab",
+            country_change: "Changed country"
+          };
+          return labels[raw] || type || "";
+        }
+
         function packageDisplay(item) {
           var page = String(item.page || "").toLowerCase();
           var section = String(item.section || "").toLowerCase();
@@ -3390,10 +3597,32 @@
                 '<tr>',
                 '<td data-label="IP"><span class="vel-analytics-ip">' + escapeHtml(item.ip || "Unknown") + '</span></td>',
                 '<td data-label="Package"><div class="vel-analytics-now-title">' + escapeHtml(packageName) + (country ? '<span class="vel-analytics-subline">' + escapeHtml(country) + '</span>' : '') + '</div></td>',
-                '<td data-label="Last action"><div class="vel-analytics-now-title">' + escapeHtml(watching) + '<span class="vel-analytics-subline">' + escapeHtml(item.lastEventType || "") + '</span></div></td>',
+                '<td data-label="Last action"><div class="vel-analytics-now-title">' + escapeHtml(watching) + '<span class="vel-analytics-subline">' + escapeHtml(eventLabel(item.lastEventType)) + '</span></div></td>',
                 '<td data-label="First">' + escapeHtml(formatTime(item.firstSeen)) + '</td>',
                 '<td data-label="Last">' + escapeHtml(formatTime(item.lastSeen)) + '</td>',
                 '<td data-label="Watched">' + escapeHtml(formatDuration(item.totalWatchSeconds || item.trialSecondsUsed || 0)) + '</td>',
+                '</tr>'
+              ].join("");
+            }).join(""),
+            '</tbody></table>',
+            '</div>'
+          ].join("");
+        }
+
+        function buttonClicksTable(items) {
+          if (!items || !items.length) return '<p class="vel-analytics-empty">No tracked button clicks in this period yet.</p>';
+          return [
+            '<div class="vel-analytics-table-wrap">',
+            '<table class="vel-analytics-table vel-analytics-table--channels">',
+            '<thead><tr><th>Button</th><th>Clicks</th><th>Visitors</th><th>Last click</th></tr></thead><tbody>',
+            items.map(function (item) {
+              var meta = [item.cta, item.source, item.browser].filter(Boolean).join(" / ");
+              return [
+                '<tr>',
+                '<td data-label="Button"><div class="vel-analytics-now-title">' + escapeHtml(eventLabel(item.type)) + (meta ? '<span class="vel-analytics-subline">' + escapeHtml(meta) + '</span>' : '') + '</div></td>',
+                '<td data-label="Clicks">' + escapeHtml(String(item.count || 0)) + '</td>',
+                '<td data-label="Visitors">' + escapeHtml(String(item.visitors || 0)) + '</td>',
+                '<td data-label="Last click">' + escapeHtml(formatTime(item.lastSeen)) + '</td>',
                 '</tr>'
               ].join("");
             }).join(""),
@@ -3478,6 +3707,7 @@
               '<div class="vel-analytics-layout vel-analytics-layout--simple">',
               '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>Visitors right now</h3><div id="va-live-list"></div></div>',
               '<div class="vel-analytics-box vel-analytics-box--live-table"><h3 id="va-visitors-title">Visitors today</h3><div id="va-visitors-list"></div></div>',
+              '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>Button clicks</h3><div id="va-button-clicks"></div></div>',
               '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>Most watched channels</h3><div id="va-channels"></div></div>',
               '</div>'
             ].join("");
@@ -3555,6 +3785,7 @@
 
             document.getElementById("va-live-list").innerHTML = visitorsTable(live.visitors || []);
             document.getElementById("va-visitors-list").innerHTML = visitorsHistoryTable(summary.visitors || []);
+            document.getElementById("va-button-clicks").innerHTML = buttonClicksTable(summary.buttonClicks || []);
             document.getElementById("va-channels").innerHTML = channelsTable(summary.topChannels || []);
             setStatus("Showing " + scopeLabel + " - updated " + formatTime(new Date().toISOString()) + " Morocco time");
           } catch (error) {
@@ -3606,6 +3837,8 @@
             });
           }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "hidden", "aria-hidden"] });
           ensureAnalyticsPanel();
+          maybeAutoOpenExternalBrowser();
+          resumeExternalTrialStart();
           send("session_start");
           trackPageIfChanged();
         }

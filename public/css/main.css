@@ -906,7 +906,7 @@ video::cue {
 .video-container:fullscreen #video-player {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: fill;
 }
 
 .video-container:fullscreen .now-playing-overlay {
@@ -923,7 +923,7 @@ video::cue {
 .video-container:-webkit-full-screen #video-player {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: fill;
 }
 
 .video-container:-webkit-full-screen .now-playing-overlay {

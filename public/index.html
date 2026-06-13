@@ -68,7 +68,9 @@
         position: fixed !important;
         inset: 0 !important;
         width: 100vw !important;
+        width: 100dvw !important;
         height: 100vh !important;
+        height: 100dvh !important;
         z-index: 2147483646 !important;
         cursor: url("data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==") 0 0, none !important;
         pointer-events: auto !important;
@@ -326,7 +328,9 @@
       #video:fullscreen,
       #video-vod:fullscreen {
         width: 100vw !important;
+        width: 100dvw !important;
         height: 100vh !important;
+        height: 100dvh !important;
         max-width: none !important;
         max-height: none !important;
         background: #000 !important;
@@ -341,7 +345,9 @@
       #video:fullscreen,
       #video-vod:fullscreen {
         width: 100vw !important;
+        width: 100dvw !important;
         height: 100vh !important;
+        height: 100dvh !important;
       }
 
       .player-container:fullscreen #video,
@@ -385,6 +391,145 @@
       #video-vod:-webkit-full-screen {
         object-fit: contain !important;
         background: #000 !important;
+      }
+
+      /* Fullscreen playback should behave like match_parent: fill the whole viewport
+         without cropping live channels, films, or series. */
+      #player-container:fullscreen,
+      #vod-player-container:fullscreen,
+      #player-container:-webkit-full-screen,
+      #vod-player-container:-webkit-full-screen,
+      #player-container.player-container--live-fullscreen,
+      #vod-player-container.player-container--fullscreen,
+      .player-container:fullscreen,
+      .player-container:-webkit-full-screen {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        max-width: none !important;
+        max-height: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: #000 !important;
+        box-shadow: none !important;
+        overflow: hidden !important;
+      }
+
+      #player-container:fullscreen .video-wrapper,
+      #vod-player-container:fullscreen .video-wrapper,
+      #player-container:-webkit-full-screen .video-wrapper,
+      #vod-player-container:-webkit-full-screen .video-wrapper,
+      #player-container.player-container--live-fullscreen .video-wrapper,
+      #vod-player-container.player-container--fullscreen .video-wrapper,
+      .player-container:fullscreen .video-wrapper,
+      .player-container:-webkit-full-screen .video-wrapper {
+        width: 100vw !important;
+        height: 100vh !important;
+        max-width: none !important;
+        max-height: none !important;
+        margin: 0 !important;
+        aspect-ratio: auto !important;
+        border-radius: 0 !important;
+        background: #000 !important;
+      }
+
+      #player-container:fullscreen .video-wrapper::before,
+      #player-container:fullscreen .video-wrapper::after,
+      #vod-player-container:fullscreen .video-wrapper::before,
+      #vod-player-container:fullscreen .video-wrapper::after,
+      #player-container:-webkit-full-screen .video-wrapper::before,
+      #player-container:-webkit-full-screen .video-wrapper::after,
+      #vod-player-container:-webkit-full-screen .video-wrapper::before,
+      #vod-player-container:-webkit-full-screen .video-wrapper::after,
+      #player-container.player-container--live-fullscreen .video-wrapper::before,
+      #player-container.player-container--live-fullscreen .video-wrapper::after,
+      #vod-player-container.player-container--fullscreen .video-wrapper::before,
+      #vod-player-container.player-container--fullscreen .video-wrapper::after {
+        content: none !important;
+        display: none !important;
+      }
+
+      #player-container:fullscreen #video,
+      #vod-player-container:fullscreen #video-vod,
+      #player-container:-webkit-full-screen #video,
+      #vod-player-container:-webkit-full-screen #video-vod,
+      #player-container.player-container--live-fullscreen #video,
+      #vod-player-container.player-container--fullscreen #video-vod,
+      .player-container:fullscreen video,
+      .player-container:-webkit-full-screen video,
+      #video:fullscreen,
+      #video-vod:fullscreen,
+      #video:-webkit-full-screen,
+      #video-vod:-webkit-full-screen {
+        width: 100vw !important;
+        height: 100vh !important;
+        max-width: none !important;
+        max-height: none !important;
+        object-fit: fill !important;
+        object-position: center center !important;
+        background: #000 !important;
+        filter: none !important;
+        opacity: 1 !important;
+      }
+
+      #player-container:fullscreen .player-buffering,
+      #vod-player-container:fullscreen .player-buffering,
+      #player-container:-webkit-full-screen .player-buffering,
+      #vod-player-container:-webkit-full-screen .player-buffering,
+      #player-container.player-container--live-fullscreen .player-buffering,
+      #vod-player-container.player-container--fullscreen .player-buffering {
+        background: transparent !important;
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+      }
+
+      #player-container:fullscreen .player-buffering.hidden,
+      #vod-player-container:fullscreen .player-buffering.hidden,
+      #player-container:-webkit-full-screen .player-buffering.hidden,
+      #vod-player-container:-webkit-full-screen .player-buffering.hidden,
+      #player-container.player-container--live-fullscreen .player-buffering.hidden,
+      #vod-player-container.player-container--fullscreen .player-buffering.hidden {
+        display: none !important;
+        background: transparent !important;
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+      }
+
+      #player-container:fullscreen video::-webkit-media-controls,
+      #player-container:fullscreen video::-webkit-media-controls-panel,
+      #player-container:fullscreen video::-webkit-media-controls-enclosure,
+      #player-container:fullscreen video::-webkit-media-controls-overlay-play-button,
+      #vod-player-container:fullscreen video::-webkit-media-controls,
+      #vod-player-container:fullscreen video::-webkit-media-controls-panel,
+      #vod-player-container:fullscreen video::-webkit-media-controls-enclosure,
+      #vod-player-container:fullscreen video::-webkit-media-controls-overlay-play-button,
+      #player-container:-webkit-full-screen video::-webkit-media-controls,
+      #player-container:-webkit-full-screen video::-webkit-media-controls-panel,
+      #player-container:-webkit-full-screen video::-webkit-media-controls-enclosure,
+      #player-container:-webkit-full-screen video::-webkit-media-controls-overlay-play-button,
+      #vod-player-container:-webkit-full-screen video::-webkit-media-controls,
+      #vod-player-container:-webkit-full-screen video::-webkit-media-controls-panel,
+      #vod-player-container:-webkit-full-screen video::-webkit-media-controls-enclosure,
+      #vod-player-container:-webkit-full-screen video::-webkit-media-controls-overlay-play-button,
+      #player-container.player-container--live-fullscreen video::-webkit-media-controls,
+      #player-container.player-container--live-fullscreen video::-webkit-media-controls-panel,
+      #player-container.player-container--live-fullscreen video::-webkit-media-controls-enclosure,
+      #player-container.player-container--live-fullscreen video::-webkit-media-controls-overlay-play-button,
+      #vod-player-container.player-container--fullscreen video::-webkit-media-controls,
+      #vod-player-container.player-container--fullscreen video::-webkit-media-controls-panel,
+      #vod-player-container.player-container--fullscreen video::-webkit-media-controls-enclosure,
+      #vod-player-container.player-container--fullscreen video::-webkit-media-controls-overlay-play-button {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        background: transparent !important;
+        background-image: none !important;
+        box-shadow: none !important;
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
       }
 
       body.trial-locked #velora-tv-pointer-shield,

@@ -1076,19 +1076,22 @@
 
       .vel-analytics-table--button-clicks th:nth-child(1),
       .vel-analytics-table--button-clicks td:nth-child(1) {
-        width: 46%;
+        width: 34%;
       }
 
       .vel-analytics-table--button-clicks th:nth-child(2),
-      .vel-analytics-table--button-clicks td:nth-child(2),
+      .vel-analytics-table--button-clicks td:nth-child(2) {
+        width: 20%;
+      }
+
       .vel-analytics-table--button-clicks th:nth-child(3),
       .vel-analytics-table--button-clicks td:nth-child(3) {
-        width: 14%;
+        width: 24%;
       }
 
       .vel-analytics-table--button-clicks th:nth-child(4),
       .vel-analytics-table--button-clicks td:nth-child(4) {
-        width: 26%;
+        width: 22%;
       }
 
       .vel-analytics-table th,
@@ -1122,6 +1125,11 @@
         background: rgba(255, 255, 255, 0.04);
       }
 
+      .vel-analytics-table tbody tr.is-selected {
+        background: rgba(45, 212, 191, 0.11);
+        box-shadow: inset 3px 0 rgba(45, 212, 191, 0.85);
+      }
+
       .vel-analytics-ip {
         display: inline-flex;
         align-items: center;
@@ -1129,6 +1137,56 @@
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         font-weight: 850;
         white-space: nowrap;
+      }
+
+      .vel-analytics-ip-button {
+        display: inline-flex;
+        align-items: center;
+        max-width: 100%;
+        min-height: 1.75rem;
+        padding: 0.1rem 0.45rem;
+        border: 1px solid rgba(45, 212, 191, 0.26);
+        border-radius: 999px;
+        background: rgba(15, 118, 110, 0.18);
+        color: #ccfbf1;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.78rem;
+        font-weight: 850;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .vel-analytics-ip-button:hover,
+      .vel-analytics-ip-button:focus-visible {
+        border-color: rgba(45, 212, 191, 0.62);
+        background: rgba(15, 118, 110, 0.32);
+        outline: none;
+      }
+
+      .vel-analytics-filter {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.65rem;
+        margin-bottom: 0.75rem;
+        padding: 0.65rem 0.75rem;
+        border: 1px solid rgba(45, 212, 191, 0.22);
+        border-radius: 14px;
+        background: rgba(15, 118, 110, 0.14);
+        color: rgba(240, 253, 250, 0.9);
+        font-weight: 800;
+      }
+
+      .vel-analytics-clear {
+        min-height: 2rem;
+        padding: 0 0.7rem;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: rgba(15, 23, 42, 0.42);
+        color: #e2e8f0;
+        font-size: 0.78rem;
+        font-weight: 850;
       }
 
       .vel-analytics-now-title {
@@ -2933,6 +2991,9 @@
         var sessionClosed = false;
         var refreshTimer = null;
         var analyticsScope = "today";
+        var analyticsSelectedIp = "";
+        var latestAnalyticsLive = null;
+        var latestAnalyticsSummary = null;
         var watchState = new WeakMap();
         var mutationTickPending = false;
         var trialStartedAt = getTrialStartedAt();
@@ -3014,6 +3075,37 @@
             .replace(/[\u{1F1E6}-\u{1F1FF}]/gu, "")
             .replace(/\s+/g, " ")
             .trim();
+        }
+
+        function sameIp(a, b) {
+          return String(a || "").trim() && String(a || "").trim() === String(b || "").trim();
+        }
+
+        function filterBySelectedIp(items) {
+          if (!analyticsSelectedIp) return items || [];
+          return (items || []).filter(function (item) {
+            return sameIp(item.ip, analyticsSelectedIp);
+          });
+        }
+
+        function ipButton(ip, live) {
+          if (!ip) return "Unknown";
+          return [
+            '<button type="button" class="vel-analytics-ip-button" data-analytics-ip="' + escapeHtml(ip) + '" title="Voir ce visiteur">',
+            live ? '<span class="vel-analytics-live-dot"></span>' : '',
+            escapeHtml(ip),
+            '</button>'
+          ].join("");
+        }
+
+        function selectedIpFilterHtml() {
+          if (!analyticsSelectedIp) return "";
+          return [
+            '<div class="vel-analytics-filter">',
+            '<span>IP sélectionnée: <span class="vel-analytics-ip">' + escapeHtml(analyticsSelectedIp) + '</span></span>',
+            '<button type="button" class="vel-analytics-clear" data-analytics-clear-ip="1">Afficher tous</button>',
+            '</div>'
+          ].join("");
         }
 
         function inferPage() {
@@ -3626,6 +3718,7 @@
         }
 
         function visitorsTable(items) {
+          items = filterBySelectedIp(items);
           if (!items || !items.length) return '<p class="vel-analytics-empty">No live visitors right now.</p>';
           return [
             '<div class="vel-analytics-table-wrap">',
@@ -3638,8 +3731,8 @@
               var packageName = packageDisplay(item);
               var country = cleanCountryName(item.country);
               return [
-                '<tr>',
-                '<td data-label="IP"><span class="vel-analytics-ip"><span class="vel-analytics-live-dot"></span>' + escapeHtml(item.ip || "Unknown") + '</span></td>',
+                '<tr' + (sameIp(item.ip, analyticsSelectedIp) ? ' class="is-selected" data-analytics-visitor-ip="' + escapeHtml(item.ip || "") + '"' : '') + '>',
+                '<td data-label="IP">' + ipButton(item.ip, true) + '</td>',
                 '<td data-label="Package"><div class="vel-analytics-now-title">' + escapeHtml(packageName) + (country ? '<span class="vel-analytics-subline">' + escapeHtml(country) + '</span>' : '') + '</div></td>',
                 '<td data-label="Watching"><div class="vel-analytics-now-title">' + escapeHtml(watching) + '</div></td>',
                 '<td data-label="Trial">' + escapeHtml(formatTime(item.trialStartedAt)) + '</td>',
@@ -3654,21 +3747,23 @@
         }
 
         function visitorsHistoryTable(items) {
+          items = filterBySelectedIp(items);
           if (!items || !items.length) return '<p class="vel-analytics-empty">No visitors in this period yet.</p>';
           return [
             '<div class="vel-analytics-table-wrap">',
             '<table class="vel-analytics-table vel-analytics-table--visitors">',
-            '<thead><tr><th>IP</th><th>Package</th><th>Last action</th><th>First</th><th>Last</th><th>Watched</th></tr></thead><tbody>',
+            '<thead><tr><th>IP</th><th>Package</th><th>Last action</th><th>Left</th><th>Last</th><th>Watched</th></tr></thead><tbody>',
             items.map(function (item) {
               var watching = item.channelName || item.mediaTitle || pageLabel(item.page, item.section);
               var packageName = packageDisplay(item);
               var country = cleanCountryName(item.country);
+              var trialRemaining = item.trialSecondsRemaining == null ? "n/a" : formatDuration(item.trialSecondsRemaining);
               return [
-                '<tr>',
-                '<td data-label="IP"><span class="vel-analytics-ip">' + escapeHtml(item.ip || "Unknown") + '</span></td>',
+                '<tr' + (sameIp(item.ip, analyticsSelectedIp) ? ' class="is-selected" data-analytics-visitor-ip="' + escapeHtml(item.ip || "") + '"' : '') + '>',
+                '<td data-label="IP">' + ipButton(item.ip, false) + '</td>',
                 '<td data-label="Package"><div class="vel-analytics-now-title">' + escapeHtml(packageName) + (country ? '<span class="vel-analytics-subline">' + escapeHtml(country) + '</span>' : '') + '</div></td>',
                 '<td data-label="Last action"><div class="vel-analytics-now-title">' + escapeHtml(watching) + '<span class="vel-analytics-subline">' + escapeHtml(eventLabel(item.lastEventType)) + '</span></div></td>',
-                '<td data-label="First">' + escapeHtml(formatTime(item.firstSeen)) + '</td>',
+                '<td data-label="Left">' + escapeHtml(trialRemaining) + '</td>',
                 '<td data-label="Last">' + escapeHtml(formatTime(item.lastSeen)) + '</td>',
                 '<td data-label="Watched">' + escapeHtml(formatDuration(item.totalWatchSeconds || item.trialSecondsUsed || 0)) + '</td>',
                 '</tr>'
@@ -3684,15 +3779,15 @@
           return [
             '<div class="vel-analytics-table-wrap">',
             '<table class="vel-analytics-table vel-analytics-table--button-clicks">',
-            '<thead><tr><th>Action</th><th>Clics</th><th>Visiteurs</th><th>Dernier clic</th></tr></thead><tbody>',
+            '<thead><tr><th>Action</th><th>IP</th><th>Contexte</th><th>Heure</th></tr></thead><tbody>',
             items.map(function (item) {
               var meta = clickContextLabel(item);
               return [
                 '<tr>',
                 '<td data-label="Action"><div class="vel-analytics-now-title">' + escapeHtml(eventLabel(item.type)) + (meta ? '<span class="vel-analytics-subline">' + escapeHtml(meta) + '</span>' : '') + '</div></td>',
-                '<td data-label="Clics">' + escapeHtml(String(item.count || 0)) + '</td>',
-                '<td data-label="Visiteurs">' + escapeHtml(String(item.visitors || 0)) + '</td>',
-                '<td data-label="Dernier clic">' + escapeHtml(formatTime(item.lastSeen)) + '</td>',
+                '<td data-label="IP">' + ipButton(item.ip || item.lastIp, false) + '</td>',
+                '<td data-label="Contexte">' + escapeHtml(packageDisplay(item)) + '</td>',
+                '<td data-label="Heure">' + escapeHtml(formatTime(item.ts || item.lastSeen)) + '</td>',
                 '</tr>'
               ].join("");
             }).join(""),
@@ -3780,6 +3875,7 @@
               '<button type="button" class="vel-analytics-subtab" role="tab" aria-selected="false" aria-controls="va-panel-channels" data-analytics-subtab="channels">Chaînes</button>',
               '</div>',
               '<div id="va-panel-visitors" class="vel-analytics-tabpanel" role="tabpanel" data-analytics-panel="visitors">',
+              '<div id="va-ip-filter"></div>',
               '<div class="vel-analytics-layout vel-analytics-layout--simple">',
               '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>Visiteurs en ligne</h3><div id="va-live-list"></div></div>',
               '<div class="vel-analytics-box vel-analytics-box--live-table"><h3 id="va-visitors-title">Visiteurs aujourd’hui</h3><div id="va-visitors-list"></div></div>',
@@ -3803,6 +3899,20 @@
                 showAnalyticsSubtab(tabButton.dataset.analyticsSubtab || "visitors");
               });
             });
+            panel.addEventListener("click", function (event) {
+              var ipButtonEl = event.target && event.target.closest ? event.target.closest("[data-analytics-ip]") : null;
+              if (ipButtonEl) {
+                event.preventDefault();
+                focusAnalyticsIp(ipButtonEl.dataset.analyticsIp || "");
+                return;
+              }
+              var clearIp = event.target && event.target.closest ? event.target.closest("[data-analytics-clear-ip]") : null;
+              if (clearIp) {
+                event.preventDefault();
+                analyticsSelectedIp = "";
+                renderAnalyticsData();
+              }
+            });
           }
           return panel;
         }
@@ -3821,6 +3931,19 @@
             section.classList.toggle("hidden", !active);
             section.hidden = !active;
           });
+        }
+
+        function focusAnalyticsIp(ip) {
+          analyticsSelectedIp = String(ip || "").trim();
+          showAnalyticsSubtab("visitors");
+          renderAnalyticsData();
+          window.setTimeout(function () {
+            var row = null;
+            document.querySelectorAll("[data-analytics-visitor-ip]").forEach(function (candidate) {
+              if (!row && candidate.dataset.analyticsVisitorIp === analyticsSelectedIp) row = candidate;
+            });
+            if (row && row.scrollIntoView) row.scrollIntoView({ block: "center", behavior: "smooth" });
+          }, 50);
         }
 
         function showAnalyticsTab() {
@@ -3858,6 +3981,21 @@
           return data;
         }
 
+        function renderAnalyticsData() {
+          var live = latestAnalyticsLive || {};
+          var summary = latestAnalyticsSummary || {};
+          var filter = document.getElementById("va-ip-filter");
+          if (filter) filter.innerHTML = selectedIpFilterHtml();
+          var liveList = document.getElementById("va-live-list");
+          var visitorsList = document.getElementById("va-visitors-list");
+          var clicksList = document.getElementById("va-button-clicks");
+          var channelsList = document.getElementById("va-channels");
+          if (liveList) liveList.innerHTML = visitorsTable(live.visitors || []);
+          if (visitorsList) visitorsList.innerHTML = visitorsHistoryTable(summary.visitors || []);
+          if (clicksList) clicksList.innerHTML = buttonClicksTable(summary.recentButtonClicks || []);
+          if (channelsList) channelsList.innerHTML = channelsTable(summary.topChannels || []);
+        }
+
         async function loadAnalytics() {
           ensureAnalyticsPanel();
           var scope = analyticsScope === "all" ? "all" : "today";
@@ -3870,6 +4008,8 @@
             ]);
             var live = results[0];
             var summary = results[1];
+            latestAnalyticsLive = live;
+            latestAnalyticsSummary = summary;
             var subtitle = document.getElementById("vel-analytics-subtitle");
             var scopeButton = document.getElementById("vel-analytics-scope");
             var visitorsTitle = document.getElementById("va-visitors-title");
@@ -3885,10 +4025,7 @@
             document.getElementById("va-ips").textContent = String(summary.uniqueIps || 0);
             document.getElementById("va-watch").textContent = formatDuration(summary.totalWatchSeconds || 0);
 
-            document.getElementById("va-live-list").innerHTML = visitorsTable(live.visitors || []);
-            document.getElementById("va-visitors-list").innerHTML = visitorsHistoryTable(summary.visitors || []);
-            document.getElementById("va-button-clicks").innerHTML = buttonClicksTable(summary.buttonClicks || []);
-            document.getElementById("va-channels").innerHTML = channelsTable(summary.topChannels || []);
+            renderAnalyticsData();
             setStatus("Showing " + scopeLabel + " - updated " + formatTime(new Date().toISOString()) + " Morocco time");
           } catch (error) {
             setStatus("Analytics unavailable: " + (error && error.message ? error.message : String(error)), true);

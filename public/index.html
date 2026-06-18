@@ -1279,6 +1279,32 @@
         font-weight: 800;
       }
 
+      .vel-analytics-user__delete {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: max-content;
+        max-width: 100%;
+        margin-top: 0.38rem;
+        margin-left: auto;
+        padding: 0.24rem 0.58rem;
+        border: 1px solid rgba(248, 113, 113, 0.36);
+        border-radius: 999px;
+        color: #fecaca;
+        background: rgba(127, 29, 29, 0.28);
+        font: inherit;
+        font-size: 0.7rem;
+        font-weight: 900;
+        cursor: pointer;
+      }
+
+      .vel-analytics-user__delete:hover,
+      .vel-analytics-user__delete:focus-visible {
+        border-color: rgba(248, 113, 113, 0.62);
+        background: rgba(153, 27, 27, 0.44);
+        outline: none;
+      }
+
       .vel-analytics-user__actions {
         display: grid;
         gap: 0;
@@ -1345,6 +1371,10 @@
         .vel-analytics-user__stat {
           grid-column: 1 / -1;
           text-align: left;
+        }
+
+        .vel-analytics-user__delete {
+          margin-left: 0;
         }
       }
 
@@ -3838,8 +3868,42 @@
           return '<div class="vel-analytics-list">' + items.map(mapper).join("") + '</div>';
         }
 
+        function mergeVisitorsByIp(items) {
+          var byUser = new Map();
+          (items || []).forEach(function (item) {
+            var key = String(item.ip || item.sessionId || "").trim();
+            if (!key) return;
+            var existing = byUser.get(key);
+            if (!existing) {
+              existing = Object.assign({}, item, {
+                eventCount: Number(item.eventCount || 0),
+                sessionCount: Number(item.sessionCount || (item.sessionId ? 1 : 0)),
+                totalWatchSeconds: Number(item.totalWatchSeconds || item.trialSecondsUsed || 0)
+              });
+              byUser.set(key, existing);
+              return;
+            }
+            var existingLast = Date.parse(existing.lastSeen || "") || 0;
+            var itemLast = Date.parse(item.lastSeen || "") || 0;
+            existing.eventCount += Number(item.eventCount || 0);
+            existing.totalWatchSeconds += Number(item.totalWatchSeconds || item.trialSecondsUsed || 0);
+            existing.sessionCount += Number(item.sessionCount || (item.sessionId && item.sessionId !== existing.sessionId ? 1 : 0));
+            existing.firstSeen = String(existing.firstSeen || "") < String(item.firstSeen || "") ? existing.firstSeen : item.firstSeen || existing.firstSeen;
+            if (itemLast >= existingLast) {
+              byUser.set(key, Object.assign(existing, item, {
+                eventCount: existing.eventCount,
+                sessionCount: existing.sessionCount,
+                totalWatchSeconds: existing.totalWatchSeconds
+              }));
+            }
+          });
+          return Array.from(byUser.values()).sort(function (a, b) {
+            return String(b.lastSeen || "").localeCompare(String(a.lastSeen || ""));
+          });
+        }
+
         function visitorsTable(items) {
-          items = filterBySelectedIp(items);
+          items = filterBySelectedIp(mergeVisitorsByIp(items));
           if (!items || !items.length) return '<p class="vel-analytics-empty">No live visitors right now.</p>';
           return [
             '<div class="vel-analytics-table-wrap">',
@@ -3868,7 +3932,7 @@
         }
 
         function visitorsHistoryTable(items) {
-          items = filterBySelectedIp(items);
+          items = filterBySelectedIp(mergeVisitorsByIp(items));
           if (!items || !items.length) return '<p class="vel-analytics-empty">No visitors in this period yet.</p>';
           return [
             '<div class="vel-analytics-table-wrap">',
@@ -3893,6 +3957,53 @@
             '</tbody></table>',
             '</div>'
           ].join("");
+        }
+
+        function mergeUserActionsByIp(groups) {
+          var byUser = new Map();
+          (groups || []).forEach(function (group) {
+            var key = String(group.ip || group.sessionId || "").trim();
+            if (!key) return;
+            var existing = byUser.get(key);
+            var actions = Array.isArray(group.actions) ? group.actions : [];
+            if (!existing) {
+              existing = Object.assign({}, group, {
+                actions: actions.slice(),
+                actionCount: Number(group.actionCount || actions.length || 0),
+                eventCount: Number(group.eventCount || 0),
+                sessionCount: Number(group.sessionCount || (group.sessionId ? 1 : 0)),
+                totalWatchSeconds: Number(group.totalWatchSeconds || group.trialSecondsUsed || 0)
+              });
+              byUser.set(key, existing);
+              return;
+            }
+            var existingLast = Date.parse(existing.lastSeen || "") || 0;
+            var groupLast = Date.parse(group.lastSeen || "") || 0;
+            existing.actions = existing.actions.concat(actions);
+            existing.actionCount += Number(group.actionCount || actions.length || 0);
+            existing.eventCount += Number(group.eventCount || 0);
+            existing.totalWatchSeconds += Number(group.totalWatchSeconds || group.trialSecondsUsed || 0);
+            existing.sessionCount += Number(group.sessionCount || (group.sessionId && group.sessionId !== existing.sessionId ? 1 : 0));
+            existing.firstSeen = String(existing.firstSeen || "") < String(group.firstSeen || "") ? existing.firstSeen : group.firstSeen || existing.firstSeen;
+            if (groupLast >= existingLast) {
+              byUser.set(key, Object.assign(existing, group, {
+                actions: existing.actions,
+                actionCount: existing.actionCount,
+                eventCount: existing.eventCount,
+                sessionCount: existing.sessionCount,
+                totalWatchSeconds: existing.totalWatchSeconds
+              }));
+            }
+          });
+          return Array.from(byUser.values()).map(function (user) {
+            user.actions = (user.actions || []).slice().sort(function (a, b) {
+              return String(a.ts || "").localeCompare(String(b.ts || ""));
+            });
+            user.actionCount = user.actionCount || user.actions.length || 0;
+            return user;
+          }).sort(function (a, b) {
+            return String(b.lastSeen || "").localeCompare(String(a.lastSeen || ""));
+          });
         }
 
         function buttonClicksTable(items) {
@@ -3953,7 +4064,7 @@
         }
 
         function userActionsList(groups) {
-          groups = filterBySelectedIp(groups || []);
+          groups = filterBySelectedIp(mergeUserActionsByIp(groups || []));
           if (!groups || !groups.length) return '<p class="vel-analytics-empty">No user actions in this period yet.</p>';
           return [
             '<div class="vel-analytics-user-actions">',
@@ -3964,13 +4075,14 @@
               var lastContext = user.channelName || user.mediaTitle || pageLabel(user.page, user.section);
               var trialRemaining = user.trialSecondsRemaining == null ? "n/a" : formatDuration(user.trialSecondsRemaining);
               var actionCount = user.actionCount || actions.length || 0;
+              var sessionCount = Number(user.sessionCount || 0);
               return [
                 '<details class="vel-analytics-user">',
                 '<summary class="vel-analytics-user__summary">',
                 '<div class="vel-analytics-user__identity">' + ipButton(user.ip, false) + '<span class="vel-analytics-subline">' + escapeHtml(formatTime(user.lastSeen)) + '</span></div>',
                 '<div class="vel-analytics-user__context"><div class="vel-analytics-now-title">' + escapeHtml(lastContext || "Browsing") + '</div><span class="vel-analytics-subline">' + escapeHtml(packageName) + (country ? " - " + escapeHtml(country) : "") + '</span></div>',
-                '<div class="vel-analytics-user__stat">' + escapeHtml(String(actionCount)) + ' actions<span class="vel-analytics-subline">' + escapeHtml(formatDuration(user.totalWatchSeconds || user.trialSecondsUsed || 0)) + ' watched</span></div>',
-                '<div class="vel-analytics-user__stat">Left<span class="vel-analytics-subline">' + escapeHtml(trialRemaining) + '</span></div>',
+                '<div class="vel-analytics-user__stat">' + escapeHtml(String(actionCount)) + ' actions<span class="vel-analytics-subline">' + escapeHtml(formatDuration(user.totalWatchSeconds || user.trialSecondsUsed || 0)) + ' watched' + (sessionCount > 1 ? ' - ' + escapeHtml(String(sessionCount)) + ' sessions' : '') + '</span></div>',
+                '<div class="vel-analytics-user__stat">Left<span class="vel-analytics-subline">' + escapeHtml(trialRemaining) + '</span><button type="button" class="vel-analytics-user__delete" data-analytics-delete-ip="' + escapeHtml(user.ip || "") + '">Clean</button></div>',
                 '</summary>',
                 actions.length
                   ? '<ol class="vel-analytics-user__actions">' + actions.map(function (action) {
@@ -4096,6 +4208,13 @@
               });
             });
             panel.addEventListener("click", function (event) {
+              var deleteIp = event.target && event.target.closest ? event.target.closest("[data-analytics-delete-ip]") : null;
+              if (deleteIp) {
+                event.preventDefault();
+                event.stopPropagation();
+                deleteAnalyticsUser(deleteIp.dataset.analyticsDeleteIp || "");
+                return;
+              }
               var ipButtonEl = event.target && event.target.closest ? event.target.closest("[data-analytics-ip]") : null;
               if (ipButtonEl) {
                 event.preventDefault();
@@ -4140,6 +4259,28 @@
             });
             if (row && row.scrollIntoView) row.scrollIntoView({ block: "center", behavior: "smooth" });
           }, 50);
+        }
+
+        async function deleteAnalyticsUser(ip) {
+          ip = String(ip || "").trim();
+          if (!ip) return;
+          if (!window.confirm("Clean analytics history for " + ip + "?")) return;
+          var scope = analyticsScope === "all" ? "all" : "today";
+          setStatus("Cleaning analytics for " + ip + "...");
+          try {
+            var res = await fetch("/api/analytics/admin/user?scope=" + encodeURIComponent(scope) + "&ip=" + encodeURIComponent(ip), {
+              method: "DELETE",
+              headers: adminHeaders(),
+              cache: "no-store"
+            });
+            var data = await res.json().catch(function () { return {}; });
+            if (!res.ok) throw new Error(data.error || "HTTP " + res.status);
+            if (sameIp(analyticsSelectedIp, ip)) analyticsSelectedIp = "";
+            await loadAnalytics();
+            setStatus("Cleaned " + String(data.deleted || 0) + " analytics events for " + ip + ".");
+          } catch (error) {
+            setStatus("Clean failed: " + (error && error.message ? error.message : String(error)), true);
+          }
         }
 
         function showAnalyticsTab() {
@@ -4187,7 +4328,7 @@
           var clicksList = document.getElementById("va-button-clicks");
           var channelsList = document.getElementById("va-channels");
           if (liveList) liveList.innerHTML = visitorsTable(live.visitors || []);
-          if (visitorsList) visitorsList.innerHTML = visitorsHistoryTable(summary.visitors || []);
+          if (visitorsList) visitorsList.innerHTML = userActionsList(summary.userActions || []);
           if (clicksList) clicksList.innerHTML = userActionsList(summary.userActions || []);
           if (channelsList) channelsList.innerHTML = channelsTable(summary.topChannels || []);
         }

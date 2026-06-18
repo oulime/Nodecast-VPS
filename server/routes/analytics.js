@@ -322,6 +322,67 @@ async function readEvents({ days = 7, limit = MAX_EVENTS_FOR_SUMMARY } = {}) {
     return events;
 }
 
+async function eventFilesForScope({ days = 7 } = {}) {
+    const dir = analyticsDir();
+    await fs.mkdir(dir, { recursive: true });
+    if (days === 'all') {
+        return (await fs.readdir(dir).catch(() => []))
+            .filter((name) => /^events-\d{4}-\d{2}-\d{2}\.jsonl$/.test(name))
+            .sort()
+            .map((name) => path.join(dir, name));
+    }
+    const maxDays = Math.min(Math.max(Number(days) || 7, 1), 30);
+    const wanted = new Set();
+    for (let i = 0; i < maxDays; i += 1) {
+        const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+        wanted.add(`events-${d.toISOString().slice(0, 10)}.jsonl`);
+    }
+    return (await fs.readdir(dir).catch(() => []))
+        .filter((name) => wanted.has(name))
+        .sort()
+        .map((name) => path.join(dir, name));
+}
+
+async function deleteAnalyticsUserEvents({ ip, days, scope }) {
+    const targetIp = normalizeIp(ip);
+    if (!targetIp) return { deleted: 0, filesChanged: 0 };
+    const files = await eventFilesForScope({ days });
+    let deleted = 0;
+    let filesChanged = 0;
+    for (const file of files) {
+        const raw = await fs.readFile(file, 'utf8').catch((err) => {
+            if (err?.code === 'ENOENT') return '';
+            throw err;
+        });
+        const kept = [];
+        let changed = false;
+        for (const line of raw.split(/\r?\n/)) {
+            if (!line.trim()) continue;
+            try {
+                const event = JSON.parse(line);
+                const inScope = scope === 'today' ? localDateKey(event.ts) === localDateKey() : true;
+                if (inScope && sameAnalyticsIp(event.ip, targetIp)) {
+                    deleted += 1;
+                    changed = true;
+                    continue;
+                }
+                kept.push(JSON.stringify(event));
+            } catch {
+                kept.push(line);
+            }
+        }
+        if (changed) {
+            filesChanged += 1;
+            await fs.writeFile(file, kept.length ? `${kept.join('\n')}\n` : '', 'utf8');
+        }
+    }
+    return { deleted, filesChanged };
+}
+
+function sameAnalyticsIp(a, b) {
+    return normalizeIp(a) === normalizeIp(b);
+}
+
 function localDateKey(value = new Date()) {
     const date = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(date.getTime())) return '';
@@ -426,11 +487,12 @@ function compactUserAction(event) {
 function summarizeUserActions(events, limit = 200) {
     const users = new Map();
     for (const event of events) {
-        const key = event.sessionId || event.ip;
+        const key = event.ip || event.sessionId;
         if (!key) continue;
         const existing = users.get(key) || {
             sessionId: event.sessionId,
             ip: event.ip,
+            sessionIds: new Set(),
             firstSeen: event.ts,
             lastSeen: event.ts,
             eventCount: 0,
@@ -438,6 +500,8 @@ function summarizeUserActions(events, limit = 200) {
             totalWatchSeconds: 0,
             actions: []
         };
+        if (event.sessionId) existing.sessionIds.add(event.sessionId);
+        existing.sessionId = event.sessionId || existing.sessionId;
         existing.ip = event.ip || existing.ip;
         existing.page = event.page || event.path || existing.page;
         existing.section = event.section || existing.section;
@@ -468,6 +532,8 @@ function summarizeUserActions(events, limit = 200) {
         .slice(0, limit)
         .map((user) => ({
             ...user,
+            sessionCount: user.sessionIds.size,
+            sessionIds: undefined,
             actions: user.actions
         }));
 }
@@ -538,11 +604,12 @@ function recentButtonClicks(events, limit = 50) {
 function summarizeVisitors(events, limit = 200) {
     const visitors = new Map();
     for (const event of events) {
-        const key = event.sessionId || event.ip;
+        const key = event.ip || event.sessionId;
         if (!key) continue;
         const existing = visitors.get(key) || {
             sessionId: event.sessionId,
             ip: event.ip,
+            sessionIds: new Set(),
             userAgent: event.userAgent,
             device: event.device || {},
             firstSeen: event.ts,
@@ -550,6 +617,8 @@ function summarizeVisitors(events, limit = 200) {
             eventCount: 0,
             totalWatchSeconds: 0
         };
+        if (event.sessionId) existing.sessionIds.add(event.sessionId);
+        existing.sessionId = event.sessionId || existing.sessionId;
         existing.ip = event.ip || existing.ip;
         existing.userAgent = event.userAgent || existing.userAgent;
         existing.device = Object.keys(event.device || {}).length ? event.device : existing.device;
@@ -576,7 +645,12 @@ function summarizeVisitors(events, limit = 200) {
     }
     return [...visitors.values()]
         .sort((a, b) => String(b.lastSeen).localeCompare(String(a.lastSeen)))
-        .slice(0, limit);
+        .slice(0, limit)
+        .map((visitor) => ({
+            ...visitor,
+            sessionCount: visitor.sessionIds.size,
+            sessionIds: undefined
+        }));
 }
 
 router.post('/event', async (req, res) => {
@@ -652,6 +726,46 @@ router.get('/admin/events', requireAdmin, async (req, res) => {
     } catch (err) {
         console.error('[analytics] events failed:', err);
         res.status(500).json({ error: 'Analytics events failed' });
+    }
+});
+
+router.delete('/admin/user', requireAdmin, async (req, res) => {
+    try {
+        const { scope, days } = analyticsScope(req);
+        const ip = cleanString(req.query.ip || req.body?.ip, 120);
+        if (!ip) {
+            res.status(400).json({ error: 'Missing ip' });
+            return;
+        }
+        if (shouldProxyRemoteAdmin(req)) {
+            const target = new URL('/api/analytics/admin/user', REMOTE_ANALYTICS_BASE);
+            if (scope === 'all' || scope === 'today') {
+                target.searchParams.set('scope', scope);
+            } else {
+                target.searchParams.set('days', String(days));
+            }
+            target.searchParams.set('ip', ip);
+            const headers = {};
+            for (const name of ['authorization', 'x-velora-admin-access', 'x-admin-access']) {
+                const value = req.get(name);
+                if (value) headers[name] = value;
+            }
+            const remote = await fetch(target, { method: 'DELETE', headers, cache: 'no-store' });
+            const text = await remote.text();
+            res.status(remote.status);
+            const contentType = remote.headers.get('content-type');
+            if (contentType) res.set('content-type', contentType);
+            res.send(text);
+            return;
+        }
+        const result = await deleteAnalyticsUserEvents({ ip, days, scope });
+        for (const [sessionId, session] of liveSessions.entries()) {
+            if (sameAnalyticsIp(session.ip, ip)) liveSessions.delete(sessionId);
+        }
+        res.json({ ok: true, ip: normalizeIp(ip), ...result });
+    } catch (err) {
+        console.error('[analytics] delete user failed:', err);
+        res.status(500).json({ error: 'Analytics user cleanup failed' });
     }
 });
 

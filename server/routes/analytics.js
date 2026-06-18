@@ -10,12 +10,7 @@ const WATCHING_WINDOW_MS = 45 * 1000;
 const MAX_STRING_LENGTH = 260;
 const MAX_EVENTS_FOR_SUMMARY = 50000;
 const ANALYTICS_TIME_ZONE = process.env.NODECAST_ANALYTICS_TIME_ZONE || 'Africa/Casablanca';
-const R2_ACCOUNT_ID = process.env.CLOUDFLARE_R2_ACCOUNT_ID || process.env.R2_ACCOUNT_ID || '';
-const R2_ACCESS_KEY_ID = process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY_ID || '';
-const R2_SECRET_ACCESS_KEY = process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_ACCESS_KEY || '';
-const R2_BUCKET = process.env.CLOUDFLARE_R2_BUCKET || process.env.R2_BUCKET || process.env.NODECAST_ANALYTICS_R2_BUCKET || '';
-const R2_ENDPOINT = (process.env.CLOUDFLARE_R2_ENDPOINT || process.env.R2_ENDPOINT || '').replace(/\/+$/, '');
-const R2_PREFIX = (process.env.NODECAST_ANALYTICS_R2_PREFIX || 'analytics').replace(/^\/+|\/+$/g, '');
+const REMOTE_ANALYTICS_BASE = (process.env.NODECAST_ANALYTICS_REMOTE_BASE || 'https://nodecast.veloravip.net').replace(/\/+$/, '');
 const BUTTON_CLICK_TYPES = new Set([
     'login_connect_click',
     'trial_start_click',
@@ -32,193 +27,14 @@ const USER_ACTION_IGNORED_TYPES = new Set([
 ]);
 const liveSessions = new Map();
 let appendQueue = Promise.resolve();
-let migrationPromise = null;
 
-function legacyAnalyticsDir() {
+function analyticsDir() {
     return process.env.NODECAST_ANALYTICS_DIR || path.join(__dirname, '..', '..', 'data', 'analytics');
 }
 
-function requireR2Config() {
-    const missing = [];
-    if (!R2_BUCKET) missing.push('CLOUDFLARE_R2_BUCKET or R2_BUCKET');
-    if (!R2_ACCESS_KEY_ID) missing.push('CLOUDFLARE_R2_ACCESS_KEY_ID or R2_ACCESS_KEY_ID');
-    if (!R2_SECRET_ACCESS_KEY) missing.push('CLOUDFLARE_R2_SECRET_ACCESS_KEY or R2_SECRET_ACCESS_KEY');
-    if (!R2_ENDPOINT && !R2_ACCOUNT_ID) missing.push('CLOUDFLARE_R2_ENDPOINT or CLOUDFLARE_R2_ACCOUNT_ID');
-    if (missing.length) throw new Error(`R2 analytics storage is not configured. Missing: ${missing.join(', ')}`);
-}
-
-function r2BaseUrl() {
-    requireR2Config();
-    return R2_ENDPOINT || `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
-}
-
-function analyticsObjectKey(date = new Date()) {
+function eventFilePath(date = new Date()) {
     const day = date.toISOString().slice(0, 10);
-    return `${R2_PREFIX ? `${R2_PREFIX}/` : ''}events-${day}.jsonl`;
-}
-
-function hmac(key, value, encoding) {
-    return crypto.createHmac('sha256', key).update(value, 'utf8').digest(encoding);
-}
-
-function sha256(value, encoding = 'hex') {
-    return crypto.createHash('sha256').update(value).digest(encoding);
-}
-
-function r2SigningKey(dateStamp) {
-    const kDate = hmac(`AWS4${R2_SECRET_ACCESS_KEY}`, dateStamp);
-    const kRegion = hmac(kDate, 'auto');
-    const kService = hmac(kRegion, 's3');
-    return hmac(kService, 'aws4_request');
-}
-
-function encodePath(pathname) {
-    return pathname.split('/').map((part) => encodeURIComponent(part)).join('/');
-}
-
-async function r2Request(method, key = '', { query = {}, body = '', contentType = 'application/octet-stream' } = {}) {
-    requireR2Config();
-    const base = r2BaseUrl();
-    const url = new URL(`${base}/${encodeURIComponent(R2_BUCKET)}${key ? `/${encodePath(key)}` : ''}`);
-    for (const [name, value] of Object.entries(query)) {
-        if (value !== undefined && value !== null) url.searchParams.set(name, String(value));
-    }
-
-    const payload = typeof body === 'string' || Buffer.isBuffer(body) ? body : '';
-    const payloadHash = sha256(payload);
-    const now = new Date();
-    const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
-    const dateStamp = amzDate.slice(0, 8);
-    const canonicalQuery = [...url.searchParams.entries()]
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([name, value]) => `${encodeURIComponent(name)}=${encodeURIComponent(value)}`)
-        .join('&');
-    const headers = {
-        host: url.host,
-        'x-amz-content-sha256': payloadHash,
-        'x-amz-date': amzDate
-    };
-    if (method !== 'GET' && method !== 'HEAD') headers['content-type'] = contentType;
-    const signedHeaders = Object.keys(headers).sort().join(';');
-    const canonicalHeaders = Object.keys(headers)
-        .sort()
-        .map((name) => `${name}:${headers[name]}\n`)
-        .join('');
-    const canonicalRequest = [
-        method,
-        url.pathname,
-        canonicalQuery,
-        canonicalHeaders,
-        signedHeaders,
-        payloadHash
-    ].join('\n');
-    const credentialScope = `${dateStamp}/auto/s3/aws4_request`;
-    const stringToSign = [
-        'AWS4-HMAC-SHA256',
-        amzDate,
-        credentialScope,
-        sha256(canonicalRequest)
-    ].join('\n');
-    const signature = hmac(r2SigningKey(dateStamp), stringToSign, 'hex');
-    headers.Authorization = `AWS4-HMAC-SHA256 Credential=${R2_ACCESS_KEY_ID}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
-
-    const res = await fetch(url, {
-        method,
-        headers,
-        body: method === 'GET' || method === 'HEAD' ? undefined : payload
-    });
-    return res;
-}
-
-async function getR2Text(key) {
-    const res = await r2Request('GET', key);
-    if (res.status === 404) return '';
-    const text = await res.text();
-    if (!res.ok) throw new Error(`R2 GET ${key} failed: ${res.status} ${res.statusText}: ${text.slice(0, 300)}`);
-    return text;
-}
-
-async function putR2Text(key, text) {
-    const res = await r2Request('PUT', key, {
-        body: text,
-        contentType: 'application/x-ndjson; charset=utf-8'
-    });
-    const body = await res.text();
-    if (!res.ok) throw new Error(`R2 PUT ${key} failed: ${res.status} ${res.statusText}: ${body.slice(0, 300)}`);
-}
-
-function parseListObjectsXml(xml) {
-    const keys = [];
-    const regex = /<Key>([\s\S]*?)<\/Key>/g;
-    let match;
-    while ((match = regex.exec(xml))) {
-        keys.push(match[1]
-            .replace(/&lt;/g, '<')
-            .replace(/&gt;/g, '>')
-            .replace(/&amp;/g, '&')
-            .replace(/&quot;/g, '"')
-            .replace(/&#39;/g, "'"));
-    }
-    return keys;
-}
-
-async function listR2AnalyticsKeys() {
-    const prefix = R2_PREFIX ? `${R2_PREFIX}/events-` : 'events-';
-    const res = await r2Request('GET', '', {
-        query: {
-            'list-type': '2',
-            prefix,
-            'max-keys': 1000
-        }
-    });
-    const xml = await res.text();
-    if (!res.ok) throw new Error(`R2 LIST failed: ${res.status} ${res.statusText}: ${xml.slice(0, 300)}`);
-    return parseListObjectsXml(xml)
-        .filter((key) => /events-\d{4}-\d{2}-\d{2}\.jsonl$/.test(key))
-        .sort();
-}
-
-async function migrateLegacyAnalyticsFiles() {
-    if (migrationPromise) return migrationPromise;
-    migrationPromise = (async () => {
-        const dir = legacyAnalyticsDir();
-        const files = await fs.readdir(dir).catch((err) => {
-            if (err?.code === 'ENOENT') return [];
-            throw err;
-        });
-        const eventFiles = files
-            .filter((name) => /^events-\d{4}-\d{2}-\d{2}\.jsonl$/.test(name))
-            .sort();
-        if (!eventFiles.length) return;
-
-        let imported = 0;
-        for (const file of eventFiles) {
-            const raw = await fs.readFile(path.join(dir, file), 'utf8').catch((err) => {
-                if (err?.code === 'ENOENT') return '';
-                throw err;
-            });
-            const key = `${R2_PREFIX ? `${R2_PREFIX}/` : ''}${file}`;
-            const existing = await getR2Text(key);
-            if (existing.trim()) continue;
-            let next = existing && !existing.endsWith('\n') ? `${existing}\n` : existing;
-            for (const line of raw.split(/\r?\n/)) {
-                if (!line.trim()) continue;
-                try {
-                    const event = JSON.parse(line);
-                    next += `${JSON.stringify(event)}\n`;
-                    imported += 1;
-                } catch {
-                    // Ignore a single malformed line instead of losing the whole import.
-                }
-            }
-            await putR2Text(key, next);
-        }
-        if (imported) console.log(`[analytics] imported ${imported} legacy JSONL events into R2`);
-    })().catch((err) => {
-        migrationPromise = null;
-        console.error('[analytics] legacy import failed:', err);
-    });
-    return migrationPromise;
+    return path.join(analyticsDir(), `events-${day}.jsonl`);
 }
 
 function normalizeIp(raw) {
@@ -295,6 +111,38 @@ function requireAdmin(req, res, next) {
     res.status(401).json({ error: 'Unauthorized' });
 }
 
+function isLocalAnalyticsRequest(req) {
+    return isLocalHostName(req.hostname)
+        || isLocalHostName(req.get('host'))
+        || isLocalIp(clientIp(req));
+}
+
+function shouldProxyRemoteAdmin(req) {
+    if (!REMOTE_ANALYTICS_BASE) return false;
+    if (!isLocalAnalyticsRequest(req)) return false;
+    try {
+        const remote = new URL(REMOTE_ANALYTICS_BASE);
+        return !isLocalHostName(remote.hostname);
+    } catch {
+        return false;
+    }
+}
+
+async function proxyRemoteAdmin(req, res) {
+    const target = new URL(req.originalUrl || req.url, REMOTE_ANALYTICS_BASE);
+    const headers = {};
+    for (const name of ['authorization', 'x-velora-admin-access', 'x-admin-access']) {
+        const value = req.get(name);
+        if (value) headers[name] = value;
+    }
+    const remote = await fetch(target, { headers, cache: 'no-store' });
+    const text = await remote.text();
+    res.status(remote.status);
+    const contentType = remote.headers.get('content-type');
+    if (contentType) res.set('content-type', contentType);
+    res.send(text);
+}
+
 function cleanString(value, max = MAX_STRING_LENGTH) {
     if (value === null || value === undefined) return undefined;
     const text = String(value).replace(/\s+/g, ' ').trim();
@@ -330,11 +178,8 @@ function cleanObject(value, depth = 0) {
 
 async function appendEvent(event) {
     appendQueue = appendQueue.catch(() => {}).then(async () => {
-        await migrateLegacyAnalyticsFiles();
-        const key = analyticsObjectKey(new Date(event.ts || Date.now()));
-        const existing = await getR2Text(key);
-        const prefix = existing && !existing.endsWith('\n') ? `${existing}\n` : existing;
-        await putR2Text(key, `${prefix}${JSON.stringify(event)}\n`);
+        await fs.mkdir(analyticsDir(), { recursive: true });
+        await fs.appendFile(eventFilePath(new Date(event.ts || Date.now())), `${JSON.stringify(event)}\n`, 'utf8');
     });
     return appendQueue;
 }
@@ -437,24 +282,33 @@ function publicEventFromRequest(req) {
 }
 
 async function readEvents({ days = 7, limit = MAX_EVENTS_FOR_SUMMARY } = {}) {
-    await migrateLegacyAnalyticsFiles();
     const maxLimit = Math.min(Math.max(Number(limit) || MAX_EVENTS_FOR_SUMMARY, 1), MAX_EVENTS_FOR_SUMMARY);
-    let keys;
+    const dir = analyticsDir();
+    await fs.mkdir(dir, { recursive: true });
+    let files;
     if (days === 'all') {
-        keys = await listR2AnalyticsKeys();
+        files = (await fs.readdir(dir).catch(() => []))
+            .filter((name) => /^events-\d{4}-\d{2}-\d{2}\.jsonl$/.test(name))
+            .sort()
+            .map((name) => path.join(dir, name));
     } else {
         const maxDays = Math.min(Math.max(Number(days) || 7, 1), 30);
-        keys = [];
         const wanted = new Set();
         for (let i = 0; i < maxDays; i += 1) {
             const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-            wanted.add(analyticsObjectKey(d));
+            wanted.add(`events-${d.toISOString().slice(0, 10)}.jsonl`);
         }
-        keys = [...wanted].sort();
+        files = (await fs.readdir(dir).catch(() => []))
+            .filter((name) => wanted.has(name))
+            .sort()
+            .map((name) => path.join(dir, name));
     }
     const events = [];
-    for (const key of keys) {
-        const raw = await getR2Text(key);
+    for (const file of files) {
+        const raw = await fs.readFile(file, 'utf8').catch((err) => {
+            if (err?.code === 'ENOENT') return '';
+            throw err;
+        });
         for (const line of raw.split(/\r?\n/)) {
             if (!line.trim()) continue;
             try {
@@ -742,6 +596,13 @@ router.post('/event', async (req, res) => {
 });
 
 router.get('/admin/live', requireAdmin, (req, res) => {
+    if (shouldProxyRemoteAdmin(req)) {
+        proxyRemoteAdmin(req, res).catch((err) => {
+            console.error('[analytics] remote live proxy failed:', err);
+            res.status(502).json({ error: 'Remote analytics unavailable' });
+        });
+        return;
+    }
     pruneLiveSessions();
     const visitors = [...liveSessions.values()]
         .sort((a, b) => String(b.lastSeen).localeCompare(String(a.lastSeen)));
@@ -754,6 +615,10 @@ router.get('/admin/live', requireAdmin, (req, res) => {
 
 router.get('/admin/summary', requireAdmin, async (req, res) => {
     try {
+        if (shouldProxyRemoteAdmin(req)) {
+            await proxyRemoteAdmin(req, res);
+            return;
+        }
         const { scope, days } = analyticsScope(req);
         const events = await readEvents({ days });
         res.json({
@@ -771,6 +636,10 @@ router.get('/admin/summary', requireAdmin, async (req, res) => {
 
 router.get('/admin/events', requireAdmin, async (req, res) => {
     try {
+        if (shouldProxyRemoteAdmin(req)) {
+            await proxyRemoteAdmin(req, res);
+            return;
+        }
         const { scope, days } = analyticsScope(req);
         const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 1000);
         const events = await readEvents({ days, limit });

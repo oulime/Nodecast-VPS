@@ -4051,7 +4051,7 @@
               '<div class="vel-analytics-hero">',
               '<div>',
               '<h2 class="vel-analytics-title">Visitor analytics</h2>',
-              '<p class="vel-analytics-subtitle" id="vel-analytics-subtitle">Today visitors, country, package and watched channels. Saved as JSON in R2.</p>',
+              '<p class="vel-analytics-subtitle" id="vel-analytics-subtitle">Today visitors, country, package and watched channels. Saved as JSON on the VPS.</p>',
               '</div>',
               '<div class="vel-analytics-actions">',
               '<button type="button" id="vel-analytics-scope" class="vel-analytics-scope">Show all time</button>',
@@ -4211,8 +4211,8 @@
             var visitorsTitle = document.getElementById("va-visitors-title");
             if (subtitle) {
               subtitle.textContent = scope === "all"
-                ? "All-time visitors, country, package and watched channels. Saved as JSON in R2."
-                : "Today visitors, country, package and watched channels. Saved as JSON in R2.";
+                ? "All-time visitors, country, package and watched channels. Saved as JSON on the VPS."
+                : "Today visitors, country, package and watched channels. Saved as JSON on the VPS.";
             }
             if (scopeButton) scopeButton.textContent = scope === "all" ? "Show today" : "Show all time";
             if (visitorsTitle) visitorsTitle.textContent = scope === "all" ? "Visiteurs tout le temps" : "Visiteurs aujourd’hui";

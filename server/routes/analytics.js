@@ -20,6 +20,10 @@ const BUTTON_CLICK_TYPES = new Set([
     'external_browser_open_click',
     'external_browser_trial_resume'
 ]);
+const USER_ACTION_IGNORED_TYPES = new Set([
+    'heartbeat',
+    'video_progress'
+]);
 const liveSessions = new Map();
 let appendQueue = Promise.resolve();
 
@@ -359,12 +363,82 @@ function summarize(events) {
         visitors: summarizeVisitors(events),
         buttonClicks: summarizeButtonClicks(events),
         recentButtonClicks: recentButtonClicks(events),
+        userActions: summarizeUserActions(events),
         topPages: countBy(events, (event) => event.page || event.path),
         topPackages: countBy(events.filter((event) => event.packageName), (event) => event.packageName),
         topChannels: countBy(watchEvents, (event) => event.channelName || event.mediaTitle, { seconds: true }),
         topMedia: countBy(events.filter((event) => event.mediaTitle), (event) => event.mediaTitle),
         recentEvents: events.slice(-80).reverse()
     };
+}
+
+function compactUserAction(event) {
+    return {
+        ts: event.ts,
+        type: event.type,
+        page: event.page,
+        section: event.section,
+        country: event.country,
+        packageName: event.packageName,
+        mediaType: event.mediaType,
+        mediaTitle: event.mediaTitle,
+        channelName: event.channelName,
+        cta: event.cta,
+        action: event.action,
+        source: event.source,
+        browser: event.browser,
+        trialSecondsRemaining: event.trialSecondsRemaining,
+        watchDeltaSeconds: event.watchDeltaSeconds
+    };
+}
+
+function summarizeUserActions(events, limit = 200) {
+    const users = new Map();
+    for (const event of events) {
+        const key = event.sessionId || event.ip;
+        if (!key) continue;
+        const existing = users.get(key) || {
+            sessionId: event.sessionId,
+            ip: event.ip,
+            firstSeen: event.ts,
+            lastSeen: event.ts,
+            eventCount: 0,
+            actionCount: 0,
+            totalWatchSeconds: 0,
+            actions: []
+        };
+        existing.ip = event.ip || existing.ip;
+        existing.page = event.page || event.path || existing.page;
+        existing.section = event.section || existing.section;
+        existing.country = event.country || existing.country;
+        existing.packageName = event.packageName || existing.packageName;
+        existing.packageId = event.packageId || existing.packageId;
+        existing.mediaType = event.mediaType || existing.mediaType;
+        existing.mediaTitle = event.mediaTitle || existing.mediaTitle;
+        existing.channelName = event.channelName || existing.channelName;
+        existing.trialStartedAt = event.trialStartedAt || existing.trialStartedAt;
+        existing.trialSecondsUsed = event.trialSecondsUsed ?? existing.trialSecondsUsed;
+        existing.trialSecondsRemaining = event.trialSecondsRemaining ?? existing.trialSecondsRemaining;
+        existing.lastEventType = event.type || existing.lastEventType;
+        existing.lastSeen = event.ts || existing.lastSeen;
+        existing.eventCount += 1;
+        const delta = Number(event.watchDeltaSeconds);
+        existing.totalWatchSeconds += Number.isFinite(delta)
+            ? Math.max(0, delta)
+            : Math.max(0, Number(event.watchedSeconds) || 0);
+        if (!USER_ACTION_IGNORED_TYPES.has(event.type)) {
+            existing.actionCount += 1;
+            existing.actions.push(compactUserAction(event));
+        }
+        users.set(key, existing);
+    }
+    return [...users.values()]
+        .sort((a, b) => String(b.lastSeen).localeCompare(String(a.lastSeen)))
+        .slice(0, limit)
+        .map((user) => ({
+            ...user,
+            actions: user.actions.slice().reverse()
+        }));
 }
 
 function summarizeButtonClicks(events, limit = 16) {

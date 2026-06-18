@@ -1220,6 +1220,87 @@
         font-weight: 950;
       }
 
+      .vel-analytics-user-actions {
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .vel-analytics-user {
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        border-radius: 14px;
+        background: rgba(2, 6, 23, 0.2);
+        overflow: hidden;
+      }
+
+      .vel-analytics-user[open] {
+        border-color: rgba(45, 212, 191, 0.28);
+        background: rgba(15, 23, 42, 0.36);
+      }
+
+      .vel-analytics-user__summary {
+        display: grid;
+        grid-template-columns: minmax(9rem, 1.2fr) minmax(0, 1.7fr) auto auto;
+        gap: 0.8rem;
+        align-items: center;
+        padding: 0.8rem 0.9rem;
+        color: #eef2ff;
+        cursor: pointer;
+        list-style: none;
+      }
+
+      .vel-analytics-user__summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .vel-analytics-user__summary::after {
+        content: "›";
+        justify-self: end;
+        color: rgba(203, 213, 225, 0.72);
+        font-size: 1.25rem;
+        font-weight: 900;
+        transform: rotate(90deg);
+        transition: transform 0.16s ease;
+      }
+
+      .vel-analytics-user[open] .vel-analytics-user__summary::after {
+        transform: rotate(-90deg);
+      }
+
+      .vel-analytics-user__identity,
+      .vel-analytics-user__context,
+      .vel-analytics-user__stat {
+        min-width: 0;
+      }
+
+      .vel-analytics-user__stat {
+        text-align: right;
+        color: rgba(226, 232, 240, 0.78);
+        font-size: 0.78rem;
+        font-weight: 800;
+      }
+
+      .vel-analytics-user__actions {
+        display: grid;
+        gap: 0;
+        margin: 0;
+        padding: 0 0.9rem 0.85rem;
+        list-style: none;
+      }
+
+      .vel-analytics-user__action {
+        display: grid;
+        grid-template-columns: 8.5rem minmax(0, 1fr);
+        gap: 0.85rem;
+        padding: 0.62rem 0;
+        border-top: 1px solid rgba(148, 163, 184, 0.1);
+      }
+
+      .vel-analytics-user__time {
+        color: rgba(203, 213, 225, 0.66);
+        font-size: 0.76rem;
+        font-weight: 800;
+      }
+
       @media (max-width: 900px) {
         .vel-analytics-hero,
         .vel-analytics-layout,
@@ -1230,11 +1311,26 @@
         .vel-analytics-grid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
+
+        .vel-analytics-user__summary {
+          grid-template-columns: minmax(0, 1fr) auto;
+        }
+
+        .vel-analytics-user__context,
+        .vel-analytics-user__stat {
+          grid-column: 1 / -1;
+          text-align: left;
+        }
       }
 
       @media (max-width: 520px) {
         .vel-analytics-grid {
           grid-template-columns: 1fr;
+        }
+
+        .vel-analytics-user__action {
+          grid-template-columns: 1fr;
+          gap: 0.2rem;
         }
 
         .vel-analytics-visitor__meta {
@@ -3796,6 +3892,52 @@
           ].join("");
         }
 
+        function actionContextLabel(item) {
+          var media = item.channelName || item.mediaTitle || "";
+          var clickMeta = clickContextLabel(item);
+          if (media) return media;
+          if (clickMeta) return clickMeta;
+          return packageDisplay(item);
+        }
+
+        function userActionsList(groups) {
+          groups = filterBySelectedIp(groups || []);
+          if (!groups || !groups.length) return '<p class="vel-analytics-empty">No user actions in this period yet.</p>';
+          return [
+            '<div class="vel-analytics-user-actions">',
+            groups.map(function (user) {
+              var actions = user.actions || [];
+              var packageName = packageDisplay(user);
+              var country = cleanCountryName(user.country);
+              var lastContext = user.channelName || user.mediaTitle || pageLabel(user.page, user.section);
+              var trialRemaining = user.trialSecondsRemaining == null ? "n/a" : formatDuration(user.trialSecondsRemaining);
+              var actionCount = user.actionCount || actions.length || 0;
+              return [
+                '<details class="vel-analytics-user">',
+                '<summary class="vel-analytics-user__summary">',
+                '<div class="vel-analytics-user__identity">' + ipButton(user.ip, false) + '<span class="vel-analytics-subline">' + escapeHtml(formatTime(user.lastSeen)) + '</span></div>',
+                '<div class="vel-analytics-user__context"><div class="vel-analytics-now-title">' + escapeHtml(lastContext || "Browsing") + '</div><span class="vel-analytics-subline">' + escapeHtml(packageName) + (country ? " - " + escapeHtml(country) : "") + '</span></div>',
+                '<div class="vel-analytics-user__stat">' + escapeHtml(String(actionCount)) + ' actions<span class="vel-analytics-subline">' + escapeHtml(formatDuration(user.totalWatchSeconds || user.trialSecondsUsed || 0)) + ' watched</span></div>',
+                '<div class="vel-analytics-user__stat">Left<span class="vel-analytics-subline">' + escapeHtml(trialRemaining) + '</span></div>',
+                '</summary>',
+                actions.length
+                  ? '<ol class="vel-analytics-user__actions">' + actions.map(function (action) {
+                    var context = actionContextLabel(action);
+                    return [
+                      '<li class="vel-analytics-user__action">',
+                      '<time class="vel-analytics-user__time">' + escapeHtml(formatTime(action.ts)) + '</time>',
+                      '<div><div class="vel-analytics-now-title">' + escapeHtml(eventLabel(action.type)) + '</div>' + (context ? '<span class="vel-analytics-subline">' + escapeHtml(context) + '</span>' : '') + '</div>',
+                      '</li>'
+                    ].join("");
+                  }).join("") + '</ol>'
+                  : '<p class="vel-analytics-empty">No important actions for this user.</p>',
+                '</details>'
+              ].join("");
+            }).join(""),
+            '</div>'
+          ].join("");
+        }
+
         function channelsTable(items) {
           if (!items || !items.length) return '<p class="vel-analytics-empty">No watched channels yet.</p>';
           return [
@@ -3871,7 +4013,7 @@
               '</div>',
               '<div class="vel-analytics-subtabs" role="tablist" aria-label="Analytics details">',
               '<button type="button" class="vel-analytics-subtab is-active" role="tab" aria-selected="true" aria-controls="va-panel-visitors" data-analytics-subtab="visitors">Visiteurs</button>',
-              '<button type="button" class="vel-analytics-subtab" role="tab" aria-selected="false" aria-controls="va-panel-clicks" data-analytics-subtab="clicks">Clics boutons</button>',
+              '<button type="button" class="vel-analytics-subtab" role="tab" aria-selected="false" aria-controls="va-panel-clicks" data-analytics-subtab="clicks">Actions</button>',
               '<button type="button" class="vel-analytics-subtab" role="tab" aria-selected="false" aria-controls="va-panel-channels" data-analytics-subtab="channels">Chaînes</button>',
               '</div>',
               '<div id="va-panel-visitors" class="vel-analytics-tabpanel" role="tabpanel" data-analytics-panel="visitors">',
@@ -3882,7 +4024,7 @@
               '</div>',
               '</div>',
               '<div id="va-panel-clicks" class="vel-analytics-tabpanel hidden" role="tabpanel" data-analytics-panel="clicks" hidden>',
-              '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>Clics sur les boutons</h3><div id="va-button-clicks"></div></div>',
+              '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>Actions par utilisateur</h3><div id="va-button-clicks"></div></div>',
               '</div>',
               '<div id="va-panel-channels" class="vel-analytics-tabpanel hidden" role="tabpanel" data-analytics-panel="channels" hidden>',
               '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>Chaînes les plus regardées</h3><div id="va-channels"></div></div>',
@@ -3992,7 +4134,7 @@
           var channelsList = document.getElementById("va-channels");
           if (liveList) liveList.innerHTML = visitorsTable(live.visitors || []);
           if (visitorsList) visitorsList.innerHTML = visitorsHistoryTable(summary.visitors || []);
-          if (clicksList) clicksList.innerHTML = buttonClicksTable(summary.recentButtonClicks || []);
+          if (clicksList) clicksList.innerHTML = userActionsList(summary.userActions || []);
           if (channelsList) channelsList.innerHTML = channelsTable(summary.topChannels || []);
         }
 

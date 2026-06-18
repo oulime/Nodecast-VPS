@@ -3143,6 +3143,7 @@
         var refreshTimer = null;
         var analyticsScope = "today";
         var analyticsSelectedIp = "";
+        var analyticsOpenIps = new Set();
         var latestAnalyticsLive = null;
         var latestAnalyticsSummary = null;
         var watchState = new WeakMap();
@@ -3373,6 +3374,7 @@
           var id = card.dataset.packageId || "";
           var name = titleFromPackage(card);
           if (!id && !name) return false;
+          stopActivePlayback("video_stop");
           currentPackage = { id: id, name: name };
           currentMedia = { type: "", id: "", title: "" };
           if (sendOpen && !shouldSkipTracking(card)) {
@@ -3396,6 +3398,7 @@
           var content = document.getElementById("content-view");
           if (packages && isVisible(packages)) {
             if (Date.now() - (lastPackageCapture.at || 0) < 1200) return;
+            stopActivePlayback("video_stop");
             currentPackage = { id: "", name: "" };
             currentMedia = { type: "", id: "", title: "" };
             return;
@@ -3644,7 +3647,7 @@
 
         function bindVideo(video, mediaType) {
           if (!video || watchState.has(video)) return;
-          watchState.set(video, { startedAt: 0, lastProgressAt: 0, lastReportedSeconds: 0, title: "" });
+          watchState.set(video, { startedAt: 0, lastProgressAt: 0, lastReportedSeconds: 0, title: "", mediaType: mediaType });
 
           video.addEventListener("play", function () {
             var state = watchState.get(video);
@@ -3686,25 +3689,34 @@
             });
           });
 
-          function finish(type) {
-            var state = watchState.get(video);
-            if (!state || !state.startedAt) return;
-            var watchedSeconds = Math.max(0, Math.round((Date.now() - state.startedAt) / 1000));
-            var delta = Math.max(0, watchedSeconds - (state.lastReportedSeconds || 0));
-            state.lastReportedSeconds = watchedSeconds;
-            send(type, {
-              mediaType: mediaType,
-              mediaTitle: state.title || nowPlayingTitle(video),
-              channelName: mediaType === "live" ? (state.title || nowPlayingTitle(video)) : undefined,
-              watchedSeconds: watchedSeconds,
-              watchDeltaSeconds: delta,
-              currentTime: video.currentTime || 0
-            });
-            state.startedAt = 0;
-          }
+          video.addEventListener("pause", function () { finishTrackedVideo(video, "video_stop"); });
+          video.addEventListener("ended", function () { finishTrackedVideo(video, "video_end"); });
+        }
 
-          video.addEventListener("pause", function () { finish("video_stop"); });
-          video.addEventListener("ended", function () { finish("video_end"); });
+        function finishTrackedVideo(video, type) {
+          var state = watchState.get(video);
+          if (!state || !state.startedAt) return false;
+          var mediaType = state.mediaType || currentMedia.type || "live";
+          var watchedSeconds = Math.max(0, Math.round((Date.now() - state.startedAt) / 1000));
+          var delta = Math.max(0, watchedSeconds - (state.lastReportedSeconds || 0));
+          var title = state.title || nowPlayingTitle(video);
+          state.lastReportedSeconds = watchedSeconds;
+          state.startedAt = 0;
+          send(type, {
+            mediaType: mediaType,
+            mediaTitle: title,
+            channelName: mediaType === "live" ? title : undefined,
+            watchedSeconds: watchedSeconds,
+            watchDeltaSeconds: delta,
+            currentTime: video.currentTime || 0
+          });
+          return true;
+        }
+
+        function stopActivePlayback(type) {
+          ["video", "video-vod"].forEach(function (id) {
+            finishTrackedVideo(document.getElementById(id), type || "video_stop");
+          });
         }
 
         function bindPackageCapture() {
@@ -4076,8 +4088,10 @@
               var trialRemaining = user.trialSecondsRemaining == null ? "n/a" : formatDuration(user.trialSecondsRemaining);
               var actionCount = user.actionCount || actions.length || 0;
               var sessionCount = Number(user.sessionCount || 0);
+              var userIp = String(user.ip || "").trim();
+              var openAttr = userIp && analyticsOpenIps.has(userIp) ? ' open' : '';
               return [
-                '<details class="vel-analytics-user">',
+                '<details class="vel-analytics-user" data-analytics-user-ip="' + escapeHtml(userIp) + '"' + openAttr + '>',
                 '<summary class="vel-analytics-user__summary">',
                 '<div class="vel-analytics-user__identity">' + ipButton(user.ip, false) + '<span class="vel-analytics-subline">' + escapeHtml(formatTime(user.lastSeen)) + '</span></div>',
                 '<div class="vel-analytics-user__context"><div class="vel-analytics-now-title">' + escapeHtml(lastContext || "Browsing") + '</div><span class="vel-analytics-subline">' + escapeHtml(packageName) + (country ? " - " + escapeHtml(country) : "") + '</span></div>',
@@ -4197,7 +4211,11 @@
               '</div>'
             ].join("");
             panels.appendChild(panel);
-            panel.querySelector("#vel-analytics-refresh").addEventListener("click", loadAnalytics);
+            panel.querySelector("#vel-analytics-refresh").addEventListener("click", function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              loadAnalytics();
+            });
             panel.querySelector("#vel-analytics-scope").addEventListener("click", function () {
               analyticsScope = analyticsScope === "today" ? "all" : "today";
               loadAnalytics();
@@ -4228,6 +4246,14 @@
                 renderAnalyticsData();
               }
             });
+            panel.addEventListener("toggle", function (event) {
+              var details = event.target && event.target.closest ? event.target.closest(".vel-analytics-user") : null;
+              if (!details || event.target !== details) return;
+              var ip = String(details.dataset.analyticsUserIp || "").trim();
+              if (!ip) return;
+              if (details.open) analyticsOpenIps.add(ip);
+              else analyticsOpenIps.delete(ip);
+            }, true);
           }
           return panel;
         }
@@ -4250,6 +4276,7 @@
 
         function focusAnalyticsIp(ip) {
           analyticsSelectedIp = String(ip || "").trim();
+          if (analyticsSelectedIp) analyticsOpenIps.add(analyticsSelectedIp);
           showAnalyticsSubtab("visitors");
           renderAnalyticsData();
           window.setTimeout(function () {
@@ -4276,6 +4303,7 @@
             var data = await res.json().catch(function () { return {}; });
             if (!res.ok) throw new Error(data.error || "HTTP " + res.status);
             if (sameIp(analyticsSelectedIp, ip)) analyticsSelectedIp = "";
+            analyticsOpenIps.delete(ip);
             await loadAnalytics();
             setStatus("Cleaned " + String(data.deleted || 0) + " analytics events for " + ip + ".");
           } catch (error) {
@@ -4331,6 +4359,16 @@
           if (visitorsList) visitorsList.innerHTML = userActionsList(summary.userActions || []);
           if (clicksList) clicksList.innerHTML = userActionsList(summary.userActions || []);
           if (channelsList) channelsList.innerHTML = channelsTable(summary.topChannels || []);
+          syncAnalyticsUserOpenState();
+        }
+
+        function syncAnalyticsUserOpenState() {
+          document.querySelectorAll(".vel-analytics-user[open]").forEach(function (details) {
+            var ip = String(details.dataset.analyticsUserIp || "").trim();
+            if (ip && analyticsOpenIps.has(ip)) return;
+            details.open = false;
+            details.removeAttribute("open");
+          });
         }
 
         async function loadAnalytics() {

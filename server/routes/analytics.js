@@ -281,28 +281,50 @@ function publicEventFromRequest(req) {
     };
 }
 
-async function readEvents({ days = 7, limit = MAX_EVENTS_FOR_SUMMARY } = {}) {
-    const maxLimit = Math.min(Math.max(Number(limit) || MAX_EVENTS_FOR_SUMMARY, 1), MAX_EVENTS_FOR_SUMMARY);
+function parseDateKey(value) {
+    const text = String(value || '').trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
+}
+
+async function analyticsEventFiles({ days = 7, from, to } = {}) {
     const dir = analyticsDir();
     await fs.mkdir(dir, { recursive: true });
-    let files;
-    if (days === 'all') {
-        files = (await fs.readdir(dir).catch(() => []))
-            .filter((name) => /^events-\d{4}-\d{2}-\d{2}\.jsonl$/.test(name))
-            .sort()
-            .map((name) => path.join(dir, name));
-    } else {
-        const maxDays = Math.min(Math.max(Number(days) || 7, 1), 30);
-        const wanted = new Set();
-        for (let i = 0; i < maxDays; i += 1) {
-            const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-            wanted.add(`events-${d.toISOString().slice(0, 10)}.jsonl`);
-        }
-        files = (await fs.readdir(dir).catch(() => []))
-            .filter((name) => wanted.has(name))
+    const dateFrom = parseDateKey(from);
+    const dateTo = parseDateKey(to);
+    if (dateFrom || dateTo) {
+        const start = dateFrom || dateTo;
+        const end = dateTo || dateFrom;
+        const min = start <= end ? start : end;
+        const max = start <= end ? end : start;
+        return (await fs.readdir(dir).catch(() => []))
+            .filter((name) => {
+                const match = /^events-(\d{4}-\d{2}-\d{2})\.jsonl$/.exec(name);
+                return match && match[1] >= min && match[1] <= max;
+            })
             .sort()
             .map((name) => path.join(dir, name));
     }
+    if (days === 'all') {
+        return (await fs.readdir(dir).catch(() => []))
+            .filter((name) => /^events-\d{4}-\d{2}-\d{2}\.jsonl$/.test(name))
+            .sort()
+            .map((name) => path.join(dir, name));
+    }
+    const maxDays = Math.min(Math.max(Number(days) || 7, 1), 30);
+    const wanted = new Set();
+    for (let i = 0; i < maxDays; i += 1) {
+        const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+        wanted.add(`events-${d.toISOString().slice(0, 10)}.jsonl`);
+    }
+    return (await fs.readdir(dir).catch(() => []))
+        .filter((name) => wanted.has(name))
+        .sort()
+        .map((name) => path.join(dir, name));
+}
+
+async function readEvents({ days = 7, limit = MAX_EVENTS_FOR_SUMMARY, from, to } = {}) {
+    const maxLimit = Math.min(Math.max(Number(limit) || MAX_EVENTS_FOR_SUMMARY, 1), MAX_EVENTS_FOR_SUMMARY);
+    const files = await analyticsEventFiles({ days, from, to });
     const events = [];
     for (const file of files) {
         const raw = await fs.readFile(file, 'utf8').catch((err) => {
@@ -322,31 +344,10 @@ async function readEvents({ days = 7, limit = MAX_EVENTS_FOR_SUMMARY } = {}) {
     return events;
 }
 
-async function eventFilesForScope({ days = 7 } = {}) {
-    const dir = analyticsDir();
-    await fs.mkdir(dir, { recursive: true });
-    if (days === 'all') {
-        return (await fs.readdir(dir).catch(() => []))
-            .filter((name) => /^events-\d{4}-\d{2}-\d{2}\.jsonl$/.test(name))
-            .sort()
-            .map((name) => path.join(dir, name));
-    }
-    const maxDays = Math.min(Math.max(Number(days) || 7, 1), 30);
-    const wanted = new Set();
-    for (let i = 0; i < maxDays; i += 1) {
-        const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-        wanted.add(`events-${d.toISOString().slice(0, 10)}.jsonl`);
-    }
-    return (await fs.readdir(dir).catch(() => []))
-        .filter((name) => wanted.has(name))
-        .sort()
-        .map((name) => path.join(dir, name));
-}
-
-async function deleteAnalyticsUserEvents({ ip, days, scope }) {
+async function deleteAnalyticsUserEvents({ ip, days, scope, from, to }) {
     const targetIp = normalizeIp(ip);
     if (!targetIp) return { deleted: 0, filesChanged: 0 };
-    const files = await eventFilesForScope({ days });
+    const files = await analyticsEventFiles({ days, from, to });
     let deleted = 0;
     let filesChanged = 0;
     for (const file of files) {
@@ -360,7 +361,7 @@ async function deleteAnalyticsUserEvents({ ip, days, scope }) {
             if (!line.trim()) continue;
             try {
                 const event = JSON.parse(line);
-                const inScope = scope === 'today' ? localDateKey(event.ts) === localDateKey() : true;
+                const inScope = eventInScope(event, { scope, from, to });
                 if (inScope && sameAnalyticsIp(event.ip, targetIp)) {
                     deleted += 1;
                     changed = true;
@@ -401,6 +402,18 @@ function localDateKey(value = new Date()) {
 }
 
 function analyticsScope(req) {
+    const from = parseDateKey(req.query.from || req.query.dateFrom || req.query.start);
+    const to = parseDateKey(req.query.to || req.query.dateTo || req.query.end);
+    if (from || to) {
+        const start = from || to;
+        const end = to || from;
+        return {
+            scope: 'range',
+            days: 'range',
+            from: start <= end ? start : end,
+            to: start <= end ? end : start
+        };
+    }
     const scope = String(req.query.scope || req.query.period || '').trim().toLowerCase();
     if (scope === 'today') return { scope: 'today', days: 2 };
     if (scope === 'all' || scope === 'all_time' || scope === 'all-time') return { scope: 'all', days: 'all' };
@@ -408,10 +421,20 @@ function analyticsScope(req) {
     return { scope: 'days', days };
 }
 
-function filterEventsForScope(events, scope) {
-    if (scope !== 'today') return events;
-    const today = localDateKey();
-    return events.filter((event) => localDateKey(event.ts) === today);
+function eventInScope(event, { scope, from, to } = {}) {
+    const day = localDateKey(event.ts);
+    if (!day) return false;
+    if (scope === 'today') return day === localDateKey();
+    if (scope === 'range') {
+        const start = parseDateKey(from);
+        const end = parseDateKey(to);
+        return (!start || day >= start) && (!end || day <= end);
+    }
+    return true;
+}
+
+function filterEventsForScope(events, scopeInfo) {
+    return events.filter((event) => eventInScope(event, scopeInfo));
 }
 
 function countBy(events, keyFn, { limit = 12, seconds = false } = {}) {
@@ -693,14 +716,17 @@ router.get('/admin/summary', requireAdmin, async (req, res) => {
             await proxyRemoteAdmin(req, res);
             return;
         }
-        const { scope, days } = analyticsScope(req);
-        const events = await readEvents({ days });
+        const scopeInfo = analyticsScope(req);
+        const { scope, days, from, to } = scopeInfo;
+        const events = await readEvents({ days, from, to });
         res.json({
             scope,
             days,
+            from,
+            to,
             timeZone: ANALYTICS_TIME_ZONE,
             generatedAt: new Date().toISOString(),
-            ...summarize(filterEventsForScope(events, scope))
+            ...summarize(filterEventsForScope(events, scopeInfo))
         });
     } catch (err) {
         console.error('[analytics] summary failed:', err);
@@ -714,14 +740,17 @@ router.get('/admin/events', requireAdmin, async (req, res) => {
             await proxyRemoteAdmin(req, res);
             return;
         }
-        const { scope, days } = analyticsScope(req);
+        const scopeInfo = analyticsScope(req);
+        const { scope, days, from, to } = scopeInfo;
         const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 1000);
-        const events = await readEvents({ days, limit });
+        const events = await readEvents({ days, limit, from, to });
         res.json({
             scope,
             days,
+            from,
+            to,
             timeZone: ANALYTICS_TIME_ZONE,
-            events: filterEventsForScope(events, scope).slice(-limit).reverse()
+            events: filterEventsForScope(events, scopeInfo).slice(-limit).reverse()
         });
     } catch (err) {
         console.error('[analytics] events failed:', err);
@@ -731,7 +760,8 @@ router.get('/admin/events', requireAdmin, async (req, res) => {
 
 router.delete('/admin/user', requireAdmin, async (req, res) => {
     try {
-        const { scope, days } = analyticsScope(req);
+        const scopeInfo = analyticsScope(req);
+        const { scope, days, from, to } = scopeInfo;
         const ip = cleanString(req.query.ip || req.body?.ip, 120);
         if (!ip) {
             res.status(400).json({ error: 'Missing ip' });
@@ -741,6 +771,9 @@ router.delete('/admin/user', requireAdmin, async (req, res) => {
             const target = new URL('/api/analytics/admin/user', REMOTE_ANALYTICS_BASE);
             if (scope === 'all' || scope === 'today') {
                 target.searchParams.set('scope', scope);
+            } else if (scope === 'range') {
+                target.searchParams.set('from', from);
+                target.searchParams.set('to', to);
             } else {
                 target.searchParams.set('days', String(days));
             }
@@ -758,7 +791,7 @@ router.delete('/admin/user', requireAdmin, async (req, res) => {
             res.send(text);
             return;
         }
-        const result = await deleteAnalyticsUserEvents({ ip, days, scope });
+        const result = await deleteAnalyticsUserEvents({ ip, days, scope, from, to });
         for (const [sessionId, session] of liveSessions.entries()) {
             if (sameAnalyticsIp(session.ip, ip)) liveSessions.delete(sessionId);
         }

@@ -758,7 +758,44 @@
         gap: 0.55rem;
       }
 
-      .vel-analytics-scope {
+      .vel-analytics-range {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.45rem;
+      }
+
+      .vel-analytics-range label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.32rem;
+        color: rgba(226, 232, 240, 0.76);
+        font-size: 0.78rem;
+        font-weight: 850;
+      }
+
+      .vel-analytics-date {
+        min-height: 2.6rem;
+        max-width: 10.5rem;
+        padding: 0 0.72rem;
+        border: 1px solid rgba(45, 212, 191, 0.24);
+        border-radius: 999px;
+        color: #ecfeff;
+        background: rgba(15, 23, 42, 0.58);
+        font: inherit;
+        font-size: 0.82rem;
+        font-weight: 800;
+        color-scheme: dark;
+      }
+
+      .vel-analytics-date:focus {
+        border-color: rgba(45, 212, 191, 0.58);
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.16);
+      }
+
+      .vel-analytics-apply {
         min-height: 2.6rem;
         padding: 0 1rem;
         border-radius: 999px;
@@ -1361,6 +1398,11 @@
 
         .vel-analytics-grid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .vel-analytics-actions,
+        .vel-analytics-range {
+          justify-content: flex-start;
         }
 
         .vel-analytics-user__summary {
@@ -3141,7 +3183,8 @@
         var lastPackageCapture = { key: "", at: 0 };
         var sessionClosed = false;
         var refreshTimer = null;
-        var analyticsScope = "today";
+        var analyticsDateFrom = todayInputDate();
+        var analyticsDateTo = todayInputDate();
         var analyticsSelectedIp = "";
         var analyticsOpenIps = new Set();
         var latestAnalyticsLive = null;
@@ -3160,6 +3203,37 @@
           } catch (error) {
             return "va_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 12);
           }
+        }
+
+        function todayInputDate() {
+          return new Date().toISOString().slice(0, 10);
+        }
+
+        function readAnalyticsDateRange() {
+          var fromInput = document.getElementById("vel-analytics-date-from");
+          var toInput = document.getElementById("vel-analytics-date-to");
+          var from = fromInput && fromInput.value ? fromInput.value : analyticsDateFrom || todayInputDate();
+          var to = toInput && toInput.value ? toInput.value : analyticsDateTo || from;
+          if (from > to) {
+            var swap = from;
+            from = to;
+            to = swap;
+          }
+          analyticsDateFrom = from;
+          analyticsDateTo = to;
+          if (fromInput) fromInput.value = from;
+          if (toInput) toInput.value = to;
+          return { from: from, to: to };
+        }
+
+        function analyticsRangeQuery() {
+          var range = readAnalyticsDateRange();
+          return "from=" + encodeURIComponent(range.from) + "&to=" + encodeURIComponent(range.to);
+        }
+
+        function analyticsRangeLabel() {
+          var range = readAnalyticsDateRange();
+          return range.from === range.to ? range.from : range.from + " to " + range.to;
         }
 
         function getTrialStartedAt() {
@@ -3606,6 +3680,10 @@
             return;
           }
 
+          if (target.closest("#btn-back-home, #btn-go-home, #btn-close-vod-player")) {
+            stopActivePlayback("video_stop");
+          }
+
           var tab = target.closest("#main-tabs .tab, .vel-adult-tab");
           if (tab) {
             send("tab_open", { section: tab.dataset.tab || tab.dataset.adultTab || text(tab) });
@@ -3716,6 +3794,37 @@
         function stopActivePlayback(type) {
           ["video", "video-vod"].forEach(function (id) {
             finishTrackedVideo(document.getElementById(id), type || "video_stop");
+          });
+        }
+
+        function stopVodPlayback(type) {
+          finishTrackedVideo(document.getElementById("video-vod"), type || "video_stop");
+        }
+
+        function detectPlaybackEndedByNavigation() {
+          var vod = document.getElementById("video-vod");
+          var state = watchState.get(vod);
+          if (!state || !state.startedAt) return;
+          var container = document.getElementById("vod-player-container");
+          if (!container || container.hidden || container.classList.contains("hidden") || container.getAttribute("aria-hidden") === "true" || !isVisible(container)) {
+            stopVodPlayback("video_stop");
+          }
+        }
+
+        function bindPlaybackEndNavigation() {
+          ["btn-back-home", "btn-go-home", "btn-close-vod-player"].forEach(function (id) {
+            var button = document.getElementById(id);
+            if (!button || button.dataset.analyticsPlaybackEndBound === "1") return;
+            button.dataset.analyticsPlaybackEndBound = "1";
+            var stop = function () {
+              stopVodPlayback("video_stop");
+            };
+            button.addEventListener("pointerdown", stop, true);
+            button.addEventListener("touchstart", stop, true);
+            button.addEventListener("click", stop, true);
+            button.addEventListener("keydown", function (event) {
+              if (event.key === "Enter" || event.key === " ") stop();
+            }, true);
           });
         }
 
@@ -4180,7 +4289,11 @@
               '<p class="vel-analytics-subtitle" id="vel-analytics-subtitle">Today visitors, country, package and watched channels. Saved as JSON on the VPS.</p>',
               '</div>',
               '<div class="vel-analytics-actions">',
-              '<button type="button" id="vel-analytics-scope" class="vel-analytics-scope">Show all time</button>',
+              '<div class="vel-analytics-range">',
+              '<label>From <input type="date" id="vel-analytics-date-from" class="vel-analytics-date" value="' + escapeHtml(analyticsDateFrom) + '"></label>',
+              '<label>To <input type="date" id="vel-analytics-date-to" class="vel-analytics-date" value="' + escapeHtml(analyticsDateTo) + '"></label>',
+              '<button type="button" id="vel-analytics-apply" class="vel-analytics-apply">Apply</button>',
+              '</div>',
               '<button type="button" id="vel-analytics-refresh" class="vel-analytics-refresh">Refresh</button>',
               '</div>',
               '</div>',
@@ -4216,9 +4329,17 @@
               event.stopPropagation();
               loadAnalytics();
             });
-            panel.querySelector("#vel-analytics-scope").addEventListener("click", function () {
-              analyticsScope = analyticsScope === "today" ? "all" : "today";
+            panel.querySelector("#vel-analytics-apply").addEventListener("click", function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              readAnalyticsDateRange();
               loadAnalytics();
+            });
+            panel.querySelectorAll("#vel-analytics-date-from, #vel-analytics-date-to").forEach(function (input) {
+              input.addEventListener("change", function () {
+                readAnalyticsDateRange();
+                loadAnalytics();
+              });
             });
             panel.querySelectorAll("[data-analytics-subtab]").forEach(function (tabButton) {
               tabButton.addEventListener("click", function () {
@@ -4292,10 +4413,10 @@
           ip = String(ip || "").trim();
           if (!ip) return;
           if (!window.confirm("Clean analytics history for " + ip + "?")) return;
-          var scope = analyticsScope === "all" ? "all" : "today";
+          var rangeQuery = analyticsRangeQuery();
           setStatus("Cleaning analytics for " + ip + "...");
           try {
-            var res = await fetch("/api/analytics/admin/user?scope=" + encodeURIComponent(scope) + "&ip=" + encodeURIComponent(ip), {
+            var res = await fetch("/api/analytics/admin/user?" + rangeQuery + "&ip=" + encodeURIComponent(ip), {
               method: "DELETE",
               headers: adminHeaders(),
               cache: "no-store"
@@ -4373,28 +4494,24 @@
 
         async function loadAnalytics() {
           ensureAnalyticsPanel();
-          var scope = analyticsScope === "all" ? "all" : "today";
-          var scopeLabel = scope === "all" ? "all time" : "today";
+          var rangeQuery = analyticsRangeQuery();
+          var scopeLabel = analyticsRangeLabel();
           setStatus("Loading " + scopeLabel + " analytics...");
           try {
             var results = await Promise.all([
               fetchJson("/api/analytics/admin/live"),
-              fetchJson("/api/analytics/admin/summary?scope=" + encodeURIComponent(scope))
+              fetchJson("/api/analytics/admin/summary?" + rangeQuery)
             ]);
             var live = results[0];
             var summary = results[1];
             latestAnalyticsLive = live;
             latestAnalyticsSummary = summary;
             var subtitle = document.getElementById("vel-analytics-subtitle");
-            var scopeButton = document.getElementById("vel-analytics-scope");
             var visitorsTitle = document.getElementById("va-visitors-title");
             if (subtitle) {
-              subtitle.textContent = scope === "all"
-                ? "All-time visitors, country, package and watched channels. Saved as JSON on the VPS."
-                : "Today visitors, country, package and watched channels. Saved as JSON on the VPS.";
+              subtitle.textContent = "Visitors, country, package and watched channels from " + scopeLabel + ". Saved as JSON on the VPS.";
             }
-            if (scopeButton) scopeButton.textContent = scope === "all" ? "Show today" : "Show all time";
-            if (visitorsTitle) visitorsTitle.textContent = scope === "all" ? "Visiteurs tout le temps" : "Visiteurs aujourd’hui";
+            if (visitorsTitle) visitorsTitle.textContent = "Visiteurs " + scopeLabel;
             document.getElementById("va-live").textContent = String(live.total || 0);
             document.getElementById("va-visitors").textContent = String(summary.uniqueVisitors || 0);
             document.getElementById("va-ips").textContent = String(summary.uniqueIps || 0);
@@ -4411,6 +4528,7 @@
           bindVideo(document.getElementById("video"), "live");
           bindVideo(document.getElementById("video-vod"), "vod");
           bindPackageCapture();
+          bindPlaybackEndNavigation();
           document.addEventListener("click", onDocumentClick, true);
           document.addEventListener("change", function (event) {
             if (event.target && event.target.id === "country-select" && !shouldSkipTracking(event.target)) {
@@ -4447,6 +4565,8 @@
               mutationTickPending = false;
               ensureAnalyticsPanel();
               bindPackageCapture();
+              bindPlaybackEndNavigation();
+              detectPlaybackEndedByNavigation();
               trackPageIfChanged();
             });
           }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "hidden", "aria-hidden"] });

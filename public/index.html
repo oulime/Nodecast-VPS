@@ -1295,10 +1295,35 @@
         border-top: 1px solid rgba(148, 163, 184, 0.1);
       }
 
+      .vel-analytics-user__action--package {
+        background: linear-gradient(90deg, rgba(45, 212, 191, 0.1), transparent 72%);
+      }
+
+      .vel-analytics-user__action--media,
+      .vel-analytics-user__action--playback {
+        background: linear-gradient(90deg, rgba(56, 189, 248, 0.1), transparent 72%);
+      }
+
       .vel-analytics-user__time {
         color: rgba(203, 213, 225, 0.66);
         font-size: 0.76rem;
         font-weight: 800;
+      }
+
+      .vel-analytics-user__tag {
+        display: inline-flex;
+        align-items: center;
+        width: max-content;
+        max-width: 100%;
+        margin-bottom: 0.18rem;
+        padding: 0.1rem 0.42rem;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 999px;
+        color: rgba(226, 232, 240, 0.8);
+        background: rgba(15, 23, 42, 0.42);
+        font-size: 0.66rem;
+        font-weight: 900;
+        text-transform: uppercase;
       }
 
       @media (max-width: 900px) {
@@ -3893,11 +3918,38 @@
         }
 
         function actionContextLabel(item) {
+          var type = String(item && item.type || "").toLowerCase();
           var media = item.channelName || item.mediaTitle || "";
           var clickMeta = clickContextLabel(item);
+          if (type === "package_open") return item.packageName || packageDisplay(item);
           if (media) return media;
           if (clickMeta) return clickMeta;
           return packageDisplay(item);
+        }
+
+        function actionKind(type) {
+          var raw = String(type || "").toLowerCase();
+          if (raw === "package_open") return { className: "package", label: "Package" };
+          if (raw === "media_open") return { className: "media", label: "Content" };
+          if (raw === "video_start" || raw === "video_stop" || raw === "video_end") return { className: "playback", label: "Watch" };
+          if (raw.indexOf("_click") !== -1 || raw === "external_browser_trial_resume") return { className: "click", label: "Click" };
+          if (raw === "page_view" || raw === "tab_open" || raw === "country_change") return { className: "navigation", label: "Navigation" };
+          return { className: "event", label: "Event" };
+        }
+
+        function actionDetailLine(action) {
+          var bits = [];
+          var packageName = action.packageName || "";
+          var page = pageLabel(action.page, action.section);
+          var country = cleanCountryName(action.country);
+          var watched = Number(action.watchedSeconds || action.watchDeltaSeconds || 0);
+          if (packageName && actionContextLabel(action) !== packageName) bits.push(packageName);
+          if (page && page !== "Browsing" && bits.indexOf(page) === -1) bits.push(page);
+          if (country) bits.push(country);
+          if (watched > 0 && (action.type === "video_stop" || action.type === "video_end")) {
+            bits.push(formatDuration(watched));
+          }
+          return bits.join(" - ");
         }
 
         function userActionsList(groups) {
@@ -3923,10 +3975,12 @@
                 actions.length
                   ? '<ol class="vel-analytics-user__actions">' + actions.map(function (action) {
                     var context = actionContextLabel(action);
+                    var detail = actionDetailLine(action);
+                    var kind = actionKind(action.type);
                     return [
-                      '<li class="vel-analytics-user__action">',
+                      '<li class="vel-analytics-user__action vel-analytics-user__action--' + escapeHtml(kind.className) + '">',
                       '<time class="vel-analytics-user__time">' + escapeHtml(formatTime(action.ts)) + '</time>',
-                      '<div><div class="vel-analytics-now-title">' + escapeHtml(eventLabel(action.type)) + '</div>' + (context ? '<span class="vel-analytics-subline">' + escapeHtml(context) + '</span>' : '') + '</div>',
+                      '<div><span class="vel-analytics-user__tag">' + escapeHtml(kind.label) + '</span><div class="vel-analytics-now-title">' + escapeHtml(eventLabel(action.type)) + '</div>' + (context ? '<span class="vel-analytics-subline">' + escapeHtml(context) + '</span>' : '') + (detail ? '<span class="vel-analytics-subline">' + escapeHtml(detail) + '</span>' : '') + '</div>',
                       '</li>'
                     ].join("");
                   }).join("") + '</ol>'
@@ -3997,7 +4051,7 @@
               '<div class="vel-analytics-hero">',
               '<div>',
               '<h2 class="vel-analytics-title">Visitor analytics</h2>',
-              '<p class="vel-analytics-subtitle" id="vel-analytics-subtitle">Today visitors, country, package and watched channels. Saved locally on this Nodecast machine.</p>',
+              '<p class="vel-analytics-subtitle" id="vel-analytics-subtitle">Today visitors, country, package and watched channels. Saved as JSON in R2.</p>',
               '</div>',
               '<div class="vel-analytics-actions">',
               '<button type="button" id="vel-analytics-scope" class="vel-analytics-scope">Show all time</button>',
@@ -4157,8 +4211,8 @@
             var visitorsTitle = document.getElementById("va-visitors-title");
             if (subtitle) {
               subtitle.textContent = scope === "all"
-                ? "All-time visitors, country, package and watched channels. Saved locally on this Nodecast machine."
-                : "Today visitors, country, package and watched channels. Saved locally on this Nodecast machine.";
+                ? "All-time visitors, country, package and watched channels. Saved as JSON in R2."
+                : "Today visitors, country, package and watched channels. Saved as JSON in R2.";
             }
             if (scopeButton) scopeButton.textContent = scope === "all" ? "Show today" : "Show all time";
             if (visitorsTitle) visitorsTitle.textContent = scope === "all" ? "Visiteurs tout le temps" : "Visiteurs aujourd’hui";

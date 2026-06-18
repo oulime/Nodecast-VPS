@@ -3351,6 +3351,12 @@
           return range.from === range.to ? from : from + " - " + to;
         }
 
+        function analyticsRangeIncludesToday() {
+          var range = readAnalyticsDateRange();
+          var today = todayInputDate();
+          return range.from <= today && today <= range.to;
+        }
+
         function syncAnalyticsRangeLabel() {
           var label = document.getElementById("vel-analytics-range-label");
           if (label) label.textContent = analyticsRangeLabel();
@@ -4474,7 +4480,7 @@
               '<div id="va-panel-visitors" class="vel-analytics-tabpanel" role="tabpanel" data-analytics-panel="visitors">',
               '<div id="va-ip-filter"></div>',
               '<div class="vel-analytics-layout vel-analytics-layout--simple">',
-              '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>Visiteurs dans la période</h3><div id="va-live-list"></div></div>',
+              '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>En train de regarder</h3><div id="va-live-list"></div></div>',
               '<div class="vel-analytics-box vel-analytics-box--live-table"><h3 id="va-visitors-title">Visiteurs aujourd’hui</h3><div id="va-visitors-list"></div></div>',
               '</div>',
               '</div>',
@@ -4666,11 +4672,18 @@
           var visitorsList = document.getElementById("va-visitors-list");
           var clicksList = document.getElementById("va-button-clicks");
           var channelsList = document.getElementById("va-channels");
-          if (liveList) liveList.innerHTML = visitorsTable(summary.visitors || []);
+          if (liveList) liveList.innerHTML = visitorsTable(liveWatchingVisitors(live.visitors || []));
           if (visitorsList) visitorsList.innerHTML = userActionsList(summary.userActions || []);
           if (clicksList) clicksList.innerHTML = userActionsList(summary.userActions || []);
           if (channelsList) channelsList.innerHTML = channelsTable(summary.topChannels || []);
           syncAnalyticsUserOpenState();
+        }
+
+        function liveWatchingVisitors(items) {
+          if (!analyticsRangeIncludesToday()) return [];
+          return (items || []).filter(function (item) {
+            return item && (item.channelName || item.mediaTitle);
+          });
         }
 
         function syncAnalyticsUserOpenState() {

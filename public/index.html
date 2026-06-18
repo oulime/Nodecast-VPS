@@ -4312,7 +4312,7 @@
               '<div id="va-panel-visitors" class="vel-analytics-tabpanel" role="tabpanel" data-analytics-panel="visitors">',
               '<div id="va-ip-filter"></div>',
               '<div class="vel-analytics-layout vel-analytics-layout--simple">',
-              '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>Visiteurs en ligne</h3><div id="va-live-list"></div></div>',
+              '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>Visiteurs dans la période</h3><div id="va-live-list"></div></div>',
               '<div class="vel-analytics-box vel-analytics-box--live-table"><h3 id="va-visitors-title">Visiteurs aujourd’hui</h3><div id="va-visitors-list"></div></div>',
               '</div>',
               '</div>',
@@ -4476,7 +4476,7 @@
           var visitorsList = document.getElementById("va-visitors-list");
           var clicksList = document.getElementById("va-button-clicks");
           var channelsList = document.getElementById("va-channels");
-          if (liveList) liveList.innerHTML = visitorsTable(live.visitors || []);
+          if (liveList) liveList.innerHTML = visitorsTable(summary.visitors || []);
           if (visitorsList) visitorsList.innerHTML = userActionsList(summary.userActions || []);
           if (clicksList) clicksList.innerHTML = userActionsList(summary.userActions || []);
           if (channelsList) channelsList.innerHTML = channelsTable(summary.topChannels || []);
@@ -4499,7 +4499,7 @@
           setStatus("Loading " + scopeLabel + " analytics...");
           try {
             var results = await Promise.all([
-              fetchJson("/api/analytics/admin/live"),
+              fetchJson("/api/analytics/admin/live?" + rangeQuery),
               fetchJson("/api/analytics/admin/summary?" + rangeQuery)
             ]);
             var live = results[0];

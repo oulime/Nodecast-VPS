@@ -759,28 +759,123 @@
       }
 
       .vel-analytics-range {
+        position: relative;
         display: inline-flex;
-        flex-wrap: wrap;
         align-items: center;
         justify-content: flex-end;
-        gap: 0.45rem;
       }
 
-      .vel-analytics-range label {
+      .vel-analytics-range-trigger {
         display: inline-flex;
         align-items: center;
-        gap: 0.32rem;
-        color: rgba(226, 232, 240, 0.76);
+        justify-content: space-between;
+        gap: 0.7rem;
+        min-width: min(19rem, 72vw);
+        min-height: 2.6rem;
+        padding: 0 0.9rem;
+        border: 1px solid rgba(45, 212, 191, 0.34);
+        border-radius: 999px;
+        color: #ecfeff;
+        background: rgba(15, 23, 42, 0.68);
+        font: inherit;
+        box-shadow: inset 0 1px rgba(255, 255, 255, 0.08), 0 12px 24px rgba(0, 0, 0, 0.22);
+        cursor: pointer;
+      }
+
+      .vel-analytics-range-trigger span {
+        color: rgba(203, 213, 225, 0.78);
+        font-size: 0.72rem;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      .vel-analytics-range-trigger strong {
+        color: #f8fafc;
+        font-size: 0.88rem;
+        font-weight: 900;
+        white-space: nowrap;
+      }
+
+      .vel-analytics-range-trigger::after {
+        content: "";
+        width: 0.45rem;
+        height: 0.45rem;
+        border-right: 2px solid rgba(125, 211, 252, 0.9);
+        border-bottom: 2px solid rgba(125, 211, 252, 0.9);
+        transform: rotate(45deg) translateY(-0.12rem);
+      }
+
+      .vel-analytics-range-trigger:focus-visible,
+      .vel-analytics-range-trigger[aria-expanded="true"] {
+        border-color: rgba(45, 212, 191, 0.62);
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.16), 0 16px 30px rgba(0, 0, 0, 0.28);
+      }
+
+      .vel-analytics-range-popover {
+        position: absolute;
+        top: calc(100% + 0.55rem);
+        right: 0;
+        z-index: 20;
+        width: min(25rem, calc(100vw - 2rem));
+        padding: 0.8rem;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        border-radius: 16px;
+        background: rgba(8, 13, 28, 0.98);
+        box-shadow: 0 24px 56px rgba(0, 0, 0, 0.44), inset 0 1px rgba(255, 255, 255, 0.08);
+      }
+
+      .vel-analytics-range-popover[hidden] {
+        display: none;
+      }
+
+      .vel-analytics-range-presets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin-bottom: 0.7rem;
+      }
+
+      .vel-analytics-range-preset,
+      .vel-analytics-range-cancel,
+      .vel-analytics-apply {
+        min-height: 2.35rem;
+        padding: 0 0.78rem;
+        border-radius: 999px;
+        font: inherit;
         font-size: 0.78rem;
-        font-weight: 850;
+        font-weight: 900;
+        cursor: pointer;
+      }
+
+      .vel-analytics-range-preset,
+      .vel-analytics-range-cancel {
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        color: rgba(226, 232, 240, 0.88);
+        background: rgba(15, 23, 42, 0.62);
+      }
+
+      .vel-analytics-range-fields {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.55rem;
+      }
+
+      .vel-analytics-range-fields label {
+        display: grid;
+        gap: 0.3rem;
+        color: rgba(226, 232, 240, 0.76);
+        font-size: 0.74rem;
+        font-weight: 900;
+        text-transform: uppercase;
       }
 
       .vel-analytics-date {
-        min-height: 2.6rem;
-        max-width: 10.5rem;
+        width: 100%;
+        min-height: 2.55rem;
         padding: 0 0.72rem;
         border: 1px solid rgba(45, 212, 191, 0.24);
-        border-radius: 999px;
+        border-radius: 10px;
         color: #ecfeff;
         background: rgba(15, 23, 42, 0.58);
         font: inherit;
@@ -795,14 +890,17 @@
         box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.16);
       }
 
+      .vel-analytics-range-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.45rem;
+        margin-top: 0.7rem;
+      }
+
       .vel-analytics-apply {
-        min-height: 2.6rem;
-        padding: 0 1rem;
-        border-radius: 999px;
         border: 1px solid rgba(45, 212, 191, 0.34);
         background: rgba(15, 118, 110, 0.22);
         color: #ccfbf1;
-        font-weight: 850;
       }
 
       .vel-analytics-grid {
@@ -3206,7 +3304,22 @@
         }
 
         function todayInputDate() {
-          return new Date().toISOString().slice(0, 10);
+          var date = new Date();
+          date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+          return date.toISOString().slice(0, 10);
+        }
+
+        function shiftedInputDate(daysBack) {
+          var date = new Date();
+          date.setDate(date.getDate() - Math.max(0, Number(daysBack) || 0));
+          date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+          return date.toISOString().slice(0, 10);
+        }
+
+        function formatAnalyticsInputDate(value) {
+          var parts = String(value || "").split("-");
+          if (parts.length !== 3) return String(value || "");
+          return parts[2] + "/" + parts[1] + "/" + parts[0];
         }
 
         function readAnalyticsDateRange() {
@@ -3233,7 +3346,42 @@
 
         function analyticsRangeLabel() {
           var range = readAnalyticsDateRange();
-          return range.from === range.to ? range.from : range.from + " to " + range.to;
+          var from = formatAnalyticsInputDate(range.from);
+          var to = formatAnalyticsInputDate(range.to);
+          return range.from === range.to ? from : from + " - " + to;
+        }
+
+        function syncAnalyticsRangeLabel() {
+          var label = document.getElementById("vel-analytics-range-label");
+          if (label) label.textContent = analyticsRangeLabel();
+        }
+
+        function setAnalyticsRangePopover(open) {
+          var popover = document.getElementById("vel-analytics-range-popover");
+          var trigger = document.getElementById("vel-analytics-range-trigger");
+          if (!popover || !trigger) return;
+          popover.hidden = !open;
+          trigger.setAttribute("aria-expanded", open ? "true" : "false");
+        }
+
+        function applyAnalyticsPreset(preset) {
+          var today = todayInputDate();
+          var from = today;
+          var to = today;
+          if (preset === "yesterday") {
+            from = shiftedInputDate(1);
+            to = from;
+          } else {
+            var days = Number(preset);
+            if (Number.isFinite(days) && days > 1) from = shiftedInputDate(days - 1);
+          }
+          analyticsDateFrom = from;
+          analyticsDateTo = to;
+          var fromInput = document.getElementById("vel-analytics-date-from");
+          var toInput = document.getElementById("vel-analytics-date-to");
+          if (fromInput) fromInput.value = from;
+          if (toInput) toInput.value = to;
+          syncAnalyticsRangeLabel();
         }
 
         function getTrialStartedAt() {
@@ -4289,10 +4437,24 @@
               '<p class="vel-analytics-subtitle" id="vel-analytics-subtitle">Today visitors, country, package and watched channels. Saved as JSON on the VPS.</p>',
               '</div>',
               '<div class="vel-analytics-actions">',
-              '<div class="vel-analytics-range">',
-              '<label>From <input type="date" id="vel-analytics-date-from" class="vel-analytics-date" value="' + escapeHtml(analyticsDateFrom) + '"></label>',
-              '<label>To <input type="date" id="vel-analytics-date-to" class="vel-analytics-date" value="' + escapeHtml(analyticsDateTo) + '"></label>',
-              '<button type="button" id="vel-analytics-apply" class="vel-analytics-apply">Apply</button>',
+              '<div class="vel-analytics-range" id="vel-analytics-range">',
+              '<button type="button" id="vel-analytics-range-trigger" class="vel-analytics-range-trigger" aria-expanded="false" aria-controls="vel-analytics-range-popover"><span>Période</span><strong id="vel-analytics-range-label">' + escapeHtml(analyticsRangeLabel()) + '</strong></button>',
+              '<div id="vel-analytics-range-popover" class="vel-analytics-range-popover" hidden>',
+              '<div class="vel-analytics-range-presets">',
+              '<button type="button" class="vel-analytics-range-preset" data-analytics-range-preset="today">Aujourd’hui</button>',
+              '<button type="button" class="vel-analytics-range-preset" data-analytics-range-preset="yesterday">Hier</button>',
+              '<button type="button" class="vel-analytics-range-preset" data-analytics-range-preset="7">7 jours</button>',
+              '<button type="button" class="vel-analytics-range-preset" data-analytics-range-preset="30">30 jours</button>',
+              '</div>',
+              '<div class="vel-analytics-range-fields">',
+              '<label>From<input type="date" id="vel-analytics-date-from" class="vel-analytics-date" value="' + escapeHtml(analyticsDateFrom) + '"></label>',
+              '<label>To<input type="date" id="vel-analytics-date-to" class="vel-analytics-date" value="' + escapeHtml(analyticsDateTo) + '"></label>',
+              '</div>',
+              '<div class="vel-analytics-range-footer">',
+              '<button type="button" id="vel-analytics-range-cancel" class="vel-analytics-range-cancel">Annuler</button>',
+              '<button type="button" id="vel-analytics-apply" class="vel-analytics-apply">Appliquer</button>',
+              '</div>',
+              '</div>',
               '</div>',
               '<button type="button" id="vel-analytics-refresh" class="vel-analytics-refresh">Refresh</button>',
               '</div>',
@@ -4329,18 +4491,46 @@
               event.stopPropagation();
               loadAnalytics();
             });
+            panel.querySelector("#vel-analytics-range-trigger").addEventListener("click", function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              var popover = document.getElementById("vel-analytics-range-popover");
+              setAnalyticsRangePopover(!popover || popover.hidden);
+            });
             panel.querySelector("#vel-analytics-apply").addEventListener("click", function (event) {
               event.preventDefault();
               event.stopPropagation();
               readAnalyticsDateRange();
+              syncAnalyticsRangeLabel();
+              setAnalyticsRangePopover(false);
               loadAnalytics();
+            });
+            panel.querySelector("#vel-analytics-range-cancel").addEventListener("click", function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              setAnalyticsRangePopover(false);
+            });
+            panel.querySelectorAll("[data-analytics-range-preset]").forEach(function (presetButton) {
+              presetButton.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                applyAnalyticsPreset(presetButton.dataset.analyticsRangePreset || "today");
+              });
             });
             panel.querySelectorAll("#vel-analytics-date-from, #vel-analytics-date-to").forEach(function (input) {
               input.addEventListener("change", function () {
                 readAnalyticsDateRange();
-                loadAnalytics();
+                syncAnalyticsRangeLabel();
               });
             });
+            document.addEventListener("click", function (event) {
+              var range = document.getElementById("vel-analytics-range");
+              if (!range || range.contains(event.target)) return;
+              setAnalyticsRangePopover(false);
+            }, true);
+            document.addEventListener("keydown", function (event) {
+              if (event.key === "Escape") setAnalyticsRangePopover(false);
+            }, true);
             panel.querySelectorAll("[data-analytics-subtab]").forEach(function (tabButton) {
               tabButton.addEventListener("click", function () {
                 showAnalyticsSubtab(tabButton.dataset.analyticsSubtab || "visitors");
@@ -4496,6 +4686,7 @@
           ensureAnalyticsPanel();
           var rangeQuery = analyticsRangeQuery();
           var scopeLabel = analyticsRangeLabel();
+          syncAnalyticsRangeLabel();
           setStatus("Loading " + scopeLabel + " analytics...");
           try {
             var results = await Promise.all([

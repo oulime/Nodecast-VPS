@@ -22,6 +22,7 @@ const BUTTON_CLICK_TYPES = new Set([
     'external_browser_trial_resume'
 ]);
 const USER_ACTION_IGNORED_TYPES = new Set([
+    'event',
     'heartbeat',
     'video_progress'
 ]);
@@ -150,6 +151,18 @@ function cleanString(value, max = MAX_STRING_LENGTH) {
     return text.slice(0, max);
 }
 
+function cleanPath(value, max = MAX_STRING_LENGTH) {
+    const text = cleanString(value, max);
+    if (!text) return undefined;
+    try {
+        const url = new URL(text, 'https://nodecast.veloravip.net');
+        return cleanString(`${url.pathname}${url.hash || ''}` || '/', max);
+    } catch (_) {
+        const withoutQuery = text.split('?')[0].split('#')[0] || text;
+        return cleanString(withoutQuery, max);
+    }
+}
+
 function cleanNumber(value) {
     const n = Number(value);
     return Number.isFinite(n) ? n : undefined;
@@ -251,7 +264,7 @@ function publicEventFromRequest(req) {
         ip: clientIp(req),
         userAgent: cleanString(req.get('user-agent'), 220),
         device: cleanObject(body.device),
-        path: cleanString(body.path || req.get('referer'), 260),
+        path: cleanPath(body.path || req.get('referer'), 260),
         host: cleanString(req.get('host'), 120),
         origin: cleanString(body.origin, 180),
         page: cleanString(body.page, 120),
@@ -275,8 +288,8 @@ function publicEventFromRequest(req) {
         action: cleanString(body.action, 120),
         source: cleanString(body.source, 120),
         browser: cleanString(body.browser, 120),
-        targetPath: cleanString(body.targetPath, 260),
-        referrer: cleanString(body.referrer, 260),
+        targetPath: cleanPath(body.targetPath, 260),
+        referrer: cleanPath(body.referrer, 260),
         meta: cleanObject(body.meta)
     };
 }

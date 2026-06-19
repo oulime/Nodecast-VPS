@@ -18,6 +18,55 @@ const { Readable } = require('stream');
 // Default cache max age in hours
 const DEFAULT_MAX_AGE_HOURS = 24;
 const MEDIA_INFO_CACHE_MS = Math.max(1, parseInt(process.env.VELORA_MEDIA_INFO_CACHE_HOURS, 10) || 168) * 60 * 60 * 1000;
+const DEFAULT_REMOTE_CATALOG_BASE = 'https://nodecast.veloravip.net';
+const REMOTE_CATALOG_DISABLED = /^(1|true|yes)$/i.test(String(process.env.VELORA_CATALOG_REMOTE_DISABLED || '').trim());
+const REMOTE_CATALOG_BASE = String(process.env.VELORA_CATALOG_REMOTE_BASE || DEFAULT_REMOTE_CATALOG_BASE).trim().replace(/\/+$/, '');
+
+function isLocalHostname(value) {
+    const host = String(value || '').split(':')[0].replace(/^\[|\]$/g, '').toLowerCase();
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '';
+}
+
+function shouldUseRemoteCatalog(req) {
+    if (REMOTE_CATALOG_DISABLED || !REMOTE_CATALOG_BASE) return false;
+    const configured = String(process.env.VELORA_CATALOG_REMOTE_BASE || '').trim();
+    if (configured) return true;
+    return isLocalHostname(req.hostname) || isLocalHostname(req.get('host'));
+}
+
+async function proxyRemoteCatalog(req, res) {
+    if (!shouldUseRemoteCatalog(req)) return false;
+    let target;
+    try {
+        target = new URL(req.originalUrl || req.url, REMOTE_CATALOG_BASE);
+        const remote = new URL(REMOTE_CATALOG_BASE);
+        const localHost = String(req.get('host') || '').toLowerCase();
+        if (remote.host.toLowerCase() === localHost) return false;
+    } catch (_) {
+        return false;
+    }
+
+    try {
+        const headers = {};
+        for (const name of ['accept', 'authorization', 'x-admin-access-key', 'x-velora-admin-key']) {
+            const value = req.get(name);
+            if (value) headers[name] = value;
+        }
+        const upstream = await fetch(target, { headers, cache: 'no-store' });
+        const body = Buffer.from(await upstream.arrayBuffer());
+        res.status(upstream.status);
+        res.set('X-Velora-Catalog-Remote', REMOTE_CATALOG_BASE);
+        const contentType = upstream.headers.get('content-type');
+        const cacheControl = upstream.headers.get('cache-control');
+        if (contentType) res.set('Content-Type', contentType);
+        if (cacheControl) res.set('Cache-Control', cacheControl);
+        res.send(body);
+        return true;
+    } catch (err) {
+        console.warn('[Velora catalog] Remote VPS catalogue unavailable, using local fallback:', err.message);
+        return false;
+    }
+}
 
 function encodeGlobalId(sourceId, itemId) {
     return Buffer.from(`${sourceId}:${itemId}`).toString('base64url');
@@ -241,6 +290,12 @@ function sendCachedSourceCategory(req, res, action, sourceId, categoryId, includ
 }
 
 // --- Xtream Codes Proxy API --- //
+
+router.use('/xtream', async (req, res, next) => {
+    if (req.method !== 'GET') return next();
+    if (await proxyRemoteCatalog(req, res)) return;
+    next();
+});
 
 // Combined Xtream-style API for every enabled playlist source.
 // Example: /api/proxy/xtream/all/live_categories

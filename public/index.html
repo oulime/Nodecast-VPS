@@ -1379,6 +1379,26 @@
         background: rgba(15, 23, 42, 0.36);
       }
 
+      .vel-analytics-user--watched {
+        border-color: rgba(74, 222, 128, 0.24);
+        background: rgba(22, 101, 52, 0.14);
+      }
+
+      .vel-analytics-user--watched[open] {
+        border-color: rgba(74, 222, 128, 0.36);
+        background: rgba(22, 101, 52, 0.2);
+      }
+
+      .vel-analytics-user--noise {
+        border-color: rgba(248, 113, 113, 0.28);
+        background: rgba(127, 29, 29, 0.16);
+      }
+
+      .vel-analytics-user--noise[open] {
+        border-color: rgba(248, 113, 113, 0.38);
+        background: rgba(127, 29, 29, 0.22);
+      }
+
       .vel-analytics-user__summary {
         display: grid;
         grid-template-columns: minmax(9rem, 1.2fr) minmax(0, 1.7fr) auto auto;
@@ -1445,6 +1465,21 @@
         border-color: rgba(248, 113, 113, 0.62);
         background: rgba(153, 27, 27, 0.44);
         outline: none;
+      }
+
+      .vel-analytics-noise-badge {
+        display: inline-flex;
+        width: max-content;
+        max-width: 100%;
+        margin-top: 0.32rem;
+        padding: 0.14rem 0.48rem;
+        border: 1px solid rgba(248, 113, 113, 0.34);
+        border-radius: 999px;
+        color: #fecaca;
+        background: rgba(127, 29, 29, 0.32);
+        font-size: 0.66rem;
+        font-weight: 950;
+        text-transform: uppercase;
       }
 
       .vel-analytics-user__actions {
@@ -4158,6 +4193,14 @@
         function pageLabel(page, section) {
           var raw = String(page || section || "").toLowerCase();
           var sec = String(section || "").toLowerCase();
+          if (/^https?:\/\//i.test(String(page || ""))) {
+            try {
+              raw = new URL(String(page), location.origin).pathname.toLowerCase() || "/";
+            } catch (error) {
+              raw = "/";
+            }
+          }
+          if (raw === "/" || raw === "") return "Landing";
           if (raw === "trial_offer" || raw === "trial") return "Page promo";
           if (raw === "login") return "Login";
           if (raw === "live_packages") return "Home Live";
@@ -4169,7 +4212,7 @@
           if (sec === "live") return "Home Live";
           if (sec === "movies") return "Home Films";
           if (sec === "series") return "Home Series";
-          return page || section || "Browsing";
+          return /^https?:\/\//i.test(String(page || "")) ? "Landing" : page || section || "Browsing";
         }
 
         function eventLabel(type) {
@@ -4330,6 +4373,10 @@
 
         function mergeUserActionsByIp(groups) {
           var byUser = new Map();
+          function isVisibleUserAction(action) {
+            var type = String(action && action.type || "").toLowerCase();
+            return type !== "event" && type !== "heartbeat" && type !== "video_progress";
+          }
           function mergeWatchedMedia(target, items) {
             target.watchedMediaMap = target.watchedMediaMap || new Map();
             (items || []).forEach(function (item) {
@@ -4347,11 +4394,11 @@
             var key = String(group.ip || group.sessionId || "").trim();
             if (!key) return;
             var existing = byUser.get(key);
-            var actions = Array.isArray(group.actions) ? group.actions : [];
+            var actions = Array.isArray(group.actions) ? group.actions.filter(isVisibleUserAction) : [];
             if (!existing) {
               existing = Object.assign({}, group, {
                 actions: actions.slice(),
-                actionCount: Number(group.actionCount || actions.length || 0),
+                actionCount: actions.length,
                 eventCount: Number(group.eventCount || 0),
                 sessionCount: Number(group.sessionCount || (group.sessionId ? 1 : 0)),
                 totalWatchSeconds: Number(group.totalWatchSeconds || group.trialSecondsUsed || 0)
@@ -4363,7 +4410,7 @@
             var existingLast = Date.parse(existing.lastSeen || "") || 0;
             var groupLast = Date.parse(group.lastSeen || "") || 0;
             existing.actions = existing.actions.concat(actions);
-            existing.actionCount += Number(group.actionCount || actions.length || 0);
+            existing.actionCount += actions.length;
             existing.eventCount += Number(group.eventCount || 0);
             existing.totalWatchSeconds += Number(group.totalWatchSeconds || group.trialSecondsUsed || 0);
             existing.sessionCount += Number(group.sessionCount || (group.sessionId && group.sessionId !== existing.sessionId ? 1 : 0));
@@ -4388,7 +4435,7 @@
               return Number(b.seconds || 0) - Number(a.seconds || 0) || String(b.lastSeen || "").localeCompare(String(a.lastSeen || ""));
             });
             user.watchedMediaMap = undefined;
-            user.actionCount = user.actionCount || user.actions.length || 0;
+            user.actionCount = user.actions.length || 0;
             return user;
           }).sort(function (a, b) {
             return String(b.lastSeen || "").localeCompare(String(a.lastSeen || ""));
@@ -4494,13 +4541,16 @@
               var actionCount = user.actionCount || actions.length || 0;
               var sessionCount = Number(user.sessionCount || 0);
               var userIp = String(user.ip || "").trim();
+              var watchedTotal = Number(user.totalWatchSeconds || user.trialSecondsUsed || 0);
+              var isNoise = actionCount === 0 && watchedTotal <= 0 && sessionCount >= 3;
+              var userStateClass = isNoise ? " vel-analytics-user--noise" : watchedTotal > 0 ? " vel-analytics-user--watched" : "";
               var openAttr = userIp && analyticsOpenIps.has(userIp) ? ' open' : '';
               return [
-                '<details class="vel-analytics-user" data-analytics-user-ip="' + escapeHtml(userIp) + '"' + openAttr + '>',
+                '<details class="vel-analytics-user' + userStateClass + '" data-analytics-user-ip="' + escapeHtml(userIp) + '"' + openAttr + '>',
                 '<summary class="vel-analytics-user__summary">',
                 '<div class="vel-analytics-user__identity">' + ipButton(user.ip, false) + '<span class="vel-analytics-subline">' + escapeHtml(formatTime(user.lastSeen)) + '</span></div>',
-                '<div class="vel-analytics-user__context"><div class="vel-analytics-now-title">' + escapeHtml(lastContext || "Browsing") + '</div><span class="vel-analytics-subline">' + escapeHtml(packageName) + (country ? " - " + escapeHtml(country) : "") + '</span></div>',
-                '<div class="vel-analytics-user__stat">' + escapeHtml(String(actionCount)) + ' actions<span class="vel-analytics-subline">' + escapeHtml(formatDuration(user.totalWatchSeconds || user.trialSecondsUsed || 0)) + ' watched' + (sessionCount > 1 ? ' - ' + escapeHtml(String(sessionCount)) + ' sessions' : '') + '</span></div>',
+                '<div class="vel-analytics-user__context"><div class="vel-analytics-now-title">' + escapeHtml(lastContext || "Browsing") + '</div><span class="vel-analytics-subline">' + escapeHtml(packageName) + (country ? " - " + escapeHtml(country) : "") + '</span>' + (isNoise ? '<span class="vel-analytics-noise-badge">Noisy landing</span>' : '') + '</div>',
+                '<div class="vel-analytics-user__stat">' + escapeHtml(String(actionCount)) + ' actions<span class="vel-analytics-subline">' + escapeHtml(formatDuration(watchedTotal)) + ' watched' + (sessionCount > 1 ? ' - ' + escapeHtml(String(sessionCount)) + ' sessions' : '') + '</span></div>',
                 '<div class="vel-analytics-user__stat">Left<span class="vel-analytics-subline">' + escapeHtml(trialRemaining) + '</span><button type="button" class="vel-analytics-user__delete" data-analytics-delete-ip="' + escapeHtml(user.ip || "") + '">Clean</button></div>',
                 '</summary>',
                 userWatchedMediaList(user.watchedMedia || [], user.ip),
@@ -4942,7 +4992,7 @@
               subtitle.textContent = "Visitors, country, package and watched channels from " + scopeLabel + ". Saved as JSON on the VPS.";
             }
             if (visitorsTitle) visitorsTitle.textContent = "Visiteurs " + scopeLabel;
-            document.getElementById("va-live").textContent = String(live.total || 0);
+            document.getElementById("va-live").textContent = String(liveWatchingVisitors(live.visitors || []).length);
             document.getElementById("va-visitors").textContent = String(summary.uniqueVisitors || 0);
             document.getElementById("va-ips").textContent = String(summary.uniqueIps || 0);
             document.getElementById("va-watch").textContent = formatDuration(summary.totalWatchSeconds || 0);

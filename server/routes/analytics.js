@@ -476,6 +476,7 @@ function summarize(events) {
         buttonClicks: summarizeButtonClicks(events),
         recentButtonClicks: recentButtonClicks(events),
         userActions: summarizeUserActions(events),
+        problemMedia: summarizeProblemMedia(events),
         topPages: countBy(events, (event) => event.page || event.path),
         topPackages: countBy(events.filter((event) => event.packageName), (event) => event.packageName),
         topChannels: countBy(watchEvents, (event) => event.channelName || event.mediaTitle, { seconds: true }),
@@ -507,6 +508,80 @@ function compactUserAction(event) {
     };
 }
 
+function mediaKey(event) {
+    return [
+        cleanString(event.mediaType, 80) || '',
+        cleanString(event.mediaId, 160) || '',
+        cleanString(event.channelName || event.mediaTitle, 220) || ''
+    ].join('|');
+}
+
+function mediaName(event) {
+    return cleanString(event.channelName || event.mediaTitle, 220) || 'Unknown';
+}
+
+function summarizeProblemMedia(events, limit = 200) {
+    const pending = new Map();
+    const problems = new Map();
+
+    function record(event) {
+        if (!event) return;
+        const name = mediaName(event);
+        const key = mediaKey(event) || name;
+        const existing = problems.get(key) || {
+            name,
+            mediaType: event.mediaType,
+            mediaId: event.mediaId,
+            packageName: event.packageName,
+            country: event.country,
+            count: 0,
+            ips: new Set(),
+            sessions: new Set(),
+            firstSeen: event.ts,
+            lastSeen: event.ts
+        };
+        existing.count += 1;
+        existing.packageName = event.packageName || existing.packageName;
+        existing.country = event.country || existing.country;
+        existing.mediaType = event.mediaType || existing.mediaType;
+        existing.mediaId = event.mediaId || existing.mediaId;
+        existing.firstSeen = String(existing.firstSeen || event.ts) < String(event.ts || '') ? existing.firstSeen : event.ts || existing.firstSeen;
+        existing.lastSeen = String(existing.lastSeen || '').localeCompare(String(event.ts || '')) >= 0 ? existing.lastSeen : event.ts || existing.lastSeen;
+        if (event.ip) existing.ips.add(event.ip);
+        if (event.sessionId) existing.sessions.add(event.sessionId);
+        problems.set(key, existing);
+    }
+
+    for (const event of events) {
+        const sessionKey = event.sessionId || event.ip;
+        if (!sessionKey) continue;
+        if (event.type === 'media_open') {
+            record(pending.get(sessionKey));
+            pending.set(sessionKey, event);
+            continue;
+        }
+        if (event.type === 'video_start') {
+            const open = pending.get(sessionKey);
+            if (open && mediaKey(open) === mediaKey(event)) pending.delete(sessionKey);
+            continue;
+        }
+        if (event.type === 'package_open' || event.type === 'session_end') {
+            record(pending.get(sessionKey));
+            pending.delete(sessionKey);
+        }
+    }
+    for (const open of pending.values()) record(open);
+
+    return [...problems.values()]
+        .map((item) => ({
+            ...item,
+            ips: item.ips.size,
+            sessions: item.sessions.size
+        }))
+        .sort((a, b) => b.count - a.count || String(b.lastSeen || '').localeCompare(String(a.lastSeen || '')))
+        .slice(0, limit);
+}
+
 function summarizeUserActions(events, limit = 200) {
     const users = new Map();
     for (const event of events) {
@@ -521,6 +596,7 @@ function summarizeUserActions(events, limit = 200) {
             eventCount: 0,
             actionCount: 0,
             totalWatchSeconds: 0,
+            watchedMedia: new Map(),
             actions: []
         };
         if (event.sessionId) existing.sessionIds.add(event.sessionId);
@@ -544,6 +620,27 @@ function summarizeUserActions(events, limit = 200) {
         existing.totalWatchSeconds += Number.isFinite(delta)
             ? Math.max(0, delta)
             : Math.max(0, Number(event.watchedSeconds) || 0);
+        if (['video_progress', 'video_stop', 'video_end'].includes(event.type)) {
+            const watched = Number.isFinite(delta)
+                ? Math.max(0, delta)
+                : Math.max(0, Number(event.watchedSeconds) || 0);
+            const name = mediaName(event);
+            const key = mediaKey(event) || name;
+            const watchedItem = existing.watchedMedia.get(key) || {
+                name,
+                mediaType: event.mediaType,
+                mediaId: event.mediaId,
+                packageName: event.packageName,
+                seconds: 0,
+                events: 0,
+                lastSeen: event.ts
+            };
+            watchedItem.seconds += watched;
+            watchedItem.events += 1;
+            watchedItem.packageName = event.packageName || watchedItem.packageName;
+            watchedItem.lastSeen = String(watchedItem.lastSeen || '').localeCompare(String(event.ts || '')) >= 0 ? watchedItem.lastSeen : event.ts || watchedItem.lastSeen;
+            existing.watchedMedia.set(key, watchedItem);
+        }
         if (!USER_ACTION_IGNORED_TYPES.has(event.type)) {
             existing.actionCount += 1;
             existing.actions.push(compactUserAction(event));
@@ -557,6 +654,7 @@ function summarizeUserActions(events, limit = 200) {
             ...user,
             sessionCount: user.sessionIds.size,
             sessionIds: undefined,
+            watchedMedia: [...user.watchedMedia.values()].sort((a, b) => b.seconds - a.seconds || String(b.lastSeen || '').localeCompare(String(a.lastSeen || ''))),
             actions: user.actions
         }));
 }

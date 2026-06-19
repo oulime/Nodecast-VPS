@@ -855,6 +855,13 @@
         background: rgba(15, 23, 42, 0.62);
       }
 
+      .vel-analytics-range-preset.is-selected {
+        border-color: rgba(45, 212, 191, 0.68);
+        color: #ecfeff;
+        background: linear-gradient(135deg, rgba(20, 184, 166, 0.42), rgba(59, 130, 246, 0.26));
+        box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.14), inset 0 1px rgba(255, 255, 255, 0.12);
+      }
+
       .vel-analytics-range-fields {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1446,6 +1453,59 @@
         margin: 0;
         padding: 0 0.9rem 0.85rem;
         list-style: none;
+      }
+
+      .vel-analytics-user__watched {
+        margin: 0 0.9rem 0.75rem;
+        padding: 0.65rem 0.75rem;
+        border-top: 1px solid rgba(148, 163, 184, 0.1);
+        border-radius: 10px;
+        background: rgba(15, 23, 42, 0.3);
+      }
+
+      .vel-analytics-user__watched-title {
+        margin: 0 0 0.45rem;
+        color: rgba(226, 232, 240, 0.84);
+        font-size: 0.76rem;
+        font-weight: 950;
+        text-transform: uppercase;
+      }
+
+      .vel-analytics-user__watched-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.75rem;
+        padding: 0.35rem 0;
+        color: rgba(226, 232, 240, 0.84);
+        font-size: 0.8rem;
+        font-weight: 780;
+      }
+
+      .vel-analytics-user__watched-time {
+        color: #bae6fd;
+        font-weight: 950;
+      }
+
+      .vel-analytics-load-more {
+        justify-self: center;
+        min-height: 2.25rem;
+        margin: 0.35rem auto 0;
+        padding: 0 0.85rem;
+        border: 1px solid rgba(56, 189, 248, 0.28);
+        border-radius: 999px;
+        color: #bae6fd;
+        background: rgba(14, 116, 144, 0.18);
+        font: inherit;
+        font-size: 0.78rem;
+        font-weight: 900;
+        cursor: pointer;
+      }
+
+      .vel-analytics-load-more:hover,
+      .vel-analytics-load-more:focus-visible {
+        border-color: rgba(56, 189, 248, 0.54);
+        background: rgba(14, 116, 144, 0.32);
+        outline: none;
       }
 
       .vel-analytics-user__action {
@@ -3285,6 +3345,11 @@
         var analyticsDateTo = todayInputDate();
         var analyticsSelectedIp = "";
         var analyticsOpenIps = new Set();
+        var analyticsVisibleUsers = 20;
+        var analyticsVisibleChannels = 20;
+        var analyticsVisibleProblems = 20;
+        var analyticsVisibleActionsByIp = {};
+        var analyticsVisibleWatchedByIp = {};
         var latestAnalyticsLive = null;
         var latestAnalyticsSummary = null;
         var watchState = new WeakMap();
@@ -3360,6 +3425,35 @@
         function syncAnalyticsRangeLabel() {
           var label = document.getElementById("vel-analytics-range-label");
           if (label) label.textContent = analyticsRangeLabel();
+          syncAnalyticsPresetSelection();
+        }
+
+        function analyticsPresetForRange() {
+          var range = readAnalyticsDateRange();
+          var today = todayInputDate();
+          if (range.from === today && range.to === today) return "today";
+          var yesterday = shiftedInputDate(1);
+          if (range.from === yesterday && range.to === yesterday) return "yesterday";
+          if (range.to === today && range.from === shiftedInputDate(6)) return "7";
+          if (range.to === today && range.from === shiftedInputDate(29)) return "30";
+          return "";
+        }
+
+        function syncAnalyticsPresetSelection() {
+          var selected = analyticsPresetForRange();
+          document.querySelectorAll("[data-analytics-range-preset]").forEach(function (button) {
+            var active = button.dataset.analyticsRangePreset === selected;
+            button.classList.toggle("is-selected", active);
+            button.setAttribute("aria-pressed", active ? "true" : "false");
+          });
+        }
+
+        function resetAnalyticsLoadMore() {
+          analyticsVisibleUsers = 20;
+          analyticsVisibleChannels = 20;
+          analyticsVisibleProblems = 20;
+          analyticsVisibleActionsByIp = {};
+          analyticsVisibleWatchedByIp = {};
         }
 
         function setAnalyticsRangePopover(open) {
@@ -4236,6 +4330,19 @@
 
         function mergeUserActionsByIp(groups) {
           var byUser = new Map();
+          function mergeWatchedMedia(target, items) {
+            target.watchedMediaMap = target.watchedMediaMap || new Map();
+            (items || []).forEach(function (item) {
+              var key = String(item.mediaType || "") + "|" + String(item.mediaId || "") + "|" + String(item.name || "");
+              if (!key.trim()) return;
+              var existing = target.watchedMediaMap.get(key) || Object.assign({}, item, { seconds: 0, events: 0 });
+              existing.seconds += Number(item.seconds || 0);
+              existing.events += Number(item.events || 0);
+              existing.packageName = item.packageName || existing.packageName;
+              existing.lastSeen = String(existing.lastSeen || "").localeCompare(String(item.lastSeen || "")) >= 0 ? existing.lastSeen : item.lastSeen || existing.lastSeen;
+              target.watchedMediaMap.set(key, existing);
+            });
+          }
           (groups || []).forEach(function (group) {
             var key = String(group.ip || group.sessionId || "").trim();
             if (!key) return;
@@ -4249,6 +4356,7 @@
                 sessionCount: Number(group.sessionCount || (group.sessionId ? 1 : 0)),
                 totalWatchSeconds: Number(group.totalWatchSeconds || group.trialSecondsUsed || 0)
               });
+              mergeWatchedMedia(existing, group.watchedMedia || []);
               byUser.set(key, existing);
               return;
             }
@@ -4259,6 +4367,7 @@
             existing.eventCount += Number(group.eventCount || 0);
             existing.totalWatchSeconds += Number(group.totalWatchSeconds || group.trialSecondsUsed || 0);
             existing.sessionCount += Number(group.sessionCount || (group.sessionId && group.sessionId !== existing.sessionId ? 1 : 0));
+            mergeWatchedMedia(existing, group.watchedMedia || []);
             existing.firstSeen = String(existing.firstSeen || "") < String(group.firstSeen || "") ? existing.firstSeen : group.firstSeen || existing.firstSeen;
             if (groupLast >= existingLast) {
               byUser.set(key, Object.assign(existing, group, {
@@ -4266,7 +4375,8 @@
                 actionCount: existing.actionCount,
                 eventCount: existing.eventCount,
                 sessionCount: existing.sessionCount,
-                totalWatchSeconds: existing.totalWatchSeconds
+                totalWatchSeconds: existing.totalWatchSeconds,
+                watchedMediaMap: existing.watchedMediaMap
               }));
             }
           });
@@ -4274,6 +4384,10 @@
             user.actions = (user.actions || []).slice().sort(function (a, b) {
               return String(a.ts || "").localeCompare(String(b.ts || ""));
             });
+            user.watchedMedia = Array.from((user.watchedMediaMap || new Map()).values()).sort(function (a, b) {
+              return Number(b.seconds || 0) - Number(a.seconds || 0) || String(b.lastSeen || "").localeCompare(String(a.lastSeen || ""));
+            });
+            user.watchedMediaMap = undefined;
             user.actionCount = user.actionCount || user.actions.length || 0;
             return user;
           }).sort(function (a, b) {
@@ -4338,13 +4452,41 @@
           return bits.join(" - ");
         }
 
+        function userWatchedMediaList(items, ip) {
+          items = (items || []).filter(function (item) {
+            return item && Number(item.seconds || 0) > 0;
+          });
+          if (!items.length) return "";
+          var key = String(ip || "").trim();
+          var visible = Math.min(items.length, analyticsVisibleWatchedByIp[key] || 20);
+          var shownItems = items.slice(0, visible);
+          return [
+            '<div class="vel-analytics-user__watched">',
+            '<p class="vel-analytics-user__watched-title">Contenu regardé</p>',
+            shownItems.map(function (item) {
+              return [
+                '<div class="vel-analytics-user__watched-row">',
+                '<span><span class="vel-analytics-now-title">' + escapeHtml(item.name || "Unknown") + '</span>' + (item.packageName ? '<span class="vel-analytics-subline">' + escapeHtml(item.packageName) + '</span>' : '') + '</span>',
+                '<span class="vel-analytics-user__watched-time">' + escapeHtml(formatDuration(item.seconds || 0)) + '</span>',
+                '</div>'
+              ].join("");
+            }).join(""),
+            visible < items.length ? '<button type="button" class="vel-analytics-load-more" data-analytics-more-watched-ip="' + escapeHtml(key) + '">Load more watched (' + escapeHtml(String(items.length - visible)) + ')</button>' : '',
+            '</div>'
+          ].join("");
+        }
+
         function userActionsList(groups) {
           groups = filterBySelectedIp(mergeUserActionsByIp(groups || []));
           if (!groups || !groups.length) return '<p class="vel-analytics-empty">No user actions in this period yet.</p>';
+          var visibleUsers = analyticsSelectedIp ? groups.length : Math.min(groups.length, analyticsVisibleUsers);
+          var shownGroups = groups.slice(0, visibleUsers);
           return [
             '<div class="vel-analytics-user-actions">',
-            groups.map(function (user) {
+            shownGroups.map(function (user) {
               var actions = user.actions || [];
+              var actionLimit = Math.min(actions.length, analyticsVisibleActionsByIp[user.ip] || 25);
+              var shownActions = actions.slice(0, actionLimit);
               var packageName = packageDisplay(user);
               var country = cleanCountryName(user.country);
               var lastContext = user.channelName || user.mediaTitle || pageLabel(user.page, user.section);
@@ -4361,8 +4503,9 @@
                 '<div class="vel-analytics-user__stat">' + escapeHtml(String(actionCount)) + ' actions<span class="vel-analytics-subline">' + escapeHtml(formatDuration(user.totalWatchSeconds || user.trialSecondsUsed || 0)) + ' watched' + (sessionCount > 1 ? ' - ' + escapeHtml(String(sessionCount)) + ' sessions' : '') + '</span></div>',
                 '<div class="vel-analytics-user__stat">Left<span class="vel-analytics-subline">' + escapeHtml(trialRemaining) + '</span><button type="button" class="vel-analytics-user__delete" data-analytics-delete-ip="' + escapeHtml(user.ip || "") + '">Clean</button></div>',
                 '</summary>',
+                userWatchedMediaList(user.watchedMedia || [], user.ip),
                 actions.length
-                  ? '<ol class="vel-analytics-user__actions">' + actions.map(function (action) {
+                  ? '<ol class="vel-analytics-user__actions">' + shownActions.map(function (action) {
                     var context = actionContextLabel(action);
                     var detail = actionDetailLine(action);
                     var kind = actionKind(action.type);
@@ -4372,22 +4515,25 @@
                       '<div><span class="vel-analytics-user__tag">' + escapeHtml(kind.label) + '</span><div class="vel-analytics-now-title">' + escapeHtml(eventLabel(action.type)) + '</div>' + (context ? '<span class="vel-analytics-subline">' + escapeHtml(context) + '</span>' : '') + (detail ? '<span class="vel-analytics-subline">' + escapeHtml(detail) + '</span>' : '') + '</div>',
                       '</li>'
                     ].join("");
-                  }).join("") + '</ol>'
+                  }).join("") + '</ol>' + (actionLimit < actions.length ? '<button type="button" class="vel-analytics-load-more" data-analytics-more-actions-ip="' + escapeHtml(user.ip || "") + '">Load more actions (' + escapeHtml(String(actions.length - actionLimit)) + ')</button>' : '')
                   : '<p class="vel-analytics-empty">No important actions for this user.</p>',
                 '</details>'
               ].join("");
             }).join(""),
+            visibleUsers < groups.length ? '<button type="button" class="vel-analytics-load-more" data-analytics-more-users="1">Load more users (' + escapeHtml(String(groups.length - visibleUsers)) + ')</button>' : '',
             '</div>'
           ].join("");
         }
 
         function channelsTable(items) {
           if (!items || !items.length) return '<p class="vel-analytics-empty">No watched channels yet.</p>';
+          var visible = Math.min(items.length, analyticsVisibleChannels);
+          var shownItems = items.slice(0, visible);
           return [
             '<div class="vel-analytics-table-wrap">',
             '<table class="vel-analytics-table vel-analytics-table--channels">',
             '<thead><tr><th>#</th><th>Channel</th><th>Total watch time</th><th>Events</th></tr></thead><tbody>',
-            items.map(function (item, index) {
+            shownItems.map(function (item, index) {
               return [
                 '<tr>',
                 '<td data-label="#"><span class="vel-analytics-rank">' + (index + 1) + '</span></td>',
@@ -4398,6 +4544,32 @@
               ].join("");
             }).join(""),
             '</tbody></table>',
+            visible < items.length ? '<button type="button" class="vel-analytics-load-more" data-analytics-more-channels="1">Load more channels (' + escapeHtml(String(items.length - visible)) + ')</button>' : '',
+            '</div>'
+          ].join("");
+        }
+
+        function problemMediaTable(items) {
+          if (!items || !items.length) return '<p class="vel-analytics-empty">No opened content without playback start in this period.</p>';
+          var visible = Math.min(items.length, analyticsVisibleProblems);
+          var shownItems = items.slice(0, visible);
+          return [
+            '<div class="vel-analytics-table-wrap">',
+            '<table class="vel-analytics-table vel-analytics-table--channels">',
+            '<thead><tr><th>Content</th><th>Package</th><th>Opens</th><th>IPs</th><th>Last</th></tr></thead><tbody>',
+            shownItems.map(function (item) {
+              return [
+                '<tr>',
+                '<td data-label="Content"><div class="vel-analytics-now-title">' + escapeHtml(item.name || "Unknown") + '<span class="vel-analytics-subline">' + escapeHtml(item.mediaType || "content") + '</span></div></td>',
+                '<td data-label="Package">' + escapeHtml(item.packageName || "-") + (item.country ? '<span class="vel-analytics-subline">' + escapeHtml(cleanCountryName(item.country)) + '</span>' : '') + '</td>',
+                '<td data-label="Opens">' + escapeHtml(String(item.count || 0)) + '</td>',
+                '<td data-label="IPs" class="vel-analytics-muted">' + escapeHtml(String(item.ips || 0)) + '</td>',
+                '<td data-label="Last">' + escapeHtml(formatTime(item.lastSeen)) + '</td>',
+                '</tr>'
+              ].join("");
+            }).join(""),
+            '</tbody></table>',
+            visible < items.length ? '<button type="button" class="vel-analytics-load-more" data-analytics-more-problems="1">Load more problems (' + escapeHtml(String(items.length - visible)) + ')</button>' : '',
             '</div>'
           ].join("");
         }
@@ -4447,10 +4619,10 @@
               '<button type="button" id="vel-analytics-range-trigger" class="vel-analytics-range-trigger" aria-expanded="false" aria-controls="vel-analytics-range-popover"><span>Période</span><strong id="vel-analytics-range-label">' + escapeHtml(analyticsRangeLabel()) + '</strong></button>',
               '<div id="vel-analytics-range-popover" class="vel-analytics-range-popover" hidden>',
               '<div class="vel-analytics-range-presets">',
-              '<button type="button" class="vel-analytics-range-preset" data-analytics-range-preset="today">Aujourd’hui</button>',
-              '<button type="button" class="vel-analytics-range-preset" data-analytics-range-preset="yesterday">Hier</button>',
-              '<button type="button" class="vel-analytics-range-preset" data-analytics-range-preset="7">7 jours</button>',
-              '<button type="button" class="vel-analytics-range-preset" data-analytics-range-preset="30">30 jours</button>',
+              '<button type="button" class="vel-analytics-range-preset" data-analytics-range-preset="today" aria-pressed="false">Aujourd’hui</button>',
+              '<button type="button" class="vel-analytics-range-preset" data-analytics-range-preset="yesterday" aria-pressed="false">Hier</button>',
+              '<button type="button" class="vel-analytics-range-preset" data-analytics-range-preset="7" aria-pressed="false">7 jours</button>',
+              '<button type="button" class="vel-analytics-range-preset" data-analytics-range-preset="30" aria-pressed="false">30 jours</button>',
               '</div>',
               '<div class="vel-analytics-range-fields">',
               '<label>From<input type="date" id="vel-analytics-date-from" class="vel-analytics-date" value="' + escapeHtml(analyticsDateFrom) + '"></label>',
@@ -4476,6 +4648,7 @@
               '<button type="button" class="vel-analytics-subtab is-active" role="tab" aria-selected="true" aria-controls="va-panel-visitors" data-analytics-subtab="visitors">Visiteurs</button>',
               '<button type="button" class="vel-analytics-subtab" role="tab" aria-selected="false" aria-controls="va-panel-clicks" data-analytics-subtab="clicks">Actions</button>',
               '<button type="button" class="vel-analytics-subtab" role="tab" aria-selected="false" aria-controls="va-panel-channels" data-analytics-subtab="channels">Chaînes</button>',
+              '<button type="button" class="vel-analytics-subtab" role="tab" aria-selected="false" aria-controls="va-panel-problems" data-analytics-subtab="problems">Problèmes</button>',
               '</div>',
               '<div id="va-panel-visitors" class="vel-analytics-tabpanel" role="tabpanel" data-analytics-panel="visitors">',
               '<div id="va-ip-filter"></div>',
@@ -4489,6 +4662,9 @@
               '</div>',
               '<div id="va-panel-channels" class="vel-analytics-tabpanel hidden" role="tabpanel" data-analytics-panel="channels" hidden>',
               '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>Chaînes les plus regardées</h3><div id="va-channels"></div></div>',
+              '</div>',
+              '<div id="va-panel-problems" class="vel-analytics-tabpanel hidden" role="tabpanel" data-analytics-panel="problems" hidden>',
+              '<div class="vel-analytics-box vel-analytics-box--live-table"><h3>Chaînes ouvertes sans lecture</h3><div id="va-problems"></div></div>',
               '</div>'
             ].join("");
             panels.appendChild(panel);
@@ -4508,6 +4684,7 @@
               event.stopPropagation();
               readAnalyticsDateRange();
               syncAnalyticsRangeLabel();
+              resetAnalyticsLoadMore();
               setAnalyticsRangePopover(false);
               loadAnalytics();
             });
@@ -4521,12 +4698,14 @@
                 event.preventDefault();
                 event.stopPropagation();
                 applyAnalyticsPreset(presetButton.dataset.analyticsRangePreset || "today");
+                resetAnalyticsLoadMore();
               });
             });
             panel.querySelectorAll("#vel-analytics-date-from, #vel-analytics-date-to").forEach(function (input) {
               input.addEventListener("change", function () {
                 readAnalyticsDateRange();
                 syncAnalyticsRangeLabel();
+                resetAnalyticsLoadMore();
               });
             });
             document.addEventListener("click", function (event) {
@@ -4537,12 +4716,57 @@
             document.addEventListener("keydown", function (event) {
               if (event.key === "Escape") setAnalyticsRangePopover(false);
             }, true);
+            syncAnalyticsPresetSelection();
             panel.querySelectorAll("[data-analytics-subtab]").forEach(function (tabButton) {
               tabButton.addEventListener("click", function () {
                 showAnalyticsSubtab(tabButton.dataset.analyticsSubtab || "visitors");
               });
             });
             panel.addEventListener("click", function (event) {
+              var moreUsers = event.target && event.target.closest ? event.target.closest("[data-analytics-more-users]") : null;
+              if (moreUsers) {
+                event.preventDefault();
+                event.stopPropagation();
+                analyticsVisibleUsers += 20;
+                renderAnalyticsData();
+                return;
+              }
+              var moreChannels = event.target && event.target.closest ? event.target.closest("[data-analytics-more-channels]") : null;
+              if (moreChannels) {
+                event.preventDefault();
+                event.stopPropagation();
+                analyticsVisibleChannels += 20;
+                renderAnalyticsData();
+                return;
+              }
+              var moreProblems = event.target && event.target.closest ? event.target.closest("[data-analytics-more-problems]") : null;
+              if (moreProblems) {
+                event.preventDefault();
+                event.stopPropagation();
+                analyticsVisibleProblems += 20;
+                renderAnalyticsData();
+                return;
+              }
+              var moreActions = event.target && event.target.closest ? event.target.closest("[data-analytics-more-actions-ip]") : null;
+              if (moreActions) {
+                event.preventDefault();
+                event.stopPropagation();
+                var moreIp = String(moreActions.dataset.analyticsMoreActionsIp || "").trim();
+                analyticsVisibleActionsByIp[moreIp] = (analyticsVisibleActionsByIp[moreIp] || 25) + 25;
+                analyticsOpenIps.add(moreIp);
+                renderAnalyticsData();
+                return;
+              }
+              var moreWatched = event.target && event.target.closest ? event.target.closest("[data-analytics-more-watched-ip]") : null;
+              if (moreWatched) {
+                event.preventDefault();
+                event.stopPropagation();
+                var watchedIp = String(moreWatched.dataset.analyticsMoreWatchedIp || "").trim();
+                analyticsVisibleWatchedByIp[watchedIp] = (analyticsVisibleWatchedByIp[watchedIp] || 20) + 20;
+                analyticsOpenIps.add(watchedIp);
+                renderAnalyticsData();
+                return;
+              }
               var deleteIp = event.target && event.target.closest ? event.target.closest("[data-analytics-delete-ip]") : null;
               if (deleteIp) {
                 event.preventDefault();
@@ -4672,10 +4896,12 @@
           var visitorsList = document.getElementById("va-visitors-list");
           var clicksList = document.getElementById("va-button-clicks");
           var channelsList = document.getElementById("va-channels");
+          var problemsList = document.getElementById("va-problems");
           if (liveList) liveList.innerHTML = visitorsTable(liveWatchingVisitors(live.visitors || []));
           if (visitorsList) visitorsList.innerHTML = userActionsList(summary.userActions || []);
           if (clicksList) clicksList.innerHTML = userActionsList(summary.userActions || []);
           if (channelsList) channelsList.innerHTML = channelsTable(summary.topChannels || []);
+          if (problemsList) problemsList.innerHTML = problemMediaTable(summary.problemMedia || []);
           syncAnalyticsUserOpenState();
         }
 

@@ -3660,13 +3660,11 @@
         }
 
         function isInAppBrowserTest() {
-          return queryParam("veloraInAppTest") === "1";
+          return false;
         }
 
         function isTikTokInAppBrowser() {
-          if (isInAppBrowserTest()) return true;
-          var ua = String(navigator.userAgent || "");
-          return /tiktok|musical_ly|bytedance|aweme|ttwebview|tiktokwebview/i.test(ua);
+          return false;
         }
 
         function inAppBrowserName() {
@@ -3687,115 +3685,17 @@
         }
 
         function sendToExternalBrowser(action, source, href) {
-          var targetUrl = externalUrlForAction(action, href);
-          send("external_browser_open_click", {
-            browser: inAppBrowserName() || "unknown",
-            action: action || "open",
-            source: source || "",
-            targetPath: targetUrl.pathname + targetUrl.search
-          });
-
-          var ua = String(navigator.userAgent || "");
-          if (/android/i.test(ua)) {
-            var scheme = targetUrl.protocol.replace(":", "") || "https";
-            var intentPath = targetUrl.host + targetUrl.pathname + targetUrl.search + targetUrl.hash;
-            location.href =
-              "intent://" +
-              intentPath +
-              "#Intent;scheme=" +
-              scheme +
-              ";package=com.android.chrome;S.browser_fallback_url=" +
-              encodeURIComponent(targetUrl.toString()) +
-              ";end";
-            return true;
-          }
-
-          if (/iphone|ipad|ipod/i.test(ua)) {
-            var chromeScheme = targetUrl.protocol === "https:" ? "googlechromes://" : "googlechrome://";
-            var chromeUrl = chromeScheme + targetUrl.href.replace(/^https?:\/\//i, "");
-            location.href = chromeUrl;
-            window.setTimeout(function () {
-              if (!document.hidden) location.href = targetUrl.toString();
-            }, 900);
-            return true;
-          }
-
-          try {
-            window.open(targetUrl.toString(), "_blank", "noopener,noreferrer");
-          } catch (error) {
-            location.href = targetUrl.toString();
-          }
-          return true;
+          return false;
         }
 
         function maybeAutoOpenExternalBrowser() {
-          if (!isTikTokInAppBrowser()) return;
-          if (queryParam("externalBrowser") === "1") return;
-          try {
-            if (sessionStorage.getItem("velora_external_browser_auto_attempted") === "1") return;
-            sessionStorage.setItem("velora_external_browser_auto_attempted", "1");
-          } catch (error) {}
-          window.setTimeout(function () {
-            sendToExternalBrowser("auto_open", "page_load");
-          }, 250);
         }
 
         function handoffClickToExternalBrowser(target, event) {
-          if (!isTikTokInAppBrowser()) return false;
-
-          var trialStart = target.closest("#velora-trial-start-btn");
-          var promo = target.closest("#vel-promo-offer-open");
-          var offerButton = target.closest(".trial-offer-button");
-          var offerHighlight = target.closest(".trial-offer-highlight");
-          if (!trialStart && !promo && !offerButton && !offerHighlight) return false;
-
-          if (event) {
-            event.preventDefault();
-            event.stopPropagation();
-            if (event.stopImmediatePropagation) event.stopImmediatePropagation();
-          }
-
-          var source = trialStart
-            ? "trial_start"
-            : promo
-              ? "promo_banner"
-              : offerButton
-                ? "trial_offer_button"
-                : "trial_offer_highlight";
-          var action = trialStart ? "trial_start" : "trial_offer";
-          if (trialStart) {
-            send("trial_start_click", { cta: "commencer_mon_essai" });
-          } else if (promo) {
-            send("promo_banner_cta_click", { cta: "j_en_profite" });
-          } else if (offerButton) {
-            send("trial_offer_cta_click", { cta: "obtenir_ma_promo" });
-          } else if (offerHighlight) {
-            send("trial_offer_highlight_click", { cta: "offre_speciale" });
-          }
-          sendToExternalBrowser(action, source, offerButton && offerButton.href ? offerButton.href : "");
-          return true;
+          return false;
         }
 
         function resumeExternalTrialStart() {
-          if (queryParam("startTrial") !== "1" || isTikTokInAppBrowser()) return;
-          var attempts = 0;
-          var timer = window.setInterval(function () {
-            attempts += 1;
-            var button = document.getElementById("velora-trial-start-btn");
-            if (button) {
-              send("external_browser_trial_resume", { browser: "external" });
-              button.click();
-              try {
-                var clean = new URL(location.href);
-                clean.searchParams.delete("externalBrowser");
-                clean.searchParams.delete("startTrial");
-                history.replaceState(null, "", clean.pathname + clean.search + clean.hash);
-              } catch (error) {}
-              window.clearInterval(timer);
-            } else if (attempts > 80) {
-              window.clearInterval(timer);
-            }
-          }, 250);
         }
 
         function onDocumentClick(event) {
@@ -3803,11 +3703,6 @@
           if (!target || !target.closest) return;
           if (handoffClickToExternalBrowser(target, event)) return;
           if (shouldSkipTracking(target)) return;
-
-          if (target.closest("#velora-trial-start-btn")) {
-            send("trial_start_click", { cta: "commencer_mon_essai" });
-            return;
-          }
 
           if (target.closest("#vel-promo-offer-open")) {
             send("promo_banner_cta_click", { cta: "j_en_profite" });

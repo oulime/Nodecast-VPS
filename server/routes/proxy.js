@@ -18,10 +18,16 @@ const { Readable } = require('stream');
 // Default cache max age in hours
 const DEFAULT_MAX_AGE_HOURS = 24;
 const MEDIA_INFO_CACHE_MS = Math.max(1, parseInt(process.env.VELORA_MEDIA_INFO_CACHE_HOURS, 10) || 168) * 60 * 60 * 1000;
-<<<<<<< HEAD
 const DEFAULT_REMOTE_CATALOG_BASE = 'https://nodecast.veloravip.net';
 const REMOTE_CATALOG_DISABLED = /^(1|true|yes)$/i.test(String(process.env.VELORA_CATALOG_REMOTE_DISABLED || '').trim());
 const REMOTE_CATALOG_BASE = String(process.env.VELORA_CATALOG_REMOTE_BASE || DEFAULT_REMOTE_CATALOG_BASE).trim().replace(/\/+$/, '');
+const STREAM_PROXY_SETTINGS_CACHE_MS = 60 * 1000;
+const STREAM_PROXY_DEBUG = /^(1|true|yes)$/i.test(String(process.env.VELORA_STREAM_PROXY_DEBUG || ''));
+
+let streamProxySettingsCache = {
+    expiresAt: 0,
+    userAgent: ''
+};
 
 function isLocalHostname(value) {
     const host = String(value || '').split(':')[0].replace(/^\[|\]$/g, '').toLowerCase();
@@ -66,14 +72,8 @@ async function proxyRemoteCatalog(req, res) {
     } catch (err) {
         console.warn('[Velora catalog] Remote VPS catalogue unavailable, using local fallback:', err.message);
         return false;
-=======
-const STREAM_PROXY_SETTINGS_CACHE_MS = 60 * 1000;
-const STREAM_PROXY_DEBUG = /^(1|true|yes)$/i.test(String(process.env.VELORA_STREAM_PROXY_DEBUG || ''));
-
-let streamProxySettingsCache = {
-    expiresAt: 0,
-    userAgent: ''
-};
+    }
+}
 
 async function getStreamProxyUserAgent() {
     const now = Date.now();
@@ -93,7 +93,6 @@ async function getStreamProxyUserAgent() {
 function streamProxyDebug(message) {
     if (STREAM_PROXY_DEBUG) {
         console.log(message);
->>>>>>> 4ed81223593bc865175065ba1a0d522b6e65bd5f
     }
 }
 

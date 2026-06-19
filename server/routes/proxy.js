@@ -18,6 +18,7 @@ const { Readable } = require('stream');
 // Default cache max age in hours
 const DEFAULT_MAX_AGE_HOURS = 24;
 const MEDIA_INFO_CACHE_MS = Math.max(1, parseInt(process.env.VELORA_MEDIA_INFO_CACHE_HOURS, 10) || 168) * 60 * 60 * 1000;
+<<<<<<< HEAD
 const DEFAULT_REMOTE_CATALOG_BASE = 'https://nodecast.veloravip.net';
 const REMOTE_CATALOG_DISABLED = /^(1|true|yes)$/i.test(String(process.env.VELORA_CATALOG_REMOTE_DISABLED || '').trim());
 const REMOTE_CATALOG_BASE = String(process.env.VELORA_CATALOG_REMOTE_BASE || DEFAULT_REMOTE_CATALOG_BASE).trim().replace(/\/+$/, '');
@@ -65,6 +66,34 @@ async function proxyRemoteCatalog(req, res) {
     } catch (err) {
         console.warn('[Velora catalog] Remote VPS catalogue unavailable, using local fallback:', err.message);
         return false;
+=======
+const STREAM_PROXY_SETTINGS_CACHE_MS = 60 * 1000;
+const STREAM_PROXY_DEBUG = /^(1|true|yes)$/i.test(String(process.env.VELORA_STREAM_PROXY_DEBUG || ''));
+
+let streamProxySettingsCache = {
+    expiresAt: 0,
+    userAgent: ''
+};
+
+async function getStreamProxyUserAgent() {
+    const now = Date.now();
+    if (streamProxySettingsCache.userAgent && streamProxySettingsCache.expiresAt > now) {
+        return streamProxySettingsCache.userAgent;
+    }
+
+    const settings = await db.settings.get();
+    const userAgent = db.getUserAgent(settings);
+    streamProxySettingsCache = {
+        expiresAt: now + STREAM_PROXY_SETTINGS_CACHE_MS,
+        userAgent
+    };
+    return userAgent;
+}
+
+function streamProxyDebug(message) {
+    if (STREAM_PROXY_DEBUG) {
+        console.log(message);
+>>>>>>> 4ed81223593bc865175065ba1a0d522b6e65bd5f
     }
 }
 
@@ -965,8 +994,7 @@ router.get('/stream', async (req, res) => {
             // Pluto TV uses multiple domains for content delivery
             const plutoDomains = ['pluto.tv', 'pluto.io', 'plutotv.net', 'siloh.pluto.tv', 'service-stitcher'];
             const isPluto = plutoDomains.some(domain => url.includes(domain));
-            const settings = await db.settings.get();
-            const userAgent = db.getUserAgent(settings);
+            const userAgent = await getStreamProxyUserAgent();
 
             const headers = {
                 'User-Agent': userAgent,
@@ -1004,6 +1032,7 @@ router.get('/stream', async (req, res) => {
 
             const contentType = response.headers.get('content-type') || '';
             res.set('Access-Control-Allow-Origin', '*');
+            res.set('X-Accel-Buffering', 'no');
 
             // Forward range-related headers for video seeking support
             const contentLength = response.headers.get('content-length');
@@ -1067,8 +1096,11 @@ router.get('/stream', async (req, res) => {
 
                 const buffer = Buffer.concat(chunks);
                 const finalUrl = response.url || url;
-                console.log(`[Proxy] Processing HLS manifest from: ${finalUrl.substring(0, 80)}...`);
+                streamProxyDebug(`[Proxy] Processing HLS manifest from: ${finalUrl.substring(0, 80)}...`);
+                res.removeHeader('Content-Length');
+                res.removeHeader('Content-Range');
                 res.set('Content-Type', 'application/vnd.apple.mpegurl');
+                res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
 
                 let manifest = buffer.toString('utf-8');
 
@@ -1110,7 +1142,7 @@ router.get('/stream', async (req, res) => {
             }
 
             // Binary/media content: stream through without full buffering.
-            console.log(`[Proxy] Serving binary content (${contentType})`);
+            streamProxyDebug(`[Proxy] Serving binary content (${contentType})`);
             res.set('Content-Type', contentType || 'application/octet-stream');
             if (!res.write(firstChunk)) {
                 await new Promise(resolve => res.once('drain', resolve));

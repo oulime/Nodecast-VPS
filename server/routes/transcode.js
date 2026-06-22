@@ -180,6 +180,12 @@ function warmDurationCache(url, ffprobePath, userAgent) {
     durationProbePromises.set(url, promise);
 }
 
+function redactStreamUrlForLogs(url = '') {
+    return String(url)
+        .replace(/\/(live|movie|series)\/([^/?#]+)\/([^/?#]+)\//gi, '/$1/***/***/')
+        .replace(/([?&](?:password|pass|token|key)=)[^&#]+/gi, '$1***');
+}
+
 function isEncoderInCooldown(encoder) {
     const until = encoderFailureUntil.get(encoder);
     if (!until) return false;
@@ -249,6 +255,19 @@ router.post('/session', async (req, res) => {
         ? requestedMode
         : (inferredVodMode ? 'vod' : requestedMode);
     const isVodMode = ['vod', 'movie', 'series', 'episode'].includes(normalizedMode);
+
+    console.log('[Transcode] Session request:', {
+        url: redactStreamUrlForLogs(url),
+        requestedMode: requestedMode || 'empty',
+        normalizedMode: normalizedMode || 'empty',
+        inferredVodMode,
+        isVodMode,
+        seekOffset: effectiveSeekOffset,
+        videoMode,
+        videoCodec,
+        audioCodec,
+        audioChannels
+    });
 
     try {
         const baseSessionOptions = {
@@ -327,7 +346,7 @@ router.post('/session', async (req, res) => {
             warmDurationCache(url, ffprobePath, userAgent);
         }
 
-        res.json({
+        const responsePayload = {
             sessionId: session.id,
             playlistUrl: `/api/transcode/${session.id}/stream.m3u8`,
             status: session.status,
@@ -343,7 +362,23 @@ router.post('/session', async (req, res) => {
             skippedEncoder,
             didFallbackToSoftware,
             ffmpegExitCode
+        };
+
+        console.log('[Transcode] Session ready:', {
+            sessionId: responsePayload.sessionId,
+            playlistUrl: responsePayload.playlistUrl,
+            status: responsePayload.status,
+            startAt: responsePayload.startAt,
+            durationSeconds: responsePayload.durationSeconds,
+            durationPending: responsePayload.durationPending,
+            seekable: responsePayload.seekable,
+            mode: responsePayload.mode,
+            selectedEncoder: responsePayload.selectedEncoder,
+            didFallbackToSoftware: responsePayload.didFallbackToSoftware,
+            ffmpegExitCode: responsePayload.ffmpegExitCode
         });
+
+        res.json(responsePayload);
 
     } catch (err) {
         console.error('[Transcode] Session creation failed:', err);

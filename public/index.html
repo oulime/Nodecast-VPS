@@ -5287,5 +5287,242 @@
       })();
     </script>
 
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var enableDebug = params.get("debug") === "1" || localStorage.getItem("veloraDebug") === "1";
+        if (params.get("debug") === "0") {
+          localStorage.removeItem("veloraDebug");
+          enableDebug = false;
+        }
+        if (!enableDebug) return;
+        localStorage.setItem("veloraDebug", "1");
+
+        var maxLines = 180;
+        var lines = [];
+        var panel;
+        var body;
+        var collapsed = false;
+
+        function safeString(value) {
+          try {
+            if (value instanceof Error) return value.name + ": " + value.message;
+            if (typeof value === "string") return value;
+            return JSON.stringify(value, function (key, val) {
+              if (typeof val === "string" && val.length > 260) return val.slice(0, 260) + "...";
+              return val;
+            });
+          } catch (err) {
+            return String(value);
+          }
+        }
+
+        function scrub(text) {
+          return String(text || "")
+            .replace(/\/(live|movie|series)\/([^/?#]+)\/([^/?#]+)\//gi, "/$1/***/***/")
+            .replace(/([?&](?:password|pass|token|key)=)[^&#]+/gi, "$1***");
+        }
+
+        function ensurePanel() {
+          if (panel) return;
+          panel = document.createElement("div");
+          panel.id = "velora-debug-panel";
+          panel.style.cssText = [
+            "position:fixed",
+            "left:8px",
+            "right:8px",
+            "bottom:8px",
+            "z-index:2147483647",
+            "max-height:46vh",
+            "background:rgba(3,7,18,.94)",
+            "color:#d1fae5",
+            "border:1px solid rgba(45,212,191,.7)",
+            "border-radius:12px",
+            "box-shadow:0 16px 48px rgba(0,0,0,.45)",
+            "font:11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace",
+            "overflow:hidden",
+            "-webkit-user-select:text",
+            "user-select:text"
+          ].join(";");
+
+          var header = document.createElement("div");
+          header.style.cssText = "display:flex;gap:6px;align-items:center;padding:7px 8px;background:rgba(15,23,42,.98);color:#fff;";
+          var title = document.createElement("div");
+          title.textContent = "Velora iPhone debug";
+          title.style.cssText = "font-weight:700;flex:1;";
+
+          function makeBtn(label, fn) {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.textContent = label;
+            btn.style.cssText = "font:inherit;color:#fff;background:#164e63;border:1px solid #22d3ee;border-radius:8px;padding:4px 7px;";
+            btn.addEventListener("click", fn);
+            return btn;
+          }
+
+          header.appendChild(title);
+          header.appendChild(makeBtn("Copy", function () {
+            var text = lines.join("\n");
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(text).catch(function () { prompt("Copy logs:", text); });
+            } else {
+              prompt("Copy logs:", text);
+            }
+          }));
+          header.appendChild(makeBtn("Hide", function () {
+            collapsed = !collapsed;
+            body.style.display = collapsed ? "none" : "block";
+          }));
+          header.appendChild(makeBtn("Off", function () {
+            localStorage.removeItem("veloraDebug");
+            panel.remove();
+          }));
+
+          body = document.createElement("pre");
+          body.style.cssText = "margin:0;padding:8px;max-height:calc(46vh - 38px);overflow:auto;white-space:pre-wrap;word-break:break-word;";
+          panel.appendChild(header);
+          panel.appendChild(body);
+          document.documentElement.appendChild(panel);
+        }
+
+        function log(level) {
+          ensurePanel();
+          var args = Array.prototype.slice.call(arguments, 1);
+          var stamp = new Date().toLocaleTimeString();
+          var line = "[" + stamp + "] " + level + " " + scrub(args.map(safeString).join(" "));
+          lines.push(line);
+          if (lines.length > maxLines) lines.splice(0, lines.length - maxLines);
+          body.textContent = lines.join("\n");
+          body.scrollTop = body.scrollHeight;
+        }
+
+        ["log", "info", "warn", "error"].forEach(function (level) {
+          var original = console[level] && console[level].bind(console);
+          console[level] = function () {
+            log.apply(null, [level.toUpperCase()].concat(Array.prototype.slice.call(arguments)));
+            if (original) original.apply(null, arguments);
+          };
+        });
+
+        window.addEventListener("error", function (event) {
+          log("WINDOW_ERROR", event.message, event.filename + ":" + event.lineno + ":" + event.colno);
+        });
+        window.addEventListener("unhandledrejection", function (event) {
+          log("PROMISE_REJECTION", event.reason);
+        });
+
+        var originalFetch = window.fetch && window.fetch.bind(window);
+        if (originalFetch) {
+          window.fetch = function (input, init) {
+            var url = typeof input === "string" ? input : input && input.url;
+            var interesting = /\/api\/(?:probe|transcode|remux|proxy\/stream)|\.m3u8|\.ts(?:\?|$)/i.test(String(url || ""));
+            var started = Date.now();
+            if (interesting) log("FETCH", (init && init.method) || "GET", url);
+            return originalFetch(input, init).then(function (response) {
+              if (interesting) {
+                log("FETCH_RES", response.status, response.headers.get("content-type") || "", (Date.now() - started) + "ms", response.url || url);
+              }
+              return response;
+            }).catch(function (err) {
+              if (interesting) log("FETCH_ERR", url, err);
+              throw err;
+            });
+          };
+        }
+
+        function videoSnapshot(video) {
+          if (!video) return "no video";
+          var err = video.error ? {
+            code: video.error.code,
+            message: video.error.message
+          } : null;
+          return {
+            id: video.id,
+            attrSrc: video.getAttribute("src") || "",
+            propSrc: video.src || "",
+            currentSrc: video.currentSrc || "",
+            networkState: video.networkState,
+            readyState: video.readyState,
+            paused: video.paused,
+            currentTime: Number(video.currentTime || 0).toFixed(2),
+            duration: Number.isFinite(video.duration) ? Number(video.duration).toFixed(2) : String(video.duration),
+            videoWidth: video.videoWidth,
+            videoHeight: video.videoHeight,
+            error: err,
+            canNativeHls: video.canPlayType("application/vnd.apple.mpegurl") || video.canPlayType("application/x-mpegURL")
+          };
+        }
+
+        function patchVideoPrototype() {
+          if (HTMLMediaElement.prototype.__veloraDebugPatched) return;
+          HTMLMediaElement.prototype.__veloraDebugPatched = true;
+          try {
+            var descriptor = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, "src");
+            if (descriptor && descriptor.set && descriptor.get) {
+              Object.defineProperty(HTMLMediaElement.prototype, "src", {
+                configurable: true,
+                enumerable: descriptor.enumerable,
+                get: function () {
+                  return descriptor.get.call(this);
+                },
+                set: function (value) {
+                  if (this && (this.id === "video-vod" || this.id === "video")) {
+                    log("VIDEO_SRC_SET", this.id, value, new Error().stack);
+                  }
+                  return descriptor.set.call(this, value);
+                }
+              });
+            }
+          } catch (err) {
+            log("VIDEO_SRC_PATCH_ERR", err);
+          }
+
+          ["load", "play", "pause", "removeAttribute", "setAttribute"].forEach(function (methodName) {
+            var original = HTMLMediaElement.prototype[methodName];
+            if (typeof original !== "function") return;
+            HTMLMediaElement.prototype[methodName] = function () {
+              if (this && (this.id === "video-vod" || this.id === "video")) {
+                var args = Array.prototype.slice.call(arguments);
+                if (methodName === "setAttribute" || methodName === "removeAttribute") {
+                  if (args[0] !== "src") return original.apply(this, arguments);
+                }
+                log("VIDEO_" + methodName.toUpperCase() + "_CALL", this.id, args, videoSnapshot(this), new Error().stack);
+              }
+              return original.apply(this, arguments);
+            };
+          });
+        }
+
+        function bindVideo(video) {
+          if (!video || video.__veloraDebugBound) return;
+          video.__veloraDebugBound = true;
+          [
+            "loadstart", "loadedmetadata", "loadeddata", "canplay", "canplaythrough",
+            "play", "playing", "pause", "waiting", "stalled", "suspend", "abort",
+            "emptied", "error", "timeupdate", "seeking", "seeked", "ended"
+          ].forEach(function (eventName) {
+            var last = 0;
+            video.addEventListener(eventName, function () {
+              if (eventName === "timeupdate" && Date.now() - last < 3000) return;
+              last = Date.now();
+              log("VIDEO_" + eventName.toUpperCase(), videoSnapshot(video));
+            }, true);
+          });
+          log("VIDEO_BOUND", videoSnapshot(video));
+        }
+
+        function bindVideos() {
+          patchVideoPrototype();
+          bindVideo(document.getElementById("video-vod"));
+          bindVideo(document.getElementById("video"));
+        }
+
+        ensurePanel();
+        log("DEBUG_ON", navigator.userAgent, location.href);
+        bindVideos();
+        new MutationObserver(bindVideos).observe(document.documentElement, { childList: true, subtree: true });
+      })();
+    </script>
+
   </body>
 </html>

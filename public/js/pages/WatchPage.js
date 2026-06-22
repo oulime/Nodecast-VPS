@@ -733,6 +733,20 @@ class WatchPage {
     playHls(url) {
         if (this.hls) {
             this.hls.destroy();
+            this.hls = null;
+        }
+
+        const canUseNativeHls = this.video?.canPlayType('application/vnd.apple.mpegurl') ||
+            this.video?.canPlayType('application/x-mpegURL');
+
+        if (!Hls.isSupported() && canUseNativeHls) {
+            console.log('[WatchPage] Loading native HLS URL:', url);
+            this.video.src = url;
+            this.video.load();
+            this.video.play().catch(e => {
+                if (e.name !== 'AbortError') console.error('[WatchPage] Autoplay error:', e);
+            });
+            return;
         }
 
         console.log('[WatchPage] Loading HLS URL:', url);

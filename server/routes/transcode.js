@@ -243,7 +243,11 @@ router.post('/session', async (req, res) => {
     const effectiveSeekOffset = Number.isFinite(Number(startAt))
         ? Math.max(0, Number(startAt))
         : Math.max(0, Number(seekOffset) || 0);
-    const normalizedMode = String(mode || '').toLowerCase();
+    const requestedMode = String(mode || '').toLowerCase();
+    const inferredVodMode = /\/(?:movie|series)\//i.test(String(url));
+    const normalizedMode = ['vod', 'movie', 'series', 'episode'].includes(requestedMode)
+        ? requestedMode
+        : (inferredVodMode ? 'vod' : requestedMode);
     const isVodMode = ['vod', 'movie', 'series', 'episode'].includes(normalizedMode);
 
     try {

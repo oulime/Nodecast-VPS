@@ -1444,7 +1444,7 @@ class VideoPlayer {
             this.hls = null;
         }
         this.video.pause();
-        this.video.src = '';
+        this.video.removeAttribute('src');
         this.video.load();
 
         // Reset UI to idle state

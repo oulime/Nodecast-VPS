@@ -830,7 +830,7 @@ class WatchPage {
         }
         if (this.video) {
             this.video.pause();
-            this.video.src = '';
+            this.video.removeAttribute('src');
             this.video.load();
         }
 

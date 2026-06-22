@@ -5361,6 +5361,10 @@
           }
 
           header.appendChild(title);
+          header.appendChild(makeBtn("Clear", function () {
+            lines = [];
+            body.textContent = "";
+          }));
           header.appendChild(makeBtn("Copy", function () {
             var text = lines.join("\n");
             if (navigator.clipboard && navigator.clipboard.writeText) {

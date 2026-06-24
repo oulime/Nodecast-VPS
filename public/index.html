@@ -4,7 +4,7 @@
     <meta charset="UTF-8"/>
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <title>VeloraVIP</title>
     <script>
@@ -530,6 +530,73 @@
         box-shadow: none !important;
         -webkit-backdrop-filter: none !important;
         backdrop-filter: none !important;
+      }
+
+      /* iPhone Safari does not support fullscreen on an arbitrary container. The
+         player therefore uses the fullscreen classes below as an in-page fallback.
+         Dynamic viewport units keep the bottom controls above Safari's chrome. */
+      #player-container.player-container--live-fullscreen,
+      #vod-player-container.player-container--fullscreen {
+        top: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        z-index: 2147483000 !important;
+        width: 100vw !important;
+        width: 100dvw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        min-width: 100vw !important;
+        min-width: 100dvw !important;
+        min-height: 100vh !important;
+        min-height: 100dvh !important;
+      }
+
+      #player-container.player-container--live-fullscreen .video-wrapper,
+      #vod-player-container.player-container--fullscreen .video-wrapper,
+      #player-container.player-container--live-fullscreen #video,
+      #vod-player-container.player-container--fullscreen #video-vod {
+        width: 100vw !important;
+        width: 100dvw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        min-width: 100vw !important;
+        min-width: 100dvw !important;
+        min-height: 100vh !important;
+        min-height: 100dvh !important;
+      }
+
+      #player-container.player-container--live-fullscreen #video,
+      #vod-player-container.player-container--fullscreen #video-vod {
+        object-fit: fill !important;
+      }
+
+      #player-container.player-container--live-fullscreen .live-controls-overlay,
+      #vod-player-container.player-container--fullscreen .vod-controls-overlay {
+        padding-left: calc(1rem + env(safe-area-inset-left, 0px)) !important;
+        padding-right: calc(1rem + env(safe-area-inset-right, 0px)) !important;
+        padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
+      }
+
+      /* Never strand touch users in the iOS fullscreen fallback. */
+      #player-container.player-container--live-fullscreen .live-controls-overlay--idle,
+      #vod-player-container.player-container--fullscreen .vod-controls-overlay--idle {
+        opacity: 1 !important;
+        transform: none !important;
+        pointer-events: auto !important;
+      }
+
+      #player-container.player-container--live-fullscreen #live-ctl-fullscreen,
+      #vod-player-container.player-container--fullscreen #vod-ctl-fullscreen {
+        position: absolute !important;
+        top: max(0.75rem, env(safe-area-inset-top, 0px)) !important;
+        right: max(0.75rem, env(safe-area-inset-right, 0px)) !important;
+        z-index: 2 !important;
+        width: 2.75rem !important;
+        height: 2.75rem !important;
+        background: rgba(5, 8, 18, 0.82) !important;
+        border-color: rgba(255, 255, 255, 0.72) !important;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55) !important;
       }
 
       body.trial-locked #velora-tv-pointer-shield,

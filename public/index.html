@@ -584,6 +584,14 @@
         opacity: 1 !important;
         transform: none !important;
         pointer-events: auto !important;
+        background: transparent !important;
+      }
+
+      #player-container.player-container--live-fullscreen .live-controls-overlay--idle .live-controls-row > :not(#live-ctl-fullscreen),
+      #vod-player-container.player-container--fullscreen .vod-controls-overlay--idle .vod-controls-row > :not(#vod-ctl-fullscreen) {
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
       }
 
       #player-container.player-container--live-fullscreen #live-ctl-fullscreen,
@@ -597,6 +605,19 @@
         background: rgba(5, 8, 18, 0.82) !important;
         border-color: rgba(255, 255, 255, 0.72) !important;
         box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55) !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+        transform: none !important;
+      }
+
+      body.vel-live-fullscreen-active #video,
+      body.vel-vod-fullscreen-active #video-vod,
+      #player-container:fullscreen #video,
+      #vod-player-container:fullscreen #video-vod,
+      #player-container:-webkit-full-screen #video,
+      #vod-player-container:-webkit-full-screen #video-vod {
+        pointer-events: none !important;
       }
 
       body.trial-locked #velora-tv-pointer-shield,
@@ -5592,6 +5613,63 @@
         log("DEBUG_ON", navigator.userAgent, location.href);
         bindVideos();
         new MutationObserver(bindVideos).observe(document.documentElement, { childList: true, subtree: true });
+      })();
+    </script>
+
+    <script>
+      (function () {
+        function suppressNativePlayerControls(video) {
+          if (!video) return;
+          video.controls = false;
+          video.removeAttribute("controls");
+          video.setAttribute("playsinline", "");
+          video.setAttribute("webkit-playsinline", "");
+          video.setAttribute("x5-playsinline", "true");
+          video.setAttribute("x5-video-player-type", "h5-page");
+          video.setAttribute("x5-video-player-fullscreen", "false");
+          video.setAttribute("controlslist", "nofullscreen nodownload noplaybackrate noremoteplayback");
+          video.setAttribute("disablepictureinpicture", "");
+          video.setAttribute("disableremoteplayback", "");
+          try {
+            video.disablePictureInPicture = true;
+          } catch (err) {}
+          try {
+            video.disableRemotePlayback = true;
+          } catch (err) {}
+        }
+
+        function suppressAllNativePlayerControls() {
+          suppressNativePlayerControls(document.getElementById("video"));
+          suppressNativePlayerControls(document.getElementById("video-vod"));
+        }
+
+        function scheduleSuppressNativePlayerControls() {
+          suppressAllNativePlayerControls();
+          window.setTimeout(suppressAllNativePlayerControls, 60);
+          window.setTimeout(suppressAllNativePlayerControls, 250);
+          window.setTimeout(suppressAllNativePlayerControls, 900);
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+          suppressAllNativePlayerControls();
+          ["video", "video-vod"].forEach(function (id) {
+            var video = document.getElementById(id);
+            if (!video) return;
+            ["loadedmetadata", "play", "playing", "pause", "webkitbeginfullscreen", "webkitendfullscreen"].forEach(function (eventName) {
+              video.addEventListener(eventName, scheduleSuppressNativePlayerControls, true);
+            });
+          });
+          ["live-ctl-fullscreen", "vod-ctl-fullscreen"].forEach(function (id) {
+            var button = document.getElementById(id);
+            if (!button) return;
+            button.addEventListener("click", scheduleSuppressNativePlayerControls, true);
+            button.addEventListener("touchend", scheduleSuppressNativePlayerControls, true);
+          });
+        });
+
+        document.addEventListener("fullscreenchange", scheduleSuppressNativePlayerControls, true);
+        document.addEventListener("webkitfullscreenchange", scheduleSuppressNativePlayerControls, true);
+        window.addEventListener("orientationchange", scheduleSuppressNativePlayerControls, true);
       })();
     </script>
 

@@ -356,7 +356,7 @@
       .video-wrapper:fullscreen #video-vod,
       #video:fullscreen,
       #video-vod:fullscreen {
-        object-fit: contain !important;
+        object-fit: fill !important;
         background: #000 !important;
       }
 
@@ -389,7 +389,7 @@
       .video-wrapper:-webkit-full-screen #video-vod,
       #video:-webkit-full-screen,
       #video-vod:-webkit-full-screen {
-        object-fit: contain !important;
+        object-fit: fill !important;
         background: #000 !important;
       }
 
@@ -585,6 +585,12 @@
       #player-container:-webkit-full-screen #video,
       #vod-player-container:-webkit-full-screen #video-vod {
         pointer-events: none !important;
+        width: 100vw !important;
+        width: 100dvw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        object-fit: fill !important;
+        object-position: center center !important;
       }
 
       body.trial-locked #velora-tv-pointer-shield,

@@ -7,7 +7,8 @@
     "scripts": {
         "start": "node server/index.js",
         "dev": "node --watch server/index.js",
-        "build": "node --check server/index.js && node --check server/routes/analytics.js && node --check public/assets/main-JkackQV-.js",
+        "build": "node --check server/index.js && node --check server/routes/analytics.js && node --check public/assets/main-JkackQV-.js && node --check public/assets/ios-native-fullscreen.js",
+        "test:ios-fullscreen": "node scripts/test-ios-native-fullscreen.js",
         "clean:transcode-cache": "node scripts/clean-transcode-cache.js",
         "migrate:package-covers": "node scripts/migrate-package-covers-to-vps.js",
         "sync:package-covers-local": "node scripts/sync-package-covers-local.js"

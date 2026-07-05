@@ -29,16 +29,8 @@ let streamProxySettingsCache = {
     userAgent: ''
 };
 
-function isLocalHostname(value) {
-    const host = String(value || '').split(':')[0].replace(/^\[|\]$/g, '').toLowerCase();
-    return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '';
-}
-
-function shouldUseRemoteCatalog(req) {
-    if (REMOTE_CATALOG_DISABLED || !REMOTE_CATALOG_BASE) return false;
-    const configured = String(process.env.VELORA_CATALOG_REMOTE_BASE || '').trim();
-    if (configured) return true;
-    return isLocalHostname(req.hostname) || isLocalHostname(req.get('host'));
+function shouldUseRemoteCatalog() {
+    return !REMOTE_CATALOG_DISABLED && Boolean(REMOTE_CATALOG_BASE);
 }
 
 async function proxyRemoteCatalog(req, res) {

@@ -78,6 +78,21 @@
     .dot { width: 8px; height: 8px; border-radius: 999px; background: currentColor; box-shadow: 0 0 14px currentColor; }
     .spin { animation: spin 1s linear infinite; border: 2px solid rgba(255,255,255,.22); border-top-color: currentColor; }
     .empty { padding: 22px; border: 1px dashed rgba(255,255,255,.14); border-radius: 16px; color: #cfc2e8; text-align: center; }
+    dialog {
+      width: min(720px, calc(100vw - 24px));
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 20px;
+      padding: 0;
+      color: #f6f0ff;
+      background: #110d24;
+      box-shadow: 0 28px 80px rgba(0,0,0,.55);
+    }
+    dialog::backdrop { background: rgba(3, 2, 10, .78); backdrop-filter: blur(5px); }
+    .dialog-body { padding: 18px; }
+    .dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+    .dialog-head h2 { margin: 0; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+    .dialog-error { min-height: 18px; margin-top: 12px; color: #fecaca; font-size: 13px; font-weight: 800; }
     @keyframes spin { to { transform: rotate(360deg); } }
     @media (max-width: 720px) {
       body { padding: 10px; }
@@ -154,6 +169,36 @@
     <div id="sources-body" class="source-list"></div>
   </section>
 
+  <dialog id="edit-source-dialog">
+    <form id="edit-source-form" class="dialog-body">
+      <div class="dialog-head">
+        <h2>Modifier la source</h2>
+        <button id="edit-source-close" type="button" class="secondary" aria-label="Fermer">Fermer</button>
+      </div>
+      <input id="edit-source-id" type="hidden">
+      <div class="grid">
+        <label>Type
+          <select id="edit-source-type">
+            <option value="xtream">Xtream</option>
+            <option value="m3u">M3U</option>
+            <option value="epg">EPG</option>
+          </select>
+        </label>
+        <label>Nom <input id="edit-source-name" required></label>
+        <label>URL <input id="edit-source-url" type="url" required></label>
+        <label>Username <input id="edit-source-user" autocomplete="off"></label>
+        <label>Nouveau password
+          <input id="edit-source-pass" type="password" autocomplete="new-password" placeholder="Laisser vide pour conserver">
+        </label>
+      </div>
+      <div id="edit-source-error" class="dialog-error" role="alert"></div>
+      <div class="dialog-actions">
+        <button id="edit-source-cancel" type="button" class="secondary">Annuler</button>
+        <button id="edit-source-save" type="submit">Enregistrer les modifications</button>
+      </div>
+    </form>
+  </dialog>
+
   <section id="panel-hardware" class="panel">
     <h2>Hardware</h2>
     <pre id="hardware-info"></pre>
@@ -169,6 +214,7 @@
     let sourcePollTimer = null;
     let sourcePollUntil = 0;
     let sourcePollMinimumUntil = 0;
+    let currentSources = new Map();
     let resizeTimer = null;
 
     function notifyParentHeight() {
@@ -289,6 +335,7 @@
 
     async function loadSources(options = {}) {
       const [sources, states] = await Promise.all([api('/sources'), api('/sources/status').catch(() => [])]);
+      currentSources = new Map(sources.map(source => [String(source.id), source]));
       const byId = new Map(states.map(s => [String(s.source_id ?? s.sourceId ?? s.id), s]));
       const hasRunning = states.some(s => ['syncing', 'warming'].includes(String(s.status || '').toLowerCase()));
       $('sources-body').innerHTML = sources.length ? sources.map(s => {
@@ -303,6 +350,7 @@
             <div class="source-row-status">${sourceStatusBadges(s, st)}</div>
           </div>
           <div class="row-actions">
+            <button class="secondary" onclick="editSource(${s.id})">Modifier</button>
             <button onclick="toggleSource(${s.id})">${s.enabled ? 'Disable' : 'Enable'}</button>
             <button onclick="syncSource(${s.id})">Sync</button>
             <button class="danger" onclick="deleteSource(${s.id})">Delete</button>
@@ -330,6 +378,57 @@
       startSourcePolling(`Source ajoutee: ${created?.name || 'nouvelle source'}. Sync demarree, suivi automatique active.`);
     };
     $('refresh-sources').onclick = async () => { await loadSources(); status('Sources rechargees.'); };
+    window.editSource = id => {
+      const source = currentSources.get(String(id));
+      if (!source) {
+        status('Source introuvable. Rechargez la liste.', true);
+        return;
+      }
+      $('edit-source-id').value = source.id;
+      $('edit-source-type').value = source.type;
+      $('edit-source-name').value = source.name || '';
+      $('edit-source-url').value = source.url || '';
+      $('edit-source-user').value = source.username || '';
+      $('edit-source-pass').value = '';
+      $('edit-source-error').textContent = '';
+      $('edit-source-dialog').showModal();
+      $('edit-source-name').focus();
+    };
+    function closeEditSource() {
+      $('edit-source-dialog').close();
+      $('edit-source-error').textContent = '';
+    }
+    $('edit-source-close').onclick = closeEditSource;
+    $('edit-source-cancel').onclick = closeEditSource;
+    $('edit-source-form').onsubmit = async event => {
+      event.preventDefault();
+      const id = $('edit-source-id').value;
+      const saveButton = $('edit-source-save');
+      const payload = {
+        type: $('edit-source-type').value,
+        name: $('edit-source-name').value.trim(),
+        url: $('edit-source-url').value.trim(),
+        username: $('edit-source-user').value.trim()
+      };
+      const password = $('edit-source-pass').value;
+      if (password) payload.password = password;
+
+      $('edit-source-error').textContent = '';
+      saveButton.disabled = true;
+      try {
+        const updated = await api(`/sources/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
+        closeEditSource();
+        await loadSources();
+        startSourcePolling(`Source modifiee: ${updated?.name || payload.name}. Sync demarree, suivi automatique active.`);
+      } catch (error) {
+        $('edit-source-error').textContent = error.message;
+      } finally {
+        saveButton.disabled = false;
+      }
+    };
     window.toggleSource = async id => { await api(`/sources/${id}/toggle`, { method: 'POST' }); await loadSources(); startSourcePolling('Source mise a jour. Suivi automatique active.'); };
     window.syncSource = async id => { await api(`/sources/${id}/sync`, { method: 'POST' }); await loadSources(); startSourcePolling('Sync demarree. Cette page passera a success sans refresh.'); };
     window.deleteSource = async id => { if (confirm('Delete source?')) { await api(`/sources/${id}`, { method: 'DELETE' }); await loadSources(); status('Source supprimee.'); } };

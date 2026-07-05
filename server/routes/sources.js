@@ -123,10 +123,22 @@ router.put('/:id', async (req, res) => {
             return res.status(404).json({ error: 'Source not found' });
         }
 
-        const { name, url, username, password } = req.body;
+        const { type, name, url, username, password } = req.body;
+        const nextType = type ?? existing.type;
+        const nextName = typeof name === 'string' ? name.trim() : existing.name;
+        const nextUrl = typeof url === 'string' ? url.trim() : existing.url;
+
+        if (!['xtream', 'm3u', 'epg'].includes(nextType)) {
+            return res.status(400).json({ error: 'Invalid source type' });
+        }
+        if (!nextName || !nextUrl) {
+            return res.status(400).json({ error: 'Type, name, and URL are required' });
+        }
+
         const updated = await sources.update(req.params.id, {
-            name: name || existing.name,
-            url: url || existing.url,
+            type: nextType,
+            name: nextName,
+            url: nextUrl,
             username: username !== undefined ? username : existing.username,
             password: password !== undefined ? password : existing.password
         });

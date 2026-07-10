@@ -80,6 +80,16 @@
         display: block !important;
         visibility: visible !important;
       }
+      body:not(.vel-promo-cta-unlocked) #vel-promo-offer-open,
+      #vel-promo-offer-open[hidden] {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+      body.vel-promo-cta-unlocked #vel-promo-offer-open {
+        visibility: visible;
+        pointer-events: auto;
+      }
       body.velora-tv-start-blocked {
         overflow: hidden !important;
       }
@@ -2335,11 +2345,72 @@
             </span>
           </div>
 
-          <button type="button" class="vel-promo-banner__cta" id="vel-promo-offer-open">
+          <button type="button" class="vel-promo-banner__cta" id="vel-promo-offer-open" hidden aria-hidden="true">
             <span>J&rsquo;en profite</span>
           </button>
         </div>
       </div>
+      <script>
+        (function () {
+          var REQUIRED_WATCH_SECONDS = 120;
+          var DEFAULT_TRIAL_LIMIT_SECONDS = 600;
+          var maxRemainingSeen = DEFAULT_TRIAL_LIMIT_SECONDS;
+
+          function numberFromText(id) {
+            var el = document.getElementById(id);
+            var value = el ? Number(String(el.textContent || "").trim()) : NaN;
+            return Number.isFinite(value) ? value : null;
+          }
+
+          function readRemainingSeconds() {
+            var minutes = numberFromText("vel-promo-minutes");
+            var seconds = numberFromText("vel-promo-seconds");
+            if (minutes === null || seconds === null) return null;
+            return Math.max(0, minutes * 60 + seconds);
+          }
+
+          function setPromoCtaUnlocked(unlocked) {
+            var button = document.getElementById("vel-promo-offer-open");
+            document.body.classList.toggle("vel-promo-cta-unlocked", unlocked);
+            if (!button) return;
+            button.hidden = !unlocked;
+            button.setAttribute("aria-hidden", unlocked ? "false" : "true");
+            if (unlocked) {
+              button.removeAttribute("tabindex");
+            } else {
+              button.setAttribute("tabindex", "-1");
+            }
+          }
+
+          function syncPromoCtaVisibility() {
+            var remaining = readRemainingSeconds();
+            if (remaining === null) {
+              setPromoCtaUnlocked(false);
+              return;
+            }
+            maxRemainingSeen = Math.max(maxRemainingSeen, remaining);
+            setPromoCtaUnlocked(maxRemainingSeen - remaining >= REQUIRED_WATCH_SECONDS);
+          }
+
+          function startPromoCtaGate() {
+            syncPromoCtaVisibility();
+            var minutes = document.getElementById("vel-promo-minutes");
+            var seconds = document.getElementById("vel-promo-seconds");
+            if (window.MutationObserver && (minutes || seconds)) {
+              var observer = new MutationObserver(syncPromoCtaVisibility);
+              if (minutes) observer.observe(minutes, { childList: true, characterData: true, subtree: true });
+              if (seconds) observer.observe(seconds, { childList: true, characterData: true, subtree: true });
+            }
+            window.setInterval(syncPromoCtaVisibility, 1000);
+          }
+
+          if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", startPromoCtaGate, { once: true });
+          } else {
+            startPromoCtaGate();
+          }
+        })();
+      </script>
       <header class="header header--login-only">
         <h1>Xtream Codes Player</h1>
         <p class="sub">Connexion Nodecast — proxy API et flux (CORS).</p>

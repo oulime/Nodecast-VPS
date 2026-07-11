@@ -515,11 +515,15 @@
         display: none !important;
       }
 
-      body:not(.vel-home-choice-picked) #catalog-loading-overlay,
+      body:not(.vel-home-choice-picked):not(.vel-home-choice-loading) #catalog-loading-overlay,
       body:not(.vel-home-choice-picked) #trial-countdown-root {
         display: none !important;
         visibility: hidden !important;
         pointer-events: none !important;
+      }
+
+      body.vel-home-choice-loading:not(.vel-home-choice-picked) .vel-home-choice {
+        display: none !important;
       }
 
       @media (max-width: 760px) {
@@ -1036,12 +1040,13 @@
       }
 
       .main--velora .vel-header-home-btn {
+        width: 2.75rem;
+        min-width: 2.75rem;
         min-height: 2.75rem;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 0.58rem;
-        padding: 0 1.05rem;
+        padding: 0;
         border: 1px solid color-mix(in srgb, var(--vel-primary, #8a2be2) 64%, rgba(255, 255, 255, 0.26));
         border-radius: 8px;
         color: #fff;
@@ -1103,9 +1108,9 @@
 
       @media (max-width: 430px) {
         .main--velora .vel-header-home-btn {
+          width: 2.45rem;
+          min-width: 2.45rem;
           min-height: 2.45rem;
-          gap: 0.42rem;
-          padding: 0 0.78rem;
           font-size: 0.86rem;
         }
 
@@ -2684,6 +2689,45 @@
         touch-action: manipulation;
       }
 
+      #vel-world-cup-entry.vel-package-card {
+        grid-column: auto !important;
+        width: auto !important;
+        height: auto !important;
+        min-height: 0 !important;
+        aspect-ratio: 1 / 1 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-self: stretch !important;
+        justify-self: stretch !important;
+        line-height: normal !important;
+        animation: none !important;
+      }
+
+      #vel-world-cup-entry.vel-package-card::before,
+      #vel-world-cup-entry.vel-package-card::after {
+        display: block !important;
+      }
+
+      #vel-world-cup-entry.vel-package-card .vel-world-cup-entry__image {
+        display: none !important;
+      }
+
+      #vel-world-cup-entry.vel-package-card .vel-package-card__art {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: cover;
+        border-radius: inherit;
+      }
+
+      #vel-world-cup-entry.vel-package-card.vel-package-card--live-default-art .vel-package-card__emoji {
+        display: none !important;
+      }
+
       .vel-packages .vel-package-card--vod-default-art,
       .vel-packages .vel-package-card--series-default-art {
         overflow: hidden !important;
@@ -2714,7 +2758,7 @@
       }
     </style>
   </head>
-  <body class="vite-autoconnect">
+  <body class="vite-autoconnect vel-home-choice-loading">
     <div id="settings-shell" class="settings-shell countries-admin-page hidden" aria-hidden="true">
       <div id="settings-view-granted">
         <header class="countries-admin-head">
@@ -3217,7 +3261,6 @@
                     <path d="M3 10.5 12 3l9 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-5v-6h-5v6h-5A1.5 1.5 0 0 1 3 19.5v-9Z"></path>
                   </svg>
                 </span>
-                <span>Accueil</span>
               </button>
               <button
                 type="button"
@@ -3957,6 +4000,66 @@
           var homeCountryFlag = document.getElementById("home-country-flag");
           var homeCountryMenu = document.getElementById("home-country-menu");
           var homeAdultBtn = document.getElementById("home-adult-btn");
+          var catalogLoadingOverlay = document.getElementById("catalog-loading-overlay");
+
+          function isCatalogLoadingVisible() {
+            return !!(
+              catalogLoadingOverlay &&
+              !catalogLoadingOverlay.classList.contains("hidden") &&
+              catalogLoadingOverlay.getAttribute("aria-hidden") !== "true"
+            );
+          }
+
+          function showHomeChoiceWhenReady() {
+            if (document.body.classList.contains("vel-home-choice-picked")) {
+              document.body.classList.remove("vel-home-choice-loading");
+              return;
+            }
+
+            document.body.classList.add("vel-home-choice-loading");
+            var sawLoading = isCatalogLoadingVisible();
+            var finished = false;
+
+            function finish() {
+              if (finished) return;
+              finished = true;
+              if (!document.body.classList.contains("vel-home-choice-picked")) {
+                document.body.classList.remove("vel-home-choice-loading");
+                window.scrollTo(0, 0);
+              }
+              if (observer) observer.disconnect();
+            }
+
+            function check() {
+              if (document.body.classList.contains("vel-home-choice-picked")) {
+                finish();
+                return;
+              }
+              if (isCatalogLoadingVisible()) {
+                sawLoading = true;
+                return;
+              }
+              if (sawLoading) {
+                window.setTimeout(finish, 90);
+              }
+            }
+
+            var observer = null;
+            if (catalogLoadingOverlay) {
+              observer = new MutationObserver(check);
+              observer.observe(catalogLoadingOverlay, {
+                attributes: true,
+                attributeFilter: ["class", "aria-hidden"]
+              });
+            }
+
+            window.setTimeout(function () {
+              if (!sawLoading) finish();
+            }, 2600);
+            check();
+          }
+
+          showHomeChoiceWhenReady();
 
           function homeCountryKey(value) {
             try {
@@ -4196,8 +4299,34 @@
               event.preventDefault();
               event.stopPropagation();
               homeChoiceRunId += 1;
+              document.body.classList.remove("vel-home-choice-loading");
               document.body.classList.add("vel-home-choice-picked");
               var adultButton = document.getElementById("btn-adult-portal");
+              var adultDialog = document.getElementById("vel-adult-confirm-dialog");
+              var restoreHomeIfAdultCancelled = function () {
+                window.setTimeout(function () {
+                  var main = document.querySelector(".main--velora");
+                  var adultIsOpen = !!(
+                    main &&
+                    main.classList.contains("main--velora-adult")
+                  );
+                  var adultButtonIsActive = !!(
+                    adultButton &&
+                    adultButton.classList.contains("active")
+                  );
+                  if (!adultIsOpen && !adultButtonIsActive) {
+                    homeChoiceRunId += 1;
+                    document.body.classList.remove("vel-home-choice-loading");
+                    document.body.classList.remove("vel-home-choice-picked");
+                    window.scrollTo(0, 0);
+                    if (main) main.scrollTop = 0;
+                  }
+                }, 140);
+              };
+              if (adultDialog) {
+                adultDialog.addEventListener("cancel", restoreHomeIfAdultCancelled, { once: true });
+                adultDialog.addEventListener("close", restoreHomeIfAdultCancelled, { once: true });
+              }
               if (adultButton) adultButton.click();
             });
           }
@@ -4229,6 +4358,7 @@
                 var isActive = document.body.dataset.velActiveTab === tabName;
 
                 if (isActive) {
+                  document.body.classList.remove("vel-home-choice-loading");
                   document.body.classList.add("vel-home-choice-picked");
                   didOpen = true;
                   return;
@@ -4251,6 +4381,7 @@
               event.preventDefault();
               event.stopImmediatePropagation();
               homeChoiceRunId += 1;
+              document.body.classList.remove("vel-home-choice-loading");
               document.body.classList.remove("vel-home-choice-picked");
               window.scrollTo(0, 0);
               var main = document.querySelector(".main--velora");

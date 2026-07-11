@@ -54,6 +54,221 @@
       })();
     </script>
     <style>
+      .vel-home-choice {
+        --vel-home-gap: clamp(12px, 2.2vw, 24px);
+        --vel-home-tile-size: min(calc((100vw - 136px) / 3), calc(100dvh - var(--vel-promo-banner-h, 0px) - 154px), 560px);
+        min-height: 0;
+        flex: 1 1 auto;
+        height: auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: clamp(10px, 2vw, 24px) clamp(14px, 4vw, 44px);
+        overflow: hidden;
+      }
+
+      .vel-home-choice__inner {
+        display: grid;
+        grid-template-columns: repeat(3, var(--vel-home-tile-size));
+        justify-content: center;
+        gap: var(--vel-home-gap);
+        width: 100%;
+        margin: 0 auto;
+      }
+
+      .vel-home-choice__btn {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: clamp(16px, 2.4vw, 28px);
+        padding: clamp(18px, 3vw, 30px);
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 22px;
+        color: #fff;
+        background: linear-gradient(150deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04)), #111322;
+        box-shadow: 0 18px 44px rgba(0, 0, 0, 0.42), inset 0 1px rgba(255, 255, 255, 0.16);
+        cursor: pointer;
+        transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+      }
+
+      .vel-home-choice__btn::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.24), transparent 54%);
+        opacity: 0.7;
+        pointer-events: none;
+      }
+
+      .vel-home-choice__btn:hover,
+      .vel-home-choice__btn:focus-visible {
+        transform: translateY(-4px);
+        border-color: rgba(255, 255, 255, 0.34);
+        box-shadow: 0 24px 56px rgba(0, 0, 0, 0.5), 0 0 38px var(--vel-home-glow, rgba(168, 85, 247, 0.28));
+        filter: brightness(1.06);
+        outline: none;
+      }
+
+      .vel-home-choice__btn--live {
+        --vel-home-glow: rgba(34, 211, 238, 0.38);
+        background: linear-gradient(150deg, rgba(34, 211, 238, 0.24), rgba(99, 102, 241, 0.1)), #0b1624;
+      }
+
+      .vel-home-choice__btn--movies {
+        --vel-home-glow: rgba(251, 191, 36, 0.34);
+        background: linear-gradient(150deg, rgba(251, 191, 36, 0.22), rgba(244, 63, 94, 0.09)), #1a1320;
+      }
+
+      .vel-home-choice__btn--series {
+        --vel-home-glow: rgba(168, 85, 247, 0.4);
+        background: linear-gradient(150deg, rgba(168, 85, 247, 0.24), rgba(20, 184, 166, 0.08)), #111424;
+      }
+
+      .vel-home-choice__icon,
+      .vel-home-choice__label {
+        position: relative;
+        z-index: 1;
+      }
+
+      .vel-home-choice__icon {
+        width: clamp(86px, 12vw, 188px);
+        height: clamp(86px, 12vw, 188px);
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08));
+        box-shadow: inset 0 1px rgba(255, 255, 255, 0.24), 0 14px 34px rgba(0, 0, 0, 0.28);
+      }
+
+      .vel-home-choice__icon svg {
+        width: 68%;
+        height: 68%;
+        fill: currentColor;
+        filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.36));
+      }
+
+      .vel-home-choice__label {
+        font-size: clamp(1.7rem, 4.4vw, 3.85rem);
+        font-weight: 950;
+        line-height: 1;
+        letter-spacing: 0;
+        text-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+      }
+
+      body.vel-home-choice-picked .vel-home-choice {
+        display: none;
+      }
+
+      body:not(.vel-home-choice-picked) {
+        overflow: hidden;
+      }
+
+      body:not(.vel-home-choice-picked) .vel-home-choice {
+        position: fixed;
+        top: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        z-index: 2147483645;
+        height: auto;
+        flex: none;
+        background:
+          radial-gradient(circle at 16% 18%, rgba(34, 211, 238, 0.13), transparent 34%),
+          radial-gradient(circle at 84% 22%, rgba(168, 85, 247, 0.2), transparent 36%),
+          radial-gradient(circle at 52% 96%, rgba(251, 191, 36, 0.09), transparent 42%),
+          linear-gradient(180deg, #060712 0%, #080711 48%, #03040a 100%);
+      }
+
+      body:not(.vel-home-choice-picked) .main--velora {
+        height: 100dvh;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      body:not(.vel-home-choice-picked) .main--velora .vel-dashboard,
+      body:not(.vel-home-choice-picked) .main--velora .vel-sticky-top {
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      body:not(.vel-home-choice-picked) .main--velora .vel-sticky-top {
+        display: flex;
+        flex-direction: column;
+      }
+
+      body:not(.vel-home-choice-picked) .main--velora .vel-sidebar,
+      body:not(.vel-home-choice-picked) .main--velora .vel-body,
+      body:not(.vel-home-choice-picked) .main--velora #vel-package-toolbar-sticky,
+      body:not(.vel-home-choice-picked) .main--velora #player-container,
+      body:not(.vel-home-choice-picked) .main--velora #vod-player-container,
+      body:not(.vel-home-choice-picked) .main--velora #now-playing,
+      body:not(.vel-home-choice-picked) .main--velora #now-playing-vod {
+        display: none !important;
+      }
+
+      body:not(.vel-home-choice-picked) #catalog-loading-overlay,
+      body:not(.vel-home-choice-picked) #trial-countdown-root {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+
+      @media (max-width: 760px) {
+        .vel-home-choice {
+          padding: 12px;
+        }
+
+        .vel-home-choice__inner {
+          height: 100%;
+          grid-template-columns: 1fr;
+          grid-template-rows: repeat(3, minmax(0, max-content));
+          align-content: center;
+          justify-items: center;
+          gap: 10px;
+        }
+
+        .vel-home-choice__btn {
+          width: min(100%, calc((100dvh - var(--vel-promo-banner-h, 0px) - 122px) / 3));
+          aspect-ratio: 1 / 1;
+          min-height: 0;
+          flex-direction: column;
+          padding: clamp(10px, 3vw, 16px);
+          gap: clamp(8px, 2vh, 14px);
+          border-radius: 14px;
+        }
+
+        .vel-home-choice__label {
+          font-size: clamp(1.15rem, 6vw, 1.8rem);
+        }
+
+        .vel-home-choice__icon {
+          width: clamp(58px, 13vh, 96px);
+          height: clamp(58px, 13vh, 96px);
+        }
+      }
+
+      @media (max-height: 520px) {
+        .vel-home-choice {
+          padding-block: 8px;
+        }
+
+        .vel-home-choice__icon {
+          width: clamp(48px, 13vh, 72px);
+          height: clamp(48px, 13vh, 72px);
+        }
+
+        .vel-home-choice__label {
+          font-size: clamp(1rem, 5vh, 1.55rem);
+        }
+      }
+
       html.velora-tv-mode,
       body.velora-tv-mode,
       html.velora-tv-mode *,
@@ -2502,6 +2717,37 @@
             </div>
           </header>
 
+          <section id="vel-home-choice" class="vel-home-choice" aria-label="Accueil">
+            <div class="vel-home-choice__inner">
+              <button type="button" class="vel-home-choice__btn vel-home-choice__btn--live" data-home-tab="live">
+                <span class="vel-home-choice__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 14.5v-8Zm2.5-.25a.25.25 0 0 0-.25.25v8c0 .14.11.25.25.25h11c.14 0 .25-.11.25-.25v-8a.25.25 0 0 0-.25-.25h-11ZM9 19h6v1.75H9V19Zm1-10.2 5 2.7-5 2.7V8.8Z" />
+                  </svg>
+                </span>
+                <span class="vel-home-choice__label">TV EN DIRECT</span>
+              </button>
+
+              <button type="button" class="vel-home-choice__btn vel-home-choice__btn--movies" data-home-tab="movies">
+                <span class="vel-home-choice__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm2.1 2-1.2 3h3L9.8 6H6.1Zm5.9 0-1.9 3h3L15 6h-3Zm5.2 0-1.9 3h4.7V6h-2.8ZM4 11v7h16v-7H4Z" />
+                  </svg>
+                </span>
+                <span class="vel-home-choice__label">FILMS</span>
+              </button>
+
+              <button type="button" class="vel-home-choice__btn vel-home-choice__btn--series" data-home-tab="series">
+                <span class="vel-home-choice__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M6 3h12a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3h-4v2h2.5v1.75h-9V20H10v-2H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3Zm0 2.25A.75.75 0 0 0 5.25 6v9c0 .41.34.75.75.75h12c.41 0 .75-.34.75-.75V6a.75.75 0 0 0-.75-.75H6Zm2.25 3h7.5V10h-7.5V8.25Zm0 3.25h5.5v1.75h-5.5V11.5Z" />
+                  </svg>
+                </span>
+                <span class="vel-home-choice__label">SÉRIES</span>
+              </button>
+            </div>
+          </section>
+
           <p id="vel-curate-status" class="vel-curate-status hidden" role="status" aria-live="polite"></p>
 
           <div id="now-playing" class="player-now-playing vel-now-playing hidden" role="status" aria-live="polite"></div>
@@ -3155,7 +3401,89 @@
         <button type="button" id="trial-expired-close" class="trial-expired-dialog__btn primary">Compris</button>
       </div>
     </dialog>
-
+
+    <script>
+      (function () {
+        function initHomeChoice() {
+          var home = document.getElementById("vel-home-choice");
+          if (!home || home.dataset.ready === "true") return;
+          home.dataset.ready = "true";
+          if (document.body && home.parentElement !== document.body) {
+            document.body.appendChild(home);
+          }
+
+          home.addEventListener("click", function (event) {
+            var button = event.target.closest("[data-home-tab]");
+            if (!button) return;
+
+            var tabName = button.getAttribute("data-home-tab");
+            activateHomeTab(tabName);
+          });
+
+          function activateHomeTab(tabName) {
+            var started = Date.now();
+            var maxWait = 12000;
+
+            function tryActivate() {
+              var tab = document.getElementById("tab-" + tabName);
+              if (tab) tab.click();
+
+              window.setTimeout(function () {
+                var currentTab = document.getElementById("tab-" + tabName);
+                var isActive =
+                  !!currentTab &&
+                  (currentTab.classList.contains("active") ||
+                    currentTab.getAttribute("aria-selected") === "true");
+
+                if (isActive) {
+                  document.body.classList.add("vel-home-choice-picked");
+                  return;
+                }
+
+                if (Date.now() - started < maxWait) {
+                  window.setTimeout(tryActivate, 250);
+                }
+              }, 60);
+            }
+
+            tryActivate();
+          }
+
+          var logoHome = document.getElementById("btn-logo-home");
+          if (logoHome) {
+            var showHomeChoice = function (event) {
+              event.preventDefault();
+              event.stopImmediatePropagation();
+              document.body.classList.remove("vel-home-choice-picked");
+              window.scrollTo(0, 0);
+              var main = document.querySelector(".main--velora");
+              if (main) main.scrollTop = 0;
+            };
+
+            logoHome.addEventListener("pointerdown", showHomeChoice, true);
+            logoHome.addEventListener("touchend", showHomeChoice, true);
+            logoHome.addEventListener("click", showHomeChoice, true);
+            logoHome.addEventListener("keydown", function (event) {
+              if (
+                event.key === "Enter" ||
+                event.key === "NumpadEnter" ||
+                event.key === " " ||
+                event.key === "Spacebar"
+              ) {
+                showHomeChoice(event);
+              }
+            }, true);
+          }
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", initHomeChoice, { once: true });
+        } else {
+          initHomeChoice();
+        }
+      })();
+    </script>
+
     <script>
       (function () {
         try {

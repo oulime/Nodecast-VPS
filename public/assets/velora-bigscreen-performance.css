@@ -101,6 +101,43 @@
   Desktop browsers repaint auto-virtualized tiles while scrolling large grids.
   Keep the full tile tree mounted on pointer-driven PC screens to avoid blink.
 */
+@media (max-width: 1023.98px) {
+  /* Keep the mobile home shell clear so the animated canvas remains visible. */
+  .main--velora:has(#packages-view:not(.hidden)):not(.main--velora-adult) {
+    background: transparent !important;
+  }
+
+  /* Do not leave a dark spacer below the mobile live-channel list. */
+  .main--velora-live-package #dynamic-list.item-list:not(.item-list--vod-vertical):not(.item-list--vod-film-detail) {
+    padding-bottom: 0 !important;
+    scroll-padding-bottom: 0;
+  }
+
+  /* A stale promo-height variable must not reserve space when no banner exists. */
+  body:not(:has(.vel-promo-banner)) .main--velora-live-package .vel-dashboard {
+    height: 100dvh !important;
+  }
+}
+
+.vel-packages-section-title {
+  grid-column: 1 / -1;
+  width: min(100% - 2rem, 72rem);
+  margin: 0 auto 0.8rem;
+  color: #fff;
+  font-size: clamp(1.15rem, 3vw, 1.65rem);
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: 0.06em;
+  text-align: center;
+  text-transform: uppercase;
+  text-shadow: 0 0 20px var(--vel-accent-glow, rgba(138, 43, 226, 0.3));
+}
+
+.vel-body:has(#packages-view.hidden) > .vel-packages-section-title,
+.main--velora-adult .vel-packages-section-title {
+  display: none;
+}
+
 @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
   .main--velora .vel-package-card,
   .main--velora .vel-vod-movie-card,

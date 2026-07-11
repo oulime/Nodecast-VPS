@@ -1022,7 +1022,7 @@
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css">
-    <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css">
+    <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=package-section-title-20260711">
     <style>
       body:not(.vel-home-choice-picked) .main--velora .vel-futuristic-bg {
         display: block !important;
@@ -1032,6 +1032,129 @@
 
       body:not(.vel-home-choice-picked) .main--velora {
         background-color: var(--vel-bg, #06050a) !important;
+      }
+
+      .main--velora .vel-header {
+        position: relative;
+        display: grid !important;
+        grid-template-columns: minmax(3rem, 1fr) auto minmax(3rem, 1fr);
+        align-items: center;
+        gap: 0.75rem;
+        padding-inline: max(0.75rem, env(safe-area-inset-left)) max(0.75rem, env(safe-area-inset-right));
+      }
+
+      .main--velora .vel-brand {
+        grid-column: 2;
+        justify-self: center;
+        text-align: center;
+        white-space: nowrap;
+      }
+
+      .main--velora .vel-header__left {
+        grid-column: 1;
+        justify-self: start;
+        display: inline-flex;
+        align-items: center;
+        min-width: 0;
+      }
+
+      .main--velora .vel-header__right {
+        grid-column: 3;
+        justify-self: end;
+      }
+
+      .main--velora .vel-header-back-btn {
+        width: 2.75rem;
+        min-width: 2.75rem;
+        min-height: 2.75rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: 1px solid color-mix(in srgb, var(--vel-primary, #8a2be2) 58%, rgba(255, 255, 255, 0.22));
+        border-radius: 8px;
+        color: #fff;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04)),
+          rgba(12, 8, 26, 0.86);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.18),
+          inset 0 -13px 24px rgba(126, 60, 255, 0.14),
+          0 0 0 1px rgba(168, 85, 247, 0.2),
+          0 10px 24px rgba(0, 0, 0, 0.42),
+          0 0 26px rgba(168, 85, 247, 0.26);
+        cursor: pointer;
+        transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+      }
+
+      .main--velora .vel-header-back-btn svg {
+        width: 1.22rem;
+        height: 1.22rem;
+        fill: currentColor;
+      }
+
+      .main--velora .vel-header-back-btn:hover,
+      .main--velora .vel-header-back-btn:focus-visible {
+        transform: translateY(-1px);
+        border-color: color-mix(in srgb, var(--vel-primary, #8a2be2) 78%, #fff);
+        outline: none;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.24),
+          inset 0 -13px 24px rgba(126, 60, 255, 0.18),
+          0 0 0 1px rgba(168, 85, 247, 0.28),
+          0 12px 28px rgba(0, 0, 0, 0.46),
+          0 0 32px rgba(168, 85, 247, 0.38);
+      }
+
+      body:not(.vel-home-choice-picked) .main--velora .vel-header-back-btn {
+        display: none !important;
+      }
+
+      .main--velora #vel-package-toolbar-sticky:has(.vel-content-toolbar > .vel-admin-add-channels-wrap.hidden:only-child) {
+        display: none !important;
+      }
+
+      .main--velora .vel-vod-detail__plot.vel-vod-detail__text--collapsible,
+      .main--velora .vel-vod-detail__cast.vel-vod-detail__text--collapsible {
+        position: relative;
+        overflow: hidden;
+      }
+
+      .main--velora .vel-vod-detail__plot.vel-vod-detail__text--collapsible:not(.vel-vod-detail__text--expanded),
+      .main--velora .vel-vod-detail__cast.vel-vod-detail__text--collapsible:not(.vel-vod-detail__text--expanded) {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
+      }
+
+      .main--velora .vel-vod-detail__show-more {
+        width: fit-content;
+        min-height: 2.35rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0.3rem 0 0.72rem;
+        padding: 0 0.82rem;
+        border: 1px solid color-mix(in srgb, var(--vel-primary, #8a2be2) 54%, rgba(255, 255, 255, 0.22));
+        border-radius: 8px;
+        color: #fff;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.05)),
+          rgba(12, 8, 26, 0.82);
+        box-shadow:
+          inset 0 1px rgba(255, 255, 255, 0.16),
+          0 8px 18px rgba(0, 0, 0, 0.32),
+          0 0 18px color-mix(in srgb, var(--vel-accent-glow, rgba(138, 43, 226, 0.3)) 42%, transparent);
+        font-size: 0.82rem;
+        font-weight: 900;
+        letter-spacing: 0;
+      }
+
+      .main--velora .vel-vod-detail__show-more:hover,
+      .main--velora .vel-vod-detail__show-more:focus-visible {
+        border-color: color-mix(in srgb, var(--vel-primary, #8a2be2) 76%, rgba(255, 255, 255, 0.34));
+        outline: none;
       }
 
       .main--velora .vel-header__country,
@@ -1107,6 +1230,26 @@
       }
 
       @media (max-width: 430px) {
+        .main--velora .vel-header {
+          grid-template-columns: 2.45rem minmax(0, auto) 2.45rem;
+          gap: 0.45rem;
+        }
+
+        .main--velora .vel-brand {
+          font-size: clamp(1.28rem, 7vw, 1.55rem) !important;
+        }
+
+        .main--velora .vel-header-back-btn {
+          width: 2.45rem;
+          min-width: 2.45rem;
+          min-height: 2.45rem;
+        }
+
+        .main--velora .vel-header-back-btn svg {
+          width: 1.08rem;
+          height: 1.08rem;
+        }
+
         .main--velora .vel-header-home-btn {
           width: 2.45rem;
           min-width: 2.45rem;
@@ -3157,6 +3300,19 @@
         <div class="vel-dashboard">
           <div class="vel-sticky-top">
           <header class="vel-header">
+            <div class="vel-header__left">
+              <button
+                type="button"
+                id="btn-header-back"
+                class="vel-header-back-btn"
+                title="Retour"
+                aria-label="Retour"
+              >
+                <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                  <path d="M14.7 5.3a1 1 0 0 1 0 1.4L10.41 11H20a1 1 0 1 1 0 2h-9.59l4.3 4.3a1 1 0 0 1-1.42 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.42 0Z"></path>
+                </svg>
+              </button>
+            </div>
             <button type="button" id="btn-logo-home" class="vel-brand vel-brand--home" aria-label="Retour à l'accueil">
               Velora<span class="vel-brand-vip"
                 ><span class="vel-brand-vip__v">V</span><span class="vel-brand-vip__i">I</span
@@ -3413,34 +3569,6 @@
 
           <div id="vel-package-toolbar-sticky" class="vel-package-toolbar-sticky">
             <div class="vel-content-toolbar">
-              <button type="button" id="btn-back-home" class="back-btn" title="Retour à l'accueil">
-                <span class="back-btn__icon" aria-hidden="true">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path
-                      d="M14 6L8 12l6 6"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                  </svg>
-                </span>
-                <span class="back-btn__text">Liste films</span>
-              </button>
-              <button type="button" id="btn-go-home" class="back-btn back-btn--secondary" title="Retour aux catégories">
-                <span class="back-btn__icon" aria-hidden="true">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path
-                      d="M19 12H5m7-7-7 7 7 7"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                  </svg>
-                </span>
-                <span class="back-btn__text">← Catégories</span>
-              </button>
               <div id="vel-admin-add-channels-wrap" class="vel-admin-add-channels-wrap hidden">
                 <button type="button" id="btn-admin-select-all-channels" class="vel-admin-add-channels-btn">
                   Tout sélectionner
@@ -3480,18 +3608,10 @@
                 </div>
               </div>
             </div>
+            <h2 id="vel-packages-section-title" class="vel-packages-section-title">TV EN DIRECT</h2>
             <div id="packages-view" class="grid vel-packages" aria-label="Bouquets"></div>
 
             <div id="content-view" class="hidden">
-              <button
-                type="button"
-                id="btn-live-return-bouquets"
-                class="vel-live-return-bouquets"
-                tabindex="0"
-                data-tv-focusable="true"
-              >
-                &larr; Retour aux bouquets
-              </button>
               <div id="cat-pills-wrap" class="cat-pills-wrap vel-cat-pills-wrap hidden">
                 <div id="cat-pills" class="vel-pills" role="tablist" aria-label="Filtres"></div>
               </div>
@@ -3918,6 +4038,61 @@
 
     <script>
       (function () {
+        function initVodDetailShowMore() {
+          var root = document.getElementById("dynamic-list");
+          if (!root || root.dataset.showMoreReady === "true") return;
+          root.dataset.showMoreReady = "true";
+
+          function enhanceTextBlock(block) {
+            if (!block) return;
+            var existingButton = block.nextElementSibling;
+            if (existingButton && existingButton.classList.contains("vel-vod-detail__show-more")) return;
+            block.dataset.showMoreChecked = "true";
+            var text = (block.textContent || "").trim();
+            if (text.length < 150) return;
+
+            block.classList.add("vel-vod-detail__text--collapsible");
+
+            var button = document.createElement("button");
+            button.type = "button";
+            button.className = "vel-vod-detail__show-more";
+            button.dataset.tvFocusable = "true";
+            button.textContent = "Afficher plus";
+            button.setAttribute("aria-expanded", "false");
+            button.addEventListener("click", function () {
+              var expanded = block.classList.toggle("vel-vod-detail__text--expanded");
+              button.textContent = expanded ? "Afficher moins" : "Afficher plus";
+              button.setAttribute("aria-expanded", expanded ? "true" : "false");
+            });
+            block.insertAdjacentElement("afterend", button);
+          }
+
+          function scan() {
+            root.querySelectorAll(".vel-vod-detail__inner").forEach(function (detail) {
+              if (!detail.querySelector(".vel-vod-detail__episodes-section")) return;
+              detail
+                .querySelectorAll(".vel-vod-detail__plot, .vel-vod-detail__cast")
+                .forEach(enhanceTextBlock);
+            });
+          }
+
+          var observer = new MutationObserver(function () {
+            window.requestAnimationFrame(scan);
+          });
+          observer.observe(root, { childList: true, subtree: true });
+          scan();
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", initVodDetailShowMore, { once: true });
+        } else {
+          initVodDetailShowMore();
+        }
+      })();
+    </script>
+
+    <script>
+      (function () {
         function initHomeChoice() {
           var home = document.getElementById("vel-home-choice");
           if (!home || home.dataset.ready === "true") return;
@@ -4230,9 +4405,19 @@
               event.stopPropagation();
               homeChoiceRunId += 1;
               document.body.classList.remove("vel-home-choice-loading");
-              document.body.classList.add("vel-home-choice-picked");
               var adultButton = document.getElementById("btn-adult-portal");
               var adultDialog = document.getElementById("vel-adult-confirm-dialog");
+              var adultConfirmYes = document.getElementById("vel-adult-confirm-yes");
+              try {
+                window.sessionStorage.removeItem("velora_adult_confirmed_v1");
+              } catch (error) {
+                // The dialog still works when session storage is unavailable.
+              }
+              if (adultConfirmYes) {
+                adultConfirmYes.addEventListener("click", function () {
+                  document.body.classList.add("vel-home-choice-picked");
+                }, { once: true });
+              }
               var restoreHomeIfAdultCancelled = function () {
                 window.setTimeout(function () {
                   var main = document.querySelector(".main--velora");
@@ -4267,6 +4452,29 @@
 
             var tabName = button.getAttribute("data-home-tab");
             activateHomeTab(tabName);
+          });
+
+          var packagesSectionTitle = document.getElementById("vel-packages-section-title");
+          var packagesView = document.getElementById("packages-view");
+          var packageSectionLabels = {
+            live: "TV EN DIRECT",
+            movies: "FILMS",
+            series: "SÉRIES"
+          };
+
+          function syncPackagesSectionTitle(tabName) {
+            var label = packageSectionLabels[tabName] || packageSectionLabels.live;
+            if (packagesSectionTitle) packagesSectionTitle.textContent = label;
+            if (packagesView) packagesView.setAttribute("aria-label", label);
+          }
+
+          document.addEventListener("velora-home-tab", function (event) {
+            syncPackagesSectionTitle(event.detail && event.detail.tab);
+          });
+
+          document.addEventListener("click", function (event) {
+            var tab = event.target && event.target.closest("#main-tabs [data-tab]");
+            if (tab) syncPackagesSectionTitle(tab.getAttribute("data-tab"));
           });
 
           function activateHomeTab(tabName) {
@@ -4348,6 +4556,35 @@
                 }
               }, true);
             }
+          }
+
+          var headerBack = document.getElementById("btn-header-back");
+          if (headerBack) {
+            var goBack = function (event) {
+              event.preventDefault();
+              event.stopImmediatePropagation();
+              if (!document.body.classList.contains("vel-home-choice-picked")) return;
+
+              var state = window.history.state && typeof window.history.state === "object" ? window.history.state : {};
+              if (state.veloraNav || state.veloraSettings) {
+                window.history.back();
+                return;
+              }
+
+              if (logoHome) logoHome.click();
+            };
+
+            headerBack.addEventListener("click", goBack, true);
+            headerBack.addEventListener("keydown", function (event) {
+              if (
+                event.key === "Enter" ||
+                event.key === "NumpadEnter" ||
+                event.key === " " ||
+                event.key === "Spacebar"
+              ) {
+                goBack(event);
+              }
+            }, true);
           }
         }
 

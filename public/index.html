@@ -56,24 +56,33 @@
     <style>
       .vel-home-choice {
         --vel-home-gap: clamp(8px, 1.3vw, 18px);
-        --vel-home-tile-size: min(calc((100vw - 84px) / 3), calc(100dvh - var(--vel-promo-banner-h, 0px) - 58px), 620px);
+        --vel-home-row-gap: clamp(14px, 2.2vw, 30px);
+        --vel-home-col-size: min(
+          calc((100vw - 32px - var(--vel-home-gap)) / 2),
+          calc((100dvh - 96px - (var(--vel-home-row-gap) * 2)) / 3),
+          320px
+        );
         min-height: 0;
         flex: 1 1 auto;
         height: auto;
         display: flex;
+        flex-direction: column;
         align-items: center;
-        justify-content: center;
+        justify-content: flex-start;
+        gap: clamp(10px, 1.6vw, 18px);
         padding: clamp(8px, 1.5vw, 20px) clamp(10px, 2vw, 24px);
         overflow: hidden;
       }
 
       .vel-home-choice__inner {
         display: grid;
-        grid-template-columns: repeat(3, var(--vel-home-tile-size));
+        grid-template-columns: repeat(2, var(--vel-home-col-size));
+        grid-auto-rows: var(--vel-home-col-size);
         justify-content: center;
-        gap: var(--vel-home-gap);
-        width: 100%;
-        margin: 0 auto;
+        column-gap: var(--vel-home-gap);
+        row-gap: var(--vel-home-row-gap);
+        width: min(100%, calc((var(--vel-home-col-size) * 2) + var(--vel-home-gap)));
+        margin: auto auto;
       }
 
       .vel-home-choice__btn {
@@ -97,6 +106,12 @@
         box-shadow: 0 10px 24px rgba(0, 0, 0, 0.34), 0 0 22px var(--vel-home-glow), inset 0 1px rgba(255, 255, 255, 0.18);
         cursor: pointer;
         transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+      }
+
+      .vel-home-choice__btn--live {
+        grid-column: 1 / -1;
+        aspect-ratio: 2 / 1;
+        flex-direction: row;
       }
 
       .vel-home-choice__btn::before {
@@ -134,6 +149,21 @@
         --vel-tab-glow: rgba(192, 112, 34, 0.42);
       }
 
+      .vel-home-choice__btn--country {
+        --vel-tab-bg: linear-gradient(150deg, rgba(255, 255, 255, 0.13), rgba(34, 211, 238, 0.12)), #10131f;
+        --vel-tab-glow: rgba(255, 255, 255, 0.18);
+      }
+
+      .vel-home-choice__btn--adult {
+        --vel-tab-bg: linear-gradient(150deg, rgba(244, 63, 94, 0.34), rgba(168, 85, 247, 0.18)), #220711;
+        --vel-tab-glow: rgba(244, 63, 94, 0.34);
+      }
+
+      .vel-home-choice__btn--adult .vel-home-choice__icon {
+        width: min(54%, 156px);
+        max-width: 156px;
+      }
+
       .vel-home-choice__icon,
       .vel-home-choice__label {
         position: relative;
@@ -159,6 +189,14 @@
         filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.36));
       }
 
+      .vel-home-choice__icon img {
+        width: 78%;
+        height: 78%;
+        display: block;
+        object-fit: contain;
+        filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.36));
+      }
+
       .vel-home-choice__label {
         width: 100%;
         max-width: 92%;
@@ -172,6 +210,245 @@
         text-wrap: balance;
       }
 
+      .vel-home-choice__tools {
+        width: min(100%, calc((var(--vel-home-col-size) * 2) + var(--vel-home-gap)));
+        display: flex;
+        justify-content: center;
+        flex: 0 0 auto;
+        margin-top: 0;
+      }
+
+      .vel-home-choice__country,
+      .vel-home-choice__adult {
+        min-height: 0;
+      }
+
+      .vel-home-choice__country {
+        position: relative;
+        width: 100%;
+        min-height: clamp(54px, 7vh, 72px);
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        align-items: center;
+        padding: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 16px;
+        color: #fff;
+        background: linear-gradient(150deg, rgba(255, 255, 255, 0.14), rgba(34, 211, 238, 0.08)), rgba(8, 8, 20, 0.9);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32), inset 0 1px rgba(255, 255, 255, 0.14);
+      }
+
+      .vel-home-choice__country-icon,
+      .vel-home-choice__adult-icon {
+        display: none;
+      }
+
+      .vel-home-choice__country-icon svg {
+        width: 100%;
+        height: 100%;
+        fill: currentColor;
+      }
+
+      .vel-home-choice__country-select {
+        position: absolute;
+        inset: auto;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .vel-home-choice__country-banner-label {
+        position: relative;
+        z-index: 1;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: clamp(0.86rem, 1.45vw, 1.05rem);
+        font-weight: 950;
+        white-space: nowrap;
+      }
+
+      .vel-home-choice__country-banner-label svg {
+        width: 22px;
+        height: 22px;
+        fill: currentColor;
+      }
+
+      .vel-home-country-picker {
+        position: relative;
+        z-index: 4;
+      }
+
+      .vel-home-country-picker__trigger {
+        position: relative;
+        width: 100%;
+        min-height: clamp(44px, 5.8vh, 56px);
+        display: grid;
+        grid-template-columns: auto;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 12px;
+        padding: 0 14px;
+        color: #fff;
+        background: linear-gradient(150deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05)), rgba(0, 0, 0, 0.22);
+        box-shadow: inset 0 1px rgba(255, 255, 255, 0.14);
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .vel-home-country-picker__trigger.country-select-trigger {
+        justify-content: stretch;
+      }
+
+      .vel-home-country-picker__kicker {
+        position: relative;
+        z-index: 2;
+        justify-self: start;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 24px;
+        padding: 0 9px;
+        border-radius: 999px;
+        color: rgba(255, 255, 255, 0.86);
+        background: rgba(255, 255, 255, 0.1);
+        font-size: clamp(0.72rem, 1.2vw, 0.86rem);
+        font-weight: 950;
+        line-height: 1;
+        text-transform: uppercase;
+      }
+
+      .vel-home-country-picker__trigger .country-select-trigger__flag {
+        flex: 0 0 auto;
+        width: 28px;
+        height: 20px;
+        display: block;
+        border-radius: 4px;
+        object-fit: cover;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.24), 0 6px 14px rgba(0, 0, 0, 0.28);
+      }
+
+      .vel-home-country-picker__trigger .country-select-trigger__flag[hidden] {
+        display: none;
+      }
+
+      .vel-home-country-picker__value {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        text-align: center;
+        font-size: clamp(0.98rem, 1.7vw, 1.15rem);
+        font-weight: 950;
+      }
+
+      .vel-home-country-picker__selected {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1;
+        min-width: 0;
+        max-width: calc(100% - 150px);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        pointer-events: none;
+      }
+
+      .vel-home-country-picker__menu {
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 0;
+        right: 0;
+        z-index: 20;
+        max-height: min(42vh, 330px);
+        overflow: auto;
+        display: grid;
+        gap: 6px;
+        padding: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(17, 18, 32, 0.98), rgba(5, 6, 16, 0.98));
+        box-shadow: 0 18px 46px rgba(0, 0, 0, 0.55), inset 0 1px rgba(255, 255, 255, 0.12);
+      }
+
+      .vel-home-country-picker__menu[hidden] {
+        display: none;
+      }
+
+      .vel-home-country-picker__menu.velora-tv-select-menu {
+        position: absolute !important;
+        display: grid !important;
+        left: 0 !important;
+        top: calc(100% + 8px) !important;
+        bottom: auto !important;
+        right: 0 !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        max-height: min(42vh, 420px) !important;
+      }
+
+      .vel-home-country-picker__menu.velora-tv-select-menu[hidden] {
+        display: none !important;
+      }
+
+      .vel-home-country-picker__option {
+        min-height: 42px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        padding: 0 12px;
+        color: rgba(255, 255, 255, 0.86);
+        background: rgba(255, 255, 255, 0.04);
+        font: inherit;
+        font-size: 0.94rem;
+        font-weight: 850;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .vel-home-country-picker__option:hover,
+      .vel-home-country-picker__option:focus-visible {
+        color: #fff;
+        border-color: rgba(34, 211, 238, 0.34);
+        background: rgba(34, 211, 238, 0.12);
+        outline: none;
+      }
+
+      .vel-home-country-picker__option.is-selected {
+        color: #fff;
+        border-color: rgba(255, 255, 255, 0.24);
+        background: linear-gradient(150deg, rgba(34, 211, 238, 0.24), rgba(168, 85, 247, 0.14));
+        box-shadow: 0 0 18px rgba(34, 211, 238, 0.2);
+      }
+
+      .vel-home-country-picker__option.velora-tv-focus {
+        color: #fff;
+        border-color: rgba(255, 255, 255, 0.24);
+        background: linear-gradient(150deg, rgba(34, 211, 238, 0.24), rgba(168, 85, 247, 0.14));
+        box-shadow: 0 0 18px rgba(34, 211, 238, 0.2);
+      }
+
+      .vel-home-choice__country-select option {
+        color: #111827;
+      }
+
+      .vel-home-choice__adult {
+        font-size: clamp(1.2rem, 2.8vw, 2.7rem);
+      }
+
+      .vel-home-choice__adult img {
+        position: relative;
+        z-index: 1;
+        width: 94%;
+        height: 94%;
+        display: block;
+        object-fit: contain;
+      }
+
       body.vel-home-choice-picked .vel-home-choice {
         display: none;
       }
@@ -181,24 +458,20 @@
       }
 
       body:not(.vel-home-choice-picked) .vel-home-choice {
-        position: fixed;
-        top: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        left: 0 !important;
-        z-index: 2147483645;
-        height: auto;
-        flex: none;
-        background:
-          radial-gradient(circle at 50% 18%, rgba(168, 85, 247, 0.24), transparent 34%),
-          radial-gradient(circle at 76% 66%, rgba(34, 211, 238, 0.15), transparent 34%),
-          rgba(2, 2, 11, 0.96);
+        position: relative;
+        z-index: 2;
+        width: 100%;
+        flex: 1 1 auto;
+        height: 100%;
+        min-height: 0;
+        background: transparent;
       }
 
       body:not(.vel-home-choice-picked) .main--velora {
         height: 100dvh;
         min-height: 0;
         overflow: hidden;
+        background: transparent !important;
       }
 
       body:not(.vel-home-choice-picked) .main--velora .vel-dashboard,
@@ -206,11 +479,30 @@
         height: 100%;
         min-height: 0;
         overflow: hidden;
+        background: transparent !important;
+        border-color: transparent !important;
+        box-shadow: none !important;
       }
 
       body:not(.vel-home-choice-picked) .main--velora .vel-sticky-top {
         display: flex;
         flex-direction: column;
+      }
+
+      body:not(.vel-home-choice-picked) .main--velora .vel-header {
+        display: none !important;
+      }
+
+      body:not(.vel-home-choice-picked) .main--velora::before,
+      body:not(.vel-home-choice-picked) .main--velora::after,
+      body:not(.vel-home-choice-picked) .main--velora .vel-dashboard::before,
+      body:not(.vel-home-choice-picked) .main--velora .vel-dashboard::after,
+      body:not(.vel-home-choice-picked) .main--velora .vel-sticky-top::before,
+      body:not(.vel-home-choice-picked) .main--velora .vel-sticky-top::after {
+        display: none !important;
+        background: transparent !important;
+        border-color: transparent !important;
+        box-shadow: none !important;
       }
 
       body:not(.vel-home-choice-picked) .main--velora .vel-sidebar,
@@ -236,17 +528,14 @@
         }
 
         .vel-home-choice__inner {
-          height: 100%;
-          grid-template-columns: 1fr;
-          grid-template-rows: repeat(3, minmax(0, max-content));
-          align-content: center;
-          justify-items: center;
-          gap: 6px;
+          grid-template-columns: repeat(2, var(--vel-home-col-size));
+          grid-auto-rows: var(--vel-home-col-size);
+          column-gap: 6px;
+          row-gap: 12px;
         }
 
         .vel-home-choice__btn {
-          width: min(100%, calc((100dvh - var(--vel-promo-banner-h, 0px) - 24px) / 3));
-          aspect-ratio: 1 / 1;
+          width: 100%;
           min-height: 0;
           flex-direction: column;
           padding: clamp(10px, 6%, 16px);
@@ -263,6 +552,91 @@
         .vel-home-choice__icon {
           width: min(38%, 82px);
           max-width: 82px;
+        }
+
+        .vel-home-choice__btn--adult .vel-home-choice__icon {
+          width: min(52%, 104px);
+          max-width: 104px;
+        }
+
+        .vel-home-choice__tools {
+          width: min(100%, calc((var(--vel-home-col-size) * 2) + 6px));
+        }
+
+        .vel-home-choice__country,
+        .vel-home-choice__adult {
+          min-height: 42px;
+          border-radius: 12px;
+        }
+
+        .vel-home-choice__country {
+          min-height: 46px;
+          padding: 6px;
+        }
+
+        .vel-home-choice__country-icon,
+        .vel-home-choice__adult-icon {
+          width: 20px;
+          height: 20px;
+        }
+
+        .vel-home-choice__country-select {
+          width: 1px;
+          height: 1px;
+        }
+
+        .vel-home-choice__country-banner-label {
+          font-size: 0.78rem;
+          gap: 6px;
+        }
+
+        .vel-home-choice__country-banner-label svg {
+          width: 18px;
+          height: 18px;
+        }
+
+        .vel-home-country-picker__trigger {
+          min-height: 36px;
+          gap: 8px;
+          padding-inline: 10px;
+        }
+
+        .vel-home-country-picker__selected {
+          gap: 7px;
+          max-width: calc(100% - 118px);
+        }
+
+        .vel-home-country-picker__kicker {
+          min-height: 21px;
+          padding: 0 7px;
+          font-size: 0.68rem;
+        }
+
+        .vel-home-country-picker__trigger .country-select-trigger__flag {
+          width: 24px;
+          height: 17px;
+        }
+
+        .vel-home-country-picker__value {
+          font-size: 0.86rem;
+        }
+
+        .vel-home-country-picker__menu {
+          max-height: min(38vh, 260px);
+        }
+
+        .vel-home-country-picker__option {
+          min-height: 38px;
+          font-size: 0.84rem;
+        }
+
+        .vel-home-choice__adult {
+          font-size: 1rem;
+        }
+
+        .vel-home-choice__adult img {
+          width: 78%;
+          height: 78%;
         }
       }
 
@@ -401,16 +775,6 @@
         opacity: 1 !important;
         display: block !important;
         visibility: visible !important;
-      }
-      body:not(.vel-promo-cta-unlocked) #vel-promo-offer-open,
-      #vel-promo-offer-open[hidden] {
-        display: none !important;
-        visibility: hidden !important;
-        pointer-events: none !important;
-      }
-      body.vel-promo-cta-unlocked #vel-promo-offer-open {
-        visibility: visible;
-        pointer-events: auto;
       }
       body.velora-tv-start-blocked {
         overflow: hidden !important;
@@ -656,6 +1020,101 @@
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css">
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css">
     <style>
+      body:not(.vel-home-choice-picked) .main--velora .vel-futuristic-bg {
+        display: block !important;
+        opacity: 0.92 !important;
+        visibility: visible !important;
+      }
+
+      body:not(.vel-home-choice-picked) .main--velora {
+        background-color: var(--vel-bg, #06050a) !important;
+      }
+
+      .main--velora .vel-header__country,
+      .main--velora #btn-adult-portal {
+        display: none !important;
+      }
+
+      .main--velora .vel-header-home-btn {
+        min-height: 2.75rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.58rem;
+        padding: 0 1.05rem;
+        border: 1px solid color-mix(in srgb, var(--vel-primary, #8a2be2) 64%, rgba(255, 255, 255, 0.26));
+        border-radius: 8px;
+        color: #fff;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04)),
+          rgba(12, 8, 26, 0.86);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.18),
+          inset 0 -13px 24px rgba(126, 60, 255, 0.14),
+          0 0 0 1px rgba(168, 85, 247, 0.2),
+          0 10px 24px rgba(0, 0, 0, 0.42),
+          0 0 26px rgba(168, 85, 247, 0.32);
+        font: inherit;
+        font-size: 0.95rem;
+        font-weight: 900;
+        letter-spacing: 0;
+        line-height: 1;
+        cursor: pointer;
+        transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+      }
+
+      .main--velora .vel-header-home-btn__icon {
+        width: 1.18rem;
+        height: 1.18rem;
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+      }
+
+      .main--velora .vel-header-home-btn__icon svg {
+        width: 100%;
+        height: 100%;
+        fill: currentColor;
+      }
+
+      .main--velora .vel-header-home-btn:hover,
+      .main--velora .vel-header-home-btn:focus-visible {
+        transform: translateY(-1px);
+        border-color: color-mix(in srgb, var(--vel-primary, #8a2be2) 82%, #fff);
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.06)),
+          rgba(18, 11, 40, 0.92);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.24),
+          inset 0 -13px 24px rgba(126, 60, 255, 0.18),
+          0 0 0 1px rgba(168, 85, 247, 0.28),
+          0 12px 28px rgba(0, 0, 0, 0.46),
+          0 0 32px rgba(168, 85, 247, 0.42);
+        outline: none;
+      }
+
+      .main--velora .vel-header-home-btn:active {
+        transform: translateY(0);
+      }
+
+      body:not(.vel-home-choice-picked) .main--velora .vel-header-home-btn {
+        display: none !important;
+      }
+
+      @media (max-width: 430px) {
+        .main--velora .vel-header-home-btn {
+          min-height: 2.45rem;
+          gap: 0.42rem;
+          padding: 0 0.78rem;
+          font-size: 0.86rem;
+        }
+
+        .main--velora .vel-header-home-btn__icon {
+          width: 1.05rem;
+          height: 1.05rem;
+        }
+      }
+
       .player-container:fullscreen,
       .video-wrapper:fullscreen,
       #video:fullscreen,
@@ -2143,6 +2602,37 @@
         position: relative !important;
       }
 
+      #vel-world-cup-entry.vel-package-card {
+        grid-column: auto !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        aspect-ratio: 1 / 1 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border-radius: inherit !important;
+        display: flex !important;
+        align-self: stretch !important;
+        justify-self: stretch !important;
+        line-height: normal !important;
+        animation: none !important;
+      }
+
+      #vel-world-cup-entry.vel-package-card::before,
+      #vel-world-cup-entry.vel-package-card::after {
+        display: none !important;
+      }
+
+      #vel-world-cup-entry.vel-package-card .vel-world-cup-entry__image {
+        width: 100% !important;
+        min-width: 0 !important;
+        height: 100% !important;
+        max-width: none !important;
+        max-height: none !important;
+        object-fit: cover !important;
+        border-radius: inherit !important;
+      }
+
       @keyframes velWorldCupNeonPulse {
         0%, 100% {
           filter: brightness(1);
@@ -2648,91 +3138,6 @@
     </div>
 
     <div class="app">
-      <div class="vel-promo-banner" role="region" aria-label="Offre promotionnelle VeloraVIP">
-        <div class="vel-promo-banner__inner">
-          <div class="vel-promo-banner__left">
-            <div class="vel-promo-banner__headline">
-              <span class="vel-promo-banner__bolt" aria-hidden="true">⚡</span>
-              <span class="vel-promo-banner__discount">-60%</span>
-              <span class="vel-promo-banner__today">Aujourd'hui</span>
-              <span class="vel-promo-banner__today-extra">seulement</span>
-            </div>
-            <p class="vel-promo-banner__text">Acc&egrave;s illimit&eacute; cha&icirc;nes, films et s&eacute;ries</p>
-          </div>
-
-          <div class="vel-promo-banner__countdown" aria-label="Temps d'essai restant">
-            <span class="vel-promo-banner__countdown-text">Expire dans</span>
-            <span class="vel-promo-banner__time">
-              <span class="vel-promo-banner__num" id="vel-promo-minutes">10</span><span class="vel-promo-banner__separator">:</span><span class="vel-promo-banner__num" id="vel-promo-seconds">00</span>
-            </span>
-          </div>
-
-          <button type="button" class="vel-promo-banner__cta" id="vel-promo-offer-open" hidden aria-hidden="true">
-            <span>J&rsquo;en profite</span>
-          </button>
-        </div>
-      </div>
-      <script>
-        (function () {
-          var REQUIRED_WATCH_SECONDS = 120;
-          var DEFAULT_TRIAL_LIMIT_SECONDS = 600;
-          var maxRemainingSeen = DEFAULT_TRIAL_LIMIT_SECONDS;
-
-          function numberFromText(id) {
-            var el = document.getElementById(id);
-            var value = el ? Number(String(el.textContent || "").trim()) : NaN;
-            return Number.isFinite(value) ? value : null;
-          }
-
-          function readRemainingSeconds() {
-            var minutes = numberFromText("vel-promo-minutes");
-            var seconds = numberFromText("vel-promo-seconds");
-            if (minutes === null || seconds === null) return null;
-            return Math.max(0, minutes * 60 + seconds);
-          }
-
-          function setPromoCtaUnlocked(unlocked) {
-            var button = document.getElementById("vel-promo-offer-open");
-            document.body.classList.toggle("vel-promo-cta-unlocked", unlocked);
-            if (!button) return;
-            button.hidden = !unlocked;
-            button.setAttribute("aria-hidden", unlocked ? "false" : "true");
-            if (unlocked) {
-              button.removeAttribute("tabindex");
-            } else {
-              button.setAttribute("tabindex", "-1");
-            }
-          }
-
-          function syncPromoCtaVisibility() {
-            var remaining = readRemainingSeconds();
-            if (remaining === null) {
-              setPromoCtaUnlocked(false);
-              return;
-            }
-            maxRemainingSeen = Math.max(maxRemainingSeen, remaining);
-            setPromoCtaUnlocked(maxRemainingSeen - remaining >= REQUIRED_WATCH_SECONDS);
-          }
-
-          function startPromoCtaGate() {
-            syncPromoCtaVisibility();
-            var minutes = document.getElementById("vel-promo-minutes");
-            var seconds = document.getElementById("vel-promo-seconds");
-            if (window.MutationObserver && (minutes || seconds)) {
-              var observer = new MutationObserver(syncPromoCtaVisibility);
-              if (minutes) observer.observe(minutes, { childList: true, characterData: true, subtree: true });
-              if (seconds) observer.observe(seconds, { childList: true, characterData: true, subtree: true });
-            }
-            window.setInterval(syncPromoCtaVisibility, 1000);
-          }
-
-          if (document.readyState === "loading") {
-            document.addEventListener("DOMContentLoaded", startPromoCtaGate, { once: true });
-          } else {
-            startPromoCtaGate();
-          }
-        })();
-      </script>
       <header class="header header--login-only">
         <h1>Xtream Codes Player</h1>
         <p class="sub">Connexion Nodecast — proxy API et flux (CORS).</p>
@@ -2802,6 +3207,20 @@
               </button>
               <button
                 type="button"
+                id="btn-header-home"
+                class="vel-header-home-btn"
+                title="Accueil"
+                aria-label="Retour a l'accueil"
+              >
+                <span class="vel-header-home-btn__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M3 10.5 12 3l9 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-5v-6h-5v6h-5A1.5 1.5 0 0 1 3 19.5v-9Z"></path>
+                  </svg>
+                </span>
+                <span>Accueil</span>
+              </button>
+              <button
+                type="button"
                 id="btn-settings"
                 class="vel-settings-btn hidden"
                 title="Paramètres (admin)"
@@ -2825,6 +3244,29 @@
           </header>
 
           <section id="vel-home-choice" class="vel-home-choice" aria-label="Accueil">
+            <div class="vel-home-choice__tools" aria-label="Choisir le pays">
+              <div class="vel-home-choice__country">
+                <div class="vel-home-country-picker">
+                  <button
+                    type="button"
+                    id="home-country-trigger"
+                    class="vel-home-country-picker__trigger country-select country-select-trigger"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                    aria-controls="home-country-menu"
+                    data-tv-focusable="true"
+                  >
+                    <span class="vel-home-country-picker__kicker">Pays :</span>
+                    <span class="vel-home-country-picker__selected">
+                      <img id="home-country-flag" class="country-select-trigger__flag" alt="" decoding="async" loading="eager" hidden />
+                      <span id="home-country-value" class="vel-home-country-picker__value country-select-trigger__text">Choisir</span>
+                    </span>
+                  </button>
+                  <div id="home-country-menu" class="vel-home-country-picker__menu velora-tv-select-menu velora-country-select-menu" role="listbox" aria-label="Pays" hidden></div>
+                </div>
+                <select id="home-country-select" class="vel-home-choice__country-select" aria-label="Choisir un pays"></select>
+              </div>
+            </div>
             <div class="vel-home-choice__inner">
               <button type="button" class="vel-home-choice__btn vel-home-choice__btn--live" data-home-tab="live">
                 <span class="vel-home-choice__icon" aria-hidden="true">
@@ -2851,6 +3293,12 @@
                   </svg>
                 </span>
                 <span class="vel-home-choice__label">SÉRIES</span>
+              </button>
+              <button type="button" id="home-adult-btn" class="vel-home-choice__btn vel-home-choice__btn--adult vel-home-choice__adult" aria-label="Contenu adulte +18">
+                <span class="vel-home-choice__icon" aria-hidden="true">
+                  <img src="/logos/adult-18.svg" alt="" />
+                </span>
+                <span class="vel-home-choice__label">ADULT</span>
               </button>
             </div>
           </section>
@@ -3501,10 +3949,258 @@
           var home = document.getElementById("vel-home-choice");
           if (!home || home.dataset.ready === "true") return;
           home.dataset.ready = "true";
-          if (document.body && home.parentElement !== document.body) {
-            document.body.appendChild(home);
-          }
           var homeChoiceRunId = 0;
+          var homeCountrySelect = document.getElementById("home-country-select");
+          var mainCountrySelect = document.getElementById("country-select");
+          var homeCountryTrigger = document.getElementById("home-country-trigger");
+          var homeCountryValue = document.getElementById("home-country-value");
+          var homeCountryFlag = document.getElementById("home-country-flag");
+          var homeCountryMenu = document.getElementById("home-country-menu");
+          var homeAdultBtn = document.getElementById("home-adult-btn");
+
+          function homeCountryKey(value) {
+            try {
+              return String(value || "")
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "_")
+                .replace(/^_+|_+$/g, "");
+            } catch (error) {
+              return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+            }
+          }
+
+          function homeCountryFlagUrl(name) {
+            var code = {
+              afghanistan: "af",
+              albanie: "al",
+              algerie: "dz",
+              allemagne: "de",
+              arabie_saoudite: "sa",
+              argentine: "ar",
+              armenie: "am",
+              australie: "au",
+              autriche: "at",
+              azerbaidjan: "az",
+              bahrein: "bh",
+              belgique: "be",
+              bielorussie: "by",
+              bolivie: "bo",
+              bosnie: "ba",
+              bresil: "br",
+              bulgarie: "bg",
+              cameroun: "cm",
+              canada: "ca",
+              chili: "cl",
+              chine: "cn",
+              chypre: "cy",
+              colombie: "co",
+              coree_du_sud: "kr",
+              costa_rica: "cr",
+              croatie: "hr",
+              danemark: "dk",
+              egypte: "eg",
+              emirats_arabes_unis: "ae",
+              equateur: "ec",
+              espagne: "es",
+              etats_unis: "us",
+              france: "fr",
+              georgie: "ge",
+              ghana: "gh",
+              grece: "gr",
+              guatemala: "gt",
+              honduras: "hn",
+              hong_kong: "hk",
+              hongrie: "hu",
+              inde: "in",
+              indonesie: "id",
+              irak: "iq",
+              iran: "ir",
+              irlande: "ie",
+              islande: "is",
+              israel: "il",
+              italie: "it",
+              japon: "jp",
+              jordanie: "jo",
+              kazakhstan: "kz",
+              koweit: "kw",
+              laos: "la",
+              lettonie: "lv",
+              liban: "lb",
+              libye: "ly",
+              lituanie: "lt",
+              malaisie: "my",
+              mali: "ml",
+              malte: "mt",
+              maroc: "ma",
+              maurice: "mu",
+              mauritanie: "mr",
+              mexique: "mx",
+              monaco: "mc",
+              montenegro: "me",
+              namibie: "na",
+              nepal: "np",
+              nicaragua: "ni",
+              nigeria: "ng",
+              norvege: "no",
+              nouvelle_zelande: "nz",
+              oman: "om",
+              ouzbekistan: "uz",
+              pakistan: "pk",
+              palestine: "ps",
+              panama: "pa",
+              paraguay: "py",
+              pays_bas: "nl",
+              perou: "pe",
+              philippines: "ph",
+              pologne: "pl",
+              portugal: "pt",
+              qatar: "qa",
+              republique_dominicaine: "do",
+              republique_tcheque: "cz",
+              roumanie: "ro",
+              royaume_uni: "gb",
+              russie: "ru",
+              senegal: "sn",
+              serbie: "rs",
+              slovenie: "si",
+              somalie: "so",
+              soudan: "sd",
+              sri_lanka: "lk",
+              suede: "se",
+              suisse: "ch",
+              suriname: "sr",
+              syrie: "sy",
+              thailande: "th",
+              tunisie: "tn",
+              turquie: "tr",
+              ukraine: "ua",
+              uruguay: "uy",
+              venezuela: "ve",
+              vietnam: "vn",
+              yemen: "ye",
+              usa: "us"
+            }[homeCountryKey(name)];
+            return code ? "https://flagcdn.com/w40/" + code + ".png" : "";
+          }
+
+          function syncHomeCountryOptions() {
+            if (!homeCountrySelect || !mainCountrySelect) return;
+            if (homeCountrySelect.dataset.syncing === "true") return;
+            var signature = Array.prototype.map
+              .call(mainCountrySelect.options, function (option) {
+                return option.value + "\u001f" + option.textContent;
+              })
+              .join("\u001e");
+            if (homeCountrySelect.dataset.signature !== signature) {
+              homeCountrySelect.innerHTML = "";
+              Array.prototype.forEach.call(mainCountrySelect.options, function (option) {
+                homeCountrySelect.appendChild(option.cloneNode(true));
+              });
+              homeCountrySelect.dataset.signature = signature;
+            }
+            homeCountrySelect.value = mainCountrySelect.value;
+            renderHomeCountryMenu();
+          }
+
+          function currentHomeCountryText() {
+            if (!homeCountrySelect) return "Choisir";
+            var option = homeCountrySelect.options[homeCountrySelect.selectedIndex];
+            return option ? option.textContent.trim() || "Choisir" : "Choisir";
+          }
+
+          function setHomeCountryMenuOpen(open) {
+            if (!homeCountryMenu || !homeCountryTrigger) return;
+            homeCountryMenu.hidden = !open;
+            homeCountryTrigger.setAttribute("aria-expanded", open ? "true" : "false");
+            if (open) {
+              var selected = homeCountryMenu.querySelector(".velora-tv-focus, .is-selected");
+              if (selected) selected.scrollIntoView({ block: "nearest" });
+            }
+          }
+
+          function applyHomeCountry(value) {
+            if (!homeCountrySelect || !mainCountrySelect) return;
+            homeCountrySelect.dataset.syncing = "true";
+            homeCountrySelect.value = value;
+            mainCountrySelect.value = value;
+            mainCountrySelect.dispatchEvent(new Event("change", { bubbles: true }));
+            homeCountrySelect.dataset.syncing = "false";
+            setHomeCountryMenuOpen(false);
+            window.setTimeout(syncHomeCountryOptions, 80);
+          }
+
+          function renderHomeCountryMenu() {
+            if (!homeCountryMenu || !homeCountrySelect || !homeCountryValue) return;
+            var selectedText = currentHomeCountryText();
+            var selectedFlag = homeCountryFlagUrl(selectedText);
+            homeCountryValue.textContent = selectedText;
+            if (homeCountryFlag) {
+              if (selectedFlag) {
+                homeCountryFlag.src = selectedFlag;
+                homeCountryFlag.hidden = false;
+              } else {
+                homeCountryFlag.removeAttribute("src");
+                homeCountryFlag.hidden = true;
+              }
+            }
+            homeCountryMenu.innerHTML = "";
+            Array.prototype.forEach.call(homeCountrySelect.options, function (option) {
+              var item = document.createElement("button");
+              item.type = "button";
+              item.className = "vel-home-country-picker__option velora-tv-select-option";
+              item.dataset.tvFocusable = "true";
+              item.tabIndex = 0;
+              item.setAttribute("role", "option");
+              item.setAttribute("aria-selected", option.selected ? "true" : "false");
+              item.classList.toggle("is-selected", option.selected);
+              item.classList.toggle("velora-tv-focus", option.selected);
+              item.dataset.value = option.value;
+              item.textContent = option.textContent;
+              item.addEventListener("click", function () {
+                applyHomeCountry(option.value);
+              });
+              homeCountryMenu.appendChild(item);
+            });
+          }
+
+          if (homeCountrySelect && mainCountrySelect) {
+            syncHomeCountryOptions();
+            if (homeCountryTrigger) {
+              homeCountryTrigger.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                var shouldOpen = !homeCountryMenu || homeCountryMenu.hidden;
+                syncHomeCountryOptions();
+                setHomeCountryMenuOpen(shouldOpen);
+              });
+            }
+            document.addEventListener("click", function (event) {
+              if (!homeCountryMenu || homeCountryMenu.hidden) return;
+              if (event.target && event.target.closest(".vel-home-country-picker")) return;
+              setHomeCountryMenuOpen(false);
+            });
+            document.addEventListener("keydown", function (event) {
+              if (event.key === "Escape") setHomeCountryMenuOpen(false);
+            });
+            mainCountrySelect.addEventListener("change", syncHomeCountryOptions);
+            new MutationObserver(syncHomeCountryOptions).observe(mainCountrySelect, {
+              childList: true,
+              subtree: true
+            });
+          }
+
+          if (homeAdultBtn) {
+            homeAdultBtn.addEventListener("click", function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              homeChoiceRunId += 1;
+              document.body.classList.add("vel-home-choice-picked");
+              var adultButton = document.getElementById("btn-adult-portal");
+              if (adultButton) adultButton.click();
+            });
+          }
 
           home.addEventListener("click", function (event) {
             var button = event.target.closest("[data-home-tab]");
@@ -3574,6 +4270,23 @@
                 showHomeChoice(event);
               }
             }, true);
+
+            var headerHome = document.getElementById("btn-header-home");
+            if (headerHome) {
+              headerHome.addEventListener("pointerdown", showHomeChoice, true);
+              headerHome.addEventListener("touchend", showHomeChoice, true);
+              headerHome.addEventListener("click", showHomeChoice, true);
+              headerHome.addEventListener("keydown", function (event) {
+                if (
+                  event.key === "Enter" ||
+                  event.key === "NumpadEnter" ||
+                  event.key === " " ||
+                  event.key === "Spacebar"
+                ) {
+                  showHomeChoice(event);
+                }
+              }, true);
+            }
           }
         }
 
@@ -4211,18 +4924,8 @@
         }
 
         function trialInfo() {
-          var remaining;
-          var minEl = document.getElementById("vel-promo-minutes");
-          var secEl = document.getElementById("vel-promo-seconds");
-          if (minEl && secEl) {
-            var m = Number(minEl.textContent || 0);
-            var s = Number(secEl.textContent || 0);
-            if (Number.isFinite(m) && Number.isFinite(s)) remaining = Math.max(0, m * 60 + s);
-          }
-          if (remaining === undefined) {
-            var timer = document.querySelector(".trial-countdown__time, .trial-timer-root__count");
-            remaining = timer ? parseTimeText(timer.textContent) : undefined;
-          }
+          var timer = document.querySelector(".trial-countdown__time, .trial-timer-root__count");
+          var remaining = timer ? parseTimeText(timer.textContent) : undefined;
           var limit = 600;
           var used = remaining === undefined ? undefined : Math.max(0, limit - remaining);
           return {
@@ -4395,13 +5098,7 @@
           if (!target || !target.closest) return;
           if (handoffClickToExternalBrowser(target, event)) return;
           if (shouldSkipTracking(target)) return;
-
-          if (target.closest("#vel-promo-offer-open")) {
-            send("promo_banner_cta_click", { cta: "j_en_profite" });
-            return;
-          }
-
-          if (target.closest(".trial-offer-button")) {
+if (target.closest(".trial-offer-button")) {
             send("trial_offer_cta_click", { cta: "obtenir_ma_promo" });
             return;
           }

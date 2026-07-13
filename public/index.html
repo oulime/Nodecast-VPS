@@ -53,6 +53,64 @@
         }
       })();
     </script>
+    <script>
+      (function () {
+        function homeHasRealCountries(select) {
+          return !!(
+            select &&
+            select.options &&
+            Array.prototype.some.call(select.options, function (option) {
+              return !option.disabled && !!String(option.value || "").trim();
+            })
+          );
+        }
+
+        function unlockHomeChoiceIfReady() {
+          var select = document.getElementById("country-select");
+          if (!homeHasRealCountries(select)) return false;
+          document.body.classList.remove("vel-home-choice-loading");
+          document.body.classList.remove("vel-home-choice-catalog-pending");
+          try {
+            document.dispatchEvent(new CustomEvent("velora-countries-ready", {
+              detail: { count: select.options.length, source: "early-dom-watchdog" }
+            }));
+          } catch (error) {
+            /* CustomEvent may be unavailable in very old browsers. */
+          }
+          return true;
+        }
+
+        function startHomeChoiceUnlockWatchdog() {
+          if (!document.body || !document.body.classList.contains("vite-autoconnect")) return;
+          if (unlockHomeChoiceIfReady()) return;
+
+          var select = document.getElementById("country-select");
+          var observer = null;
+          var deadline = Date.now() + 60000;
+
+          function check() {
+            if (unlockHomeChoiceIfReady() || Date.now() > deadline) {
+              if (observer) observer.disconnect();
+              window.clearInterval(timer);
+            }
+          }
+
+          if (select) {
+            observer = new MutationObserver(check);
+            observer.observe(select, { childList: true, subtree: true });
+          }
+
+          var timer = window.setInterval(check, 250);
+          check();
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", startHomeChoiceUnlockWatchdog, { once: true });
+        } else {
+          startHomeChoiceUnlockWatchdog();
+        }
+      })();
+    </script>
     <style>
       .vel-home-choice {
         --vel-home-gap: clamp(8px, 1.3vw, 18px);
@@ -515,6 +573,12 @@
         display: none !important;
       }
 
+      body:not(.vel-home-choice-picked) .vel-promo-banner {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+
       body:not(.vel-home-choice-picked):not(.vel-home-choice-loading) #catalog-loading-overlay,
       body:not(.vel-home-choice-picked) #trial-countdown-root {
         display: none !important;
@@ -522,8 +586,21 @@
         pointer-events: none !important;
       }
 
+      #trial-timer-root.hidden,
+      #trial-countdown-root.trial-countdown--hidden {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+
       body.vel-home-choice-loading:not(.vel-home-choice-picked) .vel-home-choice {
         display: none !important;
+      }
+
+      body.vel-home-choice-loading:not(.vel-home-choice-picked) #catalog-loading-overlay {
+        display: flex !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
       }
 
       @media (max-width: 760px) {
@@ -1179,7 +1256,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=package-card-open-rewrite-20260611"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=global-country-search-clean-results-20260713"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css">
@@ -1207,8 +1284,25 @@
       .main--velora .vel-brand {
         grid-column: 2;
         justify-self: center;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.48rem;
         text-align: center;
         white-space: nowrap;
+      }
+
+      .main--velora .vel-brand__country-flag {
+        flex: 0 0 auto;
+        width: 1.9rem;
+        height: 1.28rem;
+        border-radius: 3px;
+        object-fit: cover;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.26), 0 3px 10px rgba(0, 0, 0, 0.42);
+      }
+
+      .main--velora .vel-brand__country-flag[hidden] {
+        display: none;
       }
 
       .main--velora .vel-header__left {
@@ -1222,6 +1316,9 @@
       .main--velora .vel-header__right {
         grid-column: 3;
         justify-self: end;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
       }
 
       .main--velora .vel-header-back-btn {
@@ -1394,6 +1491,319 @@
         display: none !important;
       }
 
+      .vel-global-search {
+        --vel-global-search-pad-top: max(1rem, env(safe-area-inset-top));
+        --vel-global-search-pad-bottom: max(1rem, env(safe-area-inset-bottom));
+        --vel-global-search-offset: clamp(0.35rem, 4vh, 2rem);
+        position: fixed;
+        inset: 0;
+        z-index: 2600;
+        box-sizing: border-box;
+        display: grid;
+        place-items: start center;
+        padding: var(--vel-global-search-pad-top) max(0.9rem, env(safe-area-inset-right)) var(--vel-global-search-pad-bottom) max(0.9rem, env(safe-area-inset-left));
+        background: rgba(3, 3, 12, 0.72);
+        backdrop-filter: blur(14px);
+        overflow: hidden;
+      }
+
+      .vel-global-search.hidden {
+        display: none;
+      }
+
+      .vel-global-search__panel {
+        width: min(720px, 100%);
+        height: min(760px, calc(100dvh - var(--vel-global-search-pad-top) - var(--vel-global-search-pad-bottom) - var(--vel-global-search-offset)));
+        max-height: calc(100dvh - var(--vel-global-search-pad-top) - var(--vel-global-search-pad-bottom) - var(--vel-global-search-offset));
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr);
+        margin-top: var(--vel-global-search-offset);
+        border: 1px solid color-mix(in srgb, var(--vel-primary, #8a2be2) 48%, rgba(255, 255, 255, 0.18));
+        border-radius: 8px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.035)),
+          color-mix(in srgb, var(--vel-surface, #111322) 84%, #05040b);
+        box-shadow: 0 22px 56px rgba(0, 0, 0, 0.58), 0 0 34px color-mix(in srgb, var(--vel-accent-glow, rgba(138, 43, 226, 0.32)) 46%, transparent);
+        overflow: hidden;
+      }
+
+      .vel-global-search__bar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 2.55rem;
+        gap: 0.65rem;
+        align-items: center;
+        padding: 0.82rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      }
+
+      .vel-global-search__input {
+        width: 100%;
+        min-height: 2.75rem;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 8px;
+        padding: 0 0.95rem;
+        color: #fff;
+        background: rgba(4, 4, 12, 0.64);
+        font: inherit;
+        font-size: 1rem;
+        letter-spacing: 0;
+        outline: none;
+      }
+
+      .vel-global-search__input:focus {
+        border-color: color-mix(in srgb, var(--vel-primary, #8a2be2) 78%, #fff);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--vel-primary, #8a2be2) 22%, transparent);
+      }
+
+      .vel-global-search__close {
+        width: 2.35rem;
+        height: 2.35rem;
+        padding: 0;
+        appearance: none;
+        display: inline-grid;
+        place-items: center;
+        border: 0;
+        border-radius: 999px;
+        color: #fff;
+        background: transparent;
+        cursor: pointer;
+      }
+
+      .vel-global-search__close:hover,
+      .vel-global-search__close:focus-visible {
+        background: rgba(255, 255, 255, 0.12);
+        outline: none;
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--vel-primary, #8a2be2) 42%, transparent);
+      }
+
+      .vel-global-search__close svg {
+        width: 1.08rem;
+        height: 1.08rem;
+        fill: currentColor;
+      }
+
+      .vel-global-search__status {
+        min-height: 2.35rem;
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0 0.95rem;
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 0.86rem;
+        font-weight: 800;
+      }
+
+      .vel-global-search__status.is-loading::before {
+        content: "";
+        width: 1rem;
+        height: 1rem;
+        flex: 0 0 auto;
+        border: 2px solid rgba(255, 255, 255, 0.24);
+        border-top-color: color-mix(in srgb, var(--vel-primary, #8a2be2) 74%, #fff);
+        border-radius: 999px;
+        animation: vel-global-search-spin 0.72s linear infinite;
+      }
+
+      @keyframes vel-global-search-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .vel-global-search__results {
+        display: grid;
+        align-content: start;
+        grid-auto-rows: 4.65rem;
+        gap: 0.48rem;
+        padding: 0 0.82rem max(1rem, env(safe-area-inset-bottom));
+        overflow: auto;
+        overscroll-behavior: contain;
+        scroll-padding-bottom: max(1rem, env(safe-area-inset-bottom));
+      }
+
+      .vel-global-search__result {
+        width: 100%;
+        height: 4.65rem;
+        min-height: 0;
+        box-sizing: border-box;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        column-gap: 0.72rem;
+        align-items: center;
+        padding: 0.68rem 0.78rem;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        color: #fff;
+        background: rgba(255, 255, 255, 0.055);
+        text-align: left;
+        cursor: pointer;
+        overflow: hidden;
+      }
+
+      .vel-global-search__result:hover,
+      .vel-global-search__result:focus-visible {
+        border-color: color-mix(in srgb, var(--vel-primary, #8a2be2) 68%, rgba(255, 255, 255, 0.3));
+        background: rgba(255, 255, 255, 0.09);
+        outline: none;
+      }
+
+      .vel-global-search__thumb {
+        width: 3.15rem;
+        height: 3.15rem;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 8px;
+        background:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.035)),
+          color-mix(in srgb, var(--vel-primary, #8a2be2) 26%, rgba(5, 5, 14, 0.88));
+        box-shadow: inset 0 1px rgba(255, 255, 255, 0.16);
+      }
+
+      .vel-global-search__thumb::before {
+        content: "";
+        width: 1.15rem;
+        height: 1.15rem;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.72);
+        box-shadow: 0.48rem 0.48rem 0 -0.34rem rgba(255, 255, 255, 0.72);
+        transform: rotate(-18deg);
+      }
+
+      .vel-global-search__thumb img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: cover;
+      }
+
+      .vel-global-search__thumb:has(img)::before {
+        content: none;
+      }
+
+      .vel-global-search__title {
+        min-width: 0;
+        display: block;
+        overflow: hidden;
+        color: #fff;
+        font-size: 0.98rem;
+        font-weight: 900;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .vel-global-search__meta {
+        min-width: 0;
+        display: block;
+        margin-top: 0.18rem;
+        overflow: hidden;
+        color: rgba(255, 255, 255, 0.66);
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .vel-global-search__empty {
+        min-height: 4rem;
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+        color: rgba(255, 255, 255, 0.68);
+        font-size: 0.9rem;
+        font-weight: 800;
+        text-align: center;
+      }
+
+      @media (max-width: 640px), (max-height: 700px) {
+        .vel-global-search {
+          --vel-global-search-pad-top: max(0.55rem, env(safe-area-inset-top));
+          --vel-global-search-pad-bottom: max(0.55rem, env(safe-area-inset-bottom));
+          --vel-global-search-offset: 0rem;
+        }
+
+        .vel-global-search__panel {
+          height: calc(100dvh - var(--vel-global-search-pad-top) - var(--vel-global-search-pad-bottom));
+          max-height: calc(100dvh - var(--vel-global-search-pad-top) - var(--vel-global-search-pad-bottom));
+          margin-top: 0;
+        }
+
+        .vel-global-search__bar {
+          padding: 0.62rem;
+        }
+
+        .vel-global-search__status {
+          min-height: 2rem;
+          padding-inline: 0.78rem;
+        }
+
+        .vel-global-search__results {
+          padding: 0 0.62rem max(1.15rem, env(safe-area-inset-bottom));
+          scroll-padding-bottom: max(1.15rem, env(safe-area-inset-bottom));
+        }
+      }
+
+      .vel-scroll-top-btn {
+        position: fixed;
+        right: max(14px, env(safe-area-inset-right));
+        bottom: max(18px, env(safe-area-inset-bottom));
+        z-index: 1500;
+        width: 3rem;
+        height: 3rem;
+        min-width: 3rem;
+        min-height: 3rem;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: 1px solid color-mix(in srgb, var(--vel-primary, #8a2be2) 62%, rgba(255, 255, 255, 0.24));
+        border-radius: 999px;
+        color: #fff;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.06)),
+          color-mix(in srgb, var(--vel-surface, #111322) 78%, rgba(7, 6, 14, 0.92));
+        box-shadow:
+          0 12px 28px rgba(0, 0, 0, 0.46),
+          0 0 22px color-mix(in srgb, var(--vel-accent-glow, rgba(138, 43, 226, 0.3)) 52%, transparent),
+          inset 0 1px rgba(255, 255, 255, 0.22);
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(10px) scale(0.94);
+        transition: opacity 160ms ease, transform 160ms ease, border-color 160ms ease;
+      }
+
+      .vel-scroll-top-btn svg {
+        width: 1.35rem;
+        height: 1.35rem;
+        fill: currentColor;
+      }
+
+      .vel-scroll-top-btn.is-visible {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0) scale(1);
+      }
+
+      .vel-scroll-top-btn:hover,
+      .vel-scroll-top-btn:focus-visible {
+        border-color: color-mix(in srgb, var(--vel-primary, #8a2be2) 78%, #fff);
+        outline: none;
+        transform: translateY(-1px) scale(1.02);
+      }
+
+      @media (max-width: 760px) {
+        body.vel-home-choice-picked .vel-scroll-top-btn {
+          display: inline-flex;
+        }
+      }
+
+      @media (min-width: 761px) {
+        .vel-scroll-top-btn {
+          display: none !important;
+        }
+      }
+
       @media (max-width: 430px) {
         .main--velora .vel-header {
           grid-template-columns: 2.45rem minmax(0, auto) 2.45rem;
@@ -1402,6 +1812,12 @@
 
         .main--velora .vel-brand {
           font-size: clamp(1.28rem, 7vw, 1.55rem) !important;
+          gap: 0.36rem;
+        }
+
+        .main--velora .vel-brand__country-flag {
+          width: 1.55rem;
+          height: 1.04rem;
         }
 
         .main--velora .vel-header-back-btn {
@@ -2994,9 +3410,23 @@
         content: none !important;
         display: none !important;
       }
+
+      body:not(.vel-home-choice-loading) #catalog-loading-overlay,
+      body:not(.vel-home-choice-loading) #catalog-loading-overlay.catalog-loading-overlay,
+      body:not(.vel-home-choice-loading) #catalog-loading-overlay:not(.hidden) {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+
+      body.vel-home-choice-loading #catalog-loading-overlay.hidden {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
     </style>
   </head>
-  <body class="vite-autoconnect vel-home-choice-loading">
+  <body class="vite-autoconnect">
     <div id="settings-shell" class="settings-shell countries-admin-page hidden" aria-hidden="true">
       <div id="settings-view-granted">
         <header class="countries-admin-head">
@@ -3479,9 +3909,10 @@
               </button>
             </div>
             <button type="button" id="btn-logo-home" class="vel-brand vel-brand--home" aria-label="Retour à l'accueil">
-              Velora<span class="vel-brand-vip"
+              <img id="vel-brand-country-flag" class="vel-brand__country-flag" alt="" decoding="async" loading="eager" hidden />
+              <span class="vel-brand__text">Velora<span class="vel-brand-vip"
                 ><span class="vel-brand-vip__v">V</span><span class="vel-brand-vip__i">I</span
-                ><span class="vel-brand-vip__p">P</span></span>
+                ><span class="vel-brand-vip__p">P</span></span></span>
             </button>
             <div class="vel-header__right">
               <div class="vel-header__country">
@@ -3499,6 +3930,19 @@
                   alt=""
                   aria-hidden="true"
                 />
+              </button>
+              <button
+                type="button"
+                id="btn-header-search"
+                class="vel-header-home-btn vel-header-search-btn"
+                title="Recherche"
+                aria-label="Rechercher"
+              >
+                <span class="vel-header-home-btn__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M10.8 4a6.8 6.8 0 1 0 4.24 12.12l3.42 3.42a1 1 0 0 0 1.42-1.42l-3.42-3.42A6.8 6.8 0 0 0 10.8 4Zm0 2a4.8 4.8 0 1 1 0 9.6 4.8 4.8 0 0 1 0-9.6Z"></path>
+                  </svg>
+                </span>
               </button>
               <button
                 type="button"
@@ -3767,9 +4211,6 @@
                   <button type="button" id="adult-tab-movies" class="vel-adult-tab" data-adult-tab="movies">
                     Films
                   </button>
-                  <button type="button" id="adult-tab-home" class="vel-adult-tab vel-adult-tab--home">
-                    Accueil
-                  </button>
                 </div>
               </div>
             </div>
@@ -3785,6 +4226,27 @@
           </div>
         </div>
       </main>
+
+      <button type="button" id="vel-scroll-top-btn" class="vel-scroll-top-btn" aria-label="Remonter en haut" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 5.5 5.6 11.9a1 1 0 1 0 1.4 1.42L11 9.34V18a1 1 0 1 0 2 0V9.34l4 3.98a1 1 0 0 0 1.4-1.42L12 5.5Z"></path>
+        </svg>
+      </button>
+
+      <div id="vel-global-search" class="vel-global-search hidden" role="dialog" aria-modal="true" aria-label="Recherche" aria-hidden="true">
+        <div class="vel-global-search__panel">
+          <div class="vel-global-search__bar">
+            <input id="vel-global-search-input" class="vel-global-search__input" type="search" autocomplete="off" spellcheck="false" placeholder="Chercher une chaine" />
+            <button type="button" id="vel-global-search-close" class="vel-global-search__close" aria-label="Fermer">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M6.7 5.3 12 10.6l5.3-5.3a1 1 0 1 1 1.4 1.4L13.4 12l5.3 5.3a1 1 0 0 1-1.4 1.4L12 13.4l-5.3 5.3a1 1 0 0 1-1.4-1.4l5.3-5.3-5.3-5.3a1 1 0 0 1 1.4-1.4Z"></path>
+              </svg>
+            </button>
+          </div>
+          <div id="vel-global-search-status" class="vel-global-search__status"></div>
+          <div id="vel-global-search-results" class="vel-global-search__results" role="listbox"></div>
+        </div>
+      </div>
 
       <div
         id="catalog-loading-overlay"
@@ -4255,6 +4717,190 @@
         }
       })();
     </script>
+    <script>
+      (function () {
+        var syncTimer = null;
+        var syncStarted = 0;
+
+        function forceHideCatalogLoader() {
+          var overlay = document.getElementById("catalog-loading-overlay");
+          if (!overlay) return;
+          overlay.classList.add("hidden");
+          overlay.setAttribute("aria-hidden", "true");
+          overlay.style.setProperty("display", "none", "important");
+          overlay.style.setProperty("visibility", "hidden", "important");
+          overlay.style.setProperty("pointer-events", "none", "important");
+          document.body.classList.remove("vel-home-choice-loading");
+          document.body.classList.remove("vel-home-choice-catalog-pending");
+        }
+
+        function selectableOptions(select) {
+          if (!select || !select.options) return [];
+          return Array.prototype.filter.call(select.options, function (option) {
+            return !option.disabled && !!String(option.value || "").trim();
+          });
+        }
+
+        function countryFlagUrl(name) {
+          var normalized = String(name || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .trim();
+          var codes = {
+            france: "fr",
+            belgique: "be",
+            suisse: "ch",
+            maroc: "ma",
+            algerie: "dz",
+            tunisie: "tn",
+            espagne: "es",
+            portugal: "pt",
+            allemagne: "de",
+            italie: "it",
+            "royaume-uni": "gb",
+            "etats-unis": "us",
+            canada: "ca"
+          };
+          return codes[normalized] ? "https://flagcdn.com/w40/" + codes[normalized] + ".png" : "";
+        }
+
+        function syncHomeCountriesFallback() {
+          var main = document.getElementById("country-select");
+          var home = document.getElementById("home-country-select");
+          var value = document.getElementById("home-country-value");
+          var flag = document.getElementById("home-country-flag");
+          var brandFlag = document.getElementById("vel-brand-country-flag");
+          var menu = document.getElementById("home-country-menu");
+          var options = selectableOptions(main);
+          if (!main || !home || options.length === 0) return false;
+
+          var signature = Array.prototype.map.call(main.options, function (option) {
+            return option.value + "\u001f" + option.textContent;
+          }).join("\u001e");
+
+          if (home.dataset.fallbackSignature !== signature || home.options.length !== main.options.length) {
+            home.innerHTML = "";
+            Array.prototype.forEach.call(main.options, function (option) {
+              home.appendChild(option.cloneNode(true));
+            });
+            home.dataset.fallbackSignature = signature;
+          }
+
+          home.value = main.value;
+          var selected = home.options[home.selectedIndex] || home.options[0];
+          var selectedText = selected ? selected.textContent.trim() : "Choisir";
+          if (value) value.textContent = selectedText;
+          if (flag) {
+            var src = countryFlagUrl(selectedText);
+            if (src) {
+              flag.src = src;
+              flag.hidden = false;
+            } else {
+              flag.removeAttribute("src");
+              flag.hidden = true;
+            }
+          }
+          if (brandFlag) {
+            var brandSrc = countryFlagUrl(selectedText);
+            if (brandSrc) {
+              brandFlag.src = brandSrc;
+              brandFlag.hidden = false;
+            } else {
+              brandFlag.removeAttribute("src");
+              brandFlag.hidden = true;
+            }
+          }
+
+          if (menu && !menu.hidden) {
+            menu.innerHTML = "";
+            Array.prototype.forEach.call(home.options, function (option) {
+              var item = document.createElement("button");
+              item.type = "button";
+              item.className = "vel-home-country-picker__option velora-tv-select-option";
+              item.dataset.value = option.value;
+              item.dataset.tvFocusable = "true";
+              item.textContent = option.textContent;
+              item.addEventListener("click", function () {
+                home.value = option.value;
+                main.value = option.value;
+                main.dispatchEvent(new Event("change", { bubbles: true }));
+                menu.hidden = true;
+                syncHomeCountriesFallback();
+              });
+              menu.appendChild(item);
+            });
+          }
+
+          document.body.classList.remove("vel-home-choice-loading");
+          document.body.classList.remove("vel-home-choice-catalog-pending");
+          return true;
+        }
+
+        function openHomeTabFallback(tabName) {
+          syncHomeCountriesFallback();
+          document.dispatchEvent(new CustomEvent("velora-home-tab", {
+            detail: { tab: tabName }
+          }));
+          var started = Date.now();
+          var timer = window.setInterval(function () {
+            var active = document.body.dataset.velActiveTab;
+            if (active === tabName || Date.now() - started > 12000) {
+              window.clearInterval(timer);
+              if (active === tabName) {
+                document.body.classList.remove("vel-home-choice-loading");
+                document.body.classList.add("vel-home-choice-picked");
+              }
+            }
+          }, 120);
+        }
+
+        function bindHomeFallback() {
+          if (document.body.dataset.homeFallbackBound === "true") return;
+          document.body.dataset.homeFallbackBound = "true";
+          document.addEventListener("click", function (event) {
+            var homeRoot = document.getElementById("vel-home-choice");
+            if (homeRoot && homeRoot.dataset.ready === "true") return;
+            var countryTrigger = event.target && event.target.closest("#home-country-trigger");
+            if (countryTrigger) {
+              var menu = document.getElementById("home-country-menu");
+              syncHomeCountriesFallback();
+              if (menu) menu.hidden = !menu.hidden;
+              return;
+            }
+            var button = event.target && event.target.closest("#vel-home-choice [data-home-tab]");
+            if (!button) return;
+            openHomeTabFallback(button.getAttribute("data-home-tab"));
+          }, true);
+          document.addEventListener("change", function (event) {
+            if (event.target && event.target.id === "country-select") syncHomeCountriesFallback();
+          }, true);
+        }
+
+        function startHomeFallbackSync() {
+          bindHomeFallback();
+          syncStarted = Date.now();
+          forceHideCatalogLoader();
+          document.body.classList.remove("vel-home-choice-loading");
+          document.body.classList.remove("vel-home-choice-catalog-pending");
+          syncHomeCountriesFallback();
+          var syncAttempts = 0;
+          syncTimer = window.setInterval(function () {
+            syncAttempts += 1;
+            forceHideCatalogLoader();
+            if (syncHomeCountriesFallback() || syncAttempts >= 15) {
+              window.clearInterval(syncTimer);
+            }
+          }, 1000);
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", startHomeFallbackSync, { once: true });
+        } else {
+          startHomeFallbackSync();
+        }
+      })();
+    </script>
 
     <script>
       (function () {
@@ -4264,13 +4910,17 @@
           home.dataset.ready = "true";
           var homeChoiceRunId = 0;
           var homeCountrySelect = document.getElementById("home-country-select");
-          var mainCountrySelect = document.getElementById("country-select");
           var homeCountryTrigger = document.getElementById("home-country-trigger");
           var homeCountryValue = document.getElementById("home-country-value");
           var homeCountryFlag = document.getElementById("home-country-flag");
+          var brandCountryFlag = document.getElementById("vel-brand-country-flag");
           var homeCountryMenu = document.getElementById("home-country-menu");
           var homeAdultBtn = document.getElementById("home-adult-btn");
           var catalogLoadingOverlay = document.getElementById("catalog-loading-overlay");
+
+          function getMainCountrySelect() {
+            return document.getElementById("country-select");
+          }
 
           function isCatalogLoadingVisible() {
             return !!(
@@ -4280,24 +4930,52 @@
             );
           }
 
+          function hasSelectableCountry(select) {
+            if (!select || !select.options || select.options.length === 0) return false;
+            return Array.prototype.some.call(select.options, function (option) {
+              return !option.disabled && !!String(option.value || "").trim();
+            });
+          }
+
+          function hasPackageCards() {
+            var view = document.getElementById("packages-view");
+            return !!(view && view.querySelector(".vel-package-card[data-package-id]"));
+          }
+
           function showHomeChoiceWhenReady() {
             if (document.body.classList.contains("vel-home-choice-picked")) {
               document.body.classList.remove("vel-home-choice-loading");
+              document.body.classList.remove("vel-home-choice-catalog-pending");
               return;
             }
 
-            document.body.classList.add("vel-home-choice-loading");
-            var sawLoading = isCatalogLoadingVisible();
             var finished = false;
+            var started = Date.now();
+            var maxWait = 1200;
+
+            function setLoadingStatus(text) {
+              if (catalogLoadingOverlay && catalogLoadingOverlay.querySelector) {
+                var status = catalogLoadingOverlay.querySelector("#catalog-loading-status");
+                if (status) status.textContent = text;
+              }
+            }
 
             function finish() {
               if (finished) return;
               finished = true;
+              syncHomeCountryOptions();
               if (!document.body.classList.contains("vel-home-choice-picked")) {
                 document.body.classList.remove("vel-home-choice-loading");
+                document.body.classList.remove("vel-home-choice-catalog-pending");
                 window.scrollTo(0, 0);
               }
-              if (observer) observer.disconnect();
+              if (readyTimer) window.clearTimeout(readyTimer);
+              if (readyPoll) window.clearInterval(readyPoll);
+              document.removeEventListener("velora-countries-ready", check);
+            }
+
+            function hasCountriesReady() {
+              return hasSelectableCountry(getMainCountrySelect());
             }
 
             function check() {
@@ -4305,31 +4983,80 @@
                 finish();
                 return;
               }
-              if (isCatalogLoadingVisible()) {
-                sawLoading = true;
+              syncHomeCountryOptions();
+              if (hasCountriesReady() || hasPackageCards()) {
+                window.setTimeout(function () {
+                  finish();
+                }, 90);
                 return;
               }
-              if (sawLoading) {
-                window.setTimeout(finish, 90);
+              if (Date.now() - started >= maxWait) {
+                finish();
               }
             }
 
-            var observer = null;
-            if (catalogLoadingOverlay) {
-              observer = new MutationObserver(check);
-              observer.observe(catalogLoadingOverlay, {
-                attributes: true,
-                attributeFilter: ["class", "aria-hidden"]
-              });
-            }
+            var readyTimer = null;
+            var readyPoll = null;
+            document.addEventListener("velora-countries-ready", check);
 
-            window.setTimeout(function () {
-              if (!sawLoading) finish();
-            }, 2600);
+            readyPoll = window.setInterval(function () {
+              if (finished) {
+                window.clearInterval(readyPoll);
+                return;
+              }
+              check();
+            }, 250);
+            readyTimer = window.setTimeout(check, maxWait + 50);
             check();
           }
 
+          function startHomeAutoconnectWatchdog() {
+            if (!document.body.classList.contains("vite-autoconnect")) return;
+
+            var started = Date.now();
+            var maxWait = 45000;
+            var attempts = 0;
+
+            function hasCountriesReady() {
+              return hasSelectableCountry(getMainCountrySelect());
+            }
+
+            function tick() {
+              if (
+                hasCountriesReady() ||
+                document.body.classList.contains("vel-home-choice-picked") ||
+                Date.now() - started >= maxWait
+              ) {
+                window.clearInterval(timer);
+                return;
+              }
+
+              attempts += 1;
+              if (catalogLoadingOverlay && catalogLoadingOverlay.querySelector) {
+                var status = catalogLoadingOverlay.querySelector("#catalog-loading-status");
+                if (status) status.textContent = attempts <= 1 ? "Connexion au catalogue..." : "Relance du catalogue...";
+              }
+
+              if (typeof window.veloraForceAutoconnect === "function") {
+                window.veloraForceAutoconnect();
+                return;
+              }
+
+              var connectButton = document.getElementById("btn-connect");
+              if (connectButton && !connectButton.disabled) connectButton.click();
+            }
+
+            var timer = window.setInterval(tick, 1800);
+            window.setTimeout(tick, 600);
+            document.addEventListener("velora-app-ready", tick);
+            document.addEventListener("velora-countries-ready", function () {
+              window.clearInterval(timer);
+              document.removeEventListener("velora-app-ready", tick);
+            }, { once: true });
+          }
+
           showHomeChoiceWhenReady();
+          // The app connects on startup. Reconnecting from the home shell can race tab navigation.
 
           function homeCountryKey(value) {
             try {
@@ -4458,7 +5185,20 @@
             return code ? "https://flagcdn.com/w40/" + code + ".png" : "";
           }
 
+          function syncBrandCountryFlag(countryName) {
+            if (!brandCountryFlag) return;
+            var selectedFlag = homeCountryFlagUrl(countryName);
+            if (selectedFlag) {
+              brandCountryFlag.src = selectedFlag;
+              brandCountryFlag.hidden = false;
+            } else {
+              brandCountryFlag.removeAttribute("src");
+              brandCountryFlag.hidden = true;
+            }
+          }
+
           function syncHomeCountryOptions() {
+            var mainCountrySelect = getMainCountrySelect();
             if (!homeCountrySelect || !mainCountrySelect) return;
             if (homeCountrySelect.dataset.syncing === "true") return;
             var signature = Array.prototype.map
@@ -4477,8 +5217,20 @@
             renderHomeCountryMenu();
           }
 
+          function homeCatalogReady() {
+            return hasSelectableCountry(getMainCountrySelect()) || hasPackageCards();
+          }
+
+          document.addEventListener("velora-countries-ready", function () {
+            syncHomeCountryOptions();
+            if (homeCatalogReady()) {
+              document.body.classList.remove("vel-home-choice-loading");
+              document.body.classList.remove("vel-home-choice-catalog-pending");
+            }
+          });
+
           function currentHomeCountryText() {
-            if (!homeCountrySelect) return "Choisir";
+            if (!homeCountrySelect || homeCountrySelect.options.length === 0) return "Chargement...";
             var option = homeCountrySelect.options[homeCountrySelect.selectedIndex];
             return option ? option.textContent.trim() || "Choisir" : "Choisir";
           }
@@ -4494,6 +5246,7 @@
           }
 
           function applyHomeCountry(value) {
+            var mainCountrySelect = getMainCountrySelect();
             if (!homeCountrySelect || !mainCountrySelect) return;
             homeCountrySelect.dataset.syncing = "true";
             homeCountrySelect.value = value;
@@ -4509,6 +5262,7 @@
             var selectedText = currentHomeCountryText();
             var selectedFlag = homeCountryFlagUrl(selectedText);
             homeCountryValue.textContent = selectedText;
+            syncBrandCountryFlag(selectedText);
             if (homeCountryFlag) {
               if (selectedFlag) {
                 homeCountryFlag.src = selectedFlag;
@@ -4519,6 +5273,15 @@
               }
             }
             homeCountryMenu.innerHTML = "";
+            if (homeCountrySelect.options.length === 0) {
+              var loadingItem = document.createElement("button");
+              loadingItem.type = "button";
+              loadingItem.className = "vel-home-country-picker__option velora-tv-select-option";
+              loadingItem.disabled = true;
+              loadingItem.textContent = "Chargement...";
+              homeCountryMenu.appendChild(loadingItem);
+              return;
+            }
             Array.prototype.forEach.call(homeCountrySelect.options, function (option) {
               var item = document.createElement("button");
               item.type = "button";
@@ -4538,7 +5301,7 @@
             });
           }
 
-          if (homeCountrySelect && mainCountrySelect) {
+          if (homeCountrySelect) {
             syncHomeCountryOptions();
             if (homeCountryTrigger) {
               homeCountryTrigger.addEventListener("click", function (event) {
@@ -4557,11 +5320,17 @@
             document.addEventListener("keydown", function (event) {
               if (event.key === "Escape") setHomeCountryMenuOpen(false);
             });
-            mainCountrySelect.addEventListener("change", syncHomeCountryOptions);
-            new MutationObserver(syncHomeCountryOptions).observe(mainCountrySelect, {
-              childList: true,
-              subtree: true
+            document.addEventListener("change", function (event) {
+              if (event.target && event.target.id === "country-select") syncHomeCountryOptions();
             });
+            var countrySyncAttempts = 0;
+            var countrySyncTimer = window.setInterval(function () {
+              countrySyncAttempts += 1;
+              syncHomeCountryOptions();
+              if ((homeCountrySelect && homeCountrySelect.options.length > 0) || countrySyncAttempts >= 30) {
+                window.clearInterval(countrySyncTimer);
+              }
+            }, 1000);
           }
 
           if (homeAdultBtn) {
@@ -4645,11 +5414,12 @@
           function activateHomeTab(tabName) {
             var runId = ++homeChoiceRunId;
             var started = Date.now();
-            var maxWait = 12000;
+            var maxWait = 30000;
             var didOpen = false;
 
             function tryActivate() {
               if (runId !== homeChoiceRunId) return;
+              syncHomeCountryOptions();
               document.dispatchEvent(
                 new CustomEvent("velora-home-tab", {
                   detail: { tab: tabName }
@@ -4680,11 +5450,37 @@
 
           var logoHome = document.getElementById("btn-logo-home");
           if (logoHome) {
+            var stopHomeMediaPlayback = function () {
+              ["video", "video-vod"].forEach(function (id) {
+                var video = document.getElementById(id);
+                if (!video) return;
+                try {
+                  video.pause();
+                } catch (error) {}
+                try {
+                  video.removeAttribute("src");
+                  video.querySelectorAll("source").forEach(function (source) {
+                    source.removeAttribute("src");
+                  });
+                  video.load();
+                } catch (error) {}
+              });
+              ["player-buffering", "vod-player-buffering"].forEach(function (id) {
+                var buffering = document.getElementById(id);
+                if (buffering) buffering.classList.add("hidden");
+              });
+              try {
+                window.dispatchEvent(new CustomEvent("velora-home-media-stop"));
+              } catch (error) {}
+            };
+
             var showHomeChoice = function (event) {
               event.preventDefault();
               event.stopImmediatePropagation();
+              stopHomeMediaPlayback();
               homeChoiceRunId += 1;
               document.body.classList.remove("vel-home-choice-loading");
+              document.body.classList.remove("vel-home-choice-catalog-pending");
               document.body.classList.remove("vel-home-choice-picked");
               window.scrollTo(0, 0);
               var main = document.querySelector(".main--velora");
@@ -5697,6 +6493,10 @@ if (target.closest(".trial-offer-button")) {
             finishTrackedVideo(document.getElementById(id), type || "video_stop");
           });
         }
+
+        window.addEventListener("velora-home-media-stop", function () {
+          stopActivePlayback("video_stop");
+        });
 
         function stopVodPlayback(type) {
           finishTrackedVideo(document.getElementById("video-vod"), type || "video_stop");
@@ -7253,6 +8053,284 @@ if (target.closest(".trial-offer-button")) {
 
     <script>
       (function () {
+        function initMobileScrollTopButton() {
+          var button = document.getElementById("vel-scroll-top-btn");
+          var main = document.getElementById("main");
+          var packages = document.getElementById("packages-view");
+          var list = document.getElementById("dynamic-list");
+          if (!button || !main || !packages || !list) return;
+
+          var mobileQuery = window.matchMedia("(max-width: 760px)");
+          var scheduled = false;
+          var mutationTimer = null;
+
+          function activeList() {
+            if (document.body.classList.contains("vel-home-choice-picked") === false) return null;
+            var content = document.getElementById("content-view");
+            if (content && !content.classList.contains("hidden") && list.offsetParent !== null) return list;
+            if (!packages.classList.contains("hidden") && packages.offsetParent !== null) return packages;
+            return null;
+          }
+
+          function isScrollable(element) {
+            return !!(element && element.scrollHeight > element.clientHeight + 4);
+          }
+
+          function scrollRoot(container) {
+            if (container === list && isScrollable(list)) return list;
+            if (isScrollable(main)) return main;
+            if (isScrollable(list)) return list;
+            return document.scrollingElement || document.documentElement;
+          }
+
+          function itemCount(container) {
+            if (!container) return 0;
+            return container.querySelectorAll(
+              ".vel-package-card, .media-item, .vel-media-item-row, .vel-vod-movie-card, .vel-vod-detail__episode"
+            ).length;
+          }
+
+          function isLongList(container, root) {
+            if (!container || !root) return false;
+            var overflow = root.scrollHeight - root.clientHeight;
+            return overflow > Math.max(260, root.clientHeight * 0.65) || itemCount(container) >= 16;
+          }
+
+          function setVisible(visible) {
+            button.hidden = !visible;
+            button.classList.toggle("is-visible", visible);
+          }
+
+          function update() {
+            scheduled = false;
+            if (!mobileQuery.matches) {
+              setVisible(false);
+              return;
+            }
+            var container = activeList();
+            var root = scrollRoot(container);
+            var top = Math.max(root.scrollTop || 0, window.scrollY || 0);
+            setVisible(!!container && isLongList(container, root) && top > 260);
+          }
+
+          function scheduleUpdate() {
+            if (scheduled) return;
+            scheduled = true;
+            window.requestAnimationFrame(update);
+          }
+
+          function scheduleMutationUpdate() {
+            if (mutationTimer) window.clearTimeout(mutationTimer);
+            mutationTimer = window.setTimeout(scheduleUpdate, 120);
+          }
+
+          button.addEventListener("click", function () {
+            var root = scrollRoot(activeList());
+            if (root && typeof root.scrollTo === "function") root.scrollTo({ top: 0, behavior: "smooth" });
+            list.scrollTo({ top: 0, behavior: "smooth" });
+            main.scrollTo({ top: 0, behavior: "smooth" });
+            window.scrollTo({ top: 0, behavior: "smooth" });
+            window.setTimeout(scheduleUpdate, 260);
+          });
+
+          main.addEventListener("scroll", scheduleUpdate, { passive: true });
+          list.addEventListener("scroll", scheduleUpdate, { passive: true });
+          window.addEventListener("scroll", scheduleUpdate, { passive: true });
+          window.addEventListener("resize", scheduleUpdate);
+          if (mobileQuery.addEventListener) mobileQuery.addEventListener("change", scheduleUpdate);
+          else if (mobileQuery.addListener) mobileQuery.addListener(scheduleUpdate);
+
+          new MutationObserver(scheduleMutationUpdate).observe(document.body, {
+            attributes: true,
+            attributeFilter: ["class"]
+          });
+          new MutationObserver(scheduleMutationUpdate).observe(packages, { childList: true, subtree: true });
+          new MutationObserver(scheduleMutationUpdate).observe(list, { childList: true, subtree: true });
+
+          scheduleUpdate();
+        }
+
+        function initGlobalSearch() {
+          var trigger = document.getElementById("btn-header-search");
+          var dialog = document.getElementById("vel-global-search");
+          var input = document.getElementById("vel-global-search-input");
+          var close = document.getElementById("vel-global-search-close");
+          var status = document.getElementById("vel-global-search-status");
+          var results = document.getElementById("vel-global-search-results");
+          if (!trigger || !dialog || !input || !close || !status || !results) return;
+
+          var timer = null;
+          var runId = 0;
+
+          function setStatus(text) {
+            status.textContent = text || "";
+          }
+
+          function setSearchLoading(loading) {
+            status.classList.toggle("is-loading", !!loading);
+          }
+
+          function currentSearchPlaceholder() {
+            var tab = document.body.getAttribute("data-vel-active-tab") || "";
+            if (tab === "series") return "Chercher une serie";
+            if (tab === "movies") return "Chercher un film";
+            return "Chercher une chaine";
+          }
+
+          function updateSearchPlaceholder() {
+            input.placeholder = currentSearchPlaceholder();
+          }
+
+          function clearResults(text) {
+            results.replaceChildren();
+            if (text) {
+              var empty = document.createElement("div");
+              empty.className = "vel-global-search__empty";
+              empty.textContent = text;
+              results.appendChild(empty);
+            }
+          }
+
+          function cleanResultMeta(packageName, countryName) {
+            var meta = String(packageName || "").trim();
+            if (!meta || /\b(films?|s[ée]ries?|series?|cha[îi]nes?|chaines?)\b/i.test(meta)) {
+              return String(countryName || "").trim();
+            }
+            return meta;
+          }
+
+          function renderResults(payload, query) {
+            results.replaceChildren();
+            var list = payload && Array.isArray(payload.results) ? payload.results : [];
+            if (!list.length) {
+              clearResults(query.length >= 2 ? "Aucun resultat dans ce pays." : "");
+              return;
+            }
+            list.forEach(function (item) {
+              var button = document.createElement("button");
+              button.type = "button";
+              button.className = "vel-global-search__result";
+              button.dataset.searchResultId = item.id || "";
+              button.setAttribute("role", "option");
+
+              var thumb = document.createElement("span");
+              thumb.className = "vel-global-search__thumb";
+              thumb.setAttribute("aria-hidden", "true");
+              if (item.thumbUrl) {
+                var image = document.createElement("img");
+                image.alt = "";
+                image.loading = "lazy";
+                image.decoding = "async";
+                image.src = item.thumbUrl;
+                image.addEventListener("error", function () {
+                  image.remove();
+                });
+                thumb.appendChild(image);
+              }
+
+              var body = document.createElement("span");
+              var title = document.createElement("span");
+              title.className = "vel-global-search__title";
+              title.textContent = item.label || "";
+              var meta = document.createElement("span");
+              meta.className = "vel-global-search__meta";
+              meta.textContent = cleanResultMeta(item.packageName, payload.countryName);
+              body.append(title, meta);
+              button.append(thumb, body);
+              results.appendChild(button);
+            });
+          }
+
+          function runSearch() {
+            var query = input.value.trim();
+            runId += 1;
+            var thisRun = runId;
+            if (query.length < 2) {
+              setStatus("");
+              setSearchLoading(false);
+              clearResults("");
+              return;
+            }
+            if (typeof window.veloraSearchCountryContent !== "function") {
+              setStatus("Catalogue pas encore pret.");
+              setSearchLoading(false);
+              clearResults("");
+              return;
+            }
+            setStatus("Recherche...");
+            setSearchLoading(true);
+            function applyPayload(payload, loading) {
+              if (thisRun !== runId) return;
+              var count = payload && Array.isArray(payload.results) ? payload.results.length : 0;
+              var country = payload && payload.countryName ? payload.countryName : "ce pays";
+              setSearchLoading(loading);
+              setStatus(count
+                ? count + " resultat" + (count > 1 ? "s" : "") + " dans " + country + (loading ? "..." : "")
+                : (loading ? "Recherche dans " + country + "..." : "Aucun resultat dans " + country));
+              renderResults(payload, query);
+            }
+            var searchPromise = typeof window.veloraSearchCountryContentProgress === "function"
+              ? window.veloraSearchCountryContentProgress(query, function (payload) {
+                  applyPayload(payload, true);
+                })
+              : window.veloraSearchCountryContent(query);
+            searchPromise.then(function (payload) {
+              applyPayload(payload, false);
+            }).catch(function () {
+              if (thisRun !== runId) return;
+              setSearchLoading(false);
+              setStatus("Recherche indisponible.");
+              clearResults("");
+            });
+          }
+
+          function scheduleSearch() {
+            if (timer) window.clearTimeout(timer);
+            timer = window.setTimeout(runSearch, 180);
+          }
+
+          function openSearch() {
+            updateSearchPlaceholder();
+            dialog.classList.remove("hidden");
+            dialog.setAttribute("aria-hidden", "false");
+            setSearchLoading(false);
+            window.setTimeout(function () {
+              input.focus();
+            }, 40);
+          }
+
+          function closeSearch() {
+            runId += 1;
+            if (timer) {
+              window.clearTimeout(timer);
+              timer = null;
+            }
+            dialog.classList.add("hidden");
+            dialog.setAttribute("aria-hidden", "true");
+            setSearchLoading(false);
+            trigger.focus();
+          }
+
+          updateSearchPlaceholder();
+          trigger.addEventListener("click", openSearch);
+          close.addEventListener("click", closeSearch);
+          input.addEventListener("input", scheduleSearch);
+          dialog.addEventListener("click", function (event) {
+            if (event.target === dialog) closeSearch();
+          });
+          results.addEventListener("click", function (event) {
+            var button = event.target && event.target.closest(".vel-global-search__result[data-search-result-id]");
+            if (!button || typeof window.veloraOpenSearchResult !== "function") return;
+            var id = button.dataset.searchResultId || "";
+            if (!id) return;
+            closeSearch();
+            window.veloraOpenSearchResult(id).catch(function () {});
+          });
+          document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape" && !dialog.classList.contains("hidden")) closeSearch();
+          });
+        }
+
         function suppressNativePlayerControls(video) {
           if (!video) return;
           video.controls = false;
@@ -7286,6 +8364,8 @@ if (target.closest(".trial-offer-button")) {
         }
 
         document.addEventListener("DOMContentLoaded", function () {
+          initMobileScrollTopButton();
+          initGlobalSearch();
           suppressAllNativePlayerControls();
           ["video", "video-vod"].forEach(function (id) {
             var video = document.getElementById(id);

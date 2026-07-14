@@ -88,6 +88,91 @@
     </script>
     <script>
       (function () {
+        var persistedCountryIdKey = "lumina_selected_country_id";
+        var persistedCountryNameKey = "velora_selected_country_name_v1";
+
+        function normalizeCountryName(value) {
+          try {
+            return String(value || "")
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, " ")
+              .trim();
+          } catch (error) {
+            return String(value || "").toLowerCase().trim();
+          }
+        }
+
+        function readPersistedCountryId() {
+          try {
+            return window.localStorage.getItem(persistedCountryIdKey) ||
+              window.sessionStorage.getItem(persistedCountryIdKey) || "";
+          } catch (error) {
+            return "";
+          }
+        }
+
+        function readPersistedCountryName() {
+          try {
+            return window.localStorage.getItem(persistedCountryNameKey) || "";
+          } catch (error) {
+            return "";
+          }
+        }
+
+        function persistCountryOption(option) {
+          if (!option || !String(option.value || "").trim()) return;
+          try {
+            window.localStorage.setItem(persistedCountryIdKey, option.value);
+            window.localStorage.setItem(persistedCountryNameKey, option.textContent.trim());
+            window.sessionStorage.setItem(persistedCountryIdKey, option.value);
+          } catch (error) {
+            /* The selected country still works when storage is unavailable. */
+          }
+        }
+
+        function restorePersistedCountry(select) {
+          if (!select || !select.options || select.options.length === 0) return false;
+          var storedId = readPersistedCountryId();
+          var storedName = normalizeCountryName(readPersistedCountryName());
+          var match = null;
+
+          Array.prototype.some.call(select.options, function (option) {
+            if (storedId && option.value === storedId) {
+              match = option;
+              return true;
+            }
+            return false;
+          });
+
+          if (!match && storedName) {
+            Array.prototype.some.call(select.options, function (option) {
+              if (normalizeCountryName(option.textContent) === storedName) {
+                match = option;
+                return true;
+              }
+              return false;
+            });
+          }
+
+          if (!match) return false;
+          if (select.value !== match.value) {
+            select.value = match.value;
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+          persistCountryOption(match);
+          return true;
+        }
+
+        window.veloraRestorePersistedCountry = restorePersistedCountry;
+
+        document.addEventListener("change", function (event) {
+          var select = event.target;
+          if (!select || select.id !== "country-select") return;
+          persistCountryOption(select.options[select.selectedIndex]);
+        }, true);
+
         function homeHasRealCountries(select) {
           return !!(
             select &&
@@ -101,6 +186,7 @@
         function unlockHomeChoiceIfReady() {
           var select = document.getElementById("country-select");
           if (!homeHasRealCountries(select)) return false;
+          restorePersistedCountry(select);
           document.body.classList.remove("vel-home-choice-loading");
           document.body.classList.remove("vel-home-choice-catalog-pending");
           try {
@@ -4817,6 +4903,9 @@
           var menu = document.getElementById("home-country-menu");
           var options = selectableOptions(main);
           if (!main || !home || options.length === 0) return false;
+          if (typeof window.veloraRestorePersistedCountry === "function") {
+            window.veloraRestorePersistedCountry(main);
+          }
 
           var signature = Array.prototype.map.call(main.options, function (option) {
             return option.value + "\u001f" + option.textContent;
@@ -5240,6 +5329,9 @@
             var mainCountrySelect = getMainCountrySelect();
             if (!homeCountrySelect || !mainCountrySelect) return;
             if (homeCountrySelect.dataset.syncing === "true") return;
+            if (typeof window.veloraRestorePersistedCountry === "function") {
+              window.veloraRestorePersistedCountry(mainCountrySelect);
+            }
             var signature = Array.prototype.map
               .call(mainCountrySelect.options, function (option) {
                 return option.value + "\u001f" + option.textContent;

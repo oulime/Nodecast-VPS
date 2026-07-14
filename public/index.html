@@ -13,6 +13,39 @@
           var query = window.location.search || "";
           var tvMatch = query.match(/[?&]tv=([^&]*)/);
           var tvParam = tvMatch ? decodeURIComponent(tvMatch[1].replace(/\+/g, " ")) : null;
+          var userAgent = navigator.userAgent || "";
+          var isIosTouchDevice =
+            /iPad|iPhone|iPod/i.test(userAgent) ||
+            (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+          // TV mode installs a full-screen pointer shield. Never restore that
+          // persisted mode on iOS, where the shield would swallow normal taps.
+          if (isIosTouchDevice) {
+            window.localStorage.removeItem("velora_tv_mode");
+            try {
+              var iosUrl = new URL(window.location.href);
+              if (iosUrl.searchParams.has("tv")) {
+                iosUrl.searchParams.delete("tv");
+                window.history.replaceState(window.history.state, "", iosUrl.href);
+              }
+            } catch (error) {}
+            var removeIosTvShields = function () {
+              document.documentElement.classList.remove("velora-tv-mode");
+              if (document.body) document.body.classList.remove("velora-tv-mode", "velora-tv-start-blocked");
+              ["velora-tv-pointer-shield", "velora-tv-edge-input-shield", "velora-tv-start-overlay"].forEach(function (id) {
+                var element = document.getElementById(id);
+                if (element) element.remove();
+              });
+            };
+            removeIosTvShields();
+            window.addEventListener("DOMContentLoaded", removeIosTvShields, { once: true });
+            window.addEventListener("storage", function (event) {
+              if (event.key !== "velora_tv_mode") return;
+              window.localStorage.removeItem("velora_tv_mode");
+              removeIosTvShields();
+            });
+            return;
+          }
           var tvMode =
             tvParam === "1" || (tvParam !== "0" && window.localStorage.getItem("velora_tv_mode") === "1");
           if (!tvMode) return;
@@ -1274,11 +1307,19 @@
 
       .main--velora .vel-header {
         position: relative;
+        z-index: 2;
         display: grid !important;
         grid-template-columns: minmax(3rem, 1fr) auto minmax(3rem, 1fr);
         align-items: center;
         gap: 0.75rem;
         padding-inline: max(0.75rem, env(safe-area-inset-left)) max(0.75rem, env(safe-area-inset-right));
+      }
+
+      .main--velora .vel-header button,
+      .main--velora .nav-tabs .tab {
+        touch-action: manipulation;
+        -webkit-user-select: none;
+        user-select: none;
       }
 
       .main--velora .vel-brand {
@@ -3426,7 +3467,7 @@
       }
     </style>
   </head>
-  <body class="vite-autoconnect">
+  <body class="vite-autoconnect vel-home-choice-loading vel-home-choice-catalog-pending">
     <div id="settings-shell" class="settings-shell countries-admin-page hidden" aria-hidden="true">
       <div id="settings-view-granted">
         <header class="countries-admin-head">
@@ -4250,8 +4291,8 @@
 
       <div
         id="catalog-loading-overlay"
-        class="catalog-loading-overlay hidden"
-        aria-hidden="true"
+        class="catalog-loading-overlay"
+        aria-hidden="false"
         role="status"
         aria-live="polite"
         aria-label="Chargement du catalogue"
@@ -4722,16 +4763,18 @@
         var syncTimer = null;
         var syncStarted = 0;
 
-        function forceHideCatalogLoader() {
+        function showCatalogLoader() {
           var overlay = document.getElementById("catalog-loading-overlay");
           if (!overlay) return;
-          overlay.classList.add("hidden");
-          overlay.setAttribute("aria-hidden", "true");
-          overlay.style.setProperty("display", "none", "important");
-          overlay.style.setProperty("visibility", "hidden", "important");
-          overlay.style.setProperty("pointer-events", "none", "important");
-          document.body.classList.remove("vel-home-choice-loading");
-          document.body.classList.remove("vel-home-choice-catalog-pending");
+          overlay.classList.remove("hidden");
+          overlay.setAttribute("aria-hidden", "false");
+          overlay.style.removeProperty("display");
+          overlay.style.removeProperty("visibility");
+          overlay.style.removeProperty("pointer-events");
+          var status = overlay.querySelector("#catalog-loading-status");
+          if (status) status.textContent = "Chargement des pays…";
+          document.body.classList.add("vel-home-choice-loading");
+          document.body.classList.add("vel-home-choice-catalog-pending");
         }
 
         function selectableOptions(select) {
@@ -4880,14 +4923,10 @@
         function startHomeFallbackSync() {
           bindHomeFallback();
           syncStarted = Date.now();
-          forceHideCatalogLoader();
-          document.body.classList.remove("vel-home-choice-loading");
-          document.body.classList.remove("vel-home-choice-catalog-pending");
-          syncHomeCountriesFallback();
+          if (!syncHomeCountriesFallback()) showCatalogLoader();
           var syncAttempts = 0;
           syncTimer = window.setInterval(function () {
             syncAttempts += 1;
-            forceHideCatalogLoader();
             if (syncHomeCountriesFallback() || syncAttempts >= 15) {
               window.clearInterval(syncTimer);
             }
@@ -4951,7 +4990,7 @@
 
             var finished = false;
             var started = Date.now();
-            var maxWait = 1200;
+            var maxWait = 45000;
 
             function setLoadingStatus(text) {
               if (catalogLoadingOverlay && catalogLoadingOverlay.querySelector) {
@@ -5506,7 +5545,7 @@
               headerHome.addEventListener("pointerdown", showHomeChoice, true);
               headerHome.addEventListener("touchend", showHomeChoice, true);
               headerHome.addEventListener("click", showHomeChoice, true);
-              headerHome.addEventListener("keydown", function (event) {
+            headerHome.addEventListener("keydown", function (event) {
                 if (
                   event.key === "Enter" ||
                   event.key === "NumpadEnter" ||
@@ -5517,6 +5556,8 @@
                 }
               }, true);
             }
+
+            document.addEventListener("velora-show-home", showHomeChoice);
           }
 
           var headerBack = document.getElementById("btn-header-back");
@@ -5536,6 +5577,7 @@
             };
 
             headerBack.addEventListener("click", goBack, true);
+            document.addEventListener("velora-header-back", goBack);
             headerBack.addEventListener("keydown", function (event) {
               if (
                 event.key === "Enter" ||
@@ -8313,6 +8355,7 @@ if (target.closest(".trial-offer-button")) {
 
           updateSearchPlaceholder();
           trigger.addEventListener("click", openSearch);
+          document.addEventListener("velora-open-search", openSearch);
           close.addEventListener("click", closeSearch);
           input.addEventListener("input", scheduleSearch);
           dialog.addEventListener("click", function (event) {
@@ -8329,6 +8372,83 @@ if (target.closest(".trial-offer-button")) {
           document.addEventListener("keydown", function (event) {
             if (event.key === "Escape" && !dialog.classList.contains("hidden")) closeSearch();
           });
+        }
+
+        function initReliableMobileNavigation() {
+          var isTouchDevice =
+            navigator.maxTouchPoints > 0 ||
+            (window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+          if (!isTouchDevice || document.body.dataset.reliableMobileNavigation === "true") return;
+          document.body.dataset.reliableMobileNavigation = "true";
+
+          var selector = [
+            "#btn-header-search",
+            "#btn-header-home",
+            "#btn-logo-home",
+            "#btn-header-back",
+            "#main-tabs .tab"
+          ].join(",");
+          var gesture = null;
+          var lastControl = null;
+          var lastActivation = 0;
+
+          function findControl(target) {
+            return target instanceof Element ? target.closest(selector) : null;
+          }
+
+          function activate(control, event) {
+            if (!control || control.disabled) return;
+            var now = Date.now();
+            if (control === lastControl && now - lastActivation < 450) return;
+            lastControl = control;
+            lastActivation = now;
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+
+            if (control.id === "btn-header-search") {
+              document.dispatchEvent(new CustomEvent("velora-open-search"));
+              return;
+            }
+            if (control.id === "btn-header-back") {
+              document.dispatchEvent(new CustomEvent("velora-header-back"));
+              return;
+            }
+            if (control.id === "btn-header-home" || control.id === "btn-logo-home") {
+              if (document.body.classList.contains("vel-home-choice-picked")) {
+                document.dispatchEvent(new CustomEvent("velora-show-home"));
+              }
+              return;
+            }
+            var tab = control.getAttribute("data-tab") ||
+              (control.id === "tab-live" ? "live" : control.id === "tab-movies" ? "movies" : control.id === "tab-series" ? "series" : "");
+            if (tab && document.body.dataset.velActiveTab !== tab) {
+              document.dispatchEvent(new CustomEvent("velora-home-tab", { detail: { tab: tab } }));
+            }
+          }
+
+          document.addEventListener("pointerdown", function (event) {
+            if (event.pointerType === "mouse") return;
+            var control = findControl(event.target);
+            gesture = control ? {
+              pointerId: event.pointerId,
+              control: control,
+              x: event.clientX,
+              y: event.clientY
+            } : null;
+          }, true);
+
+          document.addEventListener("pointerup", function (event) {
+            var current = gesture;
+            gesture = null;
+            if (!current || current.pointerId !== event.pointerId) return;
+            if (Math.hypot(event.clientX - current.x, event.clientY - current.y) > 12) return;
+            activate(current.control, event);
+          }, true);
+
+          document.addEventListener("pointercancel", function () {
+            gesture = null;
+          }, true);
         }
 
         function suppressNativePlayerControls(video) {
@@ -8366,6 +8486,7 @@ if (target.closest(".trial-offer-button")) {
         document.addEventListener("DOMContentLoaded", function () {
           initMobileScrollTopButton();
           initGlobalSearch();
+          initReliableMobileNavigation();
           suppressAllNativePlayerControls();
           ["video", "video-vod"].forEach(function (id) {
             var video = document.getElementById(id);

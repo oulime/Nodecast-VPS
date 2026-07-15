@@ -8324,6 +8324,7 @@ if (target.closest(".trial-offer-button")) {
           var resultInteractionUntil = 0;
           var deferredSearchUpdate = null;
           var deferredSearchTimer = null;
+          var searchContentType = document.body.getAttribute("data-vel-active-tab") || "";
 
           function flushDeferredSearchUpdate() {
             if (deferredSearchTimer) window.clearTimeout(deferredSearchTimer);
@@ -8515,6 +8516,36 @@ if (target.closest(".trial-offer-button")) {
             clearResults("");
           }
 
+          function resetSearchForContentType(nextType) {
+            nextType = nextType === "movies" || nextType === "series" ? nextType : "live";
+            if (!searchContentType) {
+              searchContentType = nextType;
+              updateSearchPlaceholder();
+              return;
+            }
+            if (nextType === searchContentType) return;
+            searchContentType = nextType;
+            runId += 1;
+            renderedQuery = "";
+            visibleResultCount = resultsPerPage;
+            lastSearchPayload = null;
+            lastSearchQuery = "";
+            deferredSearchUpdate = null;
+            resultInteractionUntil = 0;
+            if (deferredSearchTimer) {
+              window.clearTimeout(deferredSearchTimer);
+              deferredSearchTimer = null;
+            }
+            input.value = "";
+            setSearchLoading(false);
+            setStatus("");
+            clearResults("");
+            updateSearchPlaceholder();
+            if (typeof window.veloraPinSearchResult === "function") {
+              window.veloraPinSearchResult("");
+            }
+          }
+
           function openSearch() {
             updateSearchPlaceholder();
             dialog.classList.remove("hidden");
@@ -8537,6 +8568,22 @@ if (target.closest(".trial-offer-button")) {
           updateSearchPlaceholder();
           trigger.addEventListener("click", openSearch);
           document.addEventListener("velora-open-search", openSearch);
+          document.addEventListener("velora-home-tab", function (event) {
+            resetSearchForContentType(event.detail && event.detail.tab);
+          });
+          document.addEventListener("click", function (event) {
+            var control = event.target && event.target.closest(
+              "#tab-live, #tab-movies, #tab-series, [data-home-tab]"
+            );
+            if (!control) return;
+            var nextType = control.getAttribute("data-tab") || control.getAttribute("data-home-tab") ||
+              (control.id === "tab-movies" ? "movies" : control.id === "tab-series" ? "series" : "live");
+            resetSearchForContentType(nextType);
+          }, true);
+          new MutationObserver(function () {
+            var nextType = document.body.getAttribute("data-vel-active-tab");
+            if (nextType) resetSearchForContentType(nextType);
+          }).observe(document.body, { attributes: true, attributeFilter: ["data-vel-active-tab"] });
           close.addEventListener("click", closeSearch);
           input.addEventListener("input", resetSearchForTyping);
           input.addEventListener("keydown", function (event) {

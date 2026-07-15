@@ -5704,10 +5704,14 @@
           }
         }
 
-        if (document.readyState === "loading") {
-          document.addEventListener("DOMContentLoaded", initHomeChoice, { once: true });
-        } else {
+        // This script is rendered after the dashboard markup, so its controls are
+        // already available even while a deferred module is still loading. Bind
+        // now: waiting for DOMContentLoaded leaves the visible header inert on a
+        // cold load when the module/bootstrap work delays that event.
+        if (document.getElementById("vel-home-choice")) {
           initHomeChoice();
+        } else {
+          document.addEventListener("DOMContentLoaded", initHomeChoice, { once: true });
         }
       })();
     </script>
@@ -8744,7 +8748,9 @@ if (target.closest(".trial-offer-button")) {
           window.setTimeout(suppressAllNativePlayerControls, 900);
         }
 
-        document.addEventListener("DOMContentLoaded", function () {
+        function initPageControls() {
+          if (document.body.dataset.pageControlsReady === "true") return;
+          document.body.dataset.pageControlsReady = "true";
           initMobileScrollTopButton();
           initGlobalSearch();
           initReliableMobileNavigation();
@@ -8762,7 +8768,16 @@ if (target.closest(".trial-offer-button")) {
             button.addEventListener("click", scheduleSuppressNativePlayerControls, true);
             button.addEventListener("touchend", scheduleSuppressNativePlayerControls, true);
           });
-        });
+        }
+
+        // The controls precede this script in the document. Initializing them
+        // immediately prevents a cold-load gap where they are visible but have no
+        // listeners while the deferred application module is still starting.
+        if (document.getElementById("btn-header-search")) {
+          initPageControls();
+        } else {
+          document.addEventListener("DOMContentLoaded", initPageControls, { once: true });
+        }
 
         document.addEventListener("fullscreenchange", scheduleSuppressNativePlayerControls, true);
         document.addEventListener("webkitfullscreenchange", scheduleSuppressNativePlayerControls, true);

@@ -194,6 +194,19 @@ function getCategorySnapshotFilePath(action, sourceId, categoryId, gzip = false)
     return fs.existsSync(filePath) ? filePath : null;
 }
 
+async function getCategorySnapshot(action, sourceId, categoryId) {
+    const filePath = getCategorySnapshotFilePath(action, sourceId, categoryId, false);
+    if (!filePath) return null;
+    try {
+        const json = await fs.promises.readFile(filePath, 'utf8');
+        const data = JSON.parse(json);
+        return Array.isArray(data) ? data : null;
+    } catch (err) {
+        console.warn('[Velora cache] Failed to read category snapshot', action, sourceId, categoryId, err.message);
+        return null;
+    }
+}
+
 function getSnapshot(action, categoryId = null) {
     const snapshot = loadSnapshotFromDisk();
     if (!snapshot || !Array.isArray(snapshot[action])) return null;
@@ -425,6 +438,7 @@ function startAutoWarmTimer() {
 }
 
 module.exports = {
+    getCategorySnapshot,
     getSnapshot,
     getStatus,
     hasReadySnapshot,

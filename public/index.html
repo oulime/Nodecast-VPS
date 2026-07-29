@@ -1375,7 +1375,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=provider-api-search-20260714-2"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=manual-curation-fix-20260729-13"></script>
     <script defer src="/assets/manual-pays.js?v=20260729"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
@@ -3897,6 +3897,7 @@
               </main>
               <aside><div class="manual-pays__section-title"><span>3</span><h3>Pays visibles dans l'app</h3></div>
                 <form id="mp-country-form" class="manual-pays__country-form"><input id="mp-country-name" type="text" placeholder="Nouveau pays" autocomplete="off" /><button type="submit" class="primary">Créer</button></form>
+                <label class="manual-pays__country-search"><span>Rechercher un pays</span><input id="mp-country-filter" type="search" placeholder="France, Maroc..." autocomplete="off" /></label>
                 <p class="manual-pays__drop-help">Déposez un package sur un pays.</p><div id="mp-country-list" class="manual-pays__country-list"></div>
               </aside>
             </div>
@@ -3920,6 +3921,18 @@
                   <div><select id="mp-dialog-package-select"></select><button id="mp-dialog-add" type="button" class="primary">Ajouter</button></div>
                 </div>
                 <div id="mp-dialog-package-list" class="manual-pays-dialog__list"></div>
+              </div>
+            </dialog>
+            <dialog id="mp-delete-country-dialog" class="manual-pays-dialog manual-pays-confirm">
+              <div class="manual-pays-dialog__panel">
+                <div class="manual-pays-confirm__icon">!</div>
+                <h2>Supprimer ce pays ?</h2>
+                <p id="mp-delete-country-message"></p>
+                <p class="manual-pays-confirm__warning">Tous ses packages et toutes ses affectations seront également supprimés. Cette action est définitive.</p>
+                <div class="manual-pays-confirm__actions">
+                  <button id="mp-delete-country-cancel" type="button" class="secondary">Annuler</button>
+                  <button id="mp-delete-country-confirm" type="button" class="manual-pays-confirm__delete">Supprimer définitivement</button>
+                </div>
               </div>
             </dialog>
           </section>

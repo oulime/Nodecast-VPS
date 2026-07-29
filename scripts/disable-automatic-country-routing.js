@@ -39,7 +39,19 @@ const replacements = [
     ],
     [
         'function Dh(s){if(!_)return[];',
-        'function Dh(s){if(!_)return[];if((G==="movies"||G==="series")&&Ze(s)){const e=tG(s),t=G==="movies"?_.vodStreamsByCat:_.seriesStreamsByCat,r=[];for(const n of t.values())for(const i of n)e.has(String(i.stream_id??i.series_id??i.item_id??i.id))&&r.push(i);return r.sort((n,i)=>Re(n.name).localeCompare(Re(i.name),"fr"))}'
+        'function Dh(s){if(!_)return[];if(Ze(s)){const e=tG(s),t=G==="movies"?_.vodStreamsByCat:G==="series"?_.seriesStreamsByCat:_.streamsByCatAll,r=[],n=new Set;for(const i of t.values())for(const a of i){const o=String(a.stream_id??a.series_id??a.item_id??a.id);e.has(o)&&!n.has(o)&&(n.add(o),r.push(a))}return r.sort((i,a)=>Re(i.name).localeCompare(Re(a.name),"fr"))}'
+    ],
+    [
+        'o=(r==="movies"||r==="series")&&!Ze(s)&&!Rw(r,s)',
+        'o=(r==="movies"||r==="series")&&!Rw(r,Ze(s)?(wc().packages.find(c=>Jn(c.name)===Jn(t.name))?.id??s):s)'
+    ],
+    [
+        'o&&(async()=>{try{await kw(r,s)}finally{',
+        'o&&(async()=>{try{const c=Ze(s)?(wc().packages.find(u=>Jn(u.name)===Jn(t.name))?.id??s):s;await kw(r,c)}finally{'
+    ],
+    [
+        'const e=wc().packages.find(t=>t.id===s)??(G==="live"?es.find(t=>t.id===s):void 0);',
+        'const e=wc().packages.find(t=>t.id===s)??es.find(t=>t.id===s);'
     ],
     [
         'function uG(){const s=Sr(),e=kn(),t=e?ot(e):"",r=new Map;for(const n of es){',
@@ -73,6 +85,19 @@ for (const [before, after] of replacements) {
 const manualTabMatcher = 'function __velManualPackageMatchesTab(s){const e=Jn(s.name);if(e&&wc().packages.some(t=>Jn(t.name)===e))return!0;if(!_||!Ze(s.id))return!1;const t=tG(s.id),r=G==="movies"?_.vodStreamsByCat:G==="series"?_.seriesStreamsByCat:_.streamsByCatAll;for(const n of r.values())for(const i of n)if(t.has(String(i.stream_id??i.series_id??i.item_id??i.id)))return!0;return!1}';
 while (source.includes(manualTabMatcher + manualTabMatcher)) {
     source = source.replace(manualTabMatcher + manualTabMatcher, manualTabMatcher);
+    changed = true;
+}
+
+const oldManualContentResolver = 'if((G==="movies"||G==="series")&&Ze(s)){const e=tG(s),t=G==="movies"?_.vodStreamsByCat:_.seriesStreamsByCat,r=[];for(const n of t.values())for(const i of n)e.has(String(i.stream_id??i.series_id??i.item_id??i.id))&&r.push(i);return r.sort((n,i)=>Re(n.name).localeCompare(Re(i.name),"fr"))}';
+source = source.replaceAll(oldManualContentResolver, '');
+const manualContentResolver = 'if(Ze(s)){const e=tG(s),t=G==="movies"?_.vodStreamsByCat:G==="series"?_.seriesStreamsByCat:_.streamsByCatAll,r=[],n=new Set;for(const i of t.values())for(const a of i){const o=String(a.stream_id??a.series_id??a.item_id??a.id);e.has(o)&&!n.has(o)&&(n.add(o),r.push(a))}return r.sort((i,a)=>Re(i.name).localeCompare(Re(a.name),"fr"))}';
+while (source.includes(manualContentResolver + manualContentResolver)) {
+    source = source.replace(manualContentResolver + manualContentResolver, manualContentResolver);
+    changed = true;
+}
+const curationRefreshListener = 'window.addEventListener("velora-admin-curation-changed",()=>{xt().then(()=>{_&&Nt()}).catch(s=>console.warn("[manual-curation-refresh]",s))});';
+while (source.includes(curationRefreshListener + curationRefreshListener)) {
+    source = source.replace(curationRefreshListener + curationRefreshListener, curationRefreshListener);
     changed = true;
 }
 

@@ -67,6 +67,30 @@ router.get('/status', async (req, res) => {
     }
 });
 
+// Source names for the manual Pays organizer. A development checkout can use
+// the VPS catalogue without receiving or storing provider passwords locally.
+router.get('/catalog', async (req, res) => {
+    try {
+        const local = await sources.getAll();
+        const activeLocal = local.filter(source => source.enabled && source.type === 'xtream');
+        if (activeLocal.length) {
+            return res.json(activeLocal.map(({ password, ...source }) => source));
+        }
+        const upstream = await fetch('https://nodecast.veloravip.net/api/sources', {
+            headers: { accept: 'application/json' },
+            cache: 'no-store'
+        });
+        if (!upstream.ok) {
+            return res.status(502).json({ error: `VPS sources returned HTTP ${upstream.status}` });
+        }
+        const remote = await upstream.json();
+        res.json(Array.isArray(remote) ? remote : []);
+    } catch (err) {
+        console.error('Error getting catalogue sources:', err);
+        res.status(502).json({ error: 'Failed to get local or VPS catalogue sources' });
+    }
+});
+
 // Get sources by type
 router.get('/type/:type', async (req, res) => {
     try {

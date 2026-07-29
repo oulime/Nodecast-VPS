@@ -1376,8 +1376,10 @@
       rel="stylesheet"
     />
     <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=provider-api-search-20260714-2"></script>
+    <script defer src="/assets/manual-pays.js?v=20260729"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
+    <link rel="stylesheet" href="/assets/manual-pays.css?v=20260729">
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css">
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=package-section-title-20260711">
     <style>
@@ -3869,55 +3871,57 @@
 
           <section
             id="settings-tab-countries"
-            class="settings-tab-panel panel countries-admin-form countries-admin-countries-section hidden"
+            class="settings-tab-panel panel countries-admin-form countries-admin-countries-section manual-pays hidden"
             role="tabpanel"
             aria-labelledby="settings-tab-btn-countries"
             data-settings-tab="countries"
             hidden
           >
-            <h2>Pays (liste de correspondance)</h2>
-            <p class="countries-admin-intro" style="margin-top: 0">
-              Chaque ligne associe une <strong>clé de reconnaissance</strong> (texte normalisé au début du nom de
-              catégorie, ex. <code>france</code>, <code>cameroon</code>) au <strong>nom affiché</strong> dans le menu
-              Pays. Vide = le lecteur utilise la liste intégrée par défaut.
-            </p>
-            <p id="countries-admin-status" class="status" aria-live="polite"></p>
-
-            <h3 id="cc-form-heading" class="countries-admin-subheading">Ajouter</h3>
-            <div class="field row">
-              <div>
-                <label for="cc-match">Clé (ex. france, brazil, [ALB])</label>
-                <input id="cc-match" type="text" placeholder="france ou [ALB]" autocomplete="off" />
+            <div class="manual-pays__heading">
+              <div><span class="manual-pays__eyebrow">ORGANISATION MANUELLE</span><h2>Pays &amp; packages</h2>
+                <p>Choisissez un stream, recherchez un package, puis glissez-le vers le pays qui doit l'afficher.</p>
               </div>
-              <div>
-                <label for="cc-display">Nom affiché</label>
-                <input id="cc-display" type="text" placeholder="France" autocomplete="off" />
+              <button id="mp-refresh" type="button" class="secondary">Actualiser</button>
+            </div>
+            <p id="countries-admin-status" class="status" aria-live="polite">Chargement...</p>
+            <div class="manual-pays__content-tabs" role="tablist" aria-label="Type de contenu">
+              <button type="button" role="tab" class="is-active" data-mp-kind="live" aria-selected="true">Live</button>
+              <button type="button" role="tab" data-mp-kind="vod" aria-selected="false">Movies</button>
+              <button type="button" role="tab" data-mp-kind="series" aria-selected="false">Series</button>
+            </div>
+            <div class="manual-pays__layout">
+              <aside><div class="manual-pays__section-title"><span>1</span><h3>Streams</h3></div><div id="mp-stream-list" class="manual-pays__stream-list"></div></aside>
+              <main><div class="manual-pays__section-title"><span>2</span><h3>Packages du stream</h3></div>
+                <label class="manual-pays__search"><span>Rechercher</span><input id="mp-package-filter" type="search" placeholder="Nom du package..." autocomplete="off" /></label>
+                <div id="mp-package-list" class="manual-pays__package-list"></div>
+              </main>
+              <aside><div class="manual-pays__section-title"><span>3</span><h3>Pays visibles dans l'app</h3></div>
+                <form id="mp-country-form" class="manual-pays__country-form"><input id="mp-country-name" type="text" placeholder="Nouveau pays" autocomplete="off" /><button type="submit" class="primary">Créer</button></form>
+                <p class="manual-pays__drop-help">Déposez un package sur un pays.</p><div id="mp-country-list" class="manual-pays__country-list"></div>
+              </aside>
+            </div>
+            <!-- Compatibility hooks for the legacy settings bundle. The old rule editor is intentionally hidden. -->
+            <div hidden aria-hidden="true">
+              <input id="cc-match" /><input id="cc-display" />
+              <button id="cc-add" type="button"></button><button id="cc-cancel-edit" type="button"></button>
+              <span id="cc-form-heading"></span><div id="cc-table-wrap"></div>
+              <button id="cc-export-json" type="button"></button><button id="cc-import-json" type="button"></button>
+              <input id="cc-import-json-file" type="file" />
+            </div>
+            <dialog id="mp-country-dialog" class="manual-pays-dialog">
+              <div class="manual-pays-dialog__panel">
+                <header class="manual-pays-dialog__header">
+                  <div><span class="manual-pays__eyebrow">GESTION DU PAYS</span><h2 id="mp-dialog-title">Packages</h2></div>
+                  <button id="mp-dialog-close" type="button" class="manual-pays-dialog__close" aria-label="Fermer">×</button>
+                </header>
+                <p id="mp-dialog-status" class="status" aria-live="polite"></p>
+                <div class="manual-pays-dialog__add">
+                  <label for="mp-dialog-package-select">Ajouter depuis le stream sélectionné</label>
+                  <div><select id="mp-dialog-package-select"></select><button id="mp-dialog-add" type="button" class="primary">Ajouter</button></div>
+                </div>
+                <div id="mp-dialog-package-list" class="manual-pays-dialog__list"></div>
               </div>
-            </div>
-            <div class="actions">
-              <button type="button" id="cc-add" class="primary">Ajouter</button>
-              <button type="button" id="cc-cancel-edit" class="countries-admin-cancel hidden">Annuler</button>
-            </div>
-
-            <div class="countries-admin-entries-head" style="margin-top: 1.5rem">
-              <h3 class="countries-admin-subheading">Entrées</h3>
-              <div class="countries-admin-io actions">
-                <button type="button" id="cc-export-json" class="secondary">
-                  Exporter JSON
-                </button>
-                <button type="button" id="cc-import-json" class="secondary">
-                  Importer JSON
-                </button>
-                <input
-                  type="file"
-                  id="cc-import-json-file"
-                  class="hidden"
-                  accept="application/json,.json"
-                  aria-label="Fichier JSON des correspondances pays"
-                />
-              </div>
-            </div>
-            <div id="cc-table-wrap" class="countries-admin-table-wrap"></div>
+            </dialog>
           </section>
 
           <section

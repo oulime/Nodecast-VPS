@@ -9091,6 +9091,16 @@ if (target.closest(".trial-offer-button")) {
           0 3px 9px rgba(0, 0, 0, 0.42);
       }
 
+      .vel-bottom-nav__icon-frame {
+        width: 22px;
+        height: 22px;
+        flex: 0 0 22px;
+        display: grid;
+        place-items: center;
+        color: inherit;
+        filter: drop-shadow(0 0 7px rgba(117, 99, 255, 0.25));
+      }
+
       .vel-bottom-nav__flag[hidden] {
         display: none;
       }
@@ -9176,6 +9186,119 @@ if (target.closest(".trial-offer-button")) {
         display: none !important;
         visibility: hidden !important;
         pointer-events: none !important;
+      }
+
+      .main--velora .vel-sticky-top {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+      }
+
+      /* Search uses the same glass/neon visual language as the bottom bar. */
+      .vel-global-search {
+        --vel-search-bottom-space: calc(var(--vel-bottom-nav-height) + 24px + env(safe-area-inset-bottom, 0px));
+        place-items: center;
+        padding:
+          max(14px, env(safe-area-inset-top, 0px))
+          max(14px, env(safe-area-inset-right, 0px))
+          var(--vel-search-bottom-space)
+          max(14px, env(safe-area-inset-left, 0px));
+        background:
+          radial-gradient(circle at 18% 10%, rgba(126, 87, 255, 0.17), transparent 38%),
+          radial-gradient(circle at 84% 86%, rgba(52, 197, 255, 0.09), transparent 34%),
+          rgba(3, 4, 13, 0.84);
+        -webkit-backdrop-filter: blur(22px) saturate(135%);
+        backdrop-filter: blur(22px) saturate(135%);
+      }
+
+      .vel-global-search__panel {
+        width: min(760px, 100%);
+        height: min(720px, calc(100dvh - var(--vel-search-bottom-space) - max(28px, env(safe-area-inset-top, 0px))));
+        max-height: calc(100dvh - var(--vel-search-bottom-space) - max(28px, env(safe-area-inset-top, 0px)));
+        margin-top: 0;
+        border: 1px solid rgba(151, 135, 255, 0.3);
+        border-radius: 24px;
+        background:
+          linear-gradient(145deg, rgba(30, 25, 61, 0.95), rgba(7, 11, 27, 0.97));
+        box-shadow:
+          0 28px 80px rgba(0, 0, 0, 0.62),
+          0 0 38px rgba(109, 77, 255, 0.17),
+          inset 0 1px 0 rgba(255, 255, 255, 0.09);
+      }
+
+      .vel-global-search__bar {
+        gap: 0.7rem;
+        padding: 0.9rem;
+        border-bottom-color: rgba(151, 135, 255, 0.16);
+      }
+
+      .vel-global-search__input {
+        min-height: 3rem;
+        border-color: rgba(151, 135, 255, 0.26);
+        border-radius: 15px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
+          rgba(3, 5, 17, 0.72);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+      }
+
+      .vel-global-search__input:focus {
+        border-color: rgba(126, 87, 255, 0.8);
+        box-shadow:
+          0 0 0 3px rgba(126, 87, 255, 0.16),
+          0 0 24px rgba(83, 151, 255, 0.13);
+      }
+
+      .vel-global-search__close {
+        width: 2.65rem;
+        height: 2.65rem;
+        border: 1px solid rgba(151, 135, 255, 0.23);
+        border-radius: 14px;
+        background: rgba(125, 92, 255, 0.1);
+      }
+
+      .vel-global-search__close:hover,
+      .vel-global-search__close:focus-visible {
+        background: linear-gradient(145deg, rgba(126, 87, 255, 0.3), rgba(52, 197, 255, 0.12));
+        box-shadow: 0 0 22px rgba(109, 77, 255, 0.22);
+      }
+
+      .vel-global-search__result,
+      .vel-global-search__more {
+        border-color: rgba(151, 135, 255, 0.18);
+        border-radius: 15px;
+        background:
+          linear-gradient(145deg, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.025)),
+          rgba(8, 10, 25, 0.56);
+      }
+
+      .vel-global-search__result:hover,
+      .vel-global-search__result:focus-visible,
+      .vel-global-search__more:hover,
+      .vel-global-search__more:focus-visible {
+        border-color: rgba(126, 87, 255, 0.62);
+        background: linear-gradient(145deg, rgba(126, 87, 255, 0.2), rgba(52, 197, 255, 0.07));
+        box-shadow: 0 0 22px rgba(109, 77, 255, 0.12);
+      }
+
+      .vel-global-search__thumb {
+        border-color: rgba(151, 135, 255, 0.22);
+        border-radius: 12px;
+      }
+
+      @media (max-width: 640px) {
+        .vel-global-search {
+          --vel-search-bottom-space: calc(var(--vel-bottom-nav-height) + 12px + env(safe-area-inset-bottom, 0px));
+          padding:
+            max(8px, env(safe-area-inset-top, 0px))
+            8px
+            var(--vel-search-bottom-space);
+        }
+
+        .vel-global-search__panel {
+          height: calc(100dvh - var(--vel-search-bottom-space) - max(16px, env(safe-area-inset-top, 0px)));
+          max-height: calc(100dvh - var(--vel-search-bottom-space) - max(16px, env(safe-area-inset-top, 0px)));
+          border-radius: 20px;
+        }
       }
 
       .vel-home-empty-page {
@@ -9284,7 +9407,9 @@ if (target.closest(".trial-offer-button")) {
         <span class="vel-bottom-nav__label">Séries</span>
       </button>
       <button type="button" class="vel-bottom-nav__button" data-bottom-nav="country" aria-label="Choisir un pays">
-        <img id="vel-bottom-country-flag" class="vel-bottom-nav__flag" alt="" decoding="async" hidden />
+        <span class="vel-bottom-nav__icon-frame" aria-hidden="true">
+          <img id="vel-bottom-country-flag" class="vel-bottom-nav__flag" alt="" decoding="async" hidden />
+        </span>
         <span class="vel-bottom-nav__label">Pays</span>
       </button>
       <button type="button" class="vel-bottom-nav__button" data-bottom-nav="search" aria-label="Recherche">

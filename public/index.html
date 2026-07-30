@@ -1376,10 +1376,10 @@
       rel="stylesheet"
     />
     <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=manual-curation-open-fix-20260729-16"></script>
-    <script defer src="/assets/manual-pays.js?v=20260729"></script>
+    <script defer src="/assets/manual-pays.js?v=20260729-whole-word"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
-    <link rel="stylesheet" href="/assets/manual-pays.css?v=20260729">
+    <link rel="stylesheet" href="/assets/manual-pays.css?v=20260729-whole-word">
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css">
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=package-section-title-20260711">
     <style>
@@ -3878,7 +3878,7 @@
             hidden
           >
             <div class="manual-pays__heading">
-              <div><span class="manual-pays__eyebrow">ORGANISATION MANUELLE</span><h2>Pays &amp; packages</h2>
+              <div><span class="manual-pays__eyebrow">ORGANISATION MANUELLE</span><h2><span id="mp-heading-loader" class="manual-pays__loader" aria-hidden="true"></span>Pays &amp; packages</h2>
                 <p>Choisissez un stream, recherchez un package, puis glissez-le vers le pays qui doit l'afficher.</p>
               </div>
               <button id="mp-refresh" type="button" class="secondary">Actualiser</button>
@@ -3892,7 +3892,8 @@
             <div class="manual-pays__layout">
               <aside><div class="manual-pays__section-title"><span>1</span><h3>Streams</h3></div><div id="mp-stream-list" class="manual-pays__stream-list"></div></aside>
               <main><div class="manual-pays__section-title"><span>2</span><h3>Packages du stream</h3></div>
-                <label class="manual-pays__search"><span>Rechercher</span><input id="mp-package-filter" type="search" placeholder="Nom du package..." autocomplete="off" /></label>
+                <div class="manual-pays__search"><label for="mp-package-filter">Rechercher</label><div class="manual-pays__search-control"><input id="mp-package-filter" type="search" placeholder="Nom du package..." autocomplete="off" /><label class="manual-pays__whole-word" title="Rechercher le mot ou l'expression entière"><input id="mp-package-filter-whole" type="checkbox" checked /><span aria-hidden="true">ab</span><span class="sr-only">Mot entier</span></label></div></div>
+                <div class="manual-pays__search manual-pays__search--exclude"><label for="mp-package-exclude">Exclure</label><div class="manual-pays__search-control"><input id="mp-package-exclude" type="search" placeholder="Ex. test, backup, 4K..." autocomplete="off" /><label class="manual-pays__whole-word" title="Exclure le mot ou l'expression entière"><input id="mp-package-exclude-whole" type="checkbox" checked /><span aria-hidden="true">ab</span><span class="sr-only">Mot entier</span></label></div></div>
                 <div id="mp-package-list" class="manual-pays__package-list"></div>
               </main>
               <aside><div class="manual-pays__section-title"><span>3</span><h3>Pays visibles dans l'app</h3></div>
@@ -3919,6 +3920,10 @@
                 <div class="manual-pays-dialog__add">
                   <label for="mp-dialog-package-select">Ajouter depuis le stream sélectionné</label>
                   <div><select id="mp-dialog-package-select"></select><button id="mp-dialog-add" type="button" class="primary">Ajouter</button></div>
+                </div>
+                <div class="manual-pays-dialog__merge">
+                  <span id="mp-dialog-merge-count">Sélectionnez au moins 2 packages</span>
+                  <button id="mp-dialog-merge" type="button" class="primary" disabled>Fusionner la sélection</button>
                 </div>
                 <div id="mp-dialog-package-list" class="manual-pays-dialog__list"></div>
               </div>

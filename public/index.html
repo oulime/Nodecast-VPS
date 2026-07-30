@@ -10,6 +10,22 @@
     <script>
       (function () {
         try {
+          var url = new URL(window.location.href);
+          var paidEntry = url.searchParams.get("paid") === "1";
+          if (!paidEntry) return;
+          if (!window.localStorage.getItem("authToken")) {
+            window.location.replace("/");
+            return;
+          }
+          url.searchParams.delete("paid");
+          var clean = url.pathname + (url.searchParams.toString() ? "?" + url.searchParams.toString() : "") + url.hash;
+          window.history.replaceState(window.history.state, "", clean || "/");
+        } catch (_) {}
+      })();
+    </script>
+    <script>
+      (function () {
+        try {
           var query = window.location.search || "";
           var tvMatch = query.match(/[?&]tv=([^&]*)/);
           var tvParam = tvMatch ? decodeURIComponent(tvMatch[1].replace(/\+/g, " ")) : null;
@@ -1435,11 +1451,43 @@
       rel="stylesheet"
     />
     <script src="/assets/local-velora-data.js?v=20260730-sqlite-cutover"></script>
+    <script>
+      (function () {
+        var originalFetch = window.fetch;
+        if (!originalFetch || originalFetch.__veloraPaidAccessPatched) return;
+        function isTrialApi(input) {
+          try {
+            var url = typeof input === "string" ? input : input && input.url;
+            if (!url) return false;
+            var target = new URL(url, window.location.origin);
+            return target.origin === window.location.origin && (target.pathname === "/api/trial-status" || target.pathname === "/api/trial-increment");
+          } catch (_) { return false; }
+        }
+        function token() {
+          try { return localStorage.getItem("authToken") || ""; } catch (_) { return ""; }
+        }
+        function isTrialEntry() {
+          try { return window.location.pathname.replace(/\/+$/, "") === "/trial"; } catch (_) { return false; }
+        }
+        window.fetch = function (input, init) {
+          if (!isTrialApi(input)) return originalFetch.apply(this, arguments);
+          var nextInit = Object.assign({}, init || {});
+          var headers = new Headers(nextInit.headers || (input && input.headers) || {});
+          var authToken = isTrialEntry() ? "" : token();
+          if (authToken && !headers.has("Authorization")) headers.set("Authorization", "Bearer " + authToken);
+          nextInit.headers = headers;
+          return originalFetch.call(this, input, nextInit);
+        };
+        window.fetch.__veloraPaidAccessPatched = true;
+      })();
+    </script>
     <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=search-select-live-channel-20260730-50"></script>
     <script defer src="/assets/manual-pays.js?v=20260730-hide-autres"></script>
+    <script defer src="/assets/paid-users-admin.js?v=20260730-paid-users-supabase"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
     <link rel="stylesheet" href="/assets/manual-pays.css?v=20260729-whole-word">
+    <link rel="stylesheet" href="/assets/paid-users-admin.css?v=20260730-paid-users-supabase">
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css">
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=package-section-title-20260711">
     <style>
@@ -3649,6 +3697,22 @@
     </style>
   </head>
   <body class="vite-autoconnect vel-home-choice-loading vel-home-choice-catalog-pending">
+    <script>
+      (function () {
+        try {
+          var params = new URLSearchParams(window.location.search);
+          if (params.get("settings") === "1" || params.get("admin") === "1") {
+            document.body.classList.remove(
+              "vite-autoconnect",
+              "vel-home-choice-loading",
+              "vel-home-choice-catalog-pending"
+            );
+          }
+        } catch (error) {
+          /* Admin startup guard is best-effort. */
+        }
+      })();
+    </script>
     <div id="settings-shell" class="settings-shell countries-admin-page hidden" aria-hidden="true">
       <div id="settings-view-granted">
         <header class="countries-admin-head">
@@ -4965,6 +5029,12 @@
         var syncStarted = 0;
 
         function showCatalogLoader() {
+          try {
+            var params = new URLSearchParams(window.location.search);
+            if (params.get("settings") === "1" || params.get("admin") === "1") return;
+          } catch (error) {
+            /* Continue normally when URLSearchParams is unavailable. */
+          }
           var overlay = document.getElementById("catalog-loading-overlay");
           if (!overlay) return;
           overlay.classList.remove("hidden");
@@ -8909,3 +8979,5 @@ if (target.closest(".trial-offer-button")) {
 
   </body>
 </html>
+
+

@@ -3,6 +3,9 @@ const crypto = require('crypto');
 const fs = require('fs/promises');
 const net = require('net');
 const path = require('path');
+const auth = require('../auth');
+const db = require('../db');
+const paidUsersStore = require('../services/paidUsersStore');
 
 const router = express.Router();
 const localTrialUsage = new Map();
@@ -125,6 +128,82 @@ function resolveDeviceId(req) {
     return req.get('x-velora-trial-device-id') || `nodecast-${Math.random().toString(36).slice(2)}`;
 }
 
+function tokenFromRequest(req) {
+    const authHeader = headerValue(req, 'authorization');
+    return /^Bearer\s+(.+)$/i.exec(authHeader)?.[1]?.trim() || '';
+}
+
+function subscriptionStatus(user) {
+    if (!user || user.role === 'admin') return 'admin';
+    if (user.subscriptionBlocked) return 'blocked';
+    if (!user.subscriptionEnd) return 'trial';
+    const end = new Date(user.subscriptionEnd);
+    if (Number.isNaN(end.getTime())) return 'expired';
+    return end.getTime() > Date.now() ? 'active' : 'expired';
+}
+
+async function authenticatedUser(req) {
+    const token = tokenFromRequest(req);
+    if (!token) return null;
+    const payload = auth.verifyToken(token);
+    if (!payload?.id) return null;
+    const localUser = await db.users.getById(payload.id);
+    if (localUser?.role === 'admin') return localUser;
+    if (paidUsersStore.isSupabaseEnabled()) return paidUsersStore.getById(payload.id);
+    return localUser || paidUsersStore.getById(payload.id);
+}
+
+function buildPaidPayload(req, user, deviceId = resolveDeviceId(req)) {
+    const limitSeconds = trialLimitSeconds();
+    const status = user.role === 'admin' ? 'admin' : 'active';
+    return {
+        allowed: true,
+        whitelisted: true,
+        paid: user.role !== 'admin',
+        unlimited: true,
+        deviceId,
+        userId: user.id,
+        username: user.username,
+        displayName: user.displayName || null,
+        subscriptionStart: user.subscriptionStart || null,
+        subscriptionEnd: user.subscriptionEnd || null,
+        subscriptionStatus: status,
+        secondsUsed: 0,
+        secondsRemaining: limitSeconds,
+        limitSeconds,
+        checkoutUrl: process.env.VELORA_CHECKOUT_URL || '/checkout'
+    };
+}
+
+function buildSubscriptionDeniedPayload(req, user, deviceId = resolveDeviceId(req)) {
+    const limitSeconds = trialLimitSeconds();
+    const status = subscriptionStatus(user);
+    return {
+        allowed: false,
+        whitelisted: false,
+        paid: false,
+        accountRequired: true,
+        deviceId,
+        userId: user.id,
+        username: user.username,
+        displayName: user.displayName || null,
+        subscriptionStart: user.subscriptionStart || null,
+        subscriptionEnd: user.subscriptionEnd || null,
+        subscriptionStatus: status,
+        secondsUsed: limitSeconds,
+        secondsRemaining: 0,
+        limitSeconds,
+        checkoutUrl: process.env.VELORA_CHECKOUT_URL || '/checkout'
+    };
+}
+
+async function subscriptionPayloadForRequest(req, deviceId = resolveDeviceId(req)) {
+    const user = await authenticatedUser(req);
+    if (!user) return null;
+    if (user.role === 'admin' || subscriptionStatus(user) === 'active') return buildPaidPayload(req, user, deviceId);
+    return buildSubscriptionDeniedPayload(req, user, deviceId);
+}
+
 function buildTrialPayload(req, secondsUsed = 0, deviceId = resolveDeviceId(req), whitelisted = false) {
     const limitSeconds = trialLimitSeconds();
     const used = whitelisted ? 0 : Math.min(Math.max(Math.floor(secondsUsed), 0), limitSeconds);
@@ -141,6 +220,8 @@ function buildTrialPayload(req, secondsUsed = 0, deviceId = resolveDeviceId(req)
 
 async function localTrialStatus(req) {
     const deviceId = resolveDeviceId(req);
+    const subscriptionPayload = await subscriptionPayloadForRequest(req, deviceId);
+    if (subscriptionPayload) return subscriptionPayload;
     const whitelisted = req.get('x-velora-trial-test') !== '1' && await isLocallyWhitelisted(req);
     const used = Math.max(0, ...trialIdentityKeys(req, deviceId).map((key) => localTrialUsage.get(key) || 0));
     return buildTrialPayload(req, used, deviceId, whitelisted);
@@ -287,6 +368,15 @@ async function handleLocalAdminTrialReset(req, res) {
 }
 
 async function forwardVeloraApiRequest(req, res, path, options = {}) {
+    if (options.localFallback) {
+        const payload = await subscriptionPayloadForRequest(req);
+        if (payload) {
+            res.setHeader('X-Velora-Trial-Device-Id', payload.deviceId);
+            res.status(200).json(payload);
+            return;
+        }
+    }
+
     const base = shouldUseRemoteTrialApi() ? trialApiBase() : '';
     if (!base) {
         if (options.localFallback) {
@@ -331,6 +421,152 @@ async function forwardVeloraApiRequest(req, res, path, options = {}) {
     }
 }
 
+function sanitizePaidText(value, maxLength = 160) {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed ? trimmed.slice(0, maxLength) : null;
+}
+
+function paidPlanMonths(value) {
+    const months = Number.parseInt(value, 10);
+    if (![1, 3, 6, 12, 24].includes(months)) {
+        throw new Error('Period must be 1, 3, 6, 12, or 24 months');
+    }
+    return months;
+}
+
+function addPaidMonths(date, months) {
+    const next = new Date(date.getTime());
+    const day = next.getDate();
+    next.setMonth(next.getMonth() + months);
+    if (next.getDate() !== day) next.setDate(0);
+    return next;
+}
+
+function paidPublicUser(user) {
+    if (!user) return null;
+    const { passwordHash, ...safe } = user;
+    return {
+        ...safe,
+        displayName: safe.displayName || null,
+        subscriptionStart: safe.subscriptionStart || null,
+        subscriptionEnd: safe.subscriptionEnd || null,
+        subscriptionPlanMonths: safe.subscriptionPlanMonths || null,
+        subscriptionBlocked: Boolean(safe.subscriptionBlocked),
+        subscriptionStatus: subscriptionStatus(safe)
+    };
+}
+
+async function listPaidUsers(req, res) {
+    if (!requireLocalAdmin(req, res)) return;
+    const allUsers = await paidUsersStore.getAll();
+    res.json(allUsers.filter(user => user.role !== 'admin').map(paidPublicUser));
+}
+
+async function createPaidUser(req, res) {
+    if (!requireLocalAdmin(req, res)) return;
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const username = sanitizePaidText(body.username, 80);
+    const password = typeof body.password === 'string' ? body.password : '';
+    if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
+    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    const months = paidPlanMonths(body.subscriptionPlanMonths || 1);
+    const start = new Date();
+    const end = addPaidMonths(start, months);
+    const passwordHash = await auth.hashPassword(password);
+    const user = await paidUsersStore.create({
+        username,
+        passwordHash,
+        role: 'viewer',
+        displayName: sanitizePaidText(body.displayName),
+        subscriptionStart: start.toISOString(),
+        subscriptionEnd: end.toISOString(),
+        subscriptionPlanMonths: months,
+        subscriptionBlocked: false
+    });
+    res.status(201).json(paidPublicUser(user));
+}
+
+async function updatePaidUser(req, res) {
+    if (!requireLocalAdmin(req, res)) return;
+    const existing = await paidUsersStore.getById(req.params.id);
+    if (!existing || existing.role === 'admin') return res.status(404).json({ error: 'User not found' });
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const updates = {};
+    if (Object.prototype.hasOwnProperty.call(body, 'displayName')) updates.displayName = sanitizePaidText(body.displayName);
+    if (Object.prototype.hasOwnProperty.call(body, 'username')) {
+        const username = sanitizePaidText(body.username, 80);
+        if (!username) return res.status(400).json({ error: 'Username is required' });
+        updates.username = username;
+    }
+    if (body.password) {
+        if (String(body.password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+        updates.passwordHash = await auth.hashPassword(String(body.password));
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'subscriptionBlocked')) updates.subscriptionBlocked = Boolean(body.subscriptionBlocked);
+    const user = await paidUsersStore.update(req.params.id, updates);
+    res.json(paidPublicUser(user));
+}
+
+async function renewPaidUser(req, res) {
+    if (!requireLocalAdmin(req, res)) return;
+    const existing = await paidUsersStore.getById(req.params.id);
+    if (!existing || existing.role === 'admin') return res.status(404).json({ error: 'User not found' });
+    const months = paidPlanMonths(req.body?.subscriptionPlanMonths || 1);
+    const now = new Date();
+    const currentEnd = existing.subscriptionEnd ? new Date(existing.subscriptionEnd) : null;
+    const base = currentEnd && currentEnd.getTime() > now.getTime() ? currentEnd : now;
+    const end = addPaidMonths(base, months);
+    const user = await paidUsersStore.update(req.params.id, {
+        subscriptionStart: existing.subscriptionStart || now.toISOString(),
+        subscriptionEnd: end.toISOString(),
+        subscriptionPlanMonths: months,
+        subscriptionBlocked: false
+    });
+    res.json(paidPublicUser(user));
+}
+
+async function deletePaidUser(req, res) {
+    if (!requireLocalAdmin(req, res)) return;
+    const existing = await paidUsersStore.getById(req.params.id);
+    if (!existing || existing.role === 'admin') return res.status(404).json({ error: 'User not found' });
+    await paidUsersStore.delete(req.params.id);
+    res.json({ success: true });
+}
+
+async function paidUsersStorageInfo(req, res) {
+    if (!requireLocalAdmin(req, res)) return;
+    res.json(paidUsersStore.config());
+}
+
+async function migrateLocalPaidUsers(req, res) {
+    if (!requireLocalAdmin(req, res)) return;
+    const overwrite = req.body?.overwrite === true;
+    const result = await paidUsersStore.importLocalPaidUsers({ overwrite });
+    res.json(result);
+}
+
+router.get('/admin/paid-users/storage', (req, res) => {
+    void paidUsersStorageInfo(req, res).catch(err => res.status(500).json({ error: err?.message || 'Failed to read paid user storage config' }));
+});
+router.post('/admin/paid-users/migrate-local', (req, res) => {
+    void migrateLocalPaidUsers(req, res).catch(err => res.status(500).json({ error: err?.message || 'Failed to migrate local paid users' }));
+});
+router.get('/admin/paid-users', (req, res) => {
+    void listPaidUsers(req, res).catch(err => res.status(500).json({ error: err?.message || 'Failed to list paid users' }));
+});
+router.post('/admin/paid-users', (req, res) => {
+    void createPaidUser(req, res).catch(err => res.status(500).json({ error: err?.message || 'Failed to create paid user' }));
+});
+router.put('/admin/paid-users/:id', (req, res) => {
+    void updatePaidUser(req, res).catch(err => res.status(500).json({ error: err?.message || 'Failed to update paid user' }));
+});
+router.post('/admin/paid-users/:id/renew', (req, res) => {
+    void renewPaidUser(req, res).catch(err => res.status(500).json({ error: err?.message || 'Failed to renew paid user' }));
+});
+router.delete('/admin/paid-users/:id', (req, res) => {
+    void deletePaidUser(req, res).catch(err => res.status(500).json({ error: err?.message || 'Failed to delete paid user' }));
+});
 router.get('/trial-status', (req, res) => {
     void forwardVeloraApiRequest(req, res, '/api/trial-status', { localFallback: localTrialStatus });
 });

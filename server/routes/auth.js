@@ -2,49 +2,116 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const auth = require('../auth');
+const paidUsersStore = require('../services/paidUsersStore');
+
+async function findLoginUserByUsername(username) {
+    const localUser = await db.users.getByUsername(username);
+    if (localUser?.role === 'admin') return localUser;
+    if (paidUsersStore.isSupabaseEnabled()) return paidUsersStore.getByUsername(username);
+    return localUser || paidUsersStore.getByUsername(username);
+}
+
+async function findLoginUserById(id) {
+    const localUser = await db.users.getById(id);
+    if (localUser?.role === 'admin') return localUser;
+    if (paidUsersStore.isSupabaseEnabled()) return paidUsersStore.getById(id);
+    return localUser || paidUsersStore.getById(id);
+}
 
 // Configure Passport strategies
 auth.configureLocalStrategy(
-    async (username) => await db.users.getByUsername(username),
+    findLoginUserByUsername,
     async (password, hash) => await auth.verifyPassword(password, hash)
 );
 
-auth.configureJwtStrategy(
-    async (id) => await db.users.getById(id)
-);
+auth.configureJwtStrategy(findLoginUserById);
 
-// Configure Passport session serialization (required for OIDC)
-auth.configureSessionSerialization(
-    async (id) => await db.users.getById(id)
-);
+// Configure Passport session serialization
+auth.configureSessionSerialization(findLoginUserById);
 
-// Configure OIDC Strategy
-auth.configureOidcStrategy(
-    async (oidcId) => await db.users.getByOidcId(oidcId),
-    async (email) => await db.users.getByEmail(email),
-    async (userData) => await db.users.create(userData)
-);
 
-/**
- * Start OIDC Login
- * GET /api/auth/oidc/login
- */
-router.get('/oidc/login', auth.passport.authenticate('openidconnect'));
+const SUBSCRIPTION_PLAN_MONTHS = [1, 3, 6, 12, 24];
 
-/**
- * OIDC Callback
- * GET /api/auth/oidc/callback
- */
-router.get('/oidc/callback',
-    auth.passport.authenticate('openidconnect', { session: false, failureRedirect: '/login.html?error=SSO+Failed' }),
-    (req, res) => {
-        // Successful authentication
-        const token = auth.generateToken(req.user);
+function sanitizeOptionalText(value, maxLength = 160) {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed ? trimmed.slice(0, maxLength) : null;
+}
 
-        // Redirect to hompage with token
-        res.redirect(`/?token=${token}`);
+function addMonths(date, months) {
+    const next = new Date(date.getTime());
+    const day = next.getDate();
+    next.setMonth(next.getMonth() + months);
+    if (next.getDate() !== day) next.setDate(0);
+    return next;
+}
+
+function normalizePlanMonths(value) {
+    const months = Number.parseInt(value, 10);
+    if (!SUBSCRIPTION_PLAN_MONTHS.includes(months)) {
+        throw new Error('Subscription period must be 1, 3, 6, 12, or 24 months');
     }
-);
+    return months;
+}
+
+function normalizeSubscriptionStart(value) {
+    if (!value) return new Date();
+    const start = new Date(value);
+    if (Number.isNaN(start.getTime())) throw new Error('Invalid subscription start date');
+    return start;
+}
+
+function subscriptionStatus(user) {
+    if (!user || user.role === 'admin') return 'admin';
+    if (user.subscriptionBlocked) return 'blocked';
+    if (!user.subscriptionEnd) return 'trial';
+    const end = new Date(user.subscriptionEnd);
+    if (Number.isNaN(end.getTime())) return 'expired';
+    return end.getTime() > Date.now() ? 'active' : 'expired';
+}
+
+function publicUser(user) {
+    if (!user) return null;
+    const { passwordHash, ...safe } = user;
+    return {
+        ...safe,
+        displayName: safe.displayName || null,
+        subscriptionStart: safe.subscriptionStart || null,
+        subscriptionEnd: safe.subscriptionEnd || null,
+        subscriptionPlanMonths: safe.subscriptionPlanMonths || null,
+        subscriptionBlocked: Boolean(safe.subscriptionBlocked),
+        subscriptionStatus: subscriptionStatus(safe)
+    };
+}
+
+function buildSubscriptionFields(body, existing = null) {
+    const updates = {};
+    if (Object.prototype.hasOwnProperty.call(body, 'displayName')) {
+        updates.displayName = sanitizeOptionalText(body.displayName);
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'subscriptionBlocked')) {
+        updates.subscriptionBlocked = Boolean(body.subscriptionBlocked);
+    }
+
+    const planProvided = Object.prototype.hasOwnProperty.call(body, 'subscriptionPlanMonths') && body.subscriptionPlanMonths !== '' && body.subscriptionPlanMonths !== null;
+    const startProvided = Object.prototype.hasOwnProperty.call(body, 'subscriptionStart') && body.subscriptionStart;
+    const extendFromCurrent = body.extendFromCurrent === true;
+
+    if (planProvided || startProvided) {
+        const planMonths = planProvided
+            ? normalizePlanMonths(body.subscriptionPlanMonths)
+            : normalizePlanMonths(existing?.subscriptionPlanMonths || 1);
+        const currentEnd = existing?.subscriptionEnd ? new Date(existing.subscriptionEnd) : null;
+        const base = extendFromCurrent && currentEnd && currentEnd.getTime() > Date.now()
+            ? currentEnd
+            : normalizeSubscriptionStart(startProvided ? body.subscriptionStart : existing?.subscriptionStart);
+        updates.subscriptionPlanMonths = planMonths;
+        updates.subscriptionStart = base.toISOString();
+        updates.subscriptionEnd = addMonths(base, planMonths).toISOString();
+    }
+
+    return updates;
+}
 
 /**
  * Check if initial setup is required
@@ -125,11 +192,7 @@ router.post('/login', (req, res, next) => {
 
         res.json({
             token,
-            user: {
-                id: user.id,
-                username: user.username,
-                role: user.role
-            }
+            user: publicUser(user)
         });
     })(req, res, next);
 });
@@ -150,17 +213,13 @@ router.post('/logout', (req, res) => {
  */
 router.get('/me', auth.requireAuth, async (req, res) => {
     try {
-        const user = await db.users.getById(req.user.id);
+        const user = await findLoginUserById(req.user.id);
 
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        res.json({
-            id: user.id,
-            username: user.username,
-            role: user.role
-        });
+        res.json(publicUser(user));
     } catch (err) {
         console.error('Error in /me:', err);
         res.status(500).json({ error: 'Server error' });
@@ -175,13 +234,7 @@ router.get('/users', auth.requireAuth, auth.requireAdmin, async (req, res) => {
     try {
         const allUsers = await db.users.getAll();
 
-        // Remove password hashes
-        const users = allUsers.map(u => {
-            const { passwordHash, ...userWithoutPassword } = u;
-            return userWithoutPassword;
-        });
-
-        res.json(users);
+        res.json(allUsers.map(publicUser));
     } catch (err) {
         console.error('Error fetching users:', err);
         res.status(500).json({ error: 'Server error' });
@@ -194,10 +247,11 @@ router.get('/users', auth.requireAuth, auth.requireAdmin, async (req, res) => {
  */
 router.post('/users', auth.requireAuth, auth.requireAdmin, async (req, res) => {
     try {
-        const { username, password, role } = req.body;
+        const { username, password } = req.body;
+        const role = req.body.role || 'viewer';
 
-        if (!username || !password || !role) {
-            return res.status(400).json({ error: 'Username, password, and role are required' });
+        if (!username || !password) {
+            return res.status(400).json({ error: 'Username and password are required' });
         }
 
         if (password.length < 6) {
@@ -208,14 +262,23 @@ router.post('/users', auth.requireAuth, auth.requireAdmin, async (req, res) => {
             return res.status(400).json({ error: 'Role must be either "admin" or "viewer"' });
         }
 
+        const subscriptionFields = role === 'admin'
+            ? {}
+            : buildSubscriptionFields({
+                ...req.body,
+                subscriptionPlanMonths: req.body.subscriptionPlanMonths || 1,
+                subscriptionStart: req.body.subscriptionStart || new Date().toISOString()
+            });
+
         const passwordHash = await auth.hashPassword(password);
         const newUser = await db.users.create({
-            username,
+            username: username.trim(),
             passwordHash,
-            role
+            role,
+            ...subscriptionFields
         });
 
-        res.status(201).json(newUser);
+        res.status(201).json(publicUser(newUser));
     } catch (err) {
         console.error('Error creating user:', err);
         res.status(500).json({ error: err.message || 'Server error' });
@@ -230,11 +293,19 @@ router.put('/users/:id', auth.requireAuth, auth.requireAdmin, async (req, res) =
     try {
         const { id } = req.params;
         const { username, password, role } = req.body;
+        const existingUser = await db.users.getById(id);
+        if (!existingUser) {
+            return res.status(404).json({ error: 'User not found' });
+        }
 
         const updates = {};
 
         if (username) {
-            updates.username = username;
+            updates.username = username.trim();
+        }
+
+        if (Object.prototype.hasOwnProperty.call(req.body, 'displayName')) {
+            updates.displayName = sanitizeOptionalText(req.body.displayName);
         }
 
         if (password) {
@@ -250,8 +321,7 @@ router.put('/users/:id', auth.requireAuth, auth.requireAdmin, async (req, res) =
             }
 
             // Prevent removing admin role from the last admin
-            const user = await db.users.getById(id);
-            if (user && user.role === 'admin' && role !== 'admin') {
+            if (existingUser.role === 'admin' && role !== 'admin') {
                 const allUsers = await db.users.getAll();
                 const adminCount = allUsers.filter(u => u.role === 'admin').length;
                 if (adminCount <= 1) {
@@ -262,8 +332,10 @@ router.put('/users/:id', auth.requireAuth, auth.requireAdmin, async (req, res) =
             updates.role = role;
         }
 
+        Object.assign(updates, buildSubscriptionFields(req.body, existingUser));
+
         const updatedUser = await db.users.update(id, updates);
-        res.json(updatedUser);
+        res.json(publicUser(updatedUser));
     } catch (err) {
         console.error('Error updating user:', err);
         res.status(500).json({ error: err.message || 'Server error' });

@@ -397,6 +397,11 @@ const users = {
       // For OIDC users, passwordHash is optional
       passwordHash: userData.passwordHash || null,
       role: userData.role || 'viewer',
+      displayName: userData.displayName || null,
+      subscriptionStart: userData.subscriptionStart || null,
+      subscriptionEnd: userData.subscriptionEnd || null,
+      subscriptionPlanMonths: userData.subscriptionPlanMonths || null,
+      subscriptionBlocked: Boolean(userData.subscriptionBlocked),
       oidcId: userData.oidcId || null,
       email: userData.email || null,
       createdAt: new Date().toISOString()

@@ -30,7 +30,7 @@ app.use(passport.session());
 
 const publicDir = path.join(__dirname, '..', 'public');
 
-app.use(express.static(publicDir));
+app.use(express.static(publicDir, { index: false }));
 
 // FFMPEG Configuration (optional - for transcoding support)
 // Priority: 1. System FFmpeg (better Docker DNS support), 2. ffmpeg-static npm package
@@ -198,10 +198,26 @@ app.get('/api/version', (req, res) => {
     res.json({ version: pkg.version });
 });
 
-// SPA fallback - Velora is the public frontend; Nodecast remains the backend/API engine.
-app.get('*', (req, res) => {
+function sendLoginPage(req, res) {
+    res.sendFile(path.join(publicDir, 'login.html'));
+}
+
+function sendVeloraApp(req, res) {
     res.sendFile(path.join(publicDir, 'index.html'));
+}
+
+// Main domain is the paid-user entry. Logged-in browsers hand off with ?paid=1.
+app.get('/', (req, res) => {
+    if (req.query && (req.query.paid === '1' || req.query.admin === '1' || req.query.settings === '1')) return sendVeloraApp(req, res);
+    return sendLoginPage(req, res);
 });
+app.get('/login', sendLoginPage);
+
+// Trial visitors use this public entry point.
+app.get('/trial', sendVeloraApp);
+
+// SPA fallback - Velora is the public frontend; Nodecast remains the backend/API engine.
+app.get('*', sendVeloraApp);
 
 // Error handling
 app.use((err, req, res, next) => {

@@ -770,7 +770,9 @@
       }
 
       body.vel-home-choice-loading:not(.vel-home-choice-picked) .vel-home-choice {
-        display: none !important;
+        display: flex !important;
+        visibility: visible !important;
+        pointer-events: none !important;
       }
 
       body.vel-home-choice-loading:not(.vel-home-choice-picked) #catalog-loading-overlay {
@@ -3640,9 +3642,9 @@
       }
 
       body.vel-home-choice-loading #catalog-loading-overlay.hidden {
-        display: none !important;
-        visibility: hidden !important;
-        pointer-events: none !important;
+        display: flex !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
       }
     </style>
   </head>

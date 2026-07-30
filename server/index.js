@@ -206,11 +206,10 @@ function sendVeloraApp(req, res) {
     res.sendFile(path.join(publicDir, 'index.html'));
 }
 
-// Main domain is the paid-user entry. Logged-in browsers hand off with ?paid=1.
-app.get('/', (req, res) => {
-    if (req.query && (req.query.paid === '1' || req.query.admin === '1' || req.query.settings === '1')) return sendVeloraApp(req, res);
-    return sendLoginPage(req, res);
-});
+// The browser owns the JWT in localStorage, so the server cannot determine
+// authentication from a plain page request. Always serve the app at `/`; its
+// early bootstrap redirects browsers without a token to `/login`.
+app.get('/', sendVeloraApp);
 app.get('/login', sendLoginPage);
 
 // Trial visitors use this public entry point.

@@ -12,14 +12,16 @@
         try {
           var url = new URL(window.location.href);
           var paidEntry = url.searchParams.get("paid") === "1";
-          if (!paidEntry) return;
-          if (!window.localStorage.getItem("authToken")) {
-            window.location.replace("/");
+          var protectedEntry = url.pathname === "/" || paidEntry;
+          if (protectedEntry && !window.localStorage.getItem("authToken")) {
+            window.location.replace("/login");
             return;
           }
-          url.searchParams.delete("paid");
-          var clean = url.pathname + (url.searchParams.toString() ? "?" + url.searchParams.toString() : "") + url.hash;
-          window.history.replaceState(window.history.state, "", clean || "/");
+          if (paidEntry) {
+            url.searchParams.delete("paid");
+            var clean = url.pathname + (url.searchParams.toString() ? "?" + url.searchParams.toString() : "") + url.hash;
+            window.history.replaceState(window.history.state, "", clean || "/");
+          }
         } catch (_) {}
       })();
     </script>
@@ -4497,6 +4499,10 @@
           </div>
 
           <div class="vel-body">
+            <section id="vel-home-empty-page" class="vel-home-empty-page" aria-label="Accueil">
+              <h2 class="vel-packages-section-title vel-home-empty-page__title">ACCUEIL</h2>
+              <div class="vel-home-empty-page__canvas" aria-hidden="true"></div>
+            </section>
             <div id="adult-view" class="vel-adult-portal hidden" aria-label="Contenu adulte">
               <div class="vel-adult-portal__inner">
                 <div class="vel-adult-portal__mark">
@@ -8977,6 +8983,675 @@ if (target.closest(".trial-offer-button")) {
       })();
     </script>
 
+    <style id="vel-bottom-nav-styles">
+      :root {
+        --vel-bottom-nav-height: 76px;
+      }
+
+      body {
+        padding-bottom: calc(var(--vel-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+      }
+
+      .vel-bottom-nav {
+        position: fixed;
+        z-index: 2400;
+        left: 50%;
+        bottom: max(10px, env(safe-area-inset-bottom, 0px));
+        width: min(760px, calc(100% - 24px));
+        min-height: 66px;
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 3px;
+        padding: 7px;
+        border: 1px solid rgba(151, 135, 255, 0.28);
+        border-radius: 22px;
+        background:
+          linear-gradient(135deg, rgba(28, 24, 56, 0.93), rgba(8, 12, 29, 0.96));
+        box-shadow:
+          0 20px 55px rgba(0, 0, 0, 0.48),
+          0 0 28px rgba(109, 77, 255, 0.13),
+          inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        -webkit-backdrop-filter: blur(22px) saturate(145%);
+        backdrop-filter: blur(22px) saturate(145%);
+        transform: translateX(-50%);
+        transition: opacity 180ms ease, transform 180ms ease, visibility 180ms ease;
+      }
+
+      .vel-bottom-nav__button {
+        position: relative;
+        min-width: 0;
+        height: 52px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        padding: 4px 2px;
+        border: 0;
+        border-radius: 15px;
+        color: rgba(222, 222, 244, 0.66);
+        background: transparent;
+        font: inherit;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition: color 160ms ease, background 160ms ease, transform 160ms ease;
+      }
+
+      .vel-bottom-nav__button::before {
+        content: "";
+        position: absolute;
+        top: 2px;
+        width: 24px;
+        height: 2px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #7d5cff, #36c9ff);
+        box-shadow: 0 0 12px rgba(86, 161, 255, 0.9);
+        opacity: 0;
+        transform: scaleX(0.4);
+        transition: opacity 160ms ease, transform 160ms ease;
+      }
+
+      .vel-bottom-nav__button:hover,
+      .vel-bottom-nav__button:focus-visible {
+        color: #fff;
+        background: rgba(125, 92, 255, 0.12);
+        outline: none;
+      }
+
+      .vel-bottom-nav__button:active {
+        transform: scale(0.94);
+      }
+
+      .vel-bottom-nav__button.is-active {
+        color: #fff;
+        background: linear-gradient(145deg, rgba(126, 87, 255, 0.25), rgba(52, 197, 255, 0.09));
+      }
+
+      .vel-bottom-nav__button.is-active::before {
+        opacity: 1;
+        transform: scaleX(1);
+      }
+
+      .vel-bottom-nav__icon {
+        width: 22px;
+        height: 22px;
+        display: block;
+        fill: currentColor;
+        filter: drop-shadow(0 0 7px rgba(117, 99, 255, 0.25));
+      }
+
+      .vel-bottom-nav__flag {
+        width: 25px;
+        height: 18px;
+        display: block;
+        border-radius: 4px;
+        object-fit: cover;
+        box-shadow:
+          0 0 0 1px rgba(255, 255, 255, 0.3),
+          0 3px 9px rgba(0, 0, 0, 0.42);
+      }
+
+      .vel-bottom-nav__flag[hidden] {
+        display: none;
+      }
+
+      .vel-bottom-country-menu {
+        position: fixed;
+        z-index: 2410;
+        left: 50%;
+        bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+        width: min(330px, calc(100% - 24px));
+        max-height: min(55vh, 430px);
+        overflow: auto;
+        padding: 8px;
+        border: 1px solid rgba(151, 135, 255, 0.3);
+        border-radius: 18px;
+        background: linear-gradient(145deg, rgba(27, 23, 55, 0.98), rgba(7, 11, 27, 0.98));
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.58), 0 0 30px rgba(109, 77, 255, 0.16);
+        -webkit-backdrop-filter: blur(24px) saturate(145%);
+        backdrop-filter: blur(24px) saturate(145%);
+        transform: translateX(-50%);
+      }
+
+      .vel-bottom-country-menu[hidden] {
+        display: none;
+      }
+
+      .vel-bottom-country-menu__title {
+        padding: 8px 10px 10px;
+        color: rgba(238, 237, 255, 0.72);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .vel-bottom-country-menu__option {
+        width: 100%;
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 8px 11px;
+        border: 0;
+        border-radius: 11px;
+        color: rgba(238, 237, 255, 0.78);
+        background: transparent;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 650;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .vel-bottom-country-menu__option:hover,
+      .vel-bottom-country-menu__option:focus-visible {
+        color: #fff;
+        background: rgba(125, 92, 255, 0.14);
+        outline: none;
+      }
+
+      .vel-bottom-country-menu__option.is-selected {
+        color: #fff;
+        background: linear-gradient(135deg, rgba(126, 87, 255, 0.28), rgba(52, 197, 255, 0.1));
+      }
+
+      .vel-bottom-country-menu__check {
+        color: #6dd5ff;
+        font-size: 17px;
+        line-height: 1;
+      }
+
+      /* Kept only as an internal catalogue-readiness hook. */
+      #vel-home-choice {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+
+      /* Superseded by the persistent bottom navigation. The markup remains as
+         internal hooks for the compiled application. */
+      .main--velora .vel-header {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+
+      .vel-home-empty-page {
+        display: none;
+        min-height: clamp(420px, 68vh, 780px);
+      }
+
+      body.vel-home-empty-active .vel-home-empty-page {
+        display: block;
+      }
+
+      body.vel-home-empty-active #vel-package-toolbar-sticky,
+      body.vel-home-empty-active #vel-packages-section-title,
+      body.vel-home-empty-active #packages-view,
+      body.vel-home-empty-active #content-view,
+      body.vel-home-empty-active #adult-view,
+      body.vel-home-empty-active #player-container,
+      body.vel-home-empty-active #vod-player-container,
+      body.vel-home-empty-active #now-playing,
+      body.vel-home-empty-active #now-playing-vod {
+        display: none !important;
+      }
+
+      .vel-home-empty-page__title {
+        margin: 0 0 clamp(1rem, 2vw, 1.5rem);
+      }
+
+      .vel-home-empty-page__canvas {
+        min-height: clamp(360px, 60vh, 700px);
+        border-radius: 18px;
+        background:
+          radial-gradient(circle at 15% 0%, rgba(126, 87, 255, 0.055), transparent 38%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.012), transparent 42%);
+      }
+
+      .vel-bottom-nav__label {
+        max-width: 100%;
+        overflow: hidden;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1;
+        letter-spacing: 0.01em;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      body.vel-home-choice-loading .vel-bottom-nav,
+      body.vel-live-fullscreen-active .vel-bottom-nav,
+      body.vel-vod-fullscreen-active .vel-bottom-nav,
+      :fullscreen ~ .vel-bottom-nav {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transform: translate(-50%, 18px);
+      }
+
+      @media (max-width: 640px) {
+        :root {
+          --vel-bottom-nav-height: 70px;
+        }
+
+        .vel-bottom-nav {
+          bottom: 0;
+          width: 100%;
+          min-height: 64px;
+          padding: 5px 3px calc(5px + env(safe-area-inset-bottom, 0px));
+          border-width: 1px 0 0;
+          border-radius: 18px 18px 0 0;
+        }
+
+        .vel-bottom-nav__button {
+          height: 51px;
+          border-radius: 13px;
+        }
+
+        .vel-bottom-nav__icon {
+          width: 21px;
+          height: 21px;
+        }
+
+        .vel-bottom-nav__label {
+          font-size: 9px;
+        }
+
+        .vel-bottom-country-menu {
+          bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+        }
+      }
+    </style>
+
+    <nav id="vel-bottom-nav" class="vel-bottom-nav" aria-label="Navigation principale">
+      <button type="button" class="vel-bottom-nav__button is-active" data-bottom-nav="home" aria-label="Accueil">
+        <svg class="vel-bottom-nav__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.7 12 3l9 7.7v9.1a1.2 1.2 0 0 1-1.2 1.2h-5.3v-6.2h-5V21H4.2A1.2 1.2 0 0 1 3 19.8v-9.1Z"/></svg>
+        <span class="vel-bottom-nav__label">Accueil</span>
+      </button>
+      <button type="button" class="vel-bottom-nav__button" data-bottom-nav="live" aria-label="TV en direct">
+        <svg class="vel-bottom-nav__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.3 2.7 12 6.4l3.7-3.7 1.4 1.4L13.2 8H19a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2h5.8L6.9 4.1l1.4-1.4ZM5.5 10.5V18h11v-7.5h-11Zm12.8 1.1a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm0 3.2a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/></svg>
+        <span class="vel-bottom-nav__label">TV</span>
+      </button>
+      <button type="button" class="vel-bottom-nav__button" data-bottom-nav="movies" aria-label="Films">
+        <svg class="vel-bottom-nav__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2h11A2.5 2.5 0 0 1 20 4.5v15a2.5 2.5 0 0 1-2.5 2h-11A2.5 2.5 0 0 1 4 19.5v-15Zm3 0v3h2l2-3H7Zm6 0-2 3h2l2-3h-2Zm4 0-2 3h2v-3Z"/></svg>
+        <span class="vel-bottom-nav__label">Films</span>
+      </button>
+      <button type="button" class="vel-bottom-nav__button" data-bottom-nav="series" aria-label="Séries">
+        <svg class="vel-bottom-nav__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.3 2.8 12 6.5l3.7-3.7 1.4 1.4L13.3 8H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h5.7L6.9 4.2l1.4-1.4ZM6 11v7h10v-7H6Zm12 1.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm0 3a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/></svg>
+        <span class="vel-bottom-nav__label">Séries</span>
+      </button>
+      <button type="button" class="vel-bottom-nav__button" data-bottom-nav="country" aria-label="Choisir un pays">
+        <img id="vel-bottom-country-flag" class="vel-bottom-nav__flag" alt="" decoding="async" hidden />
+        <span class="vel-bottom-nav__label">Pays</span>
+      </button>
+      <button type="button" class="vel-bottom-nav__button" data-bottom-nav="search" aria-label="Recherche">
+        <svg class="vel-bottom-nav__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.8 3a7.8 7.8 0 1 0 4.86 13.9l3.72 3.72a1 1 0 0 0 1.42-1.42l-3.72-3.72A7.8 7.8 0 0 0 10.8 3Zm0 2a5.8 5.8 0 1 1 0 11.6 5.8 5.8 0 0 1 0-11.6Z"/></svg>
+        <span class="vel-bottom-nav__label">Recherche</span>
+      </button>
+      <button type="button" class="vel-bottom-nav__button" data-bottom-nav="profile" aria-label="Profil">
+        <svg class="vel-bottom-nav__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-5 0-9 2.5-9 5.5V22h18v-2.5c0-3-4-5.5-9-5.5Z"/></svg>
+        <span class="vel-bottom-nav__label">Profil</span>
+      </button>
+    </nav>
+    <div id="vel-bottom-country-menu" class="vel-bottom-country-menu" role="listbox" aria-label="Choisir un pays" hidden>
+      <div class="vel-bottom-country-menu__title">Choisir un pays</div>
+      <div id="vel-bottom-country-options"></div>
+    </div>
+    <div id="vel-bottom-profile-menu" class="vel-bottom-country-menu vel-bottom-profile-menu" aria-label="Menu du profil" hidden>
+      <div class="vel-bottom-country-menu__title">Profil</div>
+      <button type="button" id="vel-profile-favorites" class="vel-bottom-country-menu__option">
+        <span>Favoris</span>
+        <span class="vel-bottom-country-menu__check" aria-hidden="true">♥</span>
+      </button>
+      <button type="button" id="vel-profile-session" class="vel-bottom-country-menu__option">
+        <span id="vel-profile-session-label">Connexion</span>
+      </button>
+    </div>
+
+    <script>
+      (function () {
+        var nav = document.getElementById("vel-bottom-nav");
+        if (!nav) return;
+        var buttons = Array.prototype.slice.call(nav.querySelectorAll("[data-bottom-nav]"));
+        var bottomCountryButton = nav.querySelector('[data-bottom-nav="country"]');
+        var bottomCountryMenu = document.getElementById("vel-bottom-country-menu");
+        var bottomCountryOptions = document.getElementById("vel-bottom-country-options");
+        var bottomCountryFlag = document.getElementById("vel-bottom-country-flag");
+        var bottomProfileButton = nav.querySelector('[data-bottom-nav="profile"]');
+        var bottomProfileMenu = document.getElementById("vel-bottom-profile-menu");
+        var profileFavoritesButton = document.getElementById("vel-profile-favorites");
+        var profileSessionButton = document.getElementById("vel-profile-session");
+        var profileSessionLabel = document.getElementById("vel-profile-session-label");
+
+        function isLoggedIn() {
+          try {
+            return window.location.pathname !== "/trial" && !!window.localStorage.getItem("authToken");
+          } catch (error) {
+            return false;
+          }
+        }
+
+        function setActive(name) {
+          buttons.forEach(function (button) {
+            var active = button.getAttribute("data-bottom-nav") === name;
+            button.classList.toggle("is-active", active);
+            if (active) button.setAttribute("aria-current", "page");
+            else button.removeAttribute("aria-current");
+          });
+        }
+
+        function syncProfile() {
+          var loggedIn = isLoggedIn();
+          if (profileSessionLabel) profileSessionLabel.textContent = loggedIn ? "Déconnexion" : "Connexion";
+          if (profileSessionButton) {
+            profileSessionButton.setAttribute("aria-label", loggedIn ? "Déconnexion" : "Connexion");
+          }
+        }
+
+        function openTab(tab) {
+          closeBottomCountryMenu();
+          closeProfileMenu();
+          document.body.classList.remove("vel-home-empty-active");
+          if (typeof window.veloraBlockCountryPickerAfterPageChange === "function") {
+            window.veloraBlockCountryPickerAfterPageChange();
+          }
+          var homeControl = document.querySelector('#vel-home-choice [data-home-tab="' + tab + '"]');
+          if (homeControl) {
+            homeControl.click();
+          } else {
+            document.dispatchEvent(new CustomEvent("velora-home-tab", { detail: { tab: tab } }));
+          }
+          setActive(tab);
+        }
+
+        function stopHomeMedia() {
+          ["video", "video-vod"].forEach(function (id) {
+            var video = document.getElementById(id);
+            if (!video) return;
+            try { video.pause(); } catch (error) {}
+          });
+          ["player-container", "vod-player-container", "now-playing", "now-playing-vod"].forEach(function (id) {
+            var element = document.getElementById(id);
+            if (element) element.classList.add("hidden");
+          });
+          try {
+            window.dispatchEvent(new CustomEvent("velora-home-media-stop"));
+          } catch (error) {}
+        }
+
+        function showHome() {
+          if (typeof window.veloraBlockCountryPickerAfterPageChange === "function") {
+            window.veloraBlockCountryPickerAfterPageChange();
+          }
+          closeBottomCountryMenu();
+          closeProfileMenu();
+          stopHomeMedia();
+          document.body.classList.remove("vel-home-choice-loading");
+          document.body.classList.remove("vel-home-choice-catalog-pending");
+          document.body.classList.add("vel-home-choice-picked");
+          document.body.classList.add("vel-home-empty-active");
+          window.scrollTo(0, 0);
+          var main = document.querySelector(".main--velora");
+          if (main) main.scrollTop = 0;
+          setActive("home");
+        }
+
+        function syncBottomCountry() {
+          var select = document.getElementById("country-select");
+          var sourceFlag = document.getElementById("home-country-flag") || document.getElementById("vel-brand-country-flag");
+          var selected = select && select.options ? select.options[select.selectedIndex] : null;
+          var selectedName = selected ? String(selected.textContent || "").trim() : "Pays";
+          var source = sourceFlag && !sourceFlag.hidden ? sourceFlag.getAttribute("src") : "";
+          if (bottomCountryFlag) {
+            if (source) {
+              bottomCountryFlag.src = source;
+              bottomCountryFlag.alt = selectedName;
+              bottomCountryFlag.hidden = false;
+            } else {
+              bottomCountryFlag.removeAttribute("src");
+              bottomCountryFlag.alt = "";
+              bottomCountryFlag.hidden = true;
+            }
+          }
+          if (bottomCountryButton) bottomCountryButton.setAttribute("aria-label", "Pays : " + selectedName);
+        }
+
+        function renderBottomCountries() {
+          var select = document.getElementById("country-select");
+          if (!select || !bottomCountryOptions) return;
+          bottomCountryOptions.innerHTML = "";
+          Array.prototype.forEach.call(select.options, function (option) {
+            if (option.disabled || !String(option.value || "").trim()) return;
+            var item = document.createElement("button");
+            item.type = "button";
+            item.className = "vel-bottom-country-menu__option";
+            item.setAttribute("role", "option");
+            item.setAttribute("aria-selected", option.selected ? "true" : "false");
+            item.classList.toggle("is-selected", option.selected);
+            var name = document.createElement("span");
+            name.textContent = option.textContent;
+            item.appendChild(name);
+            if (option.selected) {
+              var check = document.createElement("span");
+              check.className = "vel-bottom-country-menu__check";
+              check.textContent = "✓";
+              check.setAttribute("aria-hidden", "true");
+              item.appendChild(check);
+            }
+            item.addEventListener("click", function () {
+              select.value = option.value;
+              select.dispatchEvent(new Event("change", { bubbles: true }));
+              closeBottomCountryMenu();
+              window.setTimeout(syncBottomCountry, 80);
+            });
+            bottomCountryOptions.appendChild(item);
+          });
+        }
+
+        function closeBottomCountryMenu() {
+          if (!bottomCountryMenu || bottomCountryMenu.hidden) return;
+          bottomCountryMenu.hidden = true;
+          if (bottomCountryButton) bottomCountryButton.setAttribute("aria-expanded", "false");
+          var activeTab = document.body.dataset.velActiveTab;
+          setActive(
+            document.body.classList.contains("vel-home-empty-active")
+              ? "home"
+              : (document.body.classList.contains("vel-home-choice-picked") && activeTab ? activeTab : "home")
+          );
+        }
+
+        function restoreBottomNavActive() {
+          var activeTab = document.body.dataset.velActiveTab;
+          setActive(
+            document.body.classList.contains("vel-home-empty-active")
+              ? "home"
+              : (document.body.classList.contains("vel-home-choice-picked") && activeTab ? activeTab : "home")
+          );
+        }
+
+        function closeProfileMenu() {
+          if (!bottomProfileMenu || bottomProfileMenu.hidden) return;
+          bottomProfileMenu.hidden = true;
+          if (bottomProfileButton) bottomProfileButton.setAttribute("aria-expanded", "false");
+          restoreBottomNavActive();
+        }
+
+        function openCountryPicker() {
+          if (!bottomCountryMenu) return;
+          closeProfileMenu();
+          if (!bottomCountryMenu.hidden) {
+            closeBottomCountryMenu();
+            return;
+          }
+          renderBottomCountries();
+          syncBottomCountry();
+          bottomCountryMenu.hidden = false;
+          if (bottomCountryButton) bottomCountryButton.setAttribute("aria-expanded", "true");
+          setActive("country");
+          var selected = bottomCountryMenu.querySelector(".is-selected");
+          if (selected) selected.scrollIntoView({ block: "nearest" });
+        }
+
+        function openFavorites() {
+          openTab("live");
+          setActive("profile");
+          var attempts = 0;
+          var timer = window.setInterval(function () {
+            attempts += 1;
+            var favorites = document.querySelector('.group-header[data-group="Favorites"], .group-header[data-group="Favoris"], #favorite-channels-section');
+            if (favorites) {
+              window.clearInterval(timer);
+              if (favorites.classList.contains("collapsed")) favorites.click();
+              favorites.scrollIntoView({ behavior: "smooth", block: "start" });
+            } else if (attempts >= 12) {
+              window.clearInterval(timer);
+            }
+          }, 150);
+        }
+
+        function openProfile() {
+          if (!bottomProfileMenu) return;
+          closeBottomCountryMenu();
+          if (!bottomProfileMenu.hidden) {
+            closeProfileMenu();
+            return;
+          }
+          syncProfile();
+          bottomProfileMenu.hidden = false;
+          if (bottomProfileButton) bottomProfileButton.setAttribute("aria-expanded", "true");
+          setActive("profile");
+        }
+
+        function handleProfileSession() {
+          closeProfileMenu();
+          if (isLoggedIn()) {
+            try {
+              window.localStorage.removeItem("authToken");
+            } catch (error) {}
+            window.location.replace("/login");
+            return;
+          }
+          window.location.assign("/login");
+        }
+
+        function openSearch() {
+          closeBottomCountryMenu();
+          closeProfileMenu();
+          document.dispatchEvent(new CustomEvent("velora-open-search"));
+          setActive("search");
+        }
+
+        nav.addEventListener("click", function (event) {
+          var button = event.target.closest("[data-bottom-nav]");
+          if (!button) return;
+          var action = button.getAttribute("data-bottom-nav");
+          if (action === "home") showHome();
+          else if (action === "live" || action === "movies" || action === "series") openTab(action);
+          else if (action === "country") openCountryPicker();
+          else if (action === "search") openSearch();
+          else if (action === "profile") openProfile();
+        });
+
+        if (profileFavoritesButton) {
+          profileFavoritesButton.addEventListener("click", function () {
+            closeProfileMenu();
+            openFavorites();
+          });
+        }
+        if (profileSessionButton) profileSessionButton.addEventListener("click", handleProfileSession);
+
+        document.addEventListener("velora-show-home", function (event) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          showHome();
+        }, true);
+        document.addEventListener("velora-home-tab", function (event) {
+          document.body.classList.remove("vel-home-empty-active");
+          var tab = event.detail && event.detail.tab;
+          if (tab === "movies" || tab === "series" || tab === "live") setActive(tab);
+        }, true);
+        document.getElementById("home-country-menu")?.addEventListener("click", function () {
+          window.setTimeout(function () {
+            syncBottomCountry();
+            setActive("home");
+          }, 100);
+        });
+        document.getElementById("country-select")?.addEventListener("change", function () {
+          window.setTimeout(syncBottomCountry, 60);
+        });
+        document.addEventListener("velora-countries-ready", syncBottomCountry);
+        document.addEventListener("click", function (event) {
+          if (
+            bottomCountryMenu &&
+            !bottomCountryMenu.hidden &&
+            !bottomCountryMenu.contains(event.target) &&
+            !(bottomCountryButton && bottomCountryButton.contains(event.target))
+          ) {
+            closeBottomCountryMenu();
+          }
+          if (
+            bottomProfileMenu &&
+            !bottomProfileMenu.hidden &&
+            !bottomProfileMenu.contains(event.target) &&
+            !(bottomProfileButton && bottomProfileButton.contains(event.target))
+          ) {
+            closeProfileMenu();
+          }
+        });
+        document.addEventListener("keydown", function (event) {
+          if (event.key === "Escape") {
+            closeBottomCountryMenu();
+            closeProfileMenu();
+          }
+        });
+        document.getElementById("vel-global-search-close")?.addEventListener("click", function () {
+          window.setTimeout(restoreBottomNavActive, 0);
+        });
+
+        var observer = new MutationObserver(syncProfile);
+        observer.observe(document.body, { subtree: true, attributes: true, attributeFilter: ["class"] });
+        syncProfile();
+        var flagSource = document.getElementById("home-country-flag");
+        if (flagSource) {
+          new MutationObserver(syncBottomCountry).observe(flagSource, {
+            attributes: true,
+            attributeFilter: ["src", "hidden"]
+          });
+        }
+        syncBottomCountry();
+
+        var initialHomePending = true;
+        function openInitialHomeWhenReady() {
+          if (!initialHomePending || document.body.classList.contains("vel-home-choice-loading")) return;
+          initialHomePending = false;
+          showHome();
+        }
+        new MutationObserver(openInitialHomeWhenReady).observe(document.body, {
+          attributes: true,
+          attributeFilter: ["class"]
+        });
+        window.setTimeout(openInitialHomeWhenReady, 0);
+
+        ["pointerdown", "touchend", "click"].forEach(function (eventName) {
+          document.addEventListener(eventName, function (event) {
+            var homeControl = event.target && event.target.closest("#btn-logo-home, #btn-header-home");
+            if (!homeControl) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            showHome();
+          }, true);
+        });
+
+        document.addEventListener("click", function (event) {
+          if (event.target && event.target.closest("#btn-adult-portal, #home-adult-btn")) {
+            document.body.classList.remove("vel-home-empty-active");
+          }
+        }, true);
+      })();
+    </script>
   </body>
 </html>
 

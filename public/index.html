@@ -1375,7 +1375,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=autres-opt-in-countries-20260730-39"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=search-select-live-channel-20260730-50"></script>
     <script defer src="/assets/manual-pays.js?v=20260730-opt-in-countries"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
@@ -1742,12 +1742,24 @@
       .vel-global-search__results {
         display: grid;
         align-content: start;
-        grid-auto-rows: 4.65rem;
+        grid-auto-rows: auto;
         gap: 0.48rem;
         padding: 0 0.82rem max(1rem, env(safe-area-inset-bottom));
         overflow: auto;
         overscroll-behavior: contain;
         scroll-padding-bottom: max(1rem, env(safe-area-inset-bottom));
+      }
+
+      .vel-global-search__divider {
+        width: 100%;
+        height: 1px;
+        margin: 0.34rem 0;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          color-mix(in srgb, var(--vel-primary, #8a2be2) 72%, rgba(255, 255, 255, 0.42)),
+          transparent
+        );
       }
 
       .vel-global-search__result {
@@ -8425,7 +8437,13 @@ if (target.closest(".trial-offer-button")) {
               clearResults(query.length >= 2 ? "Aucun resultat dans ce pays." : "");
               return;
             }
-            list.slice(0, visibleResultCount).forEach(function (item) {
+            list.slice(0, visibleResultCount).forEach(function (item, itemIndex) {
+              if (itemIndex > 0 && item.preferred !== true && list[itemIndex - 1].preferred === true) {
+                var divider = document.createElement("div");
+                divider.className = "vel-global-search__divider";
+                divider.setAttribute("aria-hidden", "true");
+                results.appendChild(divider);
+              }
               var button = document.createElement("button");
               button.type = "button";
               button.className = "vel-global-search__result";

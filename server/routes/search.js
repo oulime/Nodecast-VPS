@@ -49,7 +49,7 @@ function normalizeCategories(input) {
         const key = `${sourceId}\u001f${categoryId}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        categories.push({ sourceId, categoryId, packageId, packageName });
+        categories.push({ sourceId, categoryId, packageId, packageName, priority: raw.priority === true });
         if (categories.length >= MAX_CATEGORIES) break;
     }
     return categories;
@@ -150,11 +150,15 @@ async function searchSnapshot(categories, type, normalizedQuery, limit) {
                 containerExtension: item.containerExtension,
                 categoryId: category.categoryId,
                 packageId: category.packageId,
-                packageName: category.packageName
+                packageName: category.packageName,
+                priority: category.priority
             });
         }
     }
-    results.sort((left, right) => left.name.localeCompare(right.name, 'fr'));
+    results.sort((left, right) =>
+        Number(right.priority) - Number(left.priority) ||
+        left.name.localeCompare(right.name, 'fr')
+    );
     return { available: true, results: results.slice(0, limit) };
 }
 
@@ -198,7 +202,8 @@ async function searchSource(sourceId, type, categoryMap, normalizedQuery) {
             containerExtension: cleanText(item.container_extension, 32),
             categoryId: String(item.category_id ?? category.categoryId),
             packageId: category.packageId,
-            packageName: category.packageName
+            packageName: category.packageName,
+            priority: category.priority
         });
     }
     return results;
@@ -283,7 +288,10 @@ router.post('/', async (req, res) => {
         const results = settled
             .filter(result => result.status === 'fulfilled')
             .flatMap(result => result.value)
-            .sort((left, right) => left.name.localeCompare(right.name, 'fr'))
+            .sort((left, right) =>
+                Number(right.priority) - Number(left.priority) ||
+                left.name.localeCompare(right.name, 'fr')
+            )
             .slice(0, limit);
         const errors = settled
             .filter(result => result.status === 'rejected')

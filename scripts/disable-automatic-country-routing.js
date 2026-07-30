@@ -134,8 +134,72 @@ const replacements = [
         'const p=a.filter(E=>(String(ue)==="country__other"||ue===Nn||ot(kn()??"")===ot("Autres")||ot(((Ie.options[Ie.selectedIndex]?.textContent)??""))===ot("Autres"))&&!Ze(E.id)?!0:'
     ],
     [
+        'const p=a.filter(E=>(String(ue)==="country__other"||ue===Nn||ot(kn()??"")===ot("Autres")||ot(((Ie.options[Ie.selectedIndex]?.textContent)??""))===ot("Autres"))&&!Ze(E.id)?!0:Ze(E.id)?!0:',
+        'const p=a.filter(E=>(String(ue)==="country__other"||ue===Nn||ot(kn()??"")===ot("Autres")||ot(((Ie.options[Ie.selectedIndex]?.textContent)??""))===ot("Autres"))&&!Ze(E.id)?!0:Ze(E.id)?Yr[G]?m(E):!0:'
+    ],
+    [
+        'const p=a.filter(E=>(String(ue)==="country__other"||ue===Nn||ot(kn()??"")===ot("Autres")||ot(((Ie.options[Ie.selectedIndex]?.textContent)??""))===ot("Autres"))&&!Ze(E.id)?!0:Ze(E.id)?Yr[G]?m(E):!0:',
+        'const p=a.filter(E=>(String(ue)==="country__other"||ue===Nn||ot(kn()??"")===ot("Autres")||ot(((Ie.options[Ie.selectedIndex]?.textContent)??""))===ot("Autres"))&&!Ze(E.id)?!0:Ze(E.id)?Yr[G]?tG(E.id).size===0?!1:G==="live"&&/(?:hevc|h[ .]?265|x265)/i.test(E.name)?m(E):!0:!0:'
+    ],
+    [
         'function ub(s){if(s.id===bo)return Bd;const e=jr(s.name);',
         'function ub(s){if(s.id===bo||jr(s.name)==="autres")return Bd;const e=jr(s.name);'
+    ],
+    [
+        'function VEL_SEARCH_API_CATEGORIES(s){if(!_||_.mode!=="nodecast")return[];const e=String(_.nodecastXtreamSourceId??"").trim();return VEL_SEARCH_PACKAGES(s).map(t=>{const r=mp(String(t.id),e);return{sourceId:r.sourceId,categoryId:r.categoryId,packageId:t.id,packageName:t.name||""}}).filter(t=>t.sourceId&&t.categoryId&&t.packageId)}',
+        'function VEL_SEARCH_API_CATEGORIES(s){if(!_||_.mode!=="nodecast")return[];const e=String(_.nodecastXtreamSourceId??"").trim(),t=VEL_SEARCH_PACKAGES(s),r=new Set(t.map(o=>o.id)),n=new Set(t.map(o=>Jn(o.name)).filter(Boolean)),i=new Map;for(const o of[...t,...s.packages]){const l=mp(String(o.id),e);if(!l.sourceId||!l.categoryId||!o.id)continue;const c=`${l.sourceId}::${l.categoryId}`,u=r.has(o.id)||n.has(Jn(o.name)),d={sourceId:l.sourceId,categoryId:l.categoryId,packageId:o.id,packageName:o.name||"",priority:u};(!i.has(c)||u)&&i.set(c,d)}return[...i.values()]}'
+    ],
+    [
+        'function VEL_SEARCH_API_CATEGORIES(s){if(!_||_.mode!=="nodecast")return[];const e=String(_.nodecastXtreamSourceId??"").trim(),t=VEL_SEARCH_PACKAGES(s),r=new Set(t.map(o=>o.id)),n=new Set(t.map(o=>Jn(o.name)).filter(Boolean)),i=new Map;for(const o of[...t,...s.packages]){const l=mp(String(o.id),e);if(!l.sourceId||!l.categoryId||!o.id)continue;const c=`${l.sourceId}::${l.categoryId}`,u=r.has(o.id)||n.has(Jn(o.name)),d={sourceId:l.sourceId,categoryId:l.categoryId,packageId:o.id,packageName:o.name||"",priority:u};(!i.has(c)||u)&&i.set(c,d)}return[...i.values()]}',
+        'function VEL_SEARCH_API_CATEGORIES(s){if(!_||_.mode!=="nodecast")return[];const e=String(_.nodecastXtreamSourceId??"").trim(),t=Ey(),r=new Set(t.map(o=>o.id)),n=new Set(t.map(o=>Jn(o.name)).filter(Boolean)),i=new Map;for(const o of[...t,...s.packages,...h2(pr)]){const l=mp(String(o.id),e);if(!l.sourceId||!l.categoryId||!o.id)continue;const c=`${l.sourceId}::${l.categoryId}`,u=r.has(o.id)||n.has(Jn(o.name)),d={sourceId:l.sourceId,categoryId:l.categoryId,packageId:o.id,packageName:o.name||"",priority:u};(!i.has(c)||u)&&i.set(c,d)}return[...i.values()]}'
+    ],
+    [
+        'u.push({id:v,type:i==="live"?"channel":i,label:f.name||"",packageName:f.packageName||"",countryName:n,thumbUrl:ph(f.streamIcon||"",_.base)||""})}return{countryId:r,countryName:n,source:c.source||"provider-api",debug:{activeTab:G,apiResults:u.length},results:u}}',
+        'u.push({id:v,type:i==="live"?"channel":i,label:f.name||"",packageName:f.packageName||"",countryName:f.priority===!0?n:"Autres",thumbUrl:ph(f.streamIcon||"",_.base)||"",preferred:f.priority===!0})}return u.sort((f,m)=>Number(m.preferred)-Number(f.preferred)||f.label.localeCompare(m.label,"fr")),{countryId:r,countryName:n,source:c.source||"provider-api",debug:{activeTab:G,apiResults:u.length},results:u}}'
+    ],
+    [
+        'const c=await l.json(),u=[];VEL_SEARCH_RESULTS.clear();for(const f of c.results??[]){const m=String(f.itemId??""),g=/^\\d+$/.test(m)?Number(m):m,',
+        'const c=await l.json(),u=[],d=gw();VEL_SEARCH_RESULTS.clear();for(const f of c.results??[]){const m=String(f.itemId??""),w=f.priority===!0||d.has(Number(m))||d.has(m),g=/^\\d+$/.test(m)?Number(m):m,'
+    ],
+    [
+        'const c=await l.json(),u=[],d=gw();VEL_SEARCH_RESULTS.clear();for(const f of c.results??[]){const m=String(f.itemId??""),w=f.priority===!0||d.has(Number(m))||d.has(m),g=/^\\d+$/.test(m)?Number(m):m,p={stream_id:g,series_id:i==="series"?g:void 0,name:f.name||"",category_id:f.packageId,category_ids:[f.packageId],',
+        'const c=await l.json(),u=[],d=gw();VEL_SEARCH_RESULTS.clear();for(const f of c.results??[]){const m=String(f.itemId??""),x=d.get(Number(m))??d.get(m),w=f.priority===!0||x!=null,g=/^\\d+$/.test(m)?Number(m):m,A=x?String(x):f.packageId,p={stream_id:g,series_id:i==="series"?g:void 0,name:f.name||"",category_id:A,category_ids:[A],'
+    ],
+    [
+        'VEL_SEARCH_RESULTS.set(v,{kind:y,packageId:f.packageId,item:p})',
+        'VEL_SEARCH_RESULTS.set(v,{kind:y,packageId:A,item:p})'
+    ],
+    [
+        'if(e.kind==="live"){G="live",await hl(e.packageId,{skipResetScroll:!0}),window.setTimeout(()=>{try{Rg(e.item)}catch{}},180);return}',
+        'if(e.kind==="live"){G="live",await hl(e.packageId,{skipResetScroll:!0});let s=0;const n=()=>{if(!_||Z!=="content"||Q!==e.packageId||G!=="live")return;const i=Dh(e.packageId).find(a=>String(a.stream_id)===String(e.item.stream_id));if(i){try{Rg(i)}catch{}return}s++<60&&window.setTimeout(n,250)};n();return}'
+    ],
+    [
+        'countryName:f.priority===!0?n:"Autres",thumbUrl:ph(f.streamIcon||"",_.base)||"",preferred:f.priority===!0',
+        'countryName:w?n:"Autres",thumbUrl:ph(f.streamIcon||"",_.base)||"",preferred:w'
+    ],
+    [
+        'function __velLoadLivePackageLogo(){__velLiveLogoLoad||(__velLiveLogoLoad=__velWarmLiveLogos().catch(e=>console.warn("[live-package-logo]",e)))}',
+        'function __velLoadLivePackageLogo(){return __velLiveLogoLoad||(__velLiveLogoLoad=__velWarmLiveLogos().catch(e=>console.warn("[live-package-logo]",e)))}'
+    ],
+    [
+        'async function sG(s){var a,o;if(!_||_.mode!=="nodecast"||G!=="live"||!Ze(s))return;const e=tG(s);if(e.size===0||Ph(s).length>0)return;const t=(a=_.nodecastXtreamSourceId)==null?void 0:a.trim();if(!t)return;const r=(o=_.nodecastXtreamSourceIds)!=null&&o.length?_.nodecastXtreamSourceIds:[t],n=new Map;for(const l of r){const c=await xp(_.base,l,_.nodecastAuthHeaders);Tn(n,c)}if(!_||G!=="live")return;const i=new Map;for(const l of n.values())for(const c of l)e.has(String(c.stream_id))&&!i.has(c.stream_id)&&i.set(c.stream_id,c);i.size>0&&(_.streamsByCatAll.set(s,[...i.values()]),yr())}',
+        'async function sG(s){if(!_||_.mode!=="nodecast"||G!=="live"||!Ze(s))return;const e=tG(s);if(e.size===0||Dh(s).length>0)return;await __velWarmLiveLogos();if(!_||G!=="live")return;const t=new Map;for(const r of _.streamsByCatAll.values())for(const n of r)e.has(String(n.stream_id))&&!t.has(n.stream_id)&&t.set(n.stream_id,n);t.size>0&&(_.streamsByCatAll.set(s,[...t.values()]),yr())}'
+    ],
+    [
+        'async function sG(s){if(!_||_.mode!=="nodecast"||G!=="live"||!Ze(s))return;const e=tG(s);if(e.size===0||Dh(s).length>0)return;await __velLoadLivePackageLogo();if(!_||G!=="live")return;const t=new Map;for(const r of _.streamsByCatAll.values())for(const n of r)e.has(String(n.stream_id))&&!t.has(n.stream_id)&&t.set(n.stream_id,n);t.size>0&&(_.streamsByCatAll.set(s,[...t.values()]),yr())}',
+        'async function sG(s){if(!_||_.mode!=="nodecast"||G!=="live"||!Ze(s))return;const e=tG(s);if(e.size===0||Dh(s).length>0)return;await __velWarmLiveLogos();if(!_||G!=="live")return;const t=new Map;for(const r of _.streamsByCatAll.values())for(const n of r)e.has(String(n.stream_id))&&!t.has(n.stream_id)&&t.set(n.stream_id,n);t.size>0&&(_.streamsByCatAll.set(s,[...t.values()]),yr())}'
+    ],
+    [
+        'function tG(s){const e=new Set;for(const t of vy())for(const[r,n]of t.entries())n===s&&e.add(String(r));return e}',
+        'function tG(s){const e=new Set;for(const t of En.values())for(const[r,n]of t.entries())n===s&&e.add(String(r));for(const[t,r]of Ll.entries())t.endsWith(`::${s}`)&&r.forEach(n=>e.add(String(n)));return e}'
+    ],
+    [
+        'function tG(s){const e=new Set;for(const t of En.values())for(const[r,n]of t.entries())n===s&&e.add(String(r));return e}',
+        'function tG(s){const e=new Set;for(const t of En.values())for(const[r,n]of t.entries())n===s&&e.add(String(r));for(const[t,r]of Ll.entries())t.endsWith(`::${s}`)&&r.forEach(n=>e.add(String(n)));return e}'
+    ],
+    [
+        'const n=r==="live"&&Ze(s)&&pw(s)&&Ph(s).length===0,i=r==="live"&&_y(s),a=n||i,',
+        'const n=r==="live"&&Ze(s)&&Dh(s).length===0,i=r==="live"&&_y(s),a=n||i,'
     ]
 ];
 
@@ -154,7 +218,7 @@ const legacyLiveLogoLoader = 'const __velLiveLogoLoads=new Set;function __velLoa
 const resettingSharedLiveLogoLoader = 'let __velLiveLogoLoad=null;function __velLoadLivePackageLogo(){__velLiveLogoLoad||(__velLiveLogoLoad=BG("live").catch(e=>console.warn("[live-package-logo]",e)).finally(()=>{__velLiveLogoLoad=null}))}';
 const sharedLiveLogoLoader = 'let __velLiveLogoLoad=null;function __velLoadLivePackageLogo(){__velLiveLogoLoad||(__velLiveLogoLoad=BG("live").catch(e=>console.warn("[live-package-logo]",e)))}';
 const primaryOnlyLiveLogoLoader = 'let __velLiveLogoLoad=null;async function __velWarmLiveLogos(){if(!_||_.mode!=="nodecast")return;const s=(_.nodecastXtreamSourceIds??[]).map(e=>e.trim()).filter(Boolean),e=s.length>1?"all":s[0]??_.nodecastXtreamSourceId;if(!e)return;const t=await xp(_.base,e,_.nodecastAuthHeaders);if(!_||G!=="live")return;Tn(_.streamsByCatAll,t),FG(_.liveLoadedCategoryIds,t),Pe=Qt(_.liveCategories,_.streamsByCatAll,{includeEmptyPackages:!1}),yr(),Z==="packages"&&Nt()}function __velLoadLivePackageLogo(){__velLiveLogoLoad||(__velLiveLogoLoad=__velWarmLiveLogos().catch(e=>console.warn("[live-package-logo]",e)))}';
-const completeLiveLogoLoader = 'let __velLiveLogoLoad=null;async function __velWarmLiveLogos(){if(!_||_.mode!=="nodecast")return;let s=[];try{const e=await Ke(`${_.base}/api/sources/catalog`,{headers:_.nodecastAuthHeaders,timeoutMs:8e3});s=Cs(e).filter(t=>t&&t.type==="xtream"&&t.enabled!==0&&t.enabled!==!1).map(t=>String(t.id).trim()).filter(Boolean)}catch{}s.length||(s=(_.nodecastXtreamSourceIds??[]).map(e=>e.trim()).filter(Boolean));if(!s.length&&_.nodecastXtreamSourceId)s=[_.nodecastXtreamSourceId];const e=await Promise.all(s.map(t=>xp(_.base,t,_.nodecastAuthHeaders).catch(()=>new Map))),t=new Map;for(const r of e)Tn(t,r);if(!_||G!=="live")return;Tn(_.streamsByCatAll,t),FG(_.liveLoadedCategoryIds,t),Pe=Qt(_.liveCategories,_.streamsByCatAll,{includeEmptyPackages:!1}),yr(),Z==="packages"&&Nt()}function __velLoadLivePackageLogo(){__velLiveLogoLoad||(__velLiveLogoLoad=__velWarmLiveLogos().catch(e=>console.warn("[live-package-logo]",e)))}';
+const completeLiveLogoLoader = 'let __velLiveLogoLoad=null;async function __velWarmLiveLogos(){if(!_||_.mode!=="nodecast")return;let s=[];try{const e=await Ke(`${_.base}/api/sources/catalog`,{headers:_.nodecastAuthHeaders,timeoutMs:8e3});s=Cs(e).filter(t=>t&&t.type==="xtream"&&t.enabled!==0&&t.enabled!==!1).map(t=>String(t.id).trim()).filter(Boolean)}catch{}s.length||(s=(_.nodecastXtreamSourceIds??[]).map(e=>e.trim()).filter(Boolean));if(!s.length&&_.nodecastXtreamSourceId)s=[_.nodecastXtreamSourceId];const e=await Promise.all(s.map(t=>xp(_.base,t,_.nodecastAuthHeaders).catch(()=>new Map))),t=new Map;for(const r of e)Tn(t,r);if(!_||G!=="live")return;Tn(_.streamsByCatAll,t),FG(_.liveLoadedCategoryIds,t),Pe=Qt(_.liveCategories,_.streamsByCatAll,{includeEmptyPackages:!1}),yr(),Z==="packages"&&Nt()}function __velLoadLivePackageLogo(){return __velLiveLogoLoad||(__velLiveLogoLoad=__velWarmLiveLogos().catch(e=>console.warn("[live-package-logo]",e)))}';
 if (source.includes(primaryOnlyLiveLogoLoader)) {
     source = source.replace(primaryOnlyLiveLogoLoader, completeLiveLogoLoader);
     changed = true;
@@ -178,6 +242,15 @@ if (source.includes(legacyLiveLogoLoader)) {
 while (source.includes(sharedLiveLogoLoader + sharedLiveLogoLoader)) {
     source = source.replace(sharedLiveLogoLoader + sharedLiveLogoLoader, sharedLiveLogoLoader);
     changed = true;
+}
+const liveLogoLoaderStart = source.indexOf('let __velLiveLogoLoad=null;async function __velWarmLiveLogos');
+const liveLogoLoaderEnd = liveLogoLoaderStart < 0 ? -1 : source.indexOf('function Nt(){', liveLogoLoaderStart);
+if (liveLogoLoaderStart >= 0 && liveLogoLoaderEnd > liveLogoLoaderStart) {
+    const normalized = source.slice(0, liveLogoLoaderStart) + completeLiveLogoLoader + source.slice(liveLogoLoaderEnd);
+    if (normalized !== source) {
+        source = normalized;
+        changed = true;
+    }
 }
 
 const manualTabMatcher = 'function __velManualPackageMatchesTab(s){const e=Jn(s.name);if(e&&wc().packages.some(t=>Jn(t.name)===e))return!0;if(!_||!Ze(s.id))return!1;const t=tG(s.id),r=G==="movies"?_.vodStreamsByCat:G==="series"?_.seriesStreamsByCat:_.streamsByCatAll;for(const n of r.values())for(const i of n)if(t.has(String(i.stream_id??i.series_id??i.item_id??i.id)))return!0;return!1}';

@@ -68,6 +68,42 @@ const replacements = [
     [
         'async function xt(){return nl||(nl=oG().finally(()=>{nl=null}),nl)}',
         'window.addEventListener("velora-admin-curation-changed",()=>{xt().then(()=>{_&&Nt()}).catch(s=>console.warn("[manual-curation-refresh]",s))});async function xt(){return nl||(nl=oG().finally(()=>{nl=null}),nl)}'
+    ],
+    [
+        'H&&(/^https?:\\/\\//i.test(H)||H.startsWith("/uploads/package-covers/"))&&(le.style.display="none")',
+        '(H&&(/^https?:\\/\\//i.test(H)||H.startsWith("/uploads/package-covers/"))||w&&B)&&(le.style.display="none")'
+    ],
+    [
+        '$&&(R.style.display="none")',
+        '($||w&&B)&&(R.style.display="none")'
+    ],
+    [
+        'function Nt(){var S;re.innerHTML="";',
+        'let __velLiveLogoLoad=null;async function __velWarmLiveLogos(){if(!_||_.mode!=="nodecast")return;let s=[];try{const e=await Ke(`${_.base}/api/sources/catalog`,{headers:_.nodecastAuthHeaders,timeoutMs:8e3});s=Cs(e).filter(t=>t&&t.type==="xtream"&&t.enabled!==0&&t.enabled!==!1).map(t=>String(t.id).trim()).filter(Boolean)}catch{}s.length||(s=(_.nodecastXtreamSourceIds??[]).map(e=>e.trim()).filter(Boolean));if(!s.length&&_.nodecastXtreamSourceId)s=[_.nodecastXtreamSourceId];const e=await Promise.all(s.map(t=>xp(_.base,t,_.nodecastAuthHeaders).catch(()=>new Map))),t=new Map;for(const r of e)Tn(t,r);if(!_||G!=="live")return;Tn(_.streamsByCatAll,t),FG(_.liveLoadedCategoryIds,t),Pe=Qt(_.liveCategories,_.streamsByCatAll,{includeEmptyPackages:!1}),yr(),Z==="packages"&&Nt()}function __velLoadLivePackageLogo(){__velLiveLogoLoad||(__velLiveLogoLoad=__velWarmLiveLogos().catch(e=>console.warn("[live-package-logo]",e)))}function Nt(){var S;re.innerHTML="";'
+    ],
+    [
+        'B=g(E).map(P=>ph(P.stream_icon,s.base)).find(Boolean);if(T){',
+        'B=g(E).map(P=>ph(P.stream_icon,s.base)).find(Boolean);T&&w&&!B&&__velLoadLivePackageLogo(E.id);if(T){'
+    ],
+    [
+        'if(!_||Z!=="content"||Q!==s||G!=="live")return;const i=new Map;',
+        'if(!_||G!=="live")return;const i=new Map;'
+    ],
+    [
+        'g=E=>h()?f(E.id):d(E.id);Z2();',
+        'g=E=>h()&&Ze(E.id)?Dh(E.id):h()?f(E.id):d(E.id);Z2();'
+    ],
+    [
+        'e.has(c.stream_id)&&!i.has(c.stream_id)&&i.set(c.stream_id,c)',
+        'e.has(String(c.stream_id))&&!i.has(c.stream_id)&&i.set(c.stream_id,c)'
+    ],
+    [
+        'return r.sort((i,a)=>Re(i.name).localeCompare(Re(a.name),"fr"))}if(G==="live"&&wcIsWorldCupId(s))',
+        'return r}if(G==="live"&&wcIsWorldCupId(s))'
+    ],
+    [
+        'if(Ze(s)){const e=tG(s),t=G==="movies"?_.vodStreamsByCat:G==="series"?_.seriesStreamsByCat:_.streamsByCatAll,r=[],n=new Set;for(const i of t.values())for(const a of i){const o=String(a.stream_id??a.series_id??a.item_id??a.id);e.has(o)&&!n.has(o)&&(n.add(o),r.push(a))}return r}',
+        'if(Ze(s)){const e=tG(s),t=G==="movies"?_.vodStreamsByCat:G==="series"?_.seriesStreamsByCat:_.streamsByCatAll,r=new Map;for(const n of t.values())for(const i of n){const a=String(i.stream_id??i.series_id??i.item_id??i.id);r.has(a)||r.set(a,i)}const n=[];for(const i of e){const a=r.get(i);a&&n.push(a)}return n}'
     ]
 ];
 
@@ -82,7 +118,51 @@ for (const [before, after] of replacements) {
     if (source.includes(after)) continue;
 }
 
+const legacyLiveLogoLoader = 'const __velLiveLogoLoads=new Set;function __velLoadLivePackageLogo(s){if(__velLiveLogoLoads.has(s))return;__velLiveLogoLoads.add(s),sG(s).then(()=>{_&&Z==="packages"&&Nt()}).catch(e=>console.warn("[live-package-logo]",s,e))}';
+const resettingSharedLiveLogoLoader = 'let __velLiveLogoLoad=null;function __velLoadLivePackageLogo(){__velLiveLogoLoad||(__velLiveLogoLoad=BG("live").catch(e=>console.warn("[live-package-logo]",e)).finally(()=>{__velLiveLogoLoad=null}))}';
+const sharedLiveLogoLoader = 'let __velLiveLogoLoad=null;function __velLoadLivePackageLogo(){__velLiveLogoLoad||(__velLiveLogoLoad=BG("live").catch(e=>console.warn("[live-package-logo]",e)))}';
+const primaryOnlyLiveLogoLoader = 'let __velLiveLogoLoad=null;async function __velWarmLiveLogos(){if(!_||_.mode!=="nodecast")return;const s=(_.nodecastXtreamSourceIds??[]).map(e=>e.trim()).filter(Boolean),e=s.length>1?"all":s[0]??_.nodecastXtreamSourceId;if(!e)return;const t=await xp(_.base,e,_.nodecastAuthHeaders);if(!_||G!=="live")return;Tn(_.streamsByCatAll,t),FG(_.liveLoadedCategoryIds,t),Pe=Qt(_.liveCategories,_.streamsByCatAll,{includeEmptyPackages:!1}),yr(),Z==="packages"&&Nt()}function __velLoadLivePackageLogo(){__velLiveLogoLoad||(__velLiveLogoLoad=__velWarmLiveLogos().catch(e=>console.warn("[live-package-logo]",e)))}';
+const completeLiveLogoLoader = 'let __velLiveLogoLoad=null;async function __velWarmLiveLogos(){if(!_||_.mode!=="nodecast")return;let s=[];try{const e=await Ke(`${_.base}/api/sources/catalog`,{headers:_.nodecastAuthHeaders,timeoutMs:8e3});s=Cs(e).filter(t=>t&&t.type==="xtream"&&t.enabled!==0&&t.enabled!==!1).map(t=>String(t.id).trim()).filter(Boolean)}catch{}s.length||(s=(_.nodecastXtreamSourceIds??[]).map(e=>e.trim()).filter(Boolean));if(!s.length&&_.nodecastXtreamSourceId)s=[_.nodecastXtreamSourceId];const e=await Promise.all(s.map(t=>xp(_.base,t,_.nodecastAuthHeaders).catch(()=>new Map))),t=new Map;for(const r of e)Tn(t,r);if(!_||G!=="live")return;Tn(_.streamsByCatAll,t),FG(_.liveLoadedCategoryIds,t),Pe=Qt(_.liveCategories,_.streamsByCatAll,{includeEmptyPackages:!1}),yr(),Z==="packages"&&Nt()}function __velLoadLivePackageLogo(){__velLiveLogoLoad||(__velLiveLogoLoad=__velWarmLiveLogos().catch(e=>console.warn("[live-package-logo]",e)))}';
+if (source.includes(primaryOnlyLiveLogoLoader)) {
+    source = source.replace(primaryOnlyLiveLogoLoader, completeLiveLogoLoader);
+    changed = true;
+}
+if (source.includes(sharedLiveLogoLoader)) {
+    source = source.replace(sharedLiveLogoLoader, completeLiveLogoLoader);
+    changed = true;
+}
+while (source.includes(completeLiveLogoLoader + completeLiveLogoLoader)) {
+    source = source.replace(completeLiveLogoLoader + completeLiveLogoLoader, completeLiveLogoLoader);
+    changed = true;
+}
+if (source.includes(resettingSharedLiveLogoLoader)) {
+    source = source.replace(resettingSharedLiveLogoLoader, sharedLiveLogoLoader);
+    changed = true;
+}
+if (source.includes(legacyLiveLogoLoader)) {
+    source = source.replace(legacyLiveLogoLoader, sharedLiveLogoLoader);
+    changed = true;
+}
+while (source.includes(sharedLiveLogoLoader + sharedLiveLogoLoader)) {
+    source = source.replace(sharedLiveLogoLoader + sharedLiveLogoLoader, sharedLiveLogoLoader);
+    changed = true;
+}
+
 const manualTabMatcher = 'function __velManualPackageMatchesTab(s){const e=Jn(s.name);if(e&&wc().packages.some(t=>Jn(t.name)===e))return!0;if(!_||!Ze(s.id))return!1;const t=tG(s.id),r=G==="movies"?_.vodStreamsByCat:G==="series"?_.seriesStreamsByCat:_.streamsByCatAll;for(const n of r.values())for(const i of n)if(t.has(String(i.stream_id??i.series_id??i.item_id??i.id)))return!0;return!1}';
+const legacyOrderedManualTabMatcher = 'function __velManualPackageMatchesTab(s){const e=G==="movies"||G==="series"?G:"live",t=["live","movies","series"].filter(r=>(mG(r)||[]).includes(s.id));if(t.length)return t.includes(e);const r=Jn(s.name);if(r&&wc().packages.some(n=>Jn(n.name)===r))return!0;if(!_||!Ze(s.id))return!1;const n=tG(s.id),i=G==="movies"?_.vodStreamsByCat:G==="series"?_.seriesStreamsByCat:_.streamsByCatAll;for(const a of i.values())for(const o of a)if(n.has(String(o.stream_id??o.series_id??o.item_id??o.id)))return!0;return!1}';
+const orderedManualTabMatcher = 'function __velManualPackageMatchesTab(s){const e=G==="movies"||G==="series"?G:"live",t=["live","movies","series"].filter(r=>(mG(r)||[]).includes(s.id));if(t.length)return t.includes(e);const r=Jn(s.name);return!!(r&&wc().packages.some(n=>Jn(n.name)===r))}';
+if (source.includes(legacyOrderedManualTabMatcher)) {
+    source = source.replaceAll(legacyOrderedManualTabMatcher, orderedManualTabMatcher);
+    changed = true;
+}
+if (source.includes(manualTabMatcher)) {
+    source = source.replaceAll(manualTabMatcher, orderedManualTabMatcher);
+    changed = true;
+}
+while (source.includes(orderedManualTabMatcher + orderedManualTabMatcher)) {
+    source = source.replace(orderedManualTabMatcher + orderedManualTabMatcher, orderedManualTabMatcher);
+    changed = true;
+}
 while (source.includes(manualTabMatcher + manualTabMatcher)) {
     source = source.replace(manualTabMatcher + manualTabMatcher, manualTabMatcher);
     changed = true;

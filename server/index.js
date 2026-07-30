@@ -187,6 +187,7 @@ app.use('/api/settings', require('./routes/settings'));
 app.use('/api/history', require('./routes/history'));
 app.use('/api/search', require('./routes/search'));
 app.use('/api/velora/catalog', require('./routes/veloraCatalog'));
+app.use('/api/velora-db', require('./routes/veloraData'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api', require('./routes/packageCovers'));
 app.use('/api', require('./routes/veloraTrialProxy'));

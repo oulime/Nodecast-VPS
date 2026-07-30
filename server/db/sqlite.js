@@ -102,6 +102,70 @@ function initSchema() {
         );
     `);
 
+    // Velora admin/package configuration. Rows are stored as JSON so the local
+    // API can preserve the existing PostgREST-shaped frontend contract while
+    // keeping the source of truth entirely on this VPS.
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS velora_admin_rows (
+            table_name TEXT NOT NULL,
+            row_id TEXT NOT NULL,
+            data TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (table_name, row_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_velora_admin_rows_table
+            ON velora_admin_rows(table_name);
+    `);
+
+    const veloraCount = db.prepare(
+        `SELECT COUNT(*) AS count FROM velora_admin_rows WHERE table_name = ?`
+    ).get('admin_countries').count;
+    if (veloraCount === 0) {
+        const insertVeloraRow = db.prepare(`
+            INSERT INTO velora_admin_rows (table_name, row_id, data)
+            VALUES (?, ?, ?)
+        `);
+        const franceId = 'country_france';
+        const autresId = 'country_autres';
+        const seed = db.transaction(() => {
+            insertVeloraRow.run('admin_countries', franceId, JSON.stringify({
+                id: franceId,
+                name: 'France'
+            }));
+            insertVeloraRow.run('admin_countries', autresId, JSON.stringify({
+                id: autresId,
+                name: 'Autres'
+            }));
+            insertVeloraRow.run('canonical_countries', 'canonical_france', JSON.stringify({
+                id: 'canonical_france',
+                match_key: '__manual__:france',
+                display_name: 'France',
+                sort_order: 0
+            }));
+            insertVeloraRow.run('canonical_countries', 'visible_france', JSON.stringify({
+                id: 'visible_france',
+                match_key: '__visible__:france',
+                display_name: 'France',
+                sort_order: 999999
+            }));
+            insertVeloraRow.run('canonical_countries', 'canonical_autres', JSON.stringify({
+                id: 'canonical_autres',
+                match_key: '__manual__:autres',
+                display_name: 'Autres',
+                sort_order: 999998
+            }));
+            insertVeloraRow.run('canonical_countries', 'visible_autres', JSON.stringify({
+                id: 'visible_autres',
+                match_key: '__visible__:autres',
+                display_name: 'Autres',
+                sort_order: 999999
+            }));
+        });
+        seed();
+        console.log('[SQLite] Seeded clean Velora configuration with France and Autres');
+    }
+
     // User Favorites (per-user)
     db.exec(`
         CREATE TABLE IF NOT EXISTS favorites (

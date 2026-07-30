@@ -121,6 +121,10 @@
           }
         }
 
+        var hadPersistedCountryAtStartup = !!(
+          readPersistedCountryId() || readPersistedCountryName()
+        );
+
         function persistCountryOption(option) {
           if (!option || !String(option.value || "").trim()) return;
           try {
@@ -156,6 +160,16 @@
             });
           }
 
+          if (!match && !hadPersistedCountryAtStartup) {
+            Array.prototype.some.call(select.options, function (option) {
+              if (normalizeCountryName(option.textContent) === "france") {
+                match = option;
+                return true;
+              }
+              return false;
+            });
+          }
+
           if (!match) return false;
           if (select.value !== match.value) {
             select.value = match.value;
@@ -166,6 +180,13 @@
         }
 
         window.veloraRestorePersistedCountry = restorePersistedCountry;
+        window.veloraIsStartupCountryReady = function (select) {
+          if (!select || !select.options || select.selectedIndex < 0) return false;
+          var option = select.options[select.selectedIndex];
+          if (!option || option.disabled || !String(option.value || "").trim()) return false;
+          return hadPersistedCountryAtStartup ||
+            normalizeCountryName(option.textContent) === "france";
+        };
 
         document.addEventListener("change", function (event) {
           var select = event.target;
@@ -187,6 +208,7 @@
           var select = document.getElementById("country-select");
           if (!homeHasRealCountries(select)) return false;
           restorePersistedCountry(select);
+          if (!window.veloraIsStartupCountryReady(select)) return false;
           document.body.classList.remove("vel-home-choice-loading");
           document.body.classList.remove("vel-home-choice-catalog-pending");
           try {
@@ -1375,8 +1397,9 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
       rel="stylesheet"
     />
+    <script src="/assets/local-velora-data.js?v=20260730-sqlite-cutover"></script>
     <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=search-select-live-channel-20260730-50"></script>
-    <script defer src="/assets/manual-pays.js?v=20260730-opt-in-countries"></script>
+    <script defer src="/assets/manual-pays.js?v=20260730-hide-autres"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
     <link rel="stylesheet" href="/assets/manual-pays.css?v=20260729-whole-word">
@@ -4179,7 +4202,7 @@
                     <span class="vel-home-country-picker__kicker">Pays :</span>
                     <span class="vel-home-country-picker__selected">
                       <img id="home-country-flag" class="country-select-trigger__flag" alt="" decoding="async" loading="eager" hidden />
-                      <span id="home-country-value" class="vel-home-country-picker__value country-select-trigger__text">Choisir</span>
+                      <span id="home-country-value" class="vel-home-country-picker__value country-select-trigger__text">France</span>
                     </span>
                   </button>
                   <div id="home-country-menu" class="vel-home-country-picker__menu velora-tv-select-menu velora-country-select-menu" role="listbox" aria-label="Pays" hidden></div>
@@ -4528,7 +4551,7 @@
         <fieldset class="admin-cover-theme-fieldset">
           <legend class="cover-upload-field-label">Couleurs du thème (lecteur)</legend>
           <p class="admin-cover-theme-hint">
-            Enregistré dans Supabase (<code>admin_packages</code> ou surcharges catalogue). Les couleurs identiques au
+            Enregistré localement sur le VPS (<code>admin_packages</code> ou surcharges catalogue). Les couleurs identiques au
             préréglage du nom ne sont pas stockées (le thème peut encore suivre l’image). Utilisez « Réinitialiser les
             couleurs » pour tout effacer.
           </p>
@@ -4604,7 +4627,7 @@
         <h2 class="admin-add-package-dialog__title">Nouveau package (Supabase)</h2>
         <p class="admin-add-package-dialog__hint">
           Le bouquet est enregistré dans la base. La liste des pays est la <strong>même</strong> que dans le menu
-          Pays du lecteur ; une ligne <code>admin_countries</code> est créée dans Supabase seulement si besoin pour
+          Pays du lecteur ; une ligne <code>admin_countries</code> est créée dans SQLite sur le VPS seulement si besoin pour
           lier le bouquet.
         </p>
         <p id="dap-empty-countries-hint" class="admin-add-package-dialog__microhint hidden">
@@ -5019,8 +5042,13 @@
             });
           }
 
-          document.body.classList.remove("vel-home-choice-loading");
-          document.body.classList.remove("vel-home-choice-catalog-pending");
+          if (
+            typeof window.veloraIsStartupCountryReady !== "function" ||
+            window.veloraIsStartupCountryReady(main)
+          ) {
+            document.body.classList.remove("vel-home-choice-loading");
+            document.body.classList.remove("vel-home-choice-catalog-pending");
+          }
           return true;
         }
 
@@ -5158,7 +5186,10 @@
             }
 
             function hasCountriesReady() {
-              return hasSelectableCountry(getMainCountrySelect());
+              var select = getMainCountrySelect();
+              return hasSelectableCountry(select) &&
+                (typeof window.veloraIsStartupCountryReady !== "function" ||
+                  window.veloraIsStartupCountryReady(select));
             }
 
             function check() {
@@ -5167,14 +5198,14 @@
                 return;
               }
               syncHomeCountryOptions();
-              if (hasCountriesReady() || hasPackageCards()) {
+              if (hasCountriesReady()) {
                 window.setTimeout(function () {
                   finish();
                 }, 90);
                 return;
               }
               if (Date.now() - started >= maxWait) {
-                finish();
+                setLoadingStatus("Sélection de la France…");
               }
             }
 
@@ -5404,7 +5435,10 @@
           }
 
           function homeCatalogReady() {
-            return hasSelectableCountry(getMainCountrySelect()) || hasPackageCards();
+            var select = getMainCountrySelect();
+            return hasSelectableCountry(select) &&
+              (typeof window.veloraIsStartupCountryReady !== "function" ||
+                window.veloraIsStartupCountryReady(select));
           }
 
           document.addEventListener("velora-countries-ready", function () {

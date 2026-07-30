@@ -104,6 +104,38 @@ const replacements = [
     [
         'if(Ze(s)){const e=tG(s),t=G==="movies"?_.vodStreamsByCat:G==="series"?_.seriesStreamsByCat:_.streamsByCatAll,r=[],n=new Set;for(const i of t.values())for(const a of i){const o=String(a.stream_id??a.series_id??a.item_id??a.id);e.has(o)&&!n.has(o)&&(n.add(o),r.push(a))}return r}',
         'if(Ze(s)){const e=tG(s),t=G==="movies"?_.vodStreamsByCat:G==="series"?_.seriesStreamsByCat:_.streamsByCatAll,r=new Map;for(const n of t.values())for(const i of n){const a=String(i.stream_id??i.series_id??i.item_id??i.id);r.has(a)||r.set(a,i)}const n=[];for(const i of e){const a=r.get(i);a&&n.push(a)}return n}'
+    ],
+    [
+        'function br(){return W2()}',
+        'function br(){const s=W2(),e=window.__veloraVisibleCountries;return s.filter(t=>jr(t.name)==="autres"||e instanceof Set&&e.has(jr(t.name)))}'
+    ],
+    [
+        'window.addEventListener("velora-admin-curation-changed",()=>{xt().then(()=>{_&&Nt()}).catch(s=>console.warn("[manual-curation-refresh]",s))});',
+        'window.addEventListener("velora-admin-curation-changed",()=>{xt().then(()=>{_&&Nt()}).catch(s=>console.warn("[manual-curation-refresh]",s))});window.addEventListener("velora-country-visibility-changed",()=>{vr(),_&&Z==="packages"&&Nt()});'
+    ],
+    [
+        'const p=a.filter(E=>Ze(E.id)?!0:',
+        'const p=a.filter(E=>(ue===Nn||ot(kn()??"")===ot("Autres"))&&!Ze(E.id)?!0:Ze(E.id)?!0:'
+    ],
+    [
+        'const p=a.filter(E=>(ue===Nn||ot(kn()??"")===ot("Autres"))&&!Ze(E.id)?!0:Ze(E.id)?!0:',
+        'const p=a.filter(E=>(ue===Nn||ot(kn()??"")===ot("Autres")||ot(((Ie.options[Ie.selectedIndex]?.textContent)??""))===ot("Autres"))&&!Ze(E.id)?!0:Ze(E.id)?!0:'
+    ],
+    [
+        'function Ey(){if($e)return h2(pr);return uG()}',
+        'function Ey(){if(ot(((Ie.options[Ie.selectedIndex]?.textContent)??""))===ot("Autres"))return __velUnassignedPackages();if($e)return h2(pr);return uG()}'
+    ],
+    [
+        'function Ey(){if(ot(((Ie.options[Ie.selectedIndex]?.textContent)??""))===ot("Autres"))return __velUnassignedPackages();if($e)return h2(pr);return uG()}',
+        'function Ey(){if(String(ue)==="country__other"||ue===Nn||ot(kn()??"")===ot("Autres")||ot(((Ie.options[Ie.selectedIndex]?.textContent)??""))===ot("Autres"))return __velUnassignedPackages();if($e)return h2(pr);return uG()}'
+    ],
+    [
+        'const p=a.filter(E=>(ue===Nn||ot(kn()??"")===ot("Autres")||ot(((Ie.options[Ie.selectedIndex]?.textContent)??""))===ot("Autres"))&&!Ze(E.id)?!0:',
+        'const p=a.filter(E=>(String(ue)==="country__other"||ue===Nn||ot(kn()??"")===ot("Autres")||ot(((Ie.options[Ie.selectedIndex]?.textContent)??""))===ot("Autres"))&&!Ze(E.id)?!0:'
+    ],
+    [
+        'function ub(s){if(s.id===bo)return Bd;const e=jr(s.name);',
+        'function ub(s){if(s.id===bo||jr(s.name)==="autres")return Bd;const e=jr(s.name);'
     ]
 ];
 
@@ -166,6 +198,18 @@ while (source.includes(orderedManualTabMatcher + orderedManualTabMatcher)) {
 while (source.includes(manualTabMatcher + manualTabMatcher)) {
     source = source.replace(manualTabMatcher + manualTabMatcher, manualTabMatcher);
     changed = true;
+}
+
+const manualCountryPackagesStart = source.indexOf('function __velManualPackageMatchesTab');
+const manualCountryPackagesEnd = manualCountryPackagesStart >= 0 ? source.indexOf('function dG(', manualCountryPackagesStart) : -1;
+if (manualCountryPackagesStart >= 0 && manualCountryPackagesEnd > manualCountryPackagesStart) {
+    const currentManualCountryPackages = source.slice(manualCountryPackagesStart, manualCountryPackagesEnd);
+    const automaticOthersPackages = 'function __velUnassignedPackages(){const s=new Map;for(const e of[...wc().packages,...h2(pr)])s.set(e.id,e);const e=[...s.values()],t=new Set;for(const[r,n]of io.entries())if(r.endsWith(`::${G}`))for(const i of n)t.add(i);for(const r of es)if(!t.has(r.id)){const n=Jn(r.name);n&&e.some(i=>Jn(i.name)===n)&&t.add(r.id)}const r=new Set;for(const n of En.values())for(const[i,a]of n.entries())t.has(a)&&r.add(String(i));const n=G==="movies"?_.vodStreamsByCat:G==="series"?_.seriesStreamsByCat:_.streamsByCatAll;return e.filter(i=>!(n.get(String(i.id))??[]).some(a=>r.has(String(a.stream_id??a.series_id??a.item_id??a.id))))}function uG(){const s=Sr(),e=kn(),t=e?ot(e):"",r=new Map;for(const n of es){if(!__velManualPackageMatchesTab(n))continue;if(s&&n.country_id===s){r.set(n.id,n);continue}if(!t)continue;const i=et.find(a=>a.id===n.country_id);i&&ot(i.name)===t&&r.set(n.id,n)}const n=ot(((Ie.options[Ie.selectedIndex]?.textContent)??""))===ot("Autres");if(ue===Nn||t===ot("Autres")||n)for(const i of __velUnassignedPackages())r.set(i.id,i);return[...r.values()]}';
+    const completeManualCountryPackages = orderedManualTabMatcher + automaticOthersPackages;
+    if (currentManualCountryPackages !== completeManualCountryPackages) {
+        source = source.slice(0, manualCountryPackagesStart) + completeManualCountryPackages + source.slice(manualCountryPackagesEnd);
+        changed = true;
+    }
 }
 
 const oldManualContentResolver = 'if((G==="movies"||G==="series")&&Ze(s)){const e=tG(s),t=G==="movies"?_.vodStreamsByCat:_.seriesStreamsByCat,r=[];for(const n of t.values())for(const i of n)e.has(String(i.stream_id??i.series_id??i.item_id??i.id))&&r.push(i);return r.sort((n,i)=>Re(n.name).localeCompare(Re(i.name),"fr"))}';

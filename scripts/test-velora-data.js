@@ -19,6 +19,21 @@ async function main() {
         let rows = await response.json();
         assert.equal(rows[0].name, 'France');
 
+        response = await fetch(`${base}/admin_countries?select=id,name`);
+        assert.equal(response.status, 200);
+        rows = await response.json();
+        assert.ok(rows.length >= 100, `expected complete country catalogue, received ${rows.length}`);
+
+        response = await fetch(
+            `${base}/canonical_countries?select=display_name&match_key=like.__visible__:*`
+        );
+        assert.equal(response.status, 200);
+        rows = await response.json();
+        assert.deepEqual(
+            rows.map(row => row.display_name).sort(),
+            ['Autres', 'France']
+        );
+
         response = await fetch(`${base}/admin_countries?select=id`, {
             method: 'POST',
             headers: {

@@ -121,49 +121,70 @@ function initSchema() {
     const veloraCount = db.prepare(
         `SELECT COUNT(*) AS count FROM velora_admin_rows WHERE table_name = ?`
     ).get('admin_countries').count;
-    if (veloraCount === 0) {
+    if (veloraCount < 3) {
         const insertVeloraRow = db.prepare(`
-            INSERT INTO velora_admin_rows (table_name, row_id, data)
+            INSERT OR IGNORE INTO velora_admin_rows (table_name, row_id, data)
             VALUES (?, ?, ?)
         `);
-        const franceId = 'country_france';
-        const autresId = 'country_autres';
+        const baseCountries = [
+            'Afghanistan', 'Afrique du Sud', 'Albanie', 'Algérie', 'Allemagne',
+            'Angleterre', 'Arabie saoudite', 'Arabe', 'Argentine', 'Arménie',
+            'Australie', 'Autres', 'Autriche', 'Azerbaïdjan', 'Bahreïn',
+            'Bangladesh', 'Belgique', 'Biélorussie', 'Bolivie', 'Bosnie-Herzégovine',
+            'Brésil', 'Bulgarie', 'Cameroun', 'Canada', 'Chili', 'Chine',
+            'Chypre', 'Colombie', 'Congo / Gabon', 'Corée du Sud', 'Costa Rica',
+            'Croatie', 'Danemark', 'Écosse', 'Égypte', 'Émirats arabes unis',
+            'Équateur', 'Espagne', 'États-Unis', 'Finlande', 'France', 'Géorgie',
+            'Ghana', 'Grèce', 'Guatemala', 'Honduras', 'Hong Kong', 'Hongrie',
+            'Inde', 'Indonésie', 'Irak', 'Iran', 'Irlande', 'Islande', 'Israël',
+            'Italie', 'Japon', 'Jordanie', 'Kazakhstan', 'Kosovo', 'Koweït',
+            'Kurdistan', 'Lettonie', 'Liban', 'Libye', 'Lituanie', 'Luxembourg',
+            'Macédoine du Nord', 'Malaisie', 'Mali', 'Malte', 'Maroc',
+            'Maurice', 'Mauritanie', 'Mexique', 'Monténégro', 'Népal',
+            'Nicaragua', 'Nigeria', 'Norvège', 'Nouvelle-Zélande', 'Oman',
+            'Ouzbékistan', 'Pakistan', 'Palestine', 'Panama', 'Paraguay',
+            'Pays-Bas', 'Pays de Galles', 'Pérou', 'Philippines', 'Pologne',
+            'Portugal', 'Qatar', 'République dominicaine', 'République tchèque',
+            'Roumanie', 'Royaume-Uni', 'Russie', 'Salvador', 'Sénégal',
+            'Serbie', 'Slovaquie', 'Slovénie', 'Somalie', 'Soudan', 'Sri Lanka',
+            'Suède', 'Suisse', 'Suriname', 'Syrie', 'Taïwan', 'Thaïlande',
+            'Tunisie', 'Turquie', 'Ukraine', 'Uruguay', 'USA', 'Venezuela',
+            'Vietnam', 'Yémen'
+        ];
+        const countryKey = name => name
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '');
         const seed = db.transaction(() => {
-            insertVeloraRow.run('admin_countries', franceId, JSON.stringify({
-                id: franceId,
-                name: 'France'
-            }));
-            insertVeloraRow.run('admin_countries', autresId, JSON.stringify({
-                id: autresId,
-                name: 'Autres'
-            }));
-            insertVeloraRow.run('canonical_countries', 'canonical_france', JSON.stringify({
-                id: 'canonical_france',
-                match_key: '__manual__:france',
-                display_name: 'France',
-                sort_order: 0
-            }));
-            insertVeloraRow.run('canonical_countries', 'visible_france', JSON.stringify({
-                id: 'visible_france',
-                match_key: '__visible__:france',
-                display_name: 'France',
-                sort_order: 999999
-            }));
-            insertVeloraRow.run('canonical_countries', 'canonical_autres', JSON.stringify({
-                id: 'canonical_autres',
-                match_key: '__manual__:autres',
-                display_name: 'Autres',
-                sort_order: 999998
-            }));
-            insertVeloraRow.run('canonical_countries', 'visible_autres', JSON.stringify({
-                id: 'visible_autres',
-                match_key: '__visible__:autres',
-                display_name: 'Autres',
-                sort_order: 999999
-            }));
+            for (const name of baseCountries) {
+                const key = countryKey(name);
+                const countryId = `country_${key}`;
+                const canonicalId = `canonical_${key}`;
+                insertVeloraRow.run('admin_countries', countryId, JSON.stringify({
+                    id: countryId,
+                    name
+                }));
+                insertVeloraRow.run('canonical_countries', canonicalId, JSON.stringify({
+                    id: canonicalId,
+                    match_key: `__manual__:${key}`,
+                    display_name: name,
+                    sort_order: name === 'France' ? 0 : 100
+                }));
+                if (name === 'France' || name === 'Autres') {
+                    const visibleId = `visible_${key}`;
+                    insertVeloraRow.run('canonical_countries', visibleId, JSON.stringify({
+                        id: visibleId,
+                        match_key: `__visible__:${key}`,
+                        display_name: name,
+                        sort_order: 999999
+                    }));
+                }
+            }
         });
         seed();
-        console.log('[SQLite] Seeded clean Velora configuration with France and Autres');
+        console.log(`[SQLite] Seeded clean Velora configuration with ${baseCountries.length} countries`);
     }
 
     // User Favorites (per-user)

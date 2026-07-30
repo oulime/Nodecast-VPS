@@ -187,6 +187,41 @@
           return hadPersistedCountryAtStartup ||
             normalizeCountryName(option.textContent) === "france";
         };
+        window.veloraIsStartupContentReady = function (select) {
+          return window.veloraIsStartupCountryReady(select) &&
+            document.querySelectorAll(".vel-package-card[data-package-id]").length > 0;
+        };
+        window.veloraBlockCountryPickerUntil = 0;
+        window.veloraBlockCountryPickerAfterPageChange = function () {
+          window.veloraBlockCountryPickerUntil = Date.now() + 900;
+          var homeMenu = document.getElementById("home-country-menu");
+          var homeTrigger = document.getElementById("home-country-trigger");
+          if (homeMenu) homeMenu.hidden = true;
+          if (homeTrigger) {
+            homeTrigger.setAttribute("aria-expanded", "false");
+            homeTrigger.blur();
+          }
+        };
+
+        function stopCountryPickerGhostEvent(event) {
+          if (Date.now() >= window.veloraBlockCountryPickerUntil) return;
+          var target = event.target;
+          if (!target || !target.closest) return;
+          var picker = target.closest(
+            "#country-select, #home-country-trigger, #home-country-menu, " +
+            ".vel-header__country .country-select, " +
+            ".vel-header__country .country-select-trigger, " +
+            ".velora-country-select-menu"
+          );
+          if (!picker) return;
+          event.preventDefault();
+          event.stopPropagation();
+          event.stopImmediatePropagation();
+        }
+
+        document.addEventListener("pointerup", stopCountryPickerGhostEvent, true);
+        document.addEventListener("touchend", stopCountryPickerGhostEvent, true);
+        document.addEventListener("click", stopCountryPickerGhostEvent, true);
 
         document.addEventListener("change", function (event) {
           var select = event.target;
@@ -208,7 +243,7 @@
           var select = document.getElementById("country-select");
           if (!homeHasRealCountries(select)) return false;
           restorePersistedCountry(select);
-          if (!window.veloraIsStartupCountryReady(select)) return false;
+          if (!window.veloraIsStartupContentReady(select)) return false;
           document.body.classList.remove("vel-home-choice-loading");
           document.body.classList.remove("vel-home-choice-catalog-pending");
           try {
@@ -5043,8 +5078,8 @@
           }
 
           if (
-            typeof window.veloraIsStartupCountryReady !== "function" ||
-            window.veloraIsStartupCountryReady(main)
+            typeof window.veloraIsStartupContentReady !== "function" ||
+            window.veloraIsStartupContentReady(main)
           ) {
             document.body.classList.remove("vel-home-choice-loading");
             document.body.classList.remove("vel-home-choice-catalog-pending");
@@ -5053,6 +5088,9 @@
         }
 
         function openHomeTabFallback(tabName) {
+          if (typeof window.veloraBlockCountryPickerAfterPageChange === "function") {
+            window.veloraBlockCountryPickerAfterPageChange();
+          }
           syncHomeCountriesFallback();
           document.dispatchEvent(new CustomEvent("velora-home-tab", {
             detail: { tab: tabName }
@@ -5188,8 +5226,9 @@
             function hasCountriesReady() {
               var select = getMainCountrySelect();
               return hasSelectableCountry(select) &&
-                (typeof window.veloraIsStartupCountryReady !== "function" ||
-                  window.veloraIsStartupCountryReady(select));
+                hasPackageCards() &&
+                (typeof window.veloraIsStartupContentReady !== "function" ||
+                  window.veloraIsStartupContentReady(select));
             }
 
             function check() {
@@ -5437,8 +5476,9 @@
           function homeCatalogReady() {
             var select = getMainCountrySelect();
             return hasSelectableCountry(select) &&
-              (typeof window.veloraIsStartupCountryReady !== "function" ||
-                window.veloraIsStartupCountryReady(select));
+              hasPackageCards() &&
+              (typeof window.veloraIsStartupContentReady !== "function" ||
+                window.veloraIsStartupContentReady(select));
           }
 
           document.addEventListener("velora-countries-ready", function () {
@@ -5605,6 +5645,9 @@
             if (!button) return;
 
             var tabName = button.getAttribute("data-home-tab");
+            if (typeof window.veloraBlockCountryPickerAfterPageChange === "function") {
+              window.veloraBlockCountryPickerAfterPageChange();
+            }
             activateHomeTab(tabName);
           });
 
@@ -5697,6 +5740,9 @@
             var showHomeChoice = function (event) {
               event.preventDefault();
               event.stopImmediatePropagation();
+              if (typeof window.veloraBlockCountryPickerAfterPageChange === "function") {
+                window.veloraBlockCountryPickerAfterPageChange();
+              }
               stopHomeMediaPlayback();
               homeChoiceRunId += 1;
               document.body.classList.remove("vel-home-choice-loading");

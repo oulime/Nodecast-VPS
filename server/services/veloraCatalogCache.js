@@ -220,7 +220,7 @@ function sendSnapshotResponse(req, res, action, categoryId = null) {
         const data = getSnapshot(action, categoryId);
         if (!data) return false;
         res.set('X-Velora-Catalog-Cache', 'vps-local');
-        res.set('Cache-Control', 'private, max-age=60');
+        res.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600');
         res.json(data);
         return true;
     }
@@ -233,14 +233,14 @@ function sendSnapshotResponse(req, res, action, categoryId = null) {
         const data = getSnapshot(action);
         if (!data) return false;
         res.set('X-Velora-Catalog-Cache', 'vps-local');
-        res.set('Cache-Control', 'private, max-age=60');
+        res.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600');
         res.json(data);
         return true;
     }
 
     res.set('Content-Type', 'application/json; charset=utf-8');
     res.set('X-Velora-Catalog-Cache', 'vps-local');
-    res.set('Cache-Control', 'private, max-age=60');
+    res.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600');
     if (gzipPath) {
         res.set('Content-Encoding', 'gzip');
         res.set('Vary', 'Accept-Encoding');
@@ -258,7 +258,7 @@ function sendCategorySnapshotResponse(req, res, action, sourceId, categoryId) {
 
     res.set('Content-Type', 'application/json; charset=utf-8');
     res.set('X-Velora-Catalog-Cache', 'vps-local-category');
-    res.set('Cache-Control', 'private, max-age=60');
+    res.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600');
     if (gzipPath) {
         res.set('Content-Encoding', 'gzip');
         res.set('Vary', 'Accept-Encoding');

@@ -30,7 +30,19 @@ app.use(passport.session());
 
 const publicDir = path.join(__dirname, '..', 'public');
 
-app.use(express.static(publicDir, { index: false }));
+app.use(express.static(publicDir, {
+    index: false,
+    setHeaders(res, filePath) {
+        const normalized = filePath.replace(/\\/g, '/');
+        if (/\/assets\/.*-[A-Za-z0-9_-]{6,}\.(?:js|css)$/i.test(normalized)) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            return;
+        }
+        if (/\/assets\/|\/logos\//i.test(normalized)) {
+            res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+        }
+    }
+}));
 
 // FFMPEG Configuration (optional - for transcoding support)
 // Priority: 1. System FFmpeg (better Docker DNS support), 2. ffmpeg-static npm package

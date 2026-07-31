@@ -321,11 +321,12 @@ router.all('/', async (req, res) => {
     const method = (req.method || 'GET').toUpperCase();
     const targetPath = new URL(target).pathname;
     const isPlaylistRequest = /\.m3u8$/i.test(targetPath);
+    const isImageRequest = /\.(?:avif|gif|heic|jpeg|jpg|png|svg|webp)$/i.test(targetPath);
     const isMediaSegmentRequest =
         /\.(ts|m4s|mp4|m4v|aac|mp3|webm|mkv)$/i.test(targetPath) ||
         /\/segment\//i.test(targetPath);
 
-    const abortMs = isMediaSegmentRequest ? 180000 : isPlaylistRequest ? 45000 : 60000;
+    const abortMs = isMediaSegmentRequest ? 180000 : isPlaylistRequest ? 45000 : isImageRequest ? 8000 : 60000;
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), abortMs);
 
@@ -388,6 +389,9 @@ router.all('/', async (req, res) => {
 
         res.status(upstream.status);
         copyUpstreamHeaders(upstream, res);
+        if (isImageRequest && !upstream.ok) {
+            res.setHeader('Cache-Control', 'public, max-age=900');
+        }
         if (!res.getHeader('Content-Type') && contentType) res.setHeader('Content-Type', contentType);
         if (!res.getHeader('Accept-Ranges')) {
             const acceptRanges = upstream.headers.get('accept-ranges');
@@ -415,6 +419,7 @@ router.all('/', async (req, res) => {
         const msg = err && err.name === 'AbortError'
             ? `Upstream request timed out (${Math.round(abortMs / 1000)}s).`
             : err?.message || 'Proxy error';
+        if (isImageRequest) res.setHeader('Cache-Control', 'public, max-age=300');
         res.status(502).send(msg);
     } finally {
         clearTimeout(timer);

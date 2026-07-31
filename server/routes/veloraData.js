@@ -1,8 +1,12 @@
 const crypto = require('crypto');
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const { getDb } = require('../db/sqlite');
+const veloraCatalogCache = require('../services/veloraCatalogCache');
 
 const router = express.Router();
+const homeCachePath = path.join(__dirname, '..', '..', 'data', 'velora-cache', 'home-sections.json');
 
 const ALLOWED_TABLES = new Set([
     'admin_channel_name_prefixes',
@@ -11,6 +15,7 @@ const ALLOWED_TABLES = new Set([
     'admin_global_package_allowlist',
     'admin_global_package_open_confirm',
     'admin_hidden_filters',
+    'admin_home_sections',
     'admin_package_channel_order',
     'admin_package_covers',
     'admin_packages',
@@ -24,6 +29,7 @@ const NATURAL_KEYS = {
     admin_country_package_order: ['country_id', 'ui_tab'],
     admin_global_package_allowlist: ['stream_id'],
     admin_global_package_open_confirm: ['id'],
+    admin_home_sections: ['id'],
     admin_package_channel_order: ['country_id', 'package_id'],
     admin_package_covers: ['package_id'],
     admin_packages: ['id'],
@@ -160,6 +166,90 @@ function saveRow(table, input, req) {
 
 router.use(express.json({ limit: '10mb' }));
 
+function buildHomeCache() {
+    const sections = sortRows(allRows('admin_home_sections'), 'section_order.asc');
+    const curations = allRows('admin_stream_curations');
+    const packageStreams = new Map();
+    for (const row of curations) {
+        const packageId = String(row.target_package_id || '').trim();
+        const streamId = String(row.stream_id || '').trim();
+        if (!packageId || !streamId) continue;
+        if (!packageStreams.has(packageId)) packageStreams.set(packageId, new Set());
+        packageStreams.get(packageId).add(streamId);
+    }
+    const snapshots = {
+        live: veloraCatalogCache.getSnapshot('live_streams') || [],
+        movies: veloraCatalogCache.getSnapshot('vod_streams') || [],
+        series: veloraCatalogCache.getSnapshot('series') || []
+    };
+    const output = sections.map(section => {
+        const type = ['live', 'movies', 'series'].includes(section.content_type)
+            ? section.content_type : 'live';
+        const wanted = packageStreams.get(String(section.package_id)) || new Set();
+        const entries = snapshots[type].filter(item => {
+            const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
+            return wanted.has(String(rawId));
+        }).slice(0, 500).map(item => {
+            const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
+            return {
+                id: `home-cache:${section.id}:${rawId}`,
+                name: String(item.name || item.title || item.series_name || '').trim(),
+                thumbUrl: String(item.stream_icon || item.cover || ''),
+                streamId: rawId,
+                sourceId: item.source_id,
+                globalStreamId: item.global_stream_id || item.stream_id,
+                containerExtension: item.container_extension || '',
+                contentType: type,
+                packageId: section.package_id
+            };
+        }).filter(item => item.name);
+        return { ...section, content_type: type, entries };
+    });
+    const payload = { generatedAt: new Date().toISOString(), sections: output };
+    fs.mkdirSync(path.dirname(homeCachePath), { recursive: true });
+    const temporaryPath = `${homeCachePath}.${process.pid}.tmp`;
+    fs.writeFileSync(temporaryPath, JSON.stringify(payload));
+    fs.renameSync(temporaryPath, homeCachePath);
+    return payload;
+}
+
+router.get('/home-cache', (req, res) => {
+    try {
+        const payload = fs.existsSync(homeCachePath)
+            ? JSON.parse(fs.readFileSync(homeCachePath, 'utf8'))
+            : buildHomeCache();
+        res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=600');
+        return res.json(payload);
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/home-cache/rebuild', (req, res) => {
+    try {
+        let payload;
+        if (req.body && Array.isArray(req.body.sections)) {
+            payload = {
+                generatedAt: new Date().toISOString(),
+                sections: req.body.sections.slice(0, 100).map(section => ({
+                    ...section,
+                    entries: Array.isArray(section.entries) ? section.entries.slice(0, 500) : []
+                }))
+            };
+            fs.mkdirSync(path.dirname(homeCachePath), { recursive: true });
+            const temporaryPath = `${homeCachePath}.${process.pid}.tmp`;
+            fs.writeFileSync(temporaryPath, JSON.stringify(payload));
+            fs.renameSync(temporaryPath, homeCachePath);
+        } else {
+            payload = buildHomeCache();
+        }
+        return res.json({ ok: true, generatedAt: payload.generatedAt, sections: payload.sections.length,
+            entries: payload.sections.reduce((total, section) => total + section.entries.length, 0) });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
 router.all('/rest/v1/:table', (req, res) => {
     const table = req.params.table;
     if (!ALLOWED_TABLES.has(table)) {
@@ -236,3 +326,4 @@ router.all('/rest/v1/:table', (req, res) => {
 });
 
 module.exports = router;
+module.exports.buildHomeCache = buildHomeCache;

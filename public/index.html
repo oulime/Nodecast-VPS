@@ -1483,7 +1483,8 @@
         window.fetch.__veloraPaidAccessPatched = true;
       })();
     </script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=package-prefix-display-20260731"></script>
+    <script defer src="/assets/velora-home-sections.js?v=country-name-home-match-20260731"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=resolved-package-home-cache-20260731"></script>
     <script defer src="/assets/manual-pays.js?v=20260730-hide-autres"></script>
     <script defer src="/assets/paid-users-admin.js?v=20260730-paid-users-supabase"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
@@ -1492,6 +1493,7 @@
     <link rel="stylesheet" href="/assets/paid-users-admin.css?v=20260730-paid-users-supabase">
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css">
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=live-player-placeholder-20260731">
+    <link rel="stylesheet" href="/assets/velora-home-sections.css?v=compact-poster-only-home-20260731">
     <style>
       body:not(.vel-home-choice-picked) .main--velora .vel-futuristic-bg {
         display: block !important;
@@ -3734,6 +3736,10 @@
             aria-label="Sections des paramètres"
             id="settings-tabs"
           >
+            <button type="button" role="tab" id="settings-tab-btn-home" class="settings-tabs__tab"
+              data-settings-tab="home" aria-selected="false" aria-controls="settings-tab-home" tabindex="-1">
+              Accueil
+            </button>
             <button
               type="button"
               role="tab"
@@ -3809,6 +3815,27 @@
           </div>
 
           <div class="settings-tab-panels">
+          <section id="settings-tab-home" class="settings-tab-panel panel countries-admin-form hidden"
+            role="tabpanel" aria-labelledby="settings-tab-btn-home" data-settings-tab="home" hidden>
+            <h2>Sections de la page Accueil</h2>
+            <p class="countries-admin-intro" style="margin-top: 0">Créez des rangées horizontales depuis un package Live, Films ou Séries.</p>
+            <p id="home-sections-admin-status" class="status" aria-live="polite"></p>
+            <div class="field row">
+              <div><label for="home-section-country">Pays</label><select id="home-section-country" class="admin-add-package-dialog__select">
+                <option value="default">Accueil par défaut</option>
+              </select></div>
+              <div><label for="home-section-type">Type</label><select id="home-section-type" class="admin-add-package-dialog__select">
+                <option value="live">Live</option><option value="movies">Films</option><option value="series">Séries</option>
+              </select></div>
+            </div>
+            <div class="field"><label for="home-section-title">Nom de la section</label><input id="home-section-title" type="text" placeholder="Ex. Films populaires" maxlength="80" /></div>
+            <div class="field"><label for="home-section-package">Package à afficher</label><select id="home-section-package" class="admin-add-package-dialog__select"></select></div>
+            <div class="field"><label><input id="home-section-published" type="checkbox" checked /> Publier immédiatement cette section</label></div>
+            <div class="actions"><button type="button" id="home-section-add" class="primary">Créer la section</button></div>
+            <div class="actions" style="margin-top: .65rem"><button type="button" id="home-cache-rebuild" class="countries-admin-cancel">Reconstruire le cache Accueil</button></div>
+            <p id="home-cache-status" class="status" aria-live="polite"></p>
+            <div id="home-sections-admin-list" class="vel-home-sections-admin-list"></div>
+          </section>
           <section
             id="settings-tab-prefixes"
             class="settings-tab-panel panel countries-admin-form"
@@ -4410,6 +4437,7 @@
                 <h2 class="vel-category-heading__title">ACCUEIL</h2>
                 <span class="vel-category-heading__accent-line" aria-hidden="true"></span>
               </header>
+              <div id="vel-home-sections" class="vel-home-sections" aria-live="polite"></div>
               <div class="vel-home-empty-page__canvas" aria-hidden="true"></div>
             </section>
             <div id="adult-view" class="vel-adult-portal hidden" aria-label="Contenu adulte">

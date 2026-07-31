@@ -1483,7 +1483,7 @@
         window.fetch.__veloraPaidAccessPatched = true;
       })();
     </script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=search-select-live-channel-20260730-50"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=channel-suffix-filters-20260731"></script>
     <script defer src="/assets/manual-pays.js?v=20260730-hide-autres"></script>
     <script defer src="/assets/paid-users-admin.js?v=20260730-paid-users-supabase"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
@@ -1491,7 +1491,7 @@
     <link rel="stylesheet" href="/assets/manual-pays.css?v=20260729-whole-word">
     <link rel="stylesheet" href="/assets/paid-users-admin.css?v=20260730-paid-users-supabase">
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css">
-    <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=package-section-title-20260711">
+    <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=theme-category-accent-20260731">
     <style>
       body:not(.vel-home-choice-picked) .main--velora .vel-futuristic-bg {
         display: block !important;
@@ -3737,38 +3737,14 @@
             <button
               type="button"
               role="tab"
-              id="settings-tab-btn-bouquets"
+              id="settings-tab-btn-prefixes"
               class="settings-tabs__tab settings-tabs__tab--active"
-              data-settings-tab="bouquets"
+              data-settings-tab="prefixes"
               aria-selected="true"
-              aria-controls="settings-tab-bouquets"
+              aria-controls="settings-tab-prefixes"
               tabindex="0"
             >
-              Bouquets
-            </button>
-            <button
-              type="button"
-              role="tab"
-              id="settings-tab-btn-prefixes"
-              class="settings-tabs__tab"
-              data-settings-tab="prefixes"
-              aria-selected="false"
-              aria-controls="settings-tab-prefixes"
-              tabindex="-1"
-            >
               Préfixes
-            </button>
-            <button
-              type="button"
-              role="tab"
-              id="settings-tab-btn-hidden"
-              class="settings-tabs__tab"
-              data-settings-tab="hidden"
-              aria-selected="false"
-              aria-controls="settings-tab-hidden"
-              tabindex="-1"
-            >
-              Masqués
             </button>
             <button
               type="button"
@@ -3834,73 +3810,11 @@
 
           <div class="settings-tab-panels">
           <section
-            id="settings-tab-bouquets"
-            class="settings-tab-panel panel countries-admin-form"
-            role="tabpanel"
-            aria-labelledby="settings-tab-btn-bouquets"
-            data-settings-tab="bouquets"
-          >
-            <h2>Bouquets visibles pour tous les pays</h2>
-            <p class="countries-admin-intro" style="margin-top: 0">
-              Un <strong>nom de bouquet tel que renvoyé par Nodecast</strong> par ligne (même libellé que dans le
-              catalogue : direct, films ou séries selon l’onglet actif). Retours à la ligne, virgules ou
-              points-virgules acceptés. Comparaison insensible à la casse et aux espaces multiples. Une ligne qui
-              correspond exactement à un id catalogue ou à un UUID Supabase fonctionne encore. Liste stockée dans
-              Supabase (<code>admin_global_package_allowlist</code>) — tous les lecteurs voient la même chose après
-              rechargement ou retour au lecteur.
-            </p>
-            <p id="gpa-status" class="status" aria-live="polite"></p>
-            <div class="field">
-              <label for="gpa-ids">Noms des bouquets (Nodecast)</label>
-              <textarea
-                id="gpa-ids"
-                rows="8"
-                spellcheck="false"
-                autocomplete="off"
-                placeholder="ex. FRANCE | SPORT 4K&#10;|EU| CINEMA"
-              ></textarea>
-            </div>
-            <div class="actions">
-              <button type="button" id="gpa-save" class="primary">Enregistrer la liste</button>
-            </div>
-            <h3 style="margin-top: 1.5rem; margin-bottom: 0.35rem; font-size: 1rem">Popup avant ouverture</h3>
-            <p class="countries-admin-intro" style="margin-top: 0">
-              Pour chaque bouquet de la liste ci-dessus (hors pays d’origine), un dialogue s’affiche au clic. Texte et
-              libellés des boutons sont enregistrés dans Supabase (<code>admin_global_package_open_confirm</code>).
-            </p>
-            <p id="gpa-confirm-status" class="status" aria-live="polite"></p>
-            <div class="field">
-              <label for="gpa-confirm-body">Message</label>
-              <textarea
-                id="gpa-confirm-body"
-                rows="4"
-                spellcheck="true"
-                autocomplete="off"
-                placeholder="Ex. Ce bouquet peut être soumis à des restrictions selon votre région…"
-              ></textarea>
-            </div>
-            <div class="field row">
-              <div>
-                <label for="gpa-confirm-yes-label">Libellé du bouton confirmation</label>
-                <input id="gpa-confirm-yes-label" type="text" placeholder="Oui" autocomplete="off" />
-              </div>
-              <div>
-                <label for="gpa-confirm-no-label">Libellé du bouton annulation</label>
-                <input id="gpa-confirm-no-label" type="text" placeholder="Non" autocomplete="off" />
-              </div>
-            </div>
-            <div class="actions">
-              <button type="button" id="gpa-confirm-save" class="primary">Enregistrer le popup</button>
-            </div>
-          </section>
-
-          <section
             id="settings-tab-prefixes"
-            class="settings-tab-panel panel countries-admin-form hidden"
+            class="settings-tab-panel panel countries-admin-form"
             role="tabpanel"
             aria-labelledby="settings-tab-btn-prefixes"
             data-settings-tab="prefixes"
-            hidden
           >
             <h2>Préfixes — noms de chaîne</h2>
             <p class="countries-admin-intro" style="margin-top: 0">
@@ -3919,32 +3833,24 @@
               <button type="button" id="cn-prefix-add" class="primary">Ajouter</button>
             </div>
             <div id="cn-prefix-wrap" class="countries-admin-table-wrap" style="margin-top: 1rem"></div>
-          </section>
 
-          <section
-            id="settings-tab-hidden"
-            class="settings-tab-panel panel countries-admin-form hidden"
-            role="tabpanel"
-            aria-labelledby="settings-tab-btn-hidden"
-            data-settings-tab="hidden"
-            hidden
-          >
-            <h2>Mots masqués — noms de chaîne</h2>
+            <hr style="margin: 1.6rem 0; border: 0; border-top: 1px solid rgba(255, 255, 255, 0.1)" />
+            <h2>Suffixes — masquer les chaînes</h2>
             <p class="countries-admin-intro" style="margin-top: 0">
-              Si le <strong>nom brut</strong> d’une chaîne contient l’un de ces textes (n’importe où, insensible à la
-              casse), elle n’apparaît pas dans la liste du package. Ex. <code>18+</code>, <code>XXX</code>.
+              Une chaîne est masquée uniquement lorsque son nom brut se termine par l’un de ces suffixes.
+              La comparaison est insensible à la casse et aux espaces autour du suffixe.
             </p>
-            <p id="hf-status" class="status" aria-live="polite"></p>
+            <p id="suffix-status" class="status" aria-live="polite"></p>
             <div class="field row">
               <div>
-                <label for="hf-needle">Mot ou fragment</label>
-                <input id="hf-needle" type="text" placeholder="18+" autocomplete="off" />
+                <label for="suffix-value">Suffixe de fin</label>
+                <input id="suffix-value" type="text" placeholder="ex. HEVC" autocomplete="off" />
               </div>
             </div>
             <div class="actions">
-              <button type="button" id="hf-add" class="primary">Ajouter</button>
+              <button type="button" id="suffix-add" class="primary">Ajouter le suffixe</button>
             </div>
-            <div id="hf-wrap" class="countries-admin-table-wrap" style="margin-top: 1rem"></div>
+            <div id="suffix-wrap" class="countries-admin-table-wrap" style="margin-top: 1rem"></div>
           </section>
 
           <section
@@ -4500,7 +4406,10 @@
 
           <div class="vel-body">
             <section id="vel-home-empty-page" class="vel-home-empty-page" aria-label="Accueil">
-              <h2 class="vel-packages-section-title vel-home-empty-page__title">ACCUEIL</h2>
+              <header class="vel-category-heading vel-category-heading--comedy vel-home-empty-page__title">
+                <h2 class="vel-category-heading__title">ACCUEIL</h2>
+                <span class="vel-category-heading__accent-line" aria-hidden="true"></span>
+              </header>
               <div class="vel-home-empty-page__canvas" aria-hidden="true"></div>
             </section>
             <div id="adult-view" class="vel-adult-portal hidden" aria-label="Contenu adulte">
@@ -4526,10 +4435,25 @@
                 </div>
               </div>
             </div>
-            <h2 id="vel-packages-section-title" class="vel-packages-section-title">TV EN DIRECT</h2>
+            <header id="vel-packages-section-heading" class="vel-category-heading vel-category-heading--comedy">
+              <h2 id="vel-packages-section-title" class="vel-category-heading__title">TV EN DIRECT</h2>
+              <span class="vel-category-heading__accent-line" aria-hidden="true"></span>
+            </header>
             <div id="packages-view" class="grid vel-packages" aria-label="Bouquets"></div>
 
             <div id="content-view" class="hidden">
+              <button
+                type="button"
+                id="btn-back-home"
+                class="vel-vod-detail-back hidden"
+                aria-label="Précédent"
+                title="Précédent"
+                data-tv-focusable="true"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M14.7 5.3a1 1 0 0 1 0 1.4L10.41 11H20a1 1 0 1 1 0 2h-9.59l4.3 4.3a1 1 0 0 1-1.42 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.42 0Z"></path>
+                </svg>
+              </button>
               <div id="cat-pills-wrap" class="cat-pills-wrap vel-cat-pills-wrap hidden">
                 <div id="cat-pills" class="vel-pills" role="tablist" aria-label="Filtres"></div>
               </div>
@@ -9190,7 +9114,97 @@ if (target.closest(".trial-offer-button")) {
 
       .main--velora .vel-sticky-top {
         padding-top: 0 !important;
+        padding-bottom: 0 !important;
         margin-top: 0 !important;
+        margin-bottom: 0 !important;
+        min-height: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+        background-color: transparent !important;
+        background-image: none !important;
+        box-shadow: none !important;
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+      }
+
+      .main--velora .vel-sticky-top::before,
+      .main--velora .vel-sticky-top::after {
+        display: none !important;
+        content: none !important;
+      }
+
+      .main--velora .vel-vod-detail-back {
+        position: sticky;
+        top: max(0.75rem, env(safe-area-inset-top, 0px));
+        z-index: 120;
+        width: 2.75rem;
+        height: 2.75rem;
+        margin: 0 0 0.65rem;
+        padding: 0;
+        display: grid;
+        place-items: center;
+        border: 1px solid color-mix(in srgb, var(--vel-primary, #8a2be2) 62%, rgba(255, 255, 255, 0.24));
+        border-radius: 50%;
+        color: #fff;
+        background: color-mix(in srgb, var(--vel-surface, #111322) 82%, rgba(5, 5, 12, 0.9));
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.42), 0 0 20px var(--vel-accent-glow, rgba(138, 43, 226, 0.3));
+      }
+
+      .main--velora .vel-vod-detail-back.hidden {
+        display: none !important;
+      }
+
+      .main--velora #content-view.content-view--vod-film-detail > #btn-back-home {
+        position: fixed !important;
+        top: max(0.85rem, env(safe-area-inset-top, 0px)) !important;
+        left: max(0.85rem, env(safe-area-inset-left, 0px)) !important;
+        z-index: 2147482000 !important;
+        display: grid !important;
+        margin: 0 !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+      }
+
+      .main--velora:has(#content-view.content-view--vod-film-detail)
+        #now-playing-vod:has(+ #vod-player-container:not(.hidden)) {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        width: min(calc(100% - 1.7rem), 72rem);
+        min-height: 2.75rem;
+        margin: max(0.85rem, env(safe-area-inset-top, 0px)) auto 0.35rem !important;
+        padding: 0 3.5rem !important;
+        color: #fff;
+        font-size: clamp(1.05rem, 2.6vw, 1.5rem);
+        font-weight: 850;
+        line-height: 1.2;
+        text-align: center;
+        visibility: visible !important;
+        opacity: 1 !important;
+      }
+
+      .main--velora #now-playing-vod .vel-live-ticker {
+        width: 100%;
+        min-width: 0;
+      }
+
+      .main--velora:has(#content-view.content-view--vod-film-detail)
+        #vod-player-container:not(.hidden) {
+        margin-top: 0 !important;
+      }
+
+      .main--velora .vel-vod-detail-back svg {
+        width: 1.25rem;
+        height: 1.25rem;
+        fill: currentColor;
+      }
+
+      .main--velora .vel-vod-detail-back:hover,
+      .main--velora .vel-vod-detail-back:focus-visible {
+        border-color: color-mix(in srgb, var(--vel-primary, #8a2be2) 82%, #fff);
+        outline: none;
+        transform: translateY(-1px);
       }
 
       /* Search uses the same glass/neon visual language as the bottom bar. */
@@ -9311,7 +9325,7 @@ if (target.closest(".trial-offer-button")) {
       }
 
       body.vel-home-empty-active #vel-package-toolbar-sticky,
-      body.vel-home-empty-active #vel-packages-section-title,
+      body.vel-home-empty-active #vel-packages-section-heading,
       body.vel-home-empty-active #packages-view,
       body.vel-home-empty-active #content-view,
       body.vel-home-empty-active #adult-view,
@@ -9345,6 +9359,25 @@ if (target.closest(".trial-offer-button")) {
         white-space: nowrap;
       }
 
+      body:has(.main--velora:not(.hidden)) {
+        padding-bottom: 0;
+      }
+
+      body:has(.main--velora:not(.hidden)) .app,
+      body:has(.main--velora:not(.hidden)) .main--velora,
+      body:has(.main--velora:not(.hidden)) .main--velora .vel-dashboard {
+        height: calc(100dvh - var(--vel-bottom-nav-height)) !important;
+        max-height: calc(100dvh - var(--vel-bottom-nav-height)) !important;
+        min-height: 0 !important;
+      }
+
+      body:has(.main--velora:not(.hidden)) .main--velora .vel-body,
+      body:has(.main--velora:not(.hidden)) .main--velora #packages-view,
+      body:has(.main--velora:not(.hidden)) .main--velora #content-view,
+      body:has(.main--velora:not(.hidden)) .main--velora #dynamic-list {
+        scroll-padding-bottom: 1.5rem;
+      }
+
       body.vel-home-choice-loading .vel-bottom-nav,
       body.vel-live-fullscreen-active .vel-bottom-nav,
       body.vel-vod-fullscreen-active .vel-bottom-nav,
@@ -9357,7 +9390,7 @@ if (target.closest(".trial-offer-button")) {
 
       @media (max-width: 640px) {
         :root {
-          --vel-bottom-nav-height: 70px;
+          --vel-bottom-nav-height: 64px;
         }
 
         .vel-bottom-nav {
@@ -9775,6 +9808,132 @@ if (target.closest(".trial-offer-button")) {
             document.body.classList.remove("vel-home-empty-active");
           }
         }, true);
+      })();
+    </script>
+    <script>
+      (function () {
+        var marker = "suffix:";
+        var status = document.getElementById("suffix-status");
+        var input = document.getElementById("suffix-value");
+        var addButton = document.getElementById("suffix-add");
+        var wrap = document.getElementById("suffix-wrap");
+        if (!status || !input || !addButton || !wrap) return;
+
+        var endpoint = "/api/velora-db/rest/v1/admin_hidden_filters";
+
+        function setStatus(message, isError) {
+          status.textContent = message;
+          status.classList.toggle("error", !!isError);
+        }
+
+        async function request(url, options) {
+          var response = await fetch(url, Object.assign({
+            cache: "no-store",
+            headers: {
+              "Content-Type": "application/json",
+              "Prefer": "return=representation"
+            }
+          }, options || {}));
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          if (response.status === 204) return null;
+          var text = await response.text();
+          return text ? JSON.parse(text) : null;
+        }
+
+        function render(rows) {
+          wrap.replaceChildren();
+          if (!rows.length) {
+            var empty = document.createElement("p");
+            empty.className = "countries-admin-empty";
+            empty.textContent = "Aucun suffixe — aucune chaîne n’est masquée selon sa terminaison.";
+            wrap.appendChild(empty);
+            return;
+          }
+
+          var table = document.createElement("table");
+          table.className = "countries-admin-table";
+          table.innerHTML = "<thead><tr><th>Suffixe de fin</th><th></th></tr></thead><tbody></tbody>";
+          var body = table.querySelector("tbody");
+          rows.forEach(function (row) {
+            var tr = document.createElement("tr");
+            var valueCell = document.createElement("td");
+            var code = document.createElement("code");
+            code.textContent = String(row.needle).slice(marker.length);
+            valueCell.appendChild(code);
+
+            var actionCell = document.createElement("td");
+            var remove = document.createElement("button");
+            remove.type = "button";
+            remove.className = "countries-admin-del";
+            remove.textContent = "Supprimer";
+            remove.addEventListener("click", async function () {
+              try {
+                setStatus("Suppression…");
+                await request(endpoint + "?id=eq." + encodeURIComponent(row.id), { method: "DELETE" });
+                await load();
+              } catch (error) {
+                setStatus("Impossible de supprimer ce suffixe.", true);
+              }
+            });
+            actionCell.appendChild(remove);
+            tr.append(valueCell, actionCell);
+            body.appendChild(tr);
+          });
+          wrap.appendChild(table);
+        }
+
+        async function load() {
+          try {
+            setStatus("Chargement…");
+            var rows = await request(endpoint + "?select=id,needle&order=needle.asc");
+            var suffixes = (Array.isArray(rows) ? rows : []).filter(function (row) {
+              return typeof row.needle === "string" && row.needle.toLowerCase().startsWith(marker);
+            });
+            render(suffixes);
+            setStatus(
+              suffixes.length
+                ? suffixes.length + " suffixe(s). Fermez les paramètres pour actualiser le lecteur."
+                : "Aucun suffixe configuré."
+            );
+          } catch (error) {
+            wrap.replaceChildren();
+            setStatus("Impossible de charger les suffixes.", true);
+          }
+        }
+
+        addButton.addEventListener("click", async function () {
+          var value = input.value.trim();
+          if (!value) {
+            setStatus("Saisissez un suffixe.", true);
+            return;
+          }
+          addButton.disabled = true;
+          try {
+            setStatus("Ajout…");
+            await request(endpoint, {
+              method: "POST",
+              body: JSON.stringify({ needle: marker + value })
+            });
+            input.value = "";
+            await load();
+          } catch (error) {
+            setStatus("Impossible d’ajouter ce suffixe.", true);
+          } finally {
+            addButton.disabled = false;
+          }
+        });
+
+        input.addEventListener("keydown", function (event) {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            addButton.click();
+          }
+        });
+
+        document.addEventListener("click", function (event) {
+          if (event.target && event.target.closest("[data-settings-tab='prefixes']")) load();
+        });
+        load();
       })();
     </script>
   </body>

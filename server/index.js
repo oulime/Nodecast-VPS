@@ -224,6 +224,11 @@ function sendVeloraApp(req, res) {
 app.get('/', sendVeloraApp);
 app.get('/login', sendLoginPage);
 
+// Backend admin iframe. express.static has index disabled, so serve it explicitly.
+app.get('/nodecast-admin/', (req, res) => {
+    res.sendFile(path.join(publicDir, 'nodecast-admin', 'index.html'));
+});
+
 // Trial visitors use this public entry point.
 app.get('/trial', sendVeloraApp);
 

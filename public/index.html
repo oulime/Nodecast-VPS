@@ -2019,8 +2019,8 @@
       .vel-scroll-top-btn {
         position: fixed;
         right: max(14px, env(safe-area-inset-right));
-        bottom: max(18px, env(safe-area-inset-bottom));
-        z-index: 1500;
+        bottom: calc(var(--vel-bottom-nav-height, 76px) + max(14px, env(safe-area-inset-bottom, 0px)));
+        z-index: 2450;
         width: 3rem;
         height: 3rem;
         min-width: 3rem;
@@ -8924,7 +8924,7 @@ if (target.closest(".trial-offer-button")) {
         width: min(760px, calc(100% - 24px));
         min-height: 66px;
         display: grid;
-        grid-template-columns: repeat(7, minmax(0, 1fr));
+        grid-template-columns: repeat(6, minmax(0, 1fr));
         gap: 3px;
         padding: 7px;
         border: 1px solid rgba(151, 135, 255, 0.28);
@@ -9002,6 +9002,53 @@ if (target.closest(".trial-offer-button")) {
         display: block;
         fill: currentColor;
         filter: drop-shadow(0 0 7px rgba(117, 99, 255, 0.25));
+      }
+
+      .vel-floating-search {
+        position: fixed;
+        z-index: 2395;
+        top: max(0.85rem, env(safe-area-inset-top, 0px));
+        right: max(0.85rem, env(safe-area-inset-right, 0px));
+        width: 2.75rem;
+        height: 2.75rem;
+        display: none;
+        place-items: center;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        color: rgba(239, 237, 255, 0.88);
+        background: transparent;
+        box-shadow: none;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      body.vel-home-choice-picked:not(.vel-home-empty-active)[data-vel-active-tab="live"] .vel-floating-search,
+      body.vel-home-choice-picked:not(.vel-home-empty-active)[data-vel-active-tab="movies"] .vel-floating-search,
+      body.vel-home-choice-picked:not(.vel-home-empty-active)[data-vel-active-tab="series"] .vel-floating-search {
+        display: grid;
+      }
+
+      .vel-floating-search:hover,
+      .vel-floating-search:focus-visible {
+        color: #fff;
+        background: rgba(125, 92, 255, 0.1);
+        outline: none;
+      }
+
+      .vel-floating-search:active {
+        transform: scale(0.92);
+      }
+
+      .vel-floating-search .vel-bottom-nav__icon {
+        width: 25px;
+        height: 25px;
+      }
+
+      body.vel-home-choice-loading .vel-floating-search,
+      body.vel-live-fullscreen-active .vel-floating-search,
+      body.vel-vod-fullscreen-active .vel-floating-search {
+        display: none !important;
       }
 
       .vel-bottom-nav__flag {
@@ -9445,15 +9492,14 @@ if (target.closest(".trial-offer-button")) {
         </span>
         <span class="vel-bottom-nav__label">Pays</span>
       </button>
-      <button type="button" class="vel-bottom-nav__button" data-bottom-nav="search" aria-label="Recherche">
-        <svg class="vel-bottom-nav__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.8 3a7.8 7.8 0 1 0 4.86 13.9l3.72 3.72a1 1 0 0 0 1.42-1.42l-3.72-3.72A7.8 7.8 0 0 0 10.8 3Zm0 2a5.8 5.8 0 1 1 0 11.6 5.8 5.8 0 0 1 0-11.6Z"/></svg>
-        <span class="vel-bottom-nav__label">Recherche</span>
-      </button>
       <button type="button" class="vel-bottom-nav__button" data-bottom-nav="profile" aria-label="Profil">
         <svg class="vel-bottom-nav__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-5 0-9 2.5-9 5.5V22h18v-2.5c0-3-4-5.5-9-5.5Z"/></svg>
         <span class="vel-bottom-nav__label">Profil</span>
       </button>
     </nav>
+    <button type="button" id="vel-floating-search" class="vel-floating-search" aria-label="Recherche">
+      <svg class="vel-bottom-nav__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.8 3a7.8 7.8 0 1 0 4.86 13.9l3.72 3.72a1 1 0 0 0 1.42-1.42l-3.72-3.72A7.8 7.8 0 0 0 10.8 3Zm0 2a5.8 5.8 0 1 1 0 11.6 5.8 5.8 0 0 1 0-11.6Z"/></svg>
+    </button>
     <div id="vel-bottom-country-menu" class="vel-bottom-country-menu" role="listbox" aria-label="Choisir un pays" hidden>
       <div class="vel-bottom-country-menu__title">Choisir un pays</div>
       <div id="vel-bottom-country-options"></div>
@@ -9479,6 +9525,7 @@ if (target.closest(".trial-offer-button")) {
         var bottomCountryOptions = document.getElementById("vel-bottom-country-options");
         var bottomCountryFlag = document.getElementById("vel-bottom-country-flag");
         var bottomProfileButton = nav.querySelector('[data-bottom-nav="profile"]');
+        var floatingSearchButton = document.getElementById("vel-floating-search");
         var bottomProfileMenu = document.getElementById("vel-bottom-profile-menu");
         var profileFavoritesButton = document.getElementById("vel-profile-favorites");
         var profileSessionButton = document.getElementById("vel-profile-session");
@@ -9699,8 +9746,9 @@ if (target.closest(".trial-offer-button")) {
           closeBottomCountryMenu();
           closeProfileMenu();
           document.dispatchEvent(new CustomEvent("velora-open-search"));
-          setActive("search");
         }
+
+        if (floatingSearchButton) floatingSearchButton.addEventListener("click", openSearch);
 
         nav.addEventListener("click", function (event) {
           var button = event.target.closest("[data-bottom-nav]");

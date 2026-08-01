@@ -1,15 +1,18 @@
 const express = require('express');
 require('dotenv').config();
 const path = require('path');
+const { Readable } = require('stream');
 const passport = require('passport');
 const syncService = require('./services/syncService');
 const veloraCatalogCache = require('./services/veloraCatalogCache');
 
-// Initialize database
-require('./db');
-
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number.parseInt(process.env.PORT, 10) || 3000;
+const VPS_DATA_API_BASE = String(
+    process.env.VPS_DATA_API_BASE || 'https://nodecast.veloravip.net'
+).trim().replace(/\/+$/, '');
+const USE_VPS_DATA_API = process.env.NODE_ENV !== 'production'
+    && !/^(1|true|yes)$/i.test(String(process.env.VPS_DATA_API_DISABLED || '').trim());
 
 // Trust proxy headers (X-Forwarded-Proto, X-Forwarded-For, etc.)
 // Required for correct protocol detection behind reverse proxies (nginx, Caddy, etc.)
@@ -27,6 +30,74 @@ app.use(session({
 }));
 app.use(passport.initialize());
 app.use(passport.session());
+
+// A development checkout must use the VPS as its single source of truth. These
+// endpoints own the SQLite catalogue (plus its closely related configuration),
+// while playback/transcoding endpoints continue to run on the local machine.
+const VPS_DATA_API_PATHS = [
+    '/api/auth',
+    '/api/admin/paid-users',
+    '/api/admin/my-ip',
+    '/api/admin/trial-reset',
+    '/api/trial-status',
+    '/api/trial-increment',
+    '/api/sources',
+    '/api/proxy',
+    '/api/channels',
+    '/api/favorites',
+    '/api/settings',
+    '/api/history',
+    '/api/search',
+    '/api/velora/catalog',
+    '/api/velora-db'
+];
+
+function isVpsDataApiRequest(requestPath) {
+    return VPS_DATA_API_PATHS.some(prefix => (
+        requestPath === prefix || requestPath.startsWith(`${prefix}/`)
+    ));
+}
+
+if (USE_VPS_DATA_API) {
+    app.use(async (req, res, next) => {
+        if (!isVpsDataApiRequest(req.path)) return next();
+
+        try {
+            const target = new URL(req.originalUrl, `${VPS_DATA_API_BASE}/`);
+            const headers = { ...req.headers };
+            delete headers.host;
+            delete headers['content-length'];
+            delete headers['accept-encoding'];
+
+            const hasBody = !['GET', 'HEAD'].includes(req.method) && req.body !== undefined;
+            const upstream = await fetch(target, {
+                method: req.method,
+                headers,
+                body: hasBody ? JSON.stringify(req.body) : undefined,
+                redirect: 'follow',
+                signal: req.signal
+            });
+
+            res.status(upstream.status);
+            upstream.headers.forEach((value, name) => {
+                if (!['content-encoding', 'content-length', 'transfer-encoding'].includes(name.toLowerCase())) {
+                    res.setHeader(name, value);
+                }
+            });
+            res.setHeader('X-Nodecast-Data-Source', VPS_DATA_API_BASE);
+
+            if (!upstream.body || req.method === 'HEAD') return res.end();
+            Readable.fromWeb(upstream.body).pipe(res);
+        } catch (err) {
+            console.error('[VPS data API] Request failed:', err);
+            if (!res.headersSent) {
+                res.status(502).json({ error: 'VPS data API unavailable' });
+            } else {
+                res.destroy(err);
+            }
+        }
+    });
+}
 
 const publicDir = path.join(__dirname, '..', 'public');
 
@@ -236,13 +307,18 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, async () => {
-    console.log(`NodeCast TV server running on http://localhost:${PORT}`);
+async function onServerStarted(port) {
+    console.log(`NodeCast TV server running on http://localhost:${port}`);
+    if (USE_VPS_DATA_API) {
+        console.log(`[Data] Local development is using the VPS database API at ${VPS_DATA_API_BASE}`);
+    }
 
     // Load plugins
     await loadPlugins().catch(err => {
         console.error('Plugin initialization failed:', err);
     });
+
+    if (USE_VPS_DATA_API) return;
 
     veloraCatalogCache.startAutoWarmTimer();
     const hasReadyVeloraSnapshot = veloraCatalogCache.hasReadySnapshot();
@@ -270,4 +346,27 @@ app.listen(PORT, async () => {
             console.warn('Hardware detection failed:', err.message);
         }
     }, 5000);
-});
+}
+
+function listenOnAvailablePort(port) {
+    const server = app.listen(port);
+
+    server.once('listening', () => {
+        onServerStarted(port).catch(err => {
+            console.error('Server initialization failed:', err);
+        });
+    });
+
+    server.once('error', err => {
+        if (err.code === 'EADDRINUSE') {
+            const nextPort = port + 1;
+            console.warn(`Port ${port} is already in use; trying ${nextPort}...`);
+            listenOnAvailablePort(nextPort);
+            return;
+        }
+
+        throw err;
+    });
+}
+
+listenOnAvailablePort(PORT);

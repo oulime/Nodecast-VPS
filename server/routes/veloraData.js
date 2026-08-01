@@ -250,6 +250,82 @@ router.post('/home-cache/rebuild', (req, res) => {
     }
 });
 
+router.post('/admin/assign-package', (req, res) => {
+    try {
+        const countryId = String(req.body?.countryId || '').trim();
+        const packageName = String(req.body?.packageName || '').trim();
+        const sourceId = Number.parseInt(req.body?.sourceId, 10);
+        const categoryId = String(req.body?.categoryId || '').trim();
+        const kind = String(req.body?.kind || '').trim();
+        const itemType = kind === 'vod' ? 'movie' : kind;
+        const uiTab = kind === 'vod' ? 'movies' : kind;
+        if (!countryId || !packageName || !Number.isInteger(sourceId) || !categoryId || !['live', 'movie', 'series'].includes(itemType)) {
+            return res.status(400).json({ error: 'countryId, packageName, sourceId, categoryId and kind are required' });
+        }
+
+        const db = getDb();
+        const result = db.transaction(() => {
+            let target = allRows('admin_packages').find(row =>
+                String(row.country_id) === countryId && String(row.name) === packageName
+            );
+            if (!target) {
+                target = saveRow('admin_packages', { country_id: countryId, name: packageName }, req);
+            }
+
+            const itemIds = db.prepare(`
+                SELECT item_id FROM playlist_items
+                WHERE source_id = ? AND type = ? AND category_id = ?
+            `).all(sourceId, itemType, categoryId).map(row => String(row.item_id));
+
+            const existingCurations = new Map(allRows('admin_stream_curations')
+                .filter(row => String(row.country_id) === countryId)
+                .map(row => [String(row.stream_id), row]));
+            const upsert = db.prepare(`
+                INSERT INTO velora_admin_rows (table_name, row_id, data)
+                VALUES ('admin_stream_curations', ?, ?)
+                ON CONFLICT(table_name, row_id) DO UPDATE SET
+                    data = excluded.data,
+                    updated_at = CURRENT_TIMESTAMP
+            `);
+            for (const streamId of itemIds) {
+                const existing = existingCurations.get(streamId);
+                const row = {
+                    ...(existing || {}),
+                    id: String(existing?.id || crypto.randomUUID()),
+                    stream_id: streamId,
+                    country_id: countryId,
+                    target_package_id: target.id
+                };
+                upsert.run(row.id, JSON.stringify(row));
+            }
+
+            const orderRequest = {
+                query: { on_conflict: 'country_id,ui_tab' },
+                get: name => name === 'Prefer' ? 'resolution=merge-duplicates' : ''
+            };
+            const existingOrder = allRows('admin_country_package_order').find(row =>
+                String(row.country_id) === countryId && String(row.ui_tab) === uiTab
+            );
+            const packageOrder = Array.isArray(existingOrder?.package_order)
+                ? existingOrder.package_order.map(String) : [];
+            if (!packageOrder.includes(String(target.id))) packageOrder.push(String(target.id));
+            saveRow('admin_country_package_order', {
+                ...(existingOrder || {}),
+                country_id: countryId,
+                ui_tab: uiTab,
+                package_order: packageOrder,
+                updated_at: new Date().toISOString()
+            }, orderRequest);
+
+            return { packageId: target.id, itemCount: itemIds.length };
+        })();
+        return res.json({ ok: true, ...result });
+    } catch (error) {
+        console.error('[Velora data] Package assignment failed:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
 router.all('/rest/v1/:table', (req, res) => {
     const table = req.params.table;
     if (!ALLOWED_TABLES.has(table)) {

@@ -4,7 +4,6 @@ const fs = require('fs/promises');
 const net = require('net');
 const path = require('path');
 const auth = require('../auth');
-const db = require('../db');
 const paidUsersStore = require('../services/paidUsersStore');
 
 const router = express.Router();
@@ -145,12 +144,33 @@ function subscriptionStatus(user) {
 async function authenticatedUser(req) {
     const token = tokenFromRequest(req);
     if (!token) return null;
+
+    // Development has no Supabase service key by design. Ask the VPS to
+    // validate the bearer token and resolve the user from Supabase there.
+    if (process.env.NODE_ENV !== 'production') {
+        const base = String(
+            process.env.VPS_DATA_API_BASE || 'https://nodecast.veloravip.net'
+        ).trim().replace(/\/+$/, '');
+        try {
+            const upstream = await fetch(`${base}/api/auth/me`, {
+                headers: {
+                    Accept: 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                cache: 'no-store'
+            });
+            if (upstream.status === 401 || upstream.status === 404) return null;
+            if (!upstream.ok) throw new Error(`VPS authentication returned HTTP ${upstream.status}`);
+            return upstream.json();
+        } catch (err) {
+            console.warn('[Auth] VPS Supabase validation unavailable:', err.message);
+            return null;
+        }
+    }
+
     const payload = auth.verifyToken(token);
     if (!payload?.id) return null;
-    const localUser = await db.users.getById(payload.id);
-    if (localUser?.role === 'admin') return localUser;
-    if (paidUsersStore.isSupabaseEnabled()) return paidUsersStore.getById(payload.id);
-    return localUser || paidUsersStore.getById(payload.id);
+    return paidUsersStore.getById(payload.id);
 }
 
 function buildPaidPayload(req, user, deviceId = resolveDeviceId(req)) {

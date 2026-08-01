@@ -1,21 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db');
 const auth = require('../auth');
 const paidUsersStore = require('../services/paidUsersStore');
 
 async function findLoginUserByUsername(username) {
-    const localUser = await db.users.getByUsername(username);
-    if (localUser?.role === 'admin') return localUser;
-    if (paidUsersStore.isSupabaseEnabled()) return paidUsersStore.getByUsername(username);
-    return localUser || paidUsersStore.getByUsername(username);
+    return paidUsersStore.getByUsername(username);
 }
 
 async function findLoginUserById(id) {
-    const localUser = await db.users.getById(id);
-    if (localUser?.role === 'admin') return localUser;
-    if (paidUsersStore.isSupabaseEnabled()) return paidUsersStore.getById(id);
-    return localUser || paidUsersStore.getById(id);
+    return paidUsersStore.getById(id);
 }
 
 // Configure Passport strategies
@@ -119,7 +112,7 @@ function buildSubscriptionFields(body, existing = null) {
  */
 router.get('/setup-required', async (req, res) => {
     try {
-        const userCount = await db.users.count();
+        const userCount = (await paidUsersStore.getAll()).length;
         res.json({ setupRequired: userCount === 0 });
     } catch (err) {
         console.error('Error in /setup-required:', err);
@@ -133,7 +126,7 @@ router.get('/setup-required', async (req, res) => {
  */
 router.post('/setup', async (req, res) => {
     try {
-        const userCount = await db.users.count();
+        const userCount = (await paidUsersStore.getAll()).length;
 
         // Check if setup already done
         if (userCount > 0) {
@@ -152,7 +145,7 @@ router.post('/setup', async (req, res) => {
 
         // Create admin user
         const passwordHash = await auth.hashPassword(password);
-        const adminUser = await db.users.create({
+        const adminUser = await paidUsersStore.create({
             username,
             passwordHash,
             role: 'admin'
@@ -232,7 +225,7 @@ router.get('/me', auth.requireAuth, async (req, res) => {
  */
 router.get('/users', auth.requireAuth, auth.requireAdmin, async (req, res) => {
     try {
-        const allUsers = await db.users.getAll();
+        const allUsers = await paidUsersStore.getAll();
 
         res.json(allUsers.map(publicUser));
     } catch (err) {
@@ -271,7 +264,7 @@ router.post('/users', auth.requireAuth, auth.requireAdmin, async (req, res) => {
             });
 
         const passwordHash = await auth.hashPassword(password);
-        const newUser = await db.users.create({
+        const newUser = await paidUsersStore.create({
             username: username.trim(),
             passwordHash,
             role,
@@ -293,7 +286,7 @@ router.put('/users/:id', auth.requireAuth, auth.requireAdmin, async (req, res) =
     try {
         const { id } = req.params;
         const { username, password, role } = req.body;
-        const existingUser = await db.users.getById(id);
+        const existingUser = await paidUsersStore.getById(id);
         if (!existingUser) {
             return res.status(404).json({ error: 'User not found' });
         }
@@ -322,7 +315,7 @@ router.put('/users/:id', auth.requireAuth, auth.requireAdmin, async (req, res) =
 
             // Prevent removing admin role from the last admin
             if (existingUser.role === 'admin' && role !== 'admin') {
-                const allUsers = await db.users.getAll();
+                const allUsers = await paidUsersStore.getAll();
                 const adminCount = allUsers.filter(u => u.role === 'admin').length;
                 if (adminCount <= 1) {
                     return res.status(400).json({ error: 'Cannot remove admin role from the last admin user' });
@@ -334,7 +327,7 @@ router.put('/users/:id', auth.requireAuth, auth.requireAdmin, async (req, res) =
 
         Object.assign(updates, buildSubscriptionFields(req.body, existingUser));
 
-        const updatedUser = await db.users.update(id, updates);
+        const updatedUser = await paidUsersStore.update(id, updates);
         res.json(publicUser(updatedUser));
     } catch (err) {
         console.error('Error updating user:', err);
@@ -351,11 +344,11 @@ router.delete('/users/:id', auth.requireAuth, auth.requireAdmin, async (req, res
         const { id } = req.params;
 
         // Prevent deleting yourself
-        if (parseInt(id) === req.user.id) {
+        if (String(id) === String(req.user.id)) {
             return res.status(400).json({ error: 'Cannot delete your own account' });
         }
 
-        await db.users.delete(id);
+        await paidUsersStore.delete(id);
         res.json({ success: true, message: 'User deleted successfully' });
     } catch (err) {
         console.error('Error deleting user:', err);

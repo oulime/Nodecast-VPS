@@ -147,7 +147,7 @@ const paidUsersStore = {
 
     config() {
         return {
-            mode: isSupabaseEnabled() ? 'supabase' : 'local',
+            mode: 'supabase',
             table: TABLE,
             urlConfigured: Boolean(supabaseUrl()),
             serviceKeyConfigured: Boolean(supabaseKey())
@@ -155,35 +155,27 @@ const paidUsersStore = {
     },
 
     async getAll() {
-        if (isSupabaseEnabled()) return getAllSupabase();
-        return getLocalPaidUsers();
+        return getAllSupabase();
     },
 
     async getById(id) {
-        if (isSupabaseEnabled()) return getByIdSupabase(id);
-        const user = await db.users.getById(id);
-        return user && user.role !== 'admin' ? user : null;
+        return getByIdSupabase(id);
     },
 
     async getByUsername(username) {
-        if (isSupabaseEnabled()) return getByUsernameSupabase(username);
-        const user = await db.users.getByUsername(username);
-        return user && user.role !== 'admin' ? user : null;
+        return getByUsernameSupabase(username);
     },
 
     async create(userData) {
-        if (isSupabaseEnabled()) return withoutPassword(await createSupabase(userData));
-        return db.users.create(userData);
+        return withoutPassword(await createSupabase(userData));
     },
 
     async update(id, updates) {
-        if (isSupabaseEnabled()) return withoutPassword(await updateSupabase(id, updates));
-        return db.users.update(id, updates);
+        return withoutPassword(await updateSupabase(id, updates));
     },
 
     async delete(id) {
-        if (isSupabaseEnabled()) return deleteSupabase(id);
-        return db.users.delete(id);
+        return deleteSupabase(id);
     },
 
     async importLocalPaidUsers({ overwrite = false } = {}) {

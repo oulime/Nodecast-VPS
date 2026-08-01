@@ -62,6 +62,15 @@ if (USE_VPS_DATA_API) {
     app.use(async (req, res, next) => {
         if (!isVpsDataApiRequest(req.path)) return next();
 
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
+        const clearRequest = () => clearTimeout(timeout);
+        res.once('finish', clearRequest);
+        res.once('close', () => {
+            clearRequest();
+            if (!res.writableEnded) controller.abort();
+        });
+
         try {
             const target = new URL(req.originalUrl, `${VPS_DATA_API_BASE}/`);
             const headers = { ...req.headers };
@@ -75,7 +84,7 @@ if (USE_VPS_DATA_API) {
                 headers,
                 body: hasBody ? JSON.stringify(req.body) : undefined,
                 redirect: 'follow',
-                signal: req.signal
+                signal: controller.signal
             });
 
             res.status(upstream.status);
@@ -89,9 +98,12 @@ if (USE_VPS_DATA_API) {
             if (!upstream.body || req.method === 'HEAD') return res.end();
             Readable.fromWeb(upstream.body).pipe(res);
         } catch (err) {
+            if (controller.signal.aborted && (res.destroyed || res.writableEnded)) return;
             console.error('[VPS data API] Request failed:', err);
             if (!res.headersSent) {
-                res.status(502).json({ error: 'VPS data API unavailable' });
+                res.status(controller.signal.aborted ? 504 : 502).json({
+                    error: controller.signal.aborted ? 'VPS data API timed out' : 'VPS data API unavailable'
+                });
             } else {
                 res.destroy(err);
             }
@@ -353,25 +365,13 @@ async function onServerStarted(port) {
     }, 5000);
 }
 
-function listenOnAvailablePort(port) {
-    const server = app.listen(port);
-
-    server.once('listening', () => {
-        onServerStarted(port).catch(err => {
-            console.error('Server initialization failed:', err);
-        });
+const server = app.listen(PORT, () => {
+    onServerStarted(PORT).catch(err => {
+        console.error('Server initialization failed:', err);
     });
+});
 
-    server.once('error', err => {
-        if (err.code === 'EADDRINUSE') {
-            const nextPort = port + 1;
-            console.warn(`Port ${port} is already in use; trying ${nextPort}...`);
-            listenOnAvailablePort(nextPort);
-            return;
-        }
-
-        throw err;
-    });
-}
-
-listenOnAvailablePort(PORT);
+server.once('error', err => {
+    console.error(`Server failed to listen on port ${PORT}:`, err);
+    process.exitCode = 1;
+});

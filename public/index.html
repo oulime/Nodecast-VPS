@@ -13,9 +13,24 @@
           var url = new URL(window.location.href);
           var paidEntry = url.searchParams.get("paid") === "1";
           var protectedEntry = url.pathname === "/" || paidEntry;
-          if (protectedEntry && !window.localStorage.getItem("authToken")) {
+          var authToken = window.localStorage.getItem("authToken");
+          if (protectedEntry && !authToken) {
             window.location.replace("/login");
             return;
+          }
+          if (protectedEntry && authToken) {
+            window.fetch("/api/auth/me", {
+              cache: "no-store",
+              headers: { Authorization: "Bearer " + authToken }
+            }).then(function (response) {
+              if (response.ok) return;
+              if (response.status === 401 || response.status === 403 || response.status === 404) {
+                window.localStorage.removeItem("authToken");
+                window.location.replace("/login");
+              }
+            }).catch(function () {
+              /* Keep the session during a temporary VPS/network outage. */
+            });
           }
           if (paidEntry) {
             url.searchParams.delete("paid");
@@ -9266,6 +9281,23 @@ if (target.closest(".trial-offer-button")) {
 
       .main--velora:has(#content-view.content-view--vod-film-detail)
         #vod-player-container:not(.hidden) {
+        margin-top: 0 !important;
+      }
+
+      /* Keep the live player below the header controls, matching VOD. */
+      .main--velora.main--velora-live-package #now-playing {
+        width: min(calc(100% - 1.7rem), 72rem);
+        margin: max(0.85rem, env(safe-area-inset-top, 0px)) auto 0.35rem !important;
+        padding-inline: 3.5rem;
+      }
+
+      .main--velora.main--velora-live-package #player-container:not(.hidden) {
+        margin-top: 0 !important;
+      }
+
+      #player-container:fullscreen,
+      #player-container:-webkit-full-screen,
+      #player-container.player-container--live-fullscreen {
         margin-top: 0 !important;
       }
 

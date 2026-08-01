@@ -3,7 +3,9 @@ const path = require('path');
 const fs = require('fs');
 
 const dataDir = path.join(__dirname, '..', '..', 'data');
-const dbPath = path.join(dataDir, 'content.db');
+const dbPath = process.env.CONTENT_DB_PATH
+    ? path.resolve(process.env.CONTENT_DB_PATH)
+    : path.join(dataDir, 'content.db');
 
 // Ensure data directory exists
 if (!fs.existsSync(dataDir)) {
@@ -189,6 +191,24 @@ function initSchema() {
 
     // User Favorites (per-user)
     db.exec(`
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            password_hash TEXT,
+            role TEXT NOT NULL DEFAULT 'viewer',
+            display_name TEXT,
+            subscription_start TEXT,
+            subscription_end TEXT,
+            subscription_plan_months INTEGER,
+            subscription_blocked INTEGER NOT NULL DEFAULT 0,
+            oidc_id TEXT UNIQUE,
+            email TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+        CREATE INDEX IF NOT EXISTS idx_users_subscription_end ON users(subscription_end);
+
         CREATE TABLE IF NOT EXISTS favorites (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
@@ -201,6 +221,47 @@ function initSchema() {
         CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
         CREATE INDEX IF NOT EXISTS idx_favorites_user_type ON favorites(user_id, item_type);
     `);
+
+    // One-time compatibility import from the former JSON user store. Existing
+    // IDs and password hashes are preserved so issued JWTs keep working.
+    const legacyDbPath = path.join(dataDir, 'db.json');
+    const userCount = db.prepare('SELECT COUNT(*) AS count FROM users').get().count;
+    if (userCount === 0 && fs.existsSync(legacyDbPath)) {
+        try {
+            const legacyUsers = JSON.parse(fs.readFileSync(legacyDbPath, 'utf8')).users || [];
+            const insertUser = db.prepare(`
+                INSERT OR IGNORE INTO users (
+                    id, username, password_hash, role, display_name,
+                    subscription_start, subscription_end, subscription_plan_months,
+                    subscription_blocked, oidc_id, email, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `);
+            const importUsers = db.transaction(() => {
+                for (const user of legacyUsers) {
+                    if (!user?.username) continue;
+                    insertUser.run(
+                        user.id || null,
+                        user.username,
+                        user.passwordHash || null,
+                        user.role || 'viewer',
+                        user.displayName || null,
+                        user.subscriptionStart || null,
+                        user.subscriptionEnd || null,
+                        user.subscriptionPlanMonths || null,
+                        user.subscriptionBlocked ? 1 : 0,
+                        user.oidcId || null,
+                        user.email || null,
+                        user.createdAt || new Date().toISOString(),
+                        user.updatedAt || new Date().toISOString()
+                    );
+                }
+            });
+            importUsers();
+            if (legacyUsers.length) console.log(`[SQLite] Imported ${legacyUsers.length} legacy user(s)`);
+        } catch (err) {
+            console.error('[SQLite] Failed to import legacy users:', err.message);
+        }
+    }
 
     // Watch History (per-user)
     db.exec(`

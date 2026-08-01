@@ -1501,11 +1501,11 @@
     <script defer src="/assets/velora-home-sections.js?v=country-name-home-match-20260731"></script>
     <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=resolved-package-home-cache-20260731"></script>
     <script defer src="/assets/manual-pays.js?v=20260801-packages-only"></script>
-    <script defer src="/assets/paid-users-admin.js?v=20260730-paid-users-supabase"></script>
+    <script defer src="/assets/paid-users-admin.js?v=20260801-vps-sqlite"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
     <link rel="stylesheet" href="/assets/manual-pays.css?v=20260729-whole-word">
-    <link rel="stylesheet" href="/assets/paid-users-admin.css?v=20260730-paid-users-supabase">
+    <link rel="stylesheet" href="/assets/paid-users-admin.css?v=20260801-vps-sqlite">
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css">
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=live-player-placeholder-20260731">
     <link rel="stylesheet" href="/assets/velora-home-sections.css?v=compact-poster-only-home-20260731">
@@ -4223,7 +4223,7 @@
                 P
               </button>
               <div id="vel-admin-tools-wrap" class="vel-admin-tools-wrap hidden">
-                <label class="vel-admin-tools" title="Afficher ou masquer le + et la suppression des bouquets Supabase">
+                <label class="vel-admin-tools" title="Afficher ou masquer le + et la suppression des bouquets VPS">
                   <span class="vel-admin-tools__switch">
                     <input type="checkbox" id="toggle-admin-ui" role="switch" aria-checked="true" />
                     <span class="vel-admin-tools__track" aria-hidden="true"></span>
@@ -4698,7 +4698,7 @@
 
     <dialog id="dialog-admin-add-package" class="admin-add-package-dialog admin-cover-dialog">
       <div class="admin-add-package-dialog__panel admin-cover-dialog__panel">
-        <h2 class="admin-add-package-dialog__title">Nouveau package (Supabase)</h2>
+        <h2 class="admin-add-package-dialog__title">Nouveau package (VPS SQLite)</h2>
         <p class="admin-add-package-dialog__hint">
           Le bouquet est enregistré dans la base. La liste des pays est la <strong>même</strong> que dans le menu
           Pays du lecteur ; une ligne <code>admin_countries</code> est créée dans SQLite sur le VPS seulement si besoin pour
@@ -4754,8 +4754,7 @@
             </div>
           </div>
           <p class="admin-add-package-dialog__microhint" style="margin-top: 0.5rem; margin-bottom: 0">
-            Stockage : bucket public <code>package-covers</code> sur Supabase, ou Cloudflare&nbsp;/&nbsp;R2 si configuré
-            dans l’environnement.
+            Stockage : fichiers servis par le VPS, ou Cloudflare&nbsp;/&nbsp;R2 si configuré dans l’environnement.
           </p>
         </div>
         <p id="dap-status" class="status" aria-live="polite"></p>
@@ -4887,7 +4886,7 @@
       <span
         id="trial-timer-hint"
         class="trial-timer-root__hint hidden"
-        title="Compteur local sans API Supabase (dev)"
+        title="Compteur local sans appel distant (dev)"
         >Local</span>
       <span id="trial-timer-count" class="trial-timer-root__count">10:00</span>
     </div>

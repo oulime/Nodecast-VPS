@@ -145,8 +145,8 @@ async function authenticatedUser(req) {
     const token = tokenFromRequest(req);
     if (!token) return null;
 
-    // Development has no Supabase service key by design. Ask the VPS to
-    // validate the bearer token and resolve the user from Supabase there.
+    // Development uses the VPS as the single authentication authority. Ask it
+    // to validate the bearer token and resolve the user from VPS SQLite.
     if (process.env.NODE_ENV !== 'production') {
         const base = String(
             process.env.VPS_DATA_API_BASE || 'https://nodecast.veloravip.net'
@@ -163,7 +163,7 @@ async function authenticatedUser(req) {
             if (!upstream.ok) throw new Error(`VPS authentication returned HTTP ${upstream.status}`);
             return upstream.json();
         } catch (err) {
-            console.warn('[Auth] VPS Supabase validation unavailable:', err.message);
+            console.warn('[Auth] VPS SQLite validation unavailable:', err.message);
             return null;
         }
     }
@@ -559,18 +559,8 @@ async function paidUsersStorageInfo(req, res) {
     res.json(paidUsersStore.config());
 }
 
-async function migrateLocalPaidUsers(req, res) {
-    if (!requireLocalAdmin(req, res)) return;
-    const overwrite = req.body?.overwrite === true;
-    const result = await paidUsersStore.importLocalPaidUsers({ overwrite });
-    res.json(result);
-}
-
 router.get('/admin/paid-users/storage', (req, res) => {
     void paidUsersStorageInfo(req, res).catch(err => res.status(500).json({ error: err?.message || 'Failed to read paid user storage config' }));
-});
-router.post('/admin/paid-users/migrate-local', (req, res) => {
-    void migrateLocalPaidUsers(req, res).catch(err => res.status(500).json({ error: err?.message || 'Failed to migrate local paid users' }));
 });
 router.get('/admin/paid-users', (req, res) => {
     void listPaidUsers(req, res).catch(err => res.status(500).json({ error: err?.message || 'Failed to list paid users' }));

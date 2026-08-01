@@ -1,7 +1,9 @@
 (function () {
   "use strict";
 
-  const supabaseOrigin = "https://vmobanxusorocltxygjo.supabase.co";
+  // Older compiled UI code uses this inert origin as a PostgREST-shaped API
+  // marker. Every matching request is redirected to VPS SQLite below.
+  const legacyDataOrigin = "https://vps-sqlite.invalid";
   const localRestBase = "/api/velora-db/rest/v1";
   const nativeFetch = window.fetch.bind(window);
   const responseCache = new Map();
@@ -51,7 +53,7 @@
       : String(input && input.url || "");
 
     let target = input;
-    if (rawUrl.startsWith(`${supabaseOrigin}/rest/v1/`)) {
+    if (rawUrl.startsWith(`${legacyDataOrigin}/rest/v1/`)) {
       const remote = new URL(rawUrl);
       const localUrl = `${localRestBase}${remote.pathname.slice("/rest/v1".length)}${remote.search}`;
       target = typeof input === "string" || input instanceof URL

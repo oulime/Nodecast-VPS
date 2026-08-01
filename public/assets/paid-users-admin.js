@@ -133,13 +133,8 @@
 
   function renderStorage() {
     const el = $("paid-users-storage");
-    const migrate = $("paid-migrate-local");
     if (!el) return;
-    const storage = state.storage || {};
-    const mode = storage.mode === "supabase" ? "Supabase" : "Local db.json";
-    const detail = storage.mode === "supabase" ? `Table ${esc(storage.table || "paid_users")}` : "Ajoutez SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY pour partager entre VPS.";
-    el.innerHTML = `<span>Stockage: <strong>${esc(mode)}</strong></span><small>${detail}</small>`;
-    if (migrate) migrate.hidden = storage.mode !== "supabase";
+    el.innerHTML = '<span>Stockage: <strong>SQLite VPS</strong></span><small>Base data/content.db, table users.</small>';
   }
 
   async function loadStorage() {
@@ -149,22 +144,6 @@
       state.storage = { mode: "local", error: err.message };
     }
     renderStorage();
-  }
-
-  async function migrateLocalUsers() {
-    if (!confirm("Importer les anciens clients locaux vers Supabase ? Les usernames deja presents seront ignores.")) return;
-    const button = $("paid-migrate-local");
-    if (button) button.disabled = true;
-    status("Migration vers Supabase...");
-    try {
-      const result = await api("/admin/paid-users/migrate-local", { method: "POST", body: JSON.stringify({ overwrite: false }) });
-      await loadUsers();
-      status(`Migration terminee: ${result.created} cree(s), ${result.skipped} ignore(s), ${result.updated} modifie(s), ${result.errors?.length || 0} erreur(s).`, Boolean(result.errors?.length));
-    } catch (err) {
-      status(err.message, true);
-    } finally {
-      if (button) button.disabled = false;
-    }
   }
 
   async function loadUsers() {
@@ -359,7 +338,7 @@
       panel.innerHTML = `
         <div class="paid-users__head">
           <div><span class="paid-users__eyebrow">ACCES PAYANT</span><h2>Abonnements clients</h2><p>Clients actifs: acces sans coupure apres connexion sur /login. Visiteurs non connectes: essai gratuit normal.</p></div>
-          <div class="paid-users__top-actions"><button type="button" id="paid-new" class="primary">Nouveau client</button><button type="button" id="paid-migrate-local" class="secondary" hidden>Migrer local</button><button type="button" id="paid-refresh" class="secondary">Actualiser</button></div>
+          <div class="paid-users__top-actions"><button type="button" id="paid-new" class="primary">Nouveau client</button><button type="button" id="paid-refresh" class="secondary">Actualiser</button></div>
         </div>
         <p id="paid-users-status" class="status" aria-live="polite">Pret.</p>
         <div id="paid-users-storage" class="paid-users__storage"></div>
@@ -403,7 +382,6 @@
       panel.querySelector("#paid-renew-form").addEventListener("submit", renewUser);
       panel.querySelector("#paid-new").addEventListener("click", openCreateDialog);
       panel.querySelector("#paid-refresh").addEventListener("click", () => { state.storage = null; loadUsers(); });
-      panel.querySelector("#paid-migrate-local").addEventListener("click", migrateLocalUsers);
       panel.querySelectorAll("[data-paid-close]").forEach((btn) => btn.addEventListener("click", () => closeDialog($("paid-user-dialog"))));
       panel.querySelectorAll("[data-paid-renew-close]").forEach((btn) => btn.addEventListener("click", () => { state.renewingId = null; closeDialog($("paid-renew-dialog")); }));
       closeDialogsOnBackdrop(panel);

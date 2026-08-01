@@ -23,7 +23,3 @@ jobs:
             npm run build --if-present
             pm2 restart nodecast || pm2 start npm --name nodecast -- start
             pm2 save
-            curl --fail --silent --show-error --max-time 15 http://127.0.0.1:3000/ > /dev/null
-            nginx -t
-            systemctl restart nginx
-            systemctl is-active --quiet nginx

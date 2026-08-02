@@ -5986,9 +5986,9 @@
           };
           var fallbackContextTitle = function () {
             var activeTab = document.body.dataset.velActiveTab;
-            if (activeTab === "movies") return "Films";
-            if (activeTab === "series") return "Series";
-            return "TV en direct";
+            if (activeTab === "movies") return "FILMS";
+            if (activeTab === "series") return "SÉRIES";
+            return "TV EN DIRECT";
           };
           var refreshHeaderContextTitle = function () {
             if (!headerContextTitle || !headerContextTitleText) return;
@@ -9297,13 +9297,18 @@ if (target.closest(".trial-offer-button")) {
       }
 
       .vel-bottom-nav__icon-frame {
-        width: 22px;
+        width: 28px;
         height: 22px;
         flex: 0 0 22px;
         display: grid;
         place-items: center;
+        margin-inline: auto;
         color: inherit;
         filter: drop-shadow(0 0 7px rgba(117, 99, 255, 0.25));
+      }
+
+      .vel-bottom-nav__icon-frame .vel-bottom-nav__flag {
+        margin: 0 auto;
       }
 
       .vel-bottom-nav__flag[hidden] {
@@ -9584,6 +9589,26 @@ if (target.closest(".trial-offer-button")) {
         display: none !important;
         visibility: hidden !important;
         pointer-events: none !important;
+      }
+
+      /* Top-level media pages use the same title treatment as ACCUEIL. */
+      body.vel-home-choice-picked:not(.vel-home-empty-active)
+        .main--velora:has(#packages-view:not(.hidden)):not(:has(#content-view:not(.hidden))):not(:has(#player-container:not(.hidden))):not(:has(#vod-player-container:not(.hidden)))
+        .vel-header {
+        width: 100vw;
+        max-width: none;
+        box-sizing: border-box;
+        grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem !important;
+      }
+
+      body.vel-home-choice-picked:not(.vel-home-empty-active)
+        .main--velora:has(#packages-view:not(.hidden)):not(:has(#content-view:not(.hidden)))
+        .vel-header-context-title .vel-category-heading__title {
+        font-size: 1rem;
+        font-weight: 800;
+        line-height: 1.5;
+        letter-spacing: normal;
+        text-transform: uppercase;
       }
 
       #player-container:fullscreen,
@@ -9876,6 +9901,7 @@ if (target.closest(".trial-offer-button")) {
         var bottomCountryMenu = document.getElementById("vel-bottom-country-menu");
         var bottomCountryOptions = document.getElementById("vel-bottom-country-options");
         var bottomCountryFlag = document.getElementById("vel-bottom-country-flag");
+        var bottomCountryLabel = bottomCountryButton && bottomCountryButton.querySelector(".vel-bottom-nav__label");
         var bottomProfileButton = nav.querySelector('[data-bottom-nav="profile"]');
         var floatingSearchButton = document.getElementById("vel-floating-search");
         var bottomProfileMenu = document.getElementById("vel-bottom-profile-menu");
@@ -9977,6 +10003,7 @@ if (target.closest(".trial-offer-button")) {
             }
           }
           if (bottomCountryButton) bottomCountryButton.setAttribute("aria-label", "Pays : " + selectedName);
+          if (bottomCountryLabel) bottomCountryLabel.textContent = selectedName;
         }
 
         function renderBottomCountries() {

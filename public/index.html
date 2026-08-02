@@ -100,7 +100,7 @@
             shield.style.cssText =
               "position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;" +
               "z-index:2147483646!important;cursor:url('data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==') 0 0,none!important;" +
-              "pointer-events:auto!important;touch-action:none!important;background:rgba(0,0,0,0.001)!important;" +
+              "pointer-events:none!important;touch-action:none!important;background:rgba(0,0,0,0.001)!important;" +
               "opacity:1!important;display:block!important;visibility:visible!important;";
           };
           var hideCursor = function () {
@@ -1222,7 +1222,7 @@
         height: 100dvh !important;
         z-index: 2147483646 !important;
         cursor: url("data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==") 0 0, none !important;
-        pointer-events: auto !important;
+        pointer-events: none !important;
         touch-action: none !important;
         background: rgba(0, 0, 0, 0.001) !important;
         opacity: 1 !important;
@@ -1575,6 +1575,83 @@
         display: inline-flex;
         align-items: center;
         gap: 0.45rem;
+      }
+
+      .main--velora .vel-header-context-title {
+        display: none;
+        min-width: 0;
+        overflow: hidden;
+        color: #fff;
+        font-size: clamp(0.9rem, 2vw, 1.15rem);
+        font-weight: 850;
+        line-height: 1.2;
+        text-align: center;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .main--velora .vel-header-context-title.vel-category-heading {
+        align-self: center;
+        justify-self: stretch;
+        width: 100%;
+        min-height: 2.75rem;
+        margin: 0 !important;
+        padding: 0.2rem 0.55rem 0 !important;
+        border: 0;
+        background: transparent;
+      }
+
+      .main--velora .vel-header-context-title .vel-category-heading__title {
+        display: block;
+        width: 100%;
+        margin: 0;
+        overflow: hidden;
+        font-size: clamp(0.88rem, 2vw, 1.12rem);
+        line-height: 1.5;
+        text-align: center;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .main--velora .vel-header-context-title .vel-category-heading__accent-line {
+        display: block;
+        width: min(9rem, 72%);
+        height: 2px;
+        margin: 0.16rem auto 0;
+        border-radius: 999px;
+      }
+
+      body.vel-home-choice-picked .main--velora .vel-header {
+        grid-template-columns: auto minmax(0, 1fr) auto !important;
+      }
+
+      body.vel-home-choice-picked .main--velora .vel-header-context-title {
+        grid-column: 2;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+      }
+
+      body.vel-home-choice-picked .main--velora .vel-header__right {
+        grid-column: 3;
+      }
+
+      .main--velora.main--velora-in-package .vel-header {
+        grid-template-columns: auto minmax(0, 1fr) auto !important;
+      }
+
+      .main--velora.main--velora-in-package .vel-header-context-title.is-visible {
+        grid-column: 2;
+        display: block;
+      }
+
+      .main--velora.main--velora-in-package .vel-brand {
+        grid-column: 3;
+        justify-self: end;
+      }
+
+      .main--velora.main--velora-in-package .vel-header__right {
+        display: none !important;
       }
 
       .main--velora .vel-header-back-btn {
@@ -4164,29 +4241,11 @@
                 </svg>
               </button>
             </div>
-            <button type="button" id="btn-logo-home" class="vel-brand vel-brand--home" aria-label="Retour à l'accueil">
-              <img id="vel-brand-country-flag" class="vel-brand__country-flag" alt="" decoding="async" loading="eager" hidden />
-              <span class="vel-brand__text">Velora<span class="vel-brand-vip"
-                ><span class="vel-brand-vip__v">V</span><span class="vel-brand-vip__i">I</span
-                ><span class="vel-brand-vip__p">P</span></span></span>
-            </button>
+            <div id="vel-header-context-title" class="vel-header-context-title vel-category-heading vel-category-heading--neutral" aria-live="polite">
+              <h2 id="vel-header-context-title-text" class="vel-category-heading__title"></h2>
+              <span class="vel-category-heading__accent-line" aria-hidden="true"></span>
+            </div>
             <div class="vel-header__right">
-              <div class="vel-header__country">
-                <select id="country-select" class="country-select" aria-label="Pays"></select>
-              </div>
-              <button
-                type="button"
-                id="btn-adult-portal"
-                class="vel-adult-btn"
-                title="Contenu adulte"
-                aria-label="Contenu adulte +18"
-              >
-                <img
-                  src="/logos/adult-18.svg"
-                  alt=""
-                  aria-hidden="true"
-                />
-              </button>
               <button
                 type="button"
                 id="btn-header-search"
@@ -4200,44 +4259,20 @@
                   </svg>
                 </span>
               </button>
-              <button
-                type="button"
-                id="btn-header-home"
-                class="vel-header-home-btn"
-                title="Accueil"
-                aria-label="Retour a l'accueil"
-              >
-                <span class="vel-header-home-btn__icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" focusable="false">
-                    <path d="M3 10.5 12 3l9 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-5v-6h-5v6h-5A1.5 1.5 0 0 1 3 19.5v-9Z"></path>
-                  </svg>
-                </span>
-              </button>
-              <button
-                type="button"
-                id="btn-settings"
-                class="vel-settings-btn hidden"
-                title="Paramètres (admin)"
-                aria-label="Paramètres administrateur"
-              >
-                P
-              </button>
-              <div id="vel-admin-tools-wrap" class="vel-admin-tools-wrap hidden">
-                <label class="vel-admin-tools" title="Afficher ou masquer le + et la suppression des bouquets VPS">
-                  <span class="vel-admin-tools__switch">
-                    <input type="checkbox" id="toggle-admin-ui" role="switch" aria-checked="true" />
-                    <span class="vel-admin-tools__track" aria-hidden="true"></span>
-                  </span>
-
-                </label>
-              </div>
-              <button type="button" id="btn-logout" class="vel-logout hidden" title="Déconnexion">
-                Out
-              </button>
             </div>
           </header>
+          <div class="hidden" aria-hidden="true">
+            <button type="button" id="btn-logo-home" tabindex="-1">Accueil</button>
+            <select id="country-select" class="country-select" aria-label="Pays"></select>
+            <img id="vel-brand-country-flag" alt="" hidden />
+            <button type="button" id="btn-settings" tabindex="-1">P</button>
+            <div id="vel-admin-tools-wrap">
+              <input type="checkbox" id="toggle-admin-ui" role="switch" aria-checked="true" />
+            </div>
+            <button type="button" id="btn-logout" tabindex="-1">Out</button>
+          </div>
 
-          <section id="vel-home-choice" class="vel-home-choice" aria-label="Accueil">
+          <section id="vel-home-choice" hidden aria-hidden="true" style="display: none !important">
             <div class="vel-home-choice__tools" aria-label="Choisir le pays">
               <div class="vel-home-choice__country">
                 <div class="vel-home-country-picker">
@@ -4296,6 +4331,25 @@
               </button>
             </div>
           </section>
+
+          <script>
+            // Delete the retired visual home chooser before the application boots.
+            // Only empty routing hooks remain for the compiled catalogue controller.
+            (function () {
+              var legacyHome = document.getElementById("vel-home-choice");
+              if (!legacyHome) return;
+              legacyHome.replaceChildren();
+              ["live", "movies", "series"].forEach(function (tab) {
+                var hook = document.createElement("button");
+                hook.type = "button";
+                hook.tabIndex = -1;
+                hook.hidden = true;
+                hook.setAttribute("aria-hidden", "true");
+                hook.setAttribute("data-home-tab", tab);
+                legacyHome.appendChild(hook);
+              });
+            })();
+          </script>
 
           <p id="vel-curate-status" class="vel-curate-status hidden" role="status" aria-live="polite"></p>
 
@@ -5838,13 +5892,64 @@
               event.stopImmediatePropagation();
               if (!document.body.classList.contains("vel-home-choice-picked")) return;
 
+              var livePlayer = document.getElementById("player-container");
+              var vodPlayer = document.getElementById("vod-player-container");
+              if (livePlayer && !livePlayer.classList.contains("hidden")) {
+                var closeLivePlayer = document.getElementById("btn-close-player");
+                if (closeLivePlayer) closeLivePlayer.click();
+                return;
+              }
+              if (vodPlayer && !vodPlayer.classList.contains("hidden")) {
+                var closeVodPlayer = document.getElementById("btn-close-vod-player");
+                if (closeVodPlayer) closeVodPlayer.click();
+                return;
+              }
+
+              var contentView = document.getElementById("content-view");
+              if (contentView && !contentView.classList.contains("hidden")) {
+                var isDetailView = contentView.classList.contains("content-view--vod-film-detail") || !!contentView.querySelector(
+                  ".vel-vod-detail, .vel-series-detail, .vel-vod-series-detail"
+                );
+                if (!isDetailView) {
+                  document.dispatchEvent(new CustomEvent("velora-home-tab", {
+                    detail: { tab: document.body.dataset.velActiveTab || "live" }
+                  }));
+                  packageContextTitle = "";
+                  mediaContextTitle = "";
+                  window.setTimeout(refreshHeaderContextTitle, 0);
+                  return;
+                }
+                var contentBack = document.getElementById("btn-back-home");
+                if (contentBack) {
+                  // The compiled app binds its navigation on pointerdown and can
+                  // suppress a later synthetic click. Trigger that one canonical
+                  // action directly so Back always returns one interface level.
+                  if (typeof PointerEvent === "function") {
+                    contentBack.dispatchEvent(new PointerEvent("pointerdown", {
+                      bubbles: true,
+                      cancelable: true,
+                      button: 0,
+                      pointerId: 1,
+                      pointerType: "mouse"
+                    }));
+                  } else {
+                    contentBack.dispatchEvent(new MouseEvent("click", {
+                      bubbles: true,
+                      cancelable: true,
+                      button: 0
+                    }));
+                  }
+                  return;
+                }
+              }
+
               var state = window.history.state && typeof window.history.state === "object" ? window.history.state : {};
               if (state.veloraNav || state.veloraSettings) {
                 window.history.back();
                 return;
               }
 
-              if (logoHome) logoHome.click();
+              showHomeChoice(event);
             };
 
             headerBack.addEventListener("click", goBack, true);
@@ -5860,6 +5965,93 @@
               }
             }, true);
           }
+
+          var headerContextTitle = document.getElementById("vel-header-context-title");
+          var headerContextTitleText = document.getElementById("vel-header-context-title-text");
+          var packageContextTitle = "";
+          var mediaContextTitle = "";
+          var cleanContextTitle = function (value) {
+            return String(value || "").replace(/\s+/g, " ").trim();
+          };
+          var visiblePlaybackTitle = function () {
+            var candidates = [document.getElementById("now-playing-vod"), document.getElementById("now-playing")];
+            for (var i = 0; i < candidates.length; i += 1) {
+              var candidate = candidates[i];
+              if (!candidate || candidate.classList.contains("hidden") || candidate.getAttribute("aria-hidden") === "true") continue;
+              var title = candidate.querySelector(".vel-live-ticker__title");
+              var value = cleanContextTitle(title ? title.textContent : candidate.textContent);
+              if (value) return value;
+            }
+            return "";
+          };
+          var fallbackContextTitle = function () {
+            var activeTab = document.body.dataset.velActiveTab;
+            if (activeTab === "movies") return "Films";
+            if (activeTab === "series") return "Series";
+            return "TV en direct";
+          };
+          var refreshHeaderContextTitle = function () {
+            if (!headerContextTitle || !headerContextTitleText) return;
+            var main = document.getElementById("main");
+            var contentView = document.getElementById("content-view");
+            var livePlayer = document.getElementById("player-container");
+            var vodPlayer = document.getElementById("vod-player-container");
+            var showingMediaDetail = !!(contentView && (
+              contentView.classList.contains("content-view--vod-film-detail")
+              || contentView.querySelector(".vel-vod-detail, .vel-series-detail, .vel-vod-series-detail")
+            ));
+            var inPackage = document.body.classList.contains("vel-home-choice-picked") || !!(main && (
+              main.classList.contains("main--velora-in-package")
+              || (contentView && !contentView.classList.contains("hidden"))
+              || (livePlayer && !livePlayer.classList.contains("hidden"))
+              || (vodPlayer && !vodPlayer.classList.contains("hidden"))
+            ));
+            headerContextTitleText.textContent = inPackage
+              ? (visiblePlaybackTitle() || (showingMediaDetail ? mediaContextTitle : "") || packageContextTitle || fallbackContextTitle())
+              : "";
+            headerContextTitle.classList.toggle("is-visible", inPackage);
+          };
+
+          var captureHeaderContextTitle = function (event) {
+            var card = event.target && event.target.closest
+              ? event.target.closest(".vel-package-card, .media-item, .vel-vod-movie-card, .vel-vod-detail__episode")
+              : null;
+            if (!card) return;
+            if (event.target.closest(".admin-pkg-edit-sb, .admin-pkg-del-sb, .vel-package-drag-handle")) return;
+            var label = card.querySelector(".vel-package-card__title, .media-info h4, .vel-vod-movie-card__title, .vel-vod-detail__episode-title");
+            var clickedTitle = cleanContextTitle(label ? label.textContent : card.getAttribute("aria-label"));
+            if (!clickedTitle) return;
+            if (card.classList.contains("vel-package-card")) {
+              packageContextTitle = clickedTitle;
+              mediaContextTitle = "";
+            } else {
+              mediaContextTitle = clickedTitle;
+            }
+            window.setTimeout(refreshHeaderContextTitle, 0);
+          };
+
+          // Package navigation starts on pointer/touch release and may suppress
+          // the synthetic click, so capture its title before that transition.
+          document.addEventListener("pointerdown", captureHeaderContextTitle, true);
+          document.addEventListener("touchstart", captureHeaderContextTitle, { passive: true, capture: true });
+          document.addEventListener("click", captureHeaderContextTitle, true);
+
+          var contextObserver = new MutationObserver(refreshHeaderContextTitle);
+          var contextMain = document.getElementById("main");
+          var contextLiveTitle = document.getElementById("now-playing");
+          var contextVodTitle = document.getElementById("now-playing-vod");
+          var contextContentView = document.getElementById("content-view");
+          var contextLivePlayer = document.getElementById("player-container");
+          var contextVodPlayer = document.getElementById("vod-player-container");
+          if (contextMain) contextObserver.observe(contextMain, { attributes: true, attributeFilter: ["class"] });
+          contextObserver.observe(document.body, { attributes: true, attributeFilter: ["class", "data-vel-active-tab"] });
+          if (contextContentView) contextObserver.observe(contextContentView, { attributes: true, attributeFilter: ["class"], childList: true, subtree: true });
+          if (contextLivePlayer) contextObserver.observe(contextLivePlayer, { attributes: true, attributeFilter: ["class"] });
+          if (contextVodPlayer) contextObserver.observe(contextVodPlayer, { attributes: true, attributeFilter: ["class"] });
+          if (contextLiveTitle) contextObserver.observe(contextLiveTitle, { attributes: true, childList: true, subtree: true });
+          if (contextVodTitle) contextObserver.observe(contextVodTitle, { attributes: true, childList: true, subtree: true });
+          document.addEventListener("velora-home-tab", refreshHeaderContextTitle);
+          refreshHeaderContextTitle();
         }
 
         // This script is rendered after the dashboard markup, so its controls are
@@ -9243,18 +9435,6 @@ if (target.closest(".trial-offer-button")) {
         display: none !important;
       }
 
-      .main--velora #content-view.content-view--vod-film-detail > #btn-back-home {
-        position: fixed !important;
-        top: max(0.85rem, env(safe-area-inset-top, 0px)) !important;
-        left: max(0.85rem, env(safe-area-inset-left, 0px)) !important;
-        z-index: 2147482000 !important;
-        display: grid !important;
-        margin: 0 !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        pointer-events: auto !important;
-      }
-
       .main--velora:has(#content-view.content-view--vod-film-detail)
         #now-playing-vod:has(+ #vod-player-container:not(.hidden)) {
         display: flex !important;
@@ -9292,6 +9472,118 @@ if (target.closest(".trial-offer-button")) {
 
       .main--velora.main--velora-live-package #player-container:not(.hidden) {
         margin-top: 0 !important;
+      }
+
+      .main--velora.main--velora-in-package #now-playing,
+      .main--velora.main--velora-in-package #now-playing-vod,
+      .main--velora:has(#player-container:not(.hidden)) #now-playing,
+      .main--velora:has(#vod-player-container:not(.hidden)) #now-playing-vod {
+        display: none !important;
+      }
+
+      /* The unified header owns playback titles; keep legacy tickers data-only. */
+      .main--velora #now-playing,
+      .main--velora #now-playing-vod {
+        display: none !important;
+      }
+
+      /* The centered context heading is the only page-level title. */
+      body.vel-home-choice-picked .main--velora #vel-packages-section-heading,
+      body.vel-home-choice-picked .main--velora #dynamic-list > .vel-category-heading,
+      body.vel-home-choice-picked .main--velora #content-view > .vel-category-heading {
+        display: none !important;
+      }
+
+      /* One shared package header: back, context title, search. */
+      body.vel-home-choice-picked:not(.vel-home-empty-active) .main--velora .vel-header,
+      body .main--velora:has(#content-view:not(.hidden)) .vel-header,
+      body .main--velora:has(#player-container:not(.hidden)) .vel-header,
+      body .main--velora:has(#vod-player-container:not(.hidden)) .vel-header {
+        position: relative !important;
+        z-index: 20 !important;
+        display: grid !important;
+        grid-template-columns: auto minmax(0, 1fr) auto !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+      }
+
+      body.vel-home-choice-picked:not(.vel-home-empty-active) .main--velora .vel-sticky-top,
+      body .main--velora:has(#content-view:not(.hidden)) .vel-sticky-top,
+      body .main--velora:has(#player-container:not(.hidden)) .vel-sticky-top,
+      body .main--velora:has(#vod-player-container:not(.hidden)) .vel-sticky-top {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+      }
+
+      body.vel-home-choice-picked:not(.vel-home-empty-active) .main--velora .vel-header__left,
+      body.vel-home-choice-picked:not(.vel-home-empty-active) .main--velora #btn-header-back,
+      body .main--velora:has(#content-view:not(.hidden)) .vel-header__left,
+      body .main--velora:has(#player-container:not(.hidden)) .vel-header__left,
+      body .main--velora:has(#vod-player-container:not(.hidden)) .vel-header__left,
+      body .main--velora:has(#content-view:not(.hidden)) #btn-header-back,
+      body .main--velora:has(#player-container:not(.hidden)) #btn-header-back,
+      body .main--velora:has(#vod-player-container:not(.hidden)) #btn-header-back {
+        grid-column: 1;
+        display: inline-flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+      }
+
+      body.vel-home-choice-picked:not(.vel-home-empty-active) .main--velora .vel-header-context-title,
+      body .main--velora:has(#content-view:not(.hidden)) .vel-header-context-title,
+      body .main--velora:has(#player-container:not(.hidden)) .vel-header-context-title,
+      body .main--velora:has(#vod-player-container:not(.hidden)) .vel-header-context-title {
+        grid-column: 2;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+      }
+
+      body .main--velora:has(#content-view:not(.hidden)) .vel-brand,
+      body .main--velora:has(#player-container:not(.hidden)) .vel-brand,
+      body .main--velora:has(#vod-player-container:not(.hidden)) .vel-brand {
+        display: none !important;
+      }
+
+      body.vel-home-choice-picked:not(.vel-home-empty-active) .main--velora .vel-header__right,
+      body .main--velora:has(#content-view:not(.hidden)) .vel-header__right,
+      body .main--velora:has(#player-container:not(.hidden)) .vel-header__right,
+      body .main--velora:has(#vod-player-container:not(.hidden)) .vel-header__right {
+        grid-column: 3;
+        display: inline-flex !important;
+        max-width: none;
+      }
+
+      body.vel-home-choice-picked:not(.vel-home-empty-active) .main--velora .vel-header__right > *,
+      body .main--velora:has(#content-view:not(.hidden)) .vel-header__right > *,
+      body .main--velora:has(#player-container:not(.hidden)) .vel-header__right > *,
+      body .main--velora:has(#vod-player-container:not(.hidden)) .vel-header__right > * {
+        display: none !important;
+      }
+
+      body.vel-home-choice-picked:not(.vel-home-empty-active) .main--velora #btn-header-search,
+      body .main--velora:has(#content-view:not(.hidden)) #btn-header-search,
+      body .main--velora:has(#player-container:not(.hidden)) #btn-header-search,
+      body .main--velora:has(#vod-player-container:not(.hidden)) #btn-header-search {
+        display: inline-flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+      }
+
+      /* Top-level TV / Movies / Series pages have no parent page to return to. */
+      body.vel-home-choice-picked:not(.vel-home-empty-active)
+        .main--velora:has(#packages-view:not(.hidden)):not(:has(#content-view:not(.hidden))):not(:has(#player-container:not(.hidden))):not(:has(#vod-player-container:not(.hidden)))
+        .vel-header__left,
+      body.vel-home-choice-picked:not(.vel-home-empty-active)
+        .main--velora:has(#packages-view:not(.hidden)):not(:has(#content-view:not(.hidden))):not(:has(#player-container:not(.hidden))):not(:has(#vod-player-container:not(.hidden)))
+        #btn-header-back {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
       }
 
       #player-container:fullscreen,
@@ -9556,15 +9848,16 @@ if (target.closest(".trial-offer-button")) {
         <span class="vel-bottom-nav__label">Profil</span>
       </button>
     </nav>
-    <button type="button" id="vel-floating-search" class="vel-floating-search" aria-label="Recherche">
-      <svg class="vel-bottom-nav__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.8 3a7.8 7.8 0 1 0 4.86 13.9l3.72 3.72a1 1 0 0 0 1.42-1.42l-3.72-3.72A7.8 7.8 0 0 0 10.8 3Zm0 2a5.8 5.8 0 1 1 0 11.6 5.8 5.8 0 0 1 0-11.6Z"/></svg>
-    </button>
     <div id="vel-bottom-country-menu" class="vel-bottom-country-menu" role="listbox" aria-label="Choisir un pays" hidden>
       <div class="vel-bottom-country-menu__title">Choisir un pays</div>
       <div id="vel-bottom-country-options"></div>
     </div>
     <div id="vel-bottom-profile-menu" class="vel-bottom-country-menu vel-bottom-profile-menu" aria-label="Menu du profil" hidden>
       <div class="vel-bottom-country-menu__title">Profil</div>
+      <button type="button" id="btn-adult-portal" class="vel-bottom-country-menu__option" aria-label="Contenu adulte +18">
+        <span>Adulte +18</span>
+        <img src="/logos/adult-18.svg" alt="" aria-hidden="true" width="26" height="26" />
+      </button>
       <button type="button" id="vel-profile-favorites" class="vel-bottom-country-menu__option">
         <span>Favoris</span>
         <span class="vel-bottom-country-menu__check" aria-hidden="true">♥</span>
@@ -9586,6 +9879,7 @@ if (target.closest(".trial-offer-button")) {
         var bottomProfileButton = nav.querySelector('[data-bottom-nav="profile"]');
         var floatingSearchButton = document.getElementById("vel-floating-search");
         var bottomProfileMenu = document.getElementById("vel-bottom-profile-menu");
+        var profileAdultButton = document.getElementById("btn-adult-portal");
         var profileFavoritesButton = document.getElementById("vel-profile-favorites");
         var profileSessionButton = document.getElementById("vel-profile-session");
         var profileSessionLabel = document.getElementById("vel-profile-session-label");
@@ -9665,7 +9959,9 @@ if (target.closest(".trial-offer-button")) {
 
         function syncBottomCountry() {
           var select = document.getElementById("country-select");
-          var sourceFlag = document.getElementById("home-country-flag") || document.getElementById("vel-brand-country-flag");
+          var sourceFlag = document.getElementById("home-country-flag") ||
+            (select && select.parentElement ? select.parentElement.querySelector(".country-select-trigger__flag") : null) ||
+            document.getElementById("vel-brand-country-flag");
           var selected = select && select.options ? select.options[select.selectedIndex] : null;
           var selectedName = selected ? String(selected.textContent || "").trim() : "Pays";
           var source = sourceFlag && !sourceFlag.hidden ? sourceFlag.getAttribute("src") : "";
@@ -9824,6 +10120,11 @@ if (target.closest(".trial-offer-button")) {
           profileFavoritesButton.addEventListener("click", function () {
             closeProfileMenu();
             openFavorites();
+          });
+        }
+        if (profileAdultButton) {
+          profileAdultButton.addEventListener("click", function () {
+            closeProfileMenu();
           });
         }
         if (profileSessionButton) profileSessionButton.addEventListener("click", handleProfileSession);

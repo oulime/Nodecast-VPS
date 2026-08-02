@@ -12,3 +12,13 @@
 .vel-home-section__card--movies .vel-home-section__media,.vel-home-section__card--series .vel-home-section__media{aspect-ratio:2/3;border-radius:15px}
 .vel-home-section__card--movies .vel-home-section__name,.vel-home-section__card--series .vel-home-section__name{display:none}
 @media(max-width:640px){.vel-home-section__card--movies,.vel-home-section__card--series{flex-basis:clamp(9rem,42vw,11rem)}.vel-home-section__rail{gap:.85rem}}
+
+/* Stable, immediate Accueil first paint. */
+.vel-home-section__skeleton{position:relative;display:block;flex:0 0 clamp(9.5rem,34vw,13.5rem);aspect-ratio:2/3;overflow:hidden;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:#141321}
+.vel-home-section__skeleton--live{flex-basis:clamp(10.5rem,38vw,15rem);aspect-ratio:16/9}
+.vel-home-section__skeleton::after,.vel-home-section__card.is-poster-loading::after{content:"";position:absolute;inset:0;transform:translateX(-105%);background:linear-gradient(105deg,transparent 20%,rgba(255,255,255,.09) 45%,rgba(255,255,255,.16) 50%,rgba(255,255,255,.09) 55%,transparent 80%);animation:vel-home-shimmer 1.15s ease-in-out infinite}
+.vel-home-section__card{position:relative}
+.vel-home-section__card.is-poster-loading .vel-home-section__media{opacity:0}
+.vel-home-section__card.is-poster-ready .vel-home-section__media{opacity:1;transition:opacity .24s ease}
+@keyframes vel-home-shimmer{to{transform:translateX(105%)}}
+@media(prefers-reduced-motion:reduce){.vel-home-section__skeleton::after,.vel-home-section__card.is-poster-loading::after{animation:none}.vel-home-section__card.is-poster-ready .vel-home-section__media{transition:none}}

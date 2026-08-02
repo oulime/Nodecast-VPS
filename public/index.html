@@ -157,6 +157,7 @@
         var hadPersistedCountryAtStartup = !!(
           readPersistedCountryId() || readPersistedCountryName()
         );
+        var startupCountryRestored = !hadPersistedCountryAtStartup;
 
         function persistCountryOption(option) {
           if (!option || !String(option.value || "").trim()) return;
@@ -204,6 +205,7 @@
           }
 
           if (!match) return false;
+          startupCountryRestored = true;
           if (select.value !== match.value) {
             select.value = match.value;
             select.dispatchEvent(new Event("change", { bubbles: true }));
@@ -259,6 +261,12 @@
         document.addEventListener("change", function (event) {
           var select = event.target;
           if (!select || select.id !== "country-select") return;
+          if (!startupCountryRestored && hadPersistedCountryAtStartup) {
+            window.setTimeout(function () {
+              restorePersistedCountry(select);
+            }, 0);
+            return;
+          }
           persistCountryOption(select.options[select.selectedIndex]);
         }, true);
 
@@ -1498,17 +1506,18 @@
         window.fetch.__veloraPaidAccessPatched = true;
       })();
     </script>
-    <script defer src="/assets/velora-home-sections.js?v=country-name-home-match-20260731"></script>
+    <script defer src="/assets/velora-home-sections.js?v=editable-home-sections-20260802"></script>
+    <script defer src="/assets/velora-home-cache-fallback.js?v=image-only-home-return-20260802"></script>
     <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=resolved-package-home-cache-20260731"></script>
-    <script defer src="/assets/manual-pays.js?v=20260801-packages-only"></script>
+    <script defer src="/assets/manual-pays.js?v=20260802-icon-actions"></script>
     <script defer src="/assets/paid-users-admin.js?v=20260801-vps-sqlite"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
-    <link rel="stylesheet" href="/assets/manual-pays.css?v=20260729-whole-word">
+    <link rel="stylesheet" href="/assets/manual-pays.css?v=20260802-icon-actions">
     <link rel="stylesheet" href="/assets/paid-users-admin.css?v=20260801-vps-sqlite">
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css">
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=live-player-placeholder-20260731">
-    <link rel="stylesheet" href="/assets/velora-home-sections.css?v=compact-poster-only-home-20260731">
+    <link rel="stylesheet" href="/assets/velora-home-sections.css?v=editable-home-sections-20260802">
     <style>
       body:not(.vel-home-choice-picked) .main--velora .vel-futuristic-bg {
         display: block !important;
@@ -3923,7 +3932,7 @@
             <div class="field"><label for="home-section-title">Nom de la section</label><input id="home-section-title" type="text" placeholder="Ex. Films populaires" maxlength="80" /></div>
             <div class="field"><label for="home-section-package">Package à afficher</label><select id="home-section-package" class="admin-add-package-dialog__select"></select></div>
             <div class="field"><label><input id="home-section-published" type="checkbox" checked /> Publier immédiatement cette section</label></div>
-            <div class="actions"><button type="button" id="home-section-add" class="primary">Créer la section</button></div>
+            <div class="actions"><button type="button" id="home-section-add" class="primary">Créer la section</button><button type="button" id="home-section-cancel" class="countries-admin-cancel" hidden>Annuler</button></div>
             <div class="actions" style="margin-top: .65rem"><button type="button" id="home-cache-rebuild" class="countries-admin-cancel">Reconstruire le cache Accueil</button></div>
             <p id="home-cache-status" class="status" aria-live="polite"></p>
             <div id="home-sections-admin-list" class="vel-home-sections-admin-list"></div>
@@ -4089,6 +4098,16 @@
                   <button id="mp-dialog-merge" type="button" class="primary" disabled>Fusionner la sélection</button>
                 </div>
                 <div id="mp-dialog-package-list" class="manual-pays-dialog__list"></div>
+              </div>
+            </dialog>
+            <dialog id="mp-content-dialog" class="manual-pays-dialog manual-pays-content-dialog">
+              <div class="manual-pays-dialog__panel">
+                <header class="manual-pays-dialog__header">
+                  <div><span class="manual-pays__eyebrow">CONTENU DU PACKAGE</span><h2 id="mp-content-title">Package</h2></div>
+                  <button id="mp-content-close" type="button" class="manual-pays-dialog__close" aria-label="Fermer">×</button>
+                </header>
+                <p id="mp-content-status" class="status" aria-live="polite"></p>
+                <div id="mp-content-list" class="manual-pays-content-dialog__list"></div>
               </div>
             </dialog>
             <dialog id="mp-delete-country-dialog" class="manual-pays-dialog manual-pays-confirm">
@@ -5907,6 +5926,11 @@
 
               var contentView = document.getElementById("content-view");
               if (contentView && !contentView.classList.contains("hidden")) {
+                if (document.body.dataset.veloraReturnHome === "true") {
+                  delete document.body.dataset.veloraReturnHome;
+                  document.dispatchEvent(new CustomEvent("velora-return-home"));
+                  return;
+                }
                 var isDetailView = contentView.classList.contains("content-view--vod-film-detail") || !!contentView.querySelector(
                   ".vel-vod-detail, .vel-series-detail, .vel-vod-series-detail"
                 );
@@ -9492,6 +9516,32 @@ if (target.closest(".trial-offer-button")) {
         display: none !important;
       }
 
+      /* VOD titles are rendered exclusively by the unified top header. */
+      html body .main--velora #now-playing-vod.player-now-playing.vel-now-playing.vel-now-playing--vod {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        pointer-events: none !important;
+      }
+
+      html body .main--velora:has(#content-view.content-view--vod-film-detail)
+        #now-playing-vod.player-now-playing.vel-now-playing.vel-now-playing--vod:has(+ #vod-player-container:not(.hidden)) {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        pointer-events: none !important;
+      }
+
       /* The centered context heading is the only page-level title. */
       body.vel-home-choice-picked .main--velora #vel-packages-section-heading,
       body.vel-home-choice-picked .main--velora #dynamic-list > .vel-category-heading,
@@ -9592,6 +9642,13 @@ if (target.closest(".trial-offer-button")) {
       }
 
       /* Top-level media pages use the same title treatment as ACCUEIL. */
+      body.vel-home-choice-picked:not(.vel-home-empty-active)
+        .main--velora:has(#packages-view:not(.hidden)):not(:has(#content-view:not(.hidden))):not(:has(#player-container:not(.hidden))):not(:has(#vod-player-container:not(.hidden)))
+        .vel-sticky-top {
+        position: static !important;
+        top: auto !important;
+      }
+
       body.vel-home-choice-picked:not(.vel-home-empty-active)
         .main--velora:has(#packages-view:not(.hidden)):not(:has(#content-view:not(.hidden))):not(:has(#player-container:not(.hidden))):not(:has(#vod-player-container:not(.hidden)))
         .vel-header {
@@ -9745,6 +9802,19 @@ if (target.closest(".trial-offer-button")) {
 
       body.vel-home-empty-active .vel-home-empty-page {
         display: block;
+      }
+
+      /* Accueil owns the full page; never leak a previous media header into it. */
+      html body.vel-home-empty-active .main--velora:has(#vel-home-empty-page) .vel-sticky-top,
+      html body.vel-home-empty-active .main--velora:has(#vel-home-empty-page) .vel-header {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        pointer-events: none !important;
       }
 
       body.vel-home-empty-active #vel-package-toolbar-sticky,
@@ -9973,6 +10043,13 @@ if (target.closest(".trial-offer-button")) {
           closeBottomCountryMenu();
           closeProfileMenu();
           stopHomeMedia();
+          ["content-view", "packages-view", "adult-view"].forEach(function (id) {
+            var view = document.getElementById(id);
+            if (view) {
+              view.classList.add("hidden");
+              view.setAttribute("aria-hidden", "true");
+            }
+          });
           document.body.classList.remove("vel-home-choice-loading");
           document.body.classList.remove("vel-home-choice-catalog-pending");
           document.body.classList.add("vel-home-choice-picked");
@@ -9982,6 +10059,8 @@ if (target.closest(".trial-offer-button")) {
           if (main) main.scrollTop = 0;
           setActive("home");
         }
+
+        document.addEventListener("velora-return-home", showHome);
 
         function syncBottomCountry() {
           var select = document.getElementById("country-select");

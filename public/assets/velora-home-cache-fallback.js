@@ -3,6 +3,74 @@
   var storageKey = "velora.home-cache.first-paint.v1";
   var cachePayload = null;
   var cacheRequest = null;
+  var registeredHomeCards = new WeakMap();
+  var homeTouchGesture = null;
+  var nativeTouchGesture = null;
+  var lastDirectTouchCard = null;
+  var lastDirectTouchAt = 0;
+
+  function activateDirectTouch(card, payload) {
+    var now = Date.now();
+    if (card === lastDirectTouchCard && now - lastDirectTouchAt < 650) return;
+    lastDirectTouchCard = card;
+    lastDirectTouchAt = now;
+    window.veloraOpenHomeCacheEntry(payload.section, payload.entry, card);
+  }
+
+  window.veloraBindHomeCardActivation = function (card, section, entry) {
+    if (card) registeredHomeCards.set(card, { section: section, entry: entry });
+  };
+
+  document.addEventListener("pointerdown", function (event) {
+    // Use the same direct activation path for mouse and touch. A plain click
+    // is not reliable on desktop because the app also installs global pointer
+    // handlers (notably for TV navigation) which can consume the later click.
+    // Tracking pointer movement still lets users drag a horizontal rail
+    // without accidentally opening a card.
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    var card = event.target instanceof Element && event.target.closest(".vel-home-section__card");
+    if (!card || !registeredHomeCards.has(card)) return;
+    homeTouchGesture = { card: card, pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
+  }, true);
+  document.addEventListener("pointermove", function (event) {
+    var gesture = homeTouchGesture;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    if (Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 12) gesture.moved = true;
+  }, true);
+  document.addEventListener("pointerup", function (event) {
+    var gesture = homeTouchGesture;
+    homeTouchGesture = null;
+    if (!gesture || gesture.pointerId !== event.pointerId || gesture.moved) return;
+    var payload = registeredHomeCards.get(gesture.card);
+    if (!payload) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    activateDirectTouch(gesture.card, payload);
+  }, true);
+  document.addEventListener("pointercancel", function () { homeTouchGesture = null; }, true);
+  document.addEventListener("touchstart", function (event) {
+    var touch = event.touches && event.touches[0];
+    var card = event.target instanceof Element && event.target.closest(".vel-home-section__card");
+    if (!touch || !card || !registeredHomeCards.has(card)) return;
+    nativeTouchGesture = { card: card, x: touch.clientX, y: touch.clientY, moved: false };
+  }, { capture: true, passive: true });
+  document.addEventListener("touchmove", function (event) {
+    var gesture = nativeTouchGesture;
+    var touch = event.touches && event.touches[0];
+    if (!gesture || !touch) return;
+    if (Math.hypot(touch.clientX - gesture.x, touch.clientY - gesture.y) > 12) gesture.moved = true;
+  }, { capture: true, passive: true });
+  document.addEventListener("touchend", function (event) {
+    var gesture = nativeTouchGesture;
+    nativeTouchGesture = null;
+    if (!gesture || gesture.moved) return;
+    var payload = registeredHomeCards.get(gesture.card);
+    if (!payload || gesture.card.dataset.homeOpenPending === "true") return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    activateDirectTouch(gesture.card, payload);
+  }, { capture: true, passive: false });
+  document.addEventListener("touchcancel", function () { nativeTouchGesture = null; }, { capture: true, passive: true });
 
   window.veloraLoadHomeCache = function (force) {
     if (cachePayload && !force) return Promise.resolve(cachePayload);
@@ -110,6 +178,7 @@
     name.className = "vel-home-section__name";
     name.textContent = entry.name || "";
     card.append(media, name);
+    window.veloraBindHomeCardActivation(card, section, entry);
     card.addEventListener("click", function () { window.veloraOpenHomeCacheEntry(section, entry, card); });
     return card;
   }

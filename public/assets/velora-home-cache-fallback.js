@@ -7,11 +7,11 @@
   }
 
   function openEntry(section, entry) {
+    delete document.body.dataset.velTopLevel;
     document.body.dataset.veloraReturnHome = "true";
     document.body.classList.remove("vel-home-empty-active");
-    document.body.dataset.velActiveTab = section.content_type;
     document.querySelectorAll("[data-bottom-nav]").forEach(function (button) {
-      var active = button.getAttribute("data-bottom-nav") === section.content_type;
+      var active = button.getAttribute("data-bottom-nav") === "home";
       button.classList.toggle("is-active", active);
       if (active) button.setAttribute("aria-current", "page");
       else button.removeAttribute("aria-current");

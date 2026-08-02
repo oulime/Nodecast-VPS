@@ -1506,9 +1506,9 @@
         window.fetch.__veloraPaidAccessPatched = true;
       })();
     </script>
-    <script defer src="/assets/velora-home-sections.js?v=editable-home-sections-20260802"></script>
-    <script defer src="/assets/velora-home-cache-fallback.js?v=image-only-home-return-20260802"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=resolved-package-home-cache-20260731"></script>
+    <script defer src="/assets/velora-home-sections.js?v=independent-home-detail-20260802"></script>
+    <script defer src="/assets/velora-home-cache-fallback.js?v=independent-home-detail-20260802"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=independent-home-detail-20260802"></script>
     <script defer src="/assets/manual-pays.js?v=20260802-icon-actions"></script>
     <script defer src="/assets/paid-users-admin.js?v=20260801-vps-sqlite"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
@@ -1517,7 +1517,7 @@
     <link rel="stylesheet" href="/assets/paid-users-admin.css?v=20260801-vps-sqlite">
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css">
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=live-player-placeholder-20260731">
-    <link rel="stylesheet" href="/assets/velora-home-sections.css?v=editable-home-sections-20260802">
+    <link rel="stylesheet" href="/assets/velora-home-sections.css?v=direct-cache-player-20260802">
     <style>
       body:not(.vel-home-choice-picked) .main--velora .vel-futuristic-bg {
         display: block !important;
@@ -6074,7 +6074,43 @@
           if (contextVodPlayer) contextObserver.observe(contextVodPlayer, { attributes: true, attributeFilter: ["class"] });
           if (contextLiveTitle) contextObserver.observe(contextLiveTitle, { attributes: true, childList: true, subtree: true });
           if (contextVodTitle) contextObserver.observe(contextVodTitle, { attributes: true, childList: true, subtree: true });
-          document.addEventListener("velora-home-tab", refreshHeaderContextTitle);
+          document.addEventListener("velora-home-tab", function (event) {
+            var tab = event.detail && event.detail.tab;
+            if (tab !== "live" && tab !== "movies" && tab !== "series") return;
+            delete document.body.dataset.veloraReturnHome;
+            document.body.dataset.velTopLevel = tab;
+            document.body.classList.remove("vel-home-empty-active");
+            var homePage = document.getElementById("vel-home-empty-page");
+            if (homePage) {
+              homePage.classList.add("hidden");
+              homePage.setAttribute("aria-hidden", "true");
+            }
+            ["content-view", "player-container", "vod-player-container", "adult-view"].forEach(function (id) {
+              var view = document.getElementById(id);
+              if (view) {
+                view.classList.add("hidden");
+                view.setAttribute("aria-hidden", "true");
+              }
+            });
+            var packagesView = document.getElementById("packages-view");
+            if (packagesView) {
+              packagesView.classList.remove("hidden");
+              packagesView.setAttribute("aria-hidden", "false");
+            }
+            packageContextTitle = "";
+            mediaContextTitle = "";
+            window.setTimeout(refreshHeaderContextTitle, 0);
+          });
+          document.addEventListener("velora-top-level-tab", function () {
+            packageContextTitle = "";
+            mediaContextTitle = "";
+            window.setTimeout(refreshHeaderContextTitle, 0);
+          });
+          document.addEventListener("click", function (event) {
+            if (event.target && event.target.closest(".vel-package-card, .media-item, .vel-vod-movie-card")) {
+              delete document.body.dataset.velTopLevel;
+            }
+          }, true);
           refreshHeaderContextTitle();
         }
 
@@ -9630,6 +9666,8 @@ if (target.closest(".trial-offer-button")) {
       }
 
       /* Top-level TV / Movies / Series pages have no parent page to return to. */
+      body[data-vel-top-level] .main--velora #btn-header-back,
+      body[data-vel-top-level] .main--velora .vel-header__left,
       body.vel-home-choice-picked:not(.vel-home-empty-active)
         .main--velora:has(#packages-view:not(.hidden)):not(:has(#content-view:not(.hidden))):not(:has(#player-container:not(.hidden))):not(:has(#vod-player-container:not(.hidden)))
         .vel-header__left,
@@ -10008,16 +10046,18 @@ if (target.closest(".trial-offer-button")) {
         function openTab(tab) {
           closeBottomCountryMenu();
           closeProfileMenu();
+          delete document.body.dataset.veloraReturnHome;
+          document.body.dataset.velTopLevel = tab;
           document.body.classList.remove("vel-home-empty-active");
+          document.dispatchEvent(new CustomEvent("velora-top-level-tab", { detail: { tab: tab } }));
           if (typeof window.veloraBlockCountryPickerAfterPageChange === "function") {
             window.veloraBlockCountryPickerAfterPageChange();
           }
           var homeControl = document.querySelector('#vel-home-choice [data-home-tab="' + tab + '"]');
           if (homeControl) {
             homeControl.click();
-          } else {
-            document.dispatchEvent(new CustomEvent("velora-home-tab", { detail: { tab: tab } }));
           }
+          document.dispatchEvent(new CustomEvent("velora-home-tab", { detail: { tab: tab } }));
           setActive(tab);
         }
 
@@ -10042,6 +10082,12 @@ if (target.closest(".trial-offer-button")) {
           }
           closeBottomCountryMenu();
           closeProfileMenu();
+          delete document.body.dataset.velTopLevel;
+          var homePage = document.getElementById("vel-home-empty-page");
+          if (homePage) {
+            homePage.classList.remove("hidden");
+            homePage.setAttribute("aria-hidden", "false");
+          }
           stopHomeMedia();
           ["content-view", "packages-view", "adult-view"].forEach(function (id) {
             var view = document.getElementById(id);

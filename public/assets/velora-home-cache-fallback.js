@@ -1,28 +1,83 @@
 (function () {
   "use strict";
   var storageKey = "velora.home-cache.first-paint.v1";
+  var cachePayload = null;
+  var cacheRequest = null;
+
+  window.veloraLoadHomeCache = function (force) {
+    if (cachePayload && !force) return Promise.resolve(cachePayload);
+    if (cacheRequest && !force) return cacheRequest;
+    cacheRequest = fetch("/api/velora-db/home-cache" + (force ? "?t=" + Date.now() : ""), {
+      cache: force ? "no-store" : "force-cache"
+    }).then(function (response) {
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      return response.json();
+    }).then(function (payload) {
+      cachePayload = payload;
+      window.veloraHomeCachePayload = payload;
+      return payload;
+    }).finally(function () { cacheRequest = null; });
+    return cacheRequest;
+  };
 
   function activeCountryId() {
     var select = document.getElementById("country-select");
     return select ? String(select.value || "") : "";
   }
 
-  function openEntry(section, entry) {
+  function revealEntry(section, entry) {
     delete document.body.dataset.velTopLevel;
     document.body.dataset.veloraReturnHome = "true";
     document.body.classList.remove("vel-home-empty-active");
+    var homePage = document.getElementById("vel-home-empty-page");
+    if (homePage) {
+      homePage.classList.add("hidden");
+      homePage.setAttribute("aria-hidden", "true");
+    }
+    document.dispatchEvent(new CustomEvent("velora-home-media-open", {
+      detail: { title: entry.name || "", contentType: section.content_type }
+    }));
     document.querySelectorAll("[data-bottom-nav]").forEach(function (button) {
       var active = button.getAttribute("data-bottom-nav") === "home";
       button.classList.toggle("is-active", active);
       if (active) button.setAttribute("aria-current", "page");
       else button.removeAttribute("aria-current");
     });
-    if (entry.streamId != null && typeof window.veloraOpenCachedHomeItem === "function") {
-      window.veloraOpenCachedHomeItem(section, entry);
-    } else if (typeof window.veloraOpenSearchResult === "function") {
-      window.veloraOpenSearchResult(entry.id);
-    }
+    window.veloraOpenCachedHomeItem(section, entry);
   }
+
+  window.veloraOpenHomeCacheEntry = function (section, entry, button) {
+    if (!entry || entry.streamId == null) return;
+    if (button && button.dataset.homeOpenPending === "true") return;
+    if (button) {
+      button.dataset.homeOpenPending = "true";
+      button.classList.add("is-opening");
+      button.setAttribute("aria-busy", "true");
+    }
+    var started = Date.now();
+    function finish() {
+      if (button) {
+        delete button.dataset.homeOpenPending;
+        button.classList.remove("is-opening");
+        button.removeAttribute("aria-busy");
+      }
+    }
+    function attempt() {
+      var ready = typeof window.veloraHomeCatalogReady !== "function" || window.veloraHomeCatalogReady();
+      if (ready && typeof window.veloraOpenCachedHomeItem === "function") {
+        finish();
+        revealEntry(section, entry);
+        return;
+      }
+      if (Date.now() - started >= 20000) {
+        finish();
+        return;
+      }
+      try { window.veloraForceAutoconnect && window.veloraForceAutoconnect(); } catch (error) {}
+      window.setTimeout(attempt, 120);
+    }
+    attempt();
+  };
 
   function createCard(section, entry) {
     var card = document.createElement("button");
@@ -55,7 +110,7 @@
     name.className = "vel-home-section__name";
     name.textContent = entry.name || "";
     card.append(media, name);
-    card.addEventListener("click", function () { openEntry(section, entry); });
+    card.addEventListener("click", function () { window.veloraOpenHomeCacheEntry(section, entry, card); });
     return card;
   }
 
@@ -144,11 +199,14 @@
       if (stored) renderSkeleton(JSON.parse(stored));
     } catch (error) {}
     try {
-      var response = await fetch("/api/velora-db/home-cache", { cache: "no-store" });
-      if (!response.ok) return;
-      var payload = await response.json();
+      var payload = await window.veloraLoadHomeCache(false);
       try { sessionStorage.setItem(storageKey, JSON.stringify(payload)); } catch (error) {}
       renderSkeleton(payload);
+      window.veloraHomeCacheFirstPaintReady = true;
+      document.body.dataset.veloraLoadStage = "home";
+      document.dispatchEvent(new CustomEvent("velora-home-cache-ready", {
+        detail: { countryId: activeCountryId() }
+      }));
       var attempts = 0;
       var timer = window.setInterval(function () {
         attempts += 1;
@@ -161,6 +219,7 @@
   }
 
   document.addEventListener("velora-app-ready", loadAndRender);
+  document.addEventListener("velora-countries-ready", loadAndRender);
   document.getElementById("country-select")?.addEventListener("change", loadAndRender);
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", loadAndRender, { once: true });

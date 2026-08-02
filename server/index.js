@@ -2,6 +2,7 @@ const express = require('express');
 require('dotenv').config();
 const path = require('path');
 const { Readable } = require('stream');
+const { pipeline } = require('stream/promises');
 const passport = require('passport');
 const syncService = require('./services/syncService');
 const veloraCatalogCache = require('./services/veloraCatalogCache');
@@ -63,12 +64,20 @@ if (USE_VPS_DATA_API) {
         if (!isVpsDataApiRequest(req.path)) return next();
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 30000);
+        let timedOut = false;
+        let clientDisconnected = false;
+        const timeout = setTimeout(() => {
+            timedOut = true;
+            controller.abort();
+        }, 30000);
         const clearRequest = () => clearTimeout(timeout);
         res.once('finish', clearRequest);
         res.once('close', () => {
             clearRequest();
-            if (!res.writableEnded) controller.abort();
+            if (!res.writableEnded) {
+                clientDisconnected = true;
+                controller.abort();
+            }
         });
 
         try {
@@ -96,16 +105,23 @@ if (USE_VPS_DATA_API) {
             res.setHeader('X-Nodecast-Data-Source', VPS_DATA_API_BASE);
 
             if (!upstream.body || req.method === 'HEAD') return res.end();
-            Readable.fromWeb(upstream.body).pipe(res);
+            await pipeline(Readable.fromWeb(upstream.body), res);
         } catch (err) {
-            if (controller.signal.aborted && (res.destroyed || res.writableEnded)) return;
+            if (controller.signal.aborted || err?.name === 'AbortError') {
+                if (clientDisconnected || res.destroyed || res.writableEnded) return;
+                if (timedOut && !res.headersSent) {
+                    return res.status(504).json({ error: 'VPS data API timed out' });
+                }
+                res.destroy();
+                return;
+            }
             console.error('[VPS data API] Request failed:', err);
             if (!res.headersSent) {
                 res.status(controller.signal.aborted ? 504 : 502).json({
                     error: controller.signal.aborted ? 'VPS data API timed out' : 'VPS data API unavailable'
                 });
             } else {
-                res.destroy(err);
+                res.destroy();
             }
         }
     });

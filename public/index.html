@@ -1506,9 +1506,9 @@
         window.fetch.__veloraPaidAccessPatched = true;
       })();
     </script>
-    <script defer src="/assets/velora-home-sections.js?v=home-skeleton-first-paint-20260802b"></script>
-    <script src="/assets/velora-home-cache-fallback.js?v=home-skeleton-first-paint-20260802"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=independent-home-detail-20260802"></script>
+    <script defer src="/assets/velora-home-sections.js?v=reliable-home-movie-open-20260802"></script>
+    <script src="/assets/velora-home-cache-fallback.js?v=reliable-home-movie-open-20260802"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=countries-home-catalog-order-20260802"></script>
     <script defer src="/assets/manual-pays.js?v=20260802-icon-actions"></script>
     <script defer src="/assets/paid-users-admin.js?v=20260801-vps-sqlite"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
@@ -6104,6 +6104,11 @@
           document.addEventListener("velora-top-level-tab", function () {
             packageContextTitle = "";
             mediaContextTitle = "";
+            window.setTimeout(refreshHeaderContextTitle, 0);
+          });
+          document.addEventListener("velora-home-media-open", function (event) {
+            packageContextTitle = "";
+            mediaContextTitle = cleanContextTitle(event.detail && event.detail.title);
             window.setTimeout(refreshHeaderContextTitle, 0);
           });
           document.addEventListener("click", function (event) {

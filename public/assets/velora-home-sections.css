@@ -22,3 +22,6 @@
 .vel-home-section__card.is-poster-ready .vel-home-section__media{opacity:1;transition:opacity .24s ease}
 @keyframes vel-home-shimmer{to{transform:translateX(105%)}}
 @media(prefers-reduced-motion:reduce){.vel-home-section__skeleton::after,.vel-home-section__card.is-poster-loading::after{animation:none}.vel-home-section__card.is-poster-ready .vel-home-section__media{transition:none}}
+.vel-home-section__card.is-opening::before{content:"";position:absolute;z-index:3;inset:0;background:rgba(5,5,12,.52);backdrop-filter:blur(2px)}
+.vel-home-section__card.is-opening::after{content:"";position:absolute;z-index:4;left:50%;top:50%;width:2rem;height:2rem;margin:-1rem;border:3px solid rgba(255,255,255,.28);border-top-color:#fff;border-radius:50%;animation:vel-home-open-spin .7s linear infinite}
+@keyframes vel-home-open-spin{to{transform:rotate(360deg)}}

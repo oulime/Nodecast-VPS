@@ -186,6 +186,21 @@ function getSnapshotFilePath(action, gzip = false) {
     return fs.existsSync(filePath) ? filePath : null;
 }
 
+function isSnapshotFresh() {
+    if (!status.ready || !status.completedAt) return false;
+    const completedAt = Date.parse(status.completedAt);
+    if (!Number.isFinite(completedAt)) return false;
+    try {
+        const latestSync = getDb()
+            .prepare("SELECT MAX(last_sync) AS last_sync FROM sync_status WHERE type = 'all' AND status IN ('success', 'warming')")
+            .get()?.last_sync;
+        return !latestSync || Number(latestSync) <= completedAt;
+    } catch (err) {
+        console.warn('[Velora cache] Could not compare snapshot freshness:', err.message);
+        return false;
+    }
+}
+
 function getCategorySnapshotFilePath(action, sourceId, categoryId, gzip = false) {
     const snapshotVersion = status.snapshotVersion;
     if (!snapshotVersion || !CATEGORY_ACTIONS.includes(action)) return null;
@@ -195,6 +210,7 @@ function getCategorySnapshotFilePath(action, sourceId, categoryId, gzip = false)
 }
 
 async function getCategorySnapshot(action, sourceId, categoryId) {
+    if (!isSnapshotFresh()) return null;
     const filePath = getCategorySnapshotFilePath(action, sourceId, categoryId, false);
     if (!filePath) return null;
     try {
@@ -216,11 +232,12 @@ function getSnapshot(action, categoryId = null) {
 }
 
 function sendSnapshotResponse(req, res, action, categoryId = null) {
+    if (!isSnapshotFresh()) return false;
     if (categoryId) {
         const data = getSnapshot(action, categoryId);
         if (!data) return false;
         res.set('X-Velora-Catalog-Cache', 'vps-local');
-        res.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600');
+        res.set('Cache-Control', 'private, no-cache');
         res.json(data);
         return true;
     }
@@ -233,14 +250,14 @@ function sendSnapshotResponse(req, res, action, categoryId = null) {
         const data = getSnapshot(action);
         if (!data) return false;
         res.set('X-Velora-Catalog-Cache', 'vps-local');
-        res.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600');
+        res.set('Cache-Control', 'private, no-cache');
         res.json(data);
         return true;
     }
 
     res.set('Content-Type', 'application/json; charset=utf-8');
     res.set('X-Velora-Catalog-Cache', 'vps-local');
-    res.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600');
+    res.set('Cache-Control', 'private, no-cache');
     if (gzipPath) {
         res.set('Content-Encoding', 'gzip');
         res.set('Vary', 'Accept-Encoding');
@@ -250,6 +267,7 @@ function sendSnapshotResponse(req, res, action, categoryId = null) {
 }
 
 function sendCategorySnapshotResponse(req, res, action, sourceId, categoryId) {
+    if (!isSnapshotFresh()) return false;
     const acceptsGzip = /\bgzip\b/i.test(String(req.headers['accept-encoding'] || ''));
     const gzipPath = acceptsGzip ? getCategorySnapshotFilePath(action, sourceId, categoryId, true) : null;
     const plainPath = getCategorySnapshotFilePath(action, sourceId, categoryId, false);
@@ -258,7 +276,7 @@ function sendCategorySnapshotResponse(req, res, action, sourceId, categoryId) {
 
     res.set('Content-Type', 'application/json; charset=utf-8');
     res.set('X-Velora-Catalog-Cache', 'vps-local-category');
-    res.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600');
+    res.set('Cache-Control', 'private, no-cache');
     if (gzipPath) {
         res.set('Content-Encoding', 'gzip');
         res.set('Vary', 'Accept-Encoding');

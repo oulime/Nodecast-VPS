@@ -32,7 +32,7 @@ function initSchema() {
     // Categories (Groups)
     db.exec(`
         CREATE TABLE IF NOT EXISTS categories (
-            id TEXT PRIMARY KEY, -- Composite key: sourceId:categoryId
+            id TEXT PRIMARY KEY, -- Composite key: sourceId:type:categoryId
             source_id INTEGER NOT NULL,
             category_id TEXT NOT NULL,
             type TEXT NOT NULL, -- 'live', 'movie', 'series'
@@ -47,7 +47,7 @@ function initSchema() {
     // Playlist Items (Channels, Movies, Series, Episodes)
     db.exec(`
         CREATE TABLE IF NOT EXISTS playlist_items (
-            id TEXT PRIMARY KEY, -- Composite key: sourceId:itemId
+            id TEXT PRIMARY KEY, -- Composite key: sourceId:type:itemId
             source_id INTEGER NOT NULL,
             item_id TEXT NOT NULL, -- Original ID from provider
             type TEXT NOT NULL, -- 'live', 'movie', 'series', 'episode'
@@ -80,6 +80,19 @@ function initSchema() {
     if (!playlistItemColumns.some(column => column.name === 'provider_order')) {
         db.exec(`ALTER TABLE playlist_items ADD COLUMN provider_order INTEGER`);
     }
+
+    // Provider IDs are only unique inside a media type. Older keys omitted
+    // the type, causing live/movie/series rows with the same numeric ID to
+    // overwrite or block one another during synchronization.
+    db.exec(`
+        UPDATE categories
+        SET id = CAST(source_id AS TEXT) || ':' || type || ':' || category_id
+        WHERE id <> CAST(source_id AS TEXT) || ':' || type || ':' || category_id;
+
+        UPDATE playlist_items
+        SET id = CAST(source_id AS TEXT) || ':' || type || ':' || item_id
+        WHERE id <> CAST(source_id AS TEXT) || ':' || type || ':' || item_id;
+    `);
 
     // EPG Programs
     // Optimized for range queries

@@ -236,7 +236,7 @@ class SyncService {
             for (const cat of batch) {
                 const catId = cat.category_id; // standard xtream field
                 const name = cat.category_name;
-                const id = `${sourceId}:${catId}`;
+                const id = `${sourceId}:${type}:${catId}`;
                 stmt.run(id, sourceId, String(catId), type, name, cat.parent_id || null, JSON.stringify(cat));
             }
         });
@@ -316,7 +316,7 @@ class SyncService {
                     added = item.last_modified;
                 }
 
-                const id = `${sourceId}:${itemId}`;
+                const id = `${sourceId}:${type}:${itemId}`;
                 syncedIds.add(id);
 
                 stmt.run(
@@ -475,7 +475,7 @@ class SyncService {
 
             const insertChannels = db.transaction((chanList) => {
                 for (const ch of chanList) {
-                    const id = `${sourceId}:${ch.id}`;
+                    const id = `${sourceId}:epg_channel:${ch.id}`;
                     channelStmt.run(
                         id,
                         sourceId,

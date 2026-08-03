@@ -121,10 +121,10 @@ function listStreams(sourceIds, type) {
     if (!sourceIds.length) return [];
     const placeholders = sourceIds.map(() => '?').join(',');
     return getDb().prepare(`
-        SELECT source_id, item_id, name, stream_icon, stream_url, added_at, rating, container_extension, year, category_id, data
+        SELECT source_id, item_id, name, stream_icon, stream_url, added_at, rating, container_extension, year, category_id, provider_order, data
         FROM playlist_items
         WHERE source_id IN (${placeholders}) AND type = ? AND is_hidden = 0
-        ORDER BY source_id ASC, name ASC
+        ORDER BY source_id ASC, provider_order ASC, rowid ASC
     `).all(...sourceIds, type)
         .filter(item => type !== 'live' || !shouldHidePublicLiveName(item.name))
         .map(item => {

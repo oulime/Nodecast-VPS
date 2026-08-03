@@ -64,6 +64,7 @@ function initSchema() {
             rating REAL,
             year TEXT,
             added_at TEXT,
+            provider_order INTEGER,
             
             -- App State
             is_hidden INTEGER DEFAULT 0,
@@ -74,6 +75,11 @@ function initSchema() {
         CREATE INDEX IF NOT EXISTS idx_items_source_type ON playlist_items(source_id, type);
         CREATE INDEX IF NOT EXISTS idx_items_category ON playlist_items(source_id, category_id);
     `);
+
+    const playlistItemColumns = db.prepare(`PRAGMA table_info(playlist_items)`).all();
+    if (!playlistItemColumns.some(column => column.name === 'provider_order')) {
+        db.exec(`ALTER TABLE playlist_items ADD COLUMN provider_order INTEGER`);
+    }
 
     // EPG Programs
     // Optimized for range queries

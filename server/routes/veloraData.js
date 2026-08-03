@@ -170,11 +170,16 @@ router.get('/admin/stream-curation-map', (req, res) => {
     try {
         const rows = getDb().prepare(`
             SELECT
-                json_extract(data, '$.stream_id') AS stream_id,
-                json_extract(data, '$.country_id') AS country_id,
-                json_extract(data, '$.target_package_id') AS package_id
-            FROM velora_admin_rows
-            WHERE table_name = 'admin_stream_curations'
+                json_extract(c.data, '$.stream_id') AS stream_id,
+                json_extract(c.data, '$.country_id') AS country_id,
+                json_extract(c.data, '$.target_package_id') AS package_id,
+                COALESCE(json_extract(c.data, '$.source_id'), json_extract(p.data, '$.source_id')) AS source_id,
+                COALESCE(json_extract(c.data, '$.kind'), json_extract(p.data, '$.kind')) AS kind
+            FROM velora_admin_rows c
+            LEFT JOIN velora_admin_rows p
+                ON p.table_name = 'admin_packages'
+                AND p.row_id = CAST(json_extract(c.data, '$.target_package_id') AS TEXT)
+            WHERE c.table_name = 'admin_stream_curations'
         `).all();
         const countries = [];
         const packages = [];
@@ -195,7 +200,9 @@ router.get('/admin/stream-curation-map', (req, res) => {
             compactRows.push([
                 indexFor(row.country_id, countries, countryIndexes),
                 streamId,
-                indexFor(row.package_id, packages, packageIndexes)
+                indexFor(row.package_id, packages, packageIndexes),
+                row.source_id ?? null,
+                row.kind || null
             ]);
         }
         res.set('Cache-Control', 'no-store');
@@ -209,13 +216,25 @@ router.get('/admin/stream-curation-map', (req, res) => {
 function buildHomeCache() {
     const sections = sortRows(allRows('admin_home_sections'), 'section_order.asc');
     const curations = allRows('admin_stream_curations');
+    const packages = new Map(allRows('admin_packages').map(row => [String(row.id), row]));
     const packageStreams = new Map();
     for (const row of curations) {
         const packageId = String(row.target_package_id || '').trim();
         const streamId = String(row.stream_id || '').trim();
         if (!packageId || !streamId) continue;
-        if (!packageStreams.has(packageId)) packageStreams.set(packageId, new Set());
-        packageStreams.get(packageId).add(streamId);
+        const packageRow = packages.get(packageId) || {};
+        const sourceId = String(row.source_id ?? packageRow.source_id ?? '').trim();
+        const kind = String(row.kind ?? packageRow.kind ?? '').trim();
+        if (!packageStreams.has(packageId)) {
+            packageStreams.set(packageId, { keys: new Set(), sourceAware: false });
+        }
+        const membership = packageStreams.get(packageId);
+        if ((kind === 'vod' || kind === 'series') && sourceId) {
+            membership.sourceAware = true;
+            membership.keys.add(`${sourceId}:${streamId}`);
+        } else {
+            membership.keys.add(streamId);
+        }
     }
     const snapshots = {
         live: veloraCatalogCache.getSnapshot('live_streams') || [],
@@ -225,10 +244,13 @@ function buildHomeCache() {
     const output = sections.map(section => {
         const type = ['live', 'movies', 'series'].includes(section.content_type)
             ? section.content_type : 'live';
-        const wanted = packageStreams.get(String(section.package_id)) || new Set();
+        const membership = packageStreams.get(String(section.package_id)) || { keys: new Set(), sourceAware: false };
         const entries = snapshots[type].filter(item => {
             const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
-            return wanted.has(String(rawId));
+            const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
+            return membership.sourceAware
+                ? membership.keys.has(`${sourceId}:${String(rawId)}`)
+                : membership.keys.has(String(rawId));
         }).slice(0, 500).map(item => {
             const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
             return {
@@ -345,9 +367,16 @@ router.post('/admin/assign-package', (req, res) => {
                 WHERE source_id = ? AND type = ? AND category_id = ?
             `).all(sourceId, itemType, categoryId).map(row => String(row.item_id));
 
+            const curationKey = row => {
+                const rowKind = String(row.kind || '');
+                const rowSource = String(row.source_id || '');
+                return rowKind && rowSource
+                    ? `${rowKind}:${rowSource}:${String(row.stream_id)}`
+                    : String(row.stream_id);
+            };
             const existingCurations = new Map(allRows('admin_stream_curations')
                 .filter(row => String(row.country_id) === countryId)
-                .map(row => [String(row.stream_id), row]));
+                .map(row => [curationKey(row), row]));
             const upsert = db.prepare(`
                 INSERT INTO velora_admin_rows (table_name, row_id, data)
                 VALUES ('admin_stream_curations', ?, ?)
@@ -356,13 +385,16 @@ router.post('/admin/assign-package', (req, res) => {
                     updated_at = CURRENT_TIMESTAMP
             `);
             for (const streamId of itemIds) {
-                const existing = existingCurations.get(streamId);
+                const identity = `${kind}:${sourceId}:${streamId}`;
+                const existing = existingCurations.get(identity);
                 const row = {
                     ...(existing || {}),
                     id: String(existing?.id || crypto.randomUUID()),
                     stream_id: streamId,
                     country_id: countryId,
-                    target_package_id: target.id
+                    target_package_id: target.id,
+                    source_id: sourceId,
+                    kind
                 };
                 upsert.run(row.id, JSON.stringify(row));
             }

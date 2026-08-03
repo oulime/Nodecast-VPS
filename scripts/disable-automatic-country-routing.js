@@ -204,7 +204,8 @@ const replacements = [
 ];
 
 const pagedCurationLoader = 'async function HF(s){const e=[],t=1e3;for(let r=0;;r+=t){const{data:n,error:i}=await s.from("admin_stream_curations").select("stream_id, country_id, target_package_id").range(r,r+t-1);if(i)throw i;const a=n??[];if(e.push(...a),a.length<t)break}return GF(e)}';
-const compactCurationLoader = 'async function HF(s){try{const e=await fetch("/api/velora-db/admin/stream-curation-map",{cache:"no-store"});if(!e.ok)throw new Error(`HTTP ${e.status}`);const t=await e.json(),r=Array.isArray(t.countries)?t.countries:[],n=Array.isArray(t.packages)?t.packages:[],i=new Map;for(const a of Array.isArray(t.rows)?t.rows:[]){const o=r[a[0]],l=Number(a[1]),c=n[a[2]];if(!o||!Number.isFinite(l)||!c)continue;let u=i.get(o);u||(u=new Map,i.set(o,u)),u.set(l,c)}return i}catch{const{data:e,error:t}=await s.from("admin_stream_curations").select("stream_id, country_id, target_package_id").range(0,99999);if(t)throw t;return GF(e??[])}}';
+const legacyCompactCurationLoader = 'async function HF(s){try{const e=await fetch("/api/velora-db/admin/stream-curation-map",{cache:"no-store"});if(!e.ok)throw new Error(`HTTP ${e.status}`);const t=await e.json(),r=Array.isArray(t.countries)?t.countries:[],n=Array.isArray(t.packages)?t.packages:[],i=new Map;for(const a of Array.isArray(t.rows)?t.rows:[]){const o=r[a[0]],l=Number(a[1]),c=n[a[2]];if(!o||!Number.isFinite(l)||!c)continue;let u=i.get(o);u||(u=new Map,i.set(o,u)),u.set(l,c)}return i}catch{const{data:e,error:t}=await s.from("admin_stream_curations").select("stream_id, country_id, target_package_id").range(0,99999);if(t)throw t;return GF(e??[])}}';
+const compactCurationLoader = 'async function HF(s){try{const e=await fetch("/api/velora-db/admin/stream-curation-map",{cache:"no-store"});if(!e.ok)throw new Error(`HTTP ${e.status}`);const t=await e.json(),r=Array.isArray(t.countries)?t.countries:[],n=Array.isArray(t.packages)?t.packages:[],i=new Map;for(const a of Array.isArray(t.rows)?t.rows:[]){const o=r[a[0]],l=Number(a[1]),c=n[a[2]],u=String(a[4]??""),d=String(a[3]??"");if(!o||!Number.isFinite(l)||!c)continue;let h=i.get(o);h||(h=new Map,i.set(o,h));const f=(u==="vod"||u==="series")&&d?`${u}:${d}:${l}`:l;h.set(f,c)}return i}catch{const{data:e,error:t}=await s.from("admin_stream_curations").select("stream_id, country_id, target_package_id, source_id, kind").range(0,99999);if(t)throw t;return GF(e??[])}}';
 
 let changed = false;
 for (const [before, after] of replacements) {
@@ -218,6 +219,16 @@ for (const [before, after] of replacements) {
 }
 if (source.includes(pagedCurationLoader)) {
     source = source.replaceAll(pagedCurationLoader, compactCurationLoader);
+    changed = true;
+}
+if (source.includes(legacyCompactCurationLoader)) {
+    source = source.replaceAll(legacyCompactCurationLoader, compactCurationLoader);
+    changed = true;
+}
+const legacyCurationMap = 'function GF(s){const e=new Map;for(const t of s){const r=Number(t.stream_id);if(!Number.isFinite(r))continue;let n=e.get(t.country_id);n||(n=new Map,e.set(t.country_id,n)),n.set(r,t.target_package_id)}return e}';
+const sourceAwareCurationMap = 'function GF(s){const e=new Map;for(const t of s){const r=Number(t.stream_id);if(!Number.isFinite(r))continue;const n=String(t.kind??""),i=String(t.source_id??""),a=(n==="vod"||n==="series")&&i?`${n}:${i}:${r}`:r;let o=e.get(t.country_id);o||(o=new Map,e.set(t.country_id,o)),o.set(a,t.target_package_id)}return e}';
+if (source.includes(legacyCurationMap)) {
+    source = source.replaceAll(legacyCurationMap, sourceAwareCurationMap);
     changed = true;
 }
 
@@ -294,7 +305,17 @@ if (manualCountryPackagesStart >= 0 && manualCountryPackagesEnd > manualCountryP
 
 const oldManualContentResolver = 'if((G==="movies"||G==="series")&&Ze(s)){const e=tG(s),t=G==="movies"?_.vodStreamsByCat:_.seriesStreamsByCat,r=[];for(const n of t.values())for(const i of n)e.has(String(i.stream_id??i.series_id??i.item_id??i.id))&&r.push(i);return r.sort((n,i)=>Re(n.name).localeCompare(Re(i.name),"fr"))}';
 source = source.replaceAll(oldManualContentResolver, '');
-const manualContentResolver = 'if(Ze(s)){const e=tG(s),t=G==="movies"?_.vodStreamsByCat:G==="series"?_.seriesStreamsByCat:_.streamsByCatAll,r=[],n=new Set;for(const i of t.values())for(const a of i){const o=String(a.stream_id??a.series_id??a.item_id??a.id);e.has(o)&&!n.has(o)&&(n.add(o),r.push(a))}return r.sort((i,a)=>Re(i.name).localeCompare(Re(a.name),"fr"))}';
+const legacyManualContentResolver = 'if(Ze(s)){const e=tG(s),t=G==="movies"?_.vodStreamsByCat:G==="series"?_.seriesStreamsByCat:_.streamsByCatAll,r=[],n=new Set;for(const i of t.values())for(const a of i){const o=String(a.stream_id??a.series_id??a.item_id??a.id);e.has(o)&&!n.has(o)&&(n.add(o),r.push(a))}return r}';
+const legacySortedManualContentResolver = 'if(Ze(s)){const e=tG(s),t=G==="movies"?_.vodStreamsByCat:G==="series"?_.seriesStreamsByCat:_.streamsByCatAll,r=[],n=new Set;for(const i of t.values())for(const a of i){const o=String(a.stream_id??a.series_id??a.item_id??a.id);e.has(o)&&!n.has(o)&&(n.add(o),r.push(a))}return r.sort((i,a)=>Re(i.name).localeCompare(Re(a.name),"fr"))}';
+const manualContentResolver = 'if(Ze(s)){const e=tG(s),t=G==="movies"?_.vodStreamsByCat:G==="series"?_.seriesStreamsByCat:_.streamsByCatAll,r=[],n=new Set;for(const i of t.values())for(const a of i){const o=G==="movies"||G==="series"?`${G==="movies"?"vod":G}:${a.nodecast_source_id??a.source_id??""}:${a.raw_stream_id??a.raw_series_id??a.stream_id??a.series_id??a.item_id??a.id}`:String(a.stream_id??a.series_id??a.item_id??a.id),l=String(a.stream_id??a.series_id??a.item_id??a.id);(e.has(o)||e.has(l))&&!n.has(o)&&(n.add(o),r.push(a))}return r.sort((i,a)=>Re(i.name).localeCompare(Re(a.name),"fr"))}';
+if (source.includes(legacyManualContentResolver)) {
+    source = source.replaceAll(legacyManualContentResolver, manualContentResolver);
+    changed = true;
+}
+if (source.includes(legacySortedManualContentResolver)) {
+    source = source.replaceAll(legacySortedManualContentResolver, manualContentResolver);
+    changed = true;
+}
 while (source.includes(manualContentResolver + manualContentResolver)) {
     source = source.replace(manualContentResolver + manualContentResolver, manualContentResolver);
     changed = true;

@@ -177,7 +177,7 @@ function getCategoriesFromDbForSources(sourceIds, type, includeHidden = false) {
 function getStreamsFromDb(sourceId, type, categoryId = null, includeHidden = false) {
     const db = getDb();
     let query = `
-        SELECT source_id, item_id, name, stream_icon, stream_url, added_at, rating, container_extension, year, category_id, data
+        SELECT source_id, item_id, name, stream_icon, stream_url, added_at, rating, container_extension, year, category_id, provider_order, data
         FROM playlist_items 
         WHERE source_id = ? AND type = ?
     `;
@@ -190,6 +190,8 @@ function getStreamsFromDb(sourceId, type, categoryId = null, includeHidden = fal
         query += ` AND category_id = ?`;
         params.push(categoryId);
     }
+
+    query += ` ORDER BY provider_order ASC, rowid ASC`;
 
     // Default sorting
     // query += ` ORDER BY name ASC`; // Sorting usually handled by client
@@ -227,7 +229,7 @@ function getStreamsFromDbForSources(sourceIds, type, categoryId = null, includeH
     const db = getDb();
     const placeholders = sourceIds.map(() => '?').join(',');
     let query = `
-        SELECT source_id, item_id, name, stream_icon, stream_url, added_at, rating, container_extension, year, category_id, data
+        SELECT source_id, item_id, name, stream_icon, stream_url, added_at, rating, container_extension, year, category_id, provider_order, data
         FROM playlist_items
         WHERE source_id IN (${placeholders}) AND type = ?
     `;
@@ -252,7 +254,7 @@ function getStreamsFromDbForSources(sourceIds, type, categoryId = null, includeH
         }
     }
 
-    query += ` ORDER BY source_id ASC, name ASC`;
+    query += ` ORDER BY source_id ASC, provider_order ASC, rowid ASC`;
 
     return db.prepare(query).all(...params).map(item => {
         const data = JSON.parse(item.data || '{}');

@@ -273,19 +273,21 @@ class SyncService {
             INSERT INTO playlist_items (
                 id, source_id, item_id, type, name, category_id, 
                 stream_icon, stream_url, container_extension, 
-                rating, year, added_at, data
+                rating, year, added_at, provider_order, data
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 name = excluded.name,
                 category_id = excluded.category_id,
                 stream_icon = excluded.stream_icon,
                 container_extension = excluded.container_extension,
+                provider_order = excluded.provider_order,
                 data = excluded.data
         `);
 
-        const insertBatch = db.transaction((batch) => {
-            for (const item of batch) {
+        const insertBatch = db.transaction((batch, batchOffset) => {
+            for (let itemIndex = 0; itemIndex < batch.length; itemIndex += 1) {
+                const item = batch[itemIndex];
                 // Map fields based on type
                 let itemId, name, catId, icon, container;
                 let rating = null, year = null, added = null;
@@ -330,6 +332,7 @@ class SyncService {
                     rating,
                     year,
                     added,
+                    batchOffset + itemIndex,
                     JSON.stringify(item)
                 );
             }
@@ -338,7 +341,7 @@ class SyncService {
         // Reduced batch size for better event loop interleaving
         const BATCH_SIZE = 100;
         for (let i = 0; i < items.length; i += BATCH_SIZE) {
-            insertBatch(items.slice(i, i + BATCH_SIZE));
+            insertBatch(items.slice(i, i + BATCH_SIZE), i);
             // Yield to event loop between batches to allow other requests
             await new Promise(resolve => setImmediate(resolve));
         }

@@ -268,7 +268,18 @@
       heading.textContent = section.title || "";
       var rail = document.createElement("div");
       rail.className = "vel-home-section__rail";
-      (Array.isArray(section.entries) ? section.entries : []).forEach(function (entry) {
+      var entries = Array.isArray(section.entries) ? section.entries : [];
+      var sourceCounts = {};
+      entries.forEach(function (entry) {
+        var source = String(entry.sourceId || "");
+        if (source) sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+      });
+      var dominantSource = Object.keys(sourceCounts).sort(function (a, b) {
+        return sourceCounts[b] - sourceCounts[a];
+      })[0];
+      entries.filter(function (entry) {
+        return !dominantSource || String(entry.sourceId || "") === dominantSource;
+      }).forEach(function (entry) {
         rail.appendChild(createCard(section, entry));
       });
       block.append(heading, rail);
@@ -316,4 +327,8 @@
   }
   window.setTimeout(releaseStaleHomeLoader, 1200);
   window.setTimeout(releaseStaleHomeLoader, 3000);
+  window.setTimeout(function () {
+    var root = document.getElementById("vel-home-sections");
+    if (cachePayload && root && !root.querySelector(".vel-home-section__card")) render(cachePayload);
+  }, 6000);
 })();

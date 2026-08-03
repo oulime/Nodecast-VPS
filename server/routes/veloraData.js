@@ -310,10 +310,20 @@ function buildHomeCache() {
     const output = sections.map(section => {
         const type = ['live', 'movies', 'series'].includes(section.content_type)
             ? section.content_type : 'live';
+        const packageRow = packages.get(String(section.package_id)) || {};
+        const providerSourceId = String(packageRow.source_id ?? '').trim();
+        const providerCategoryId = String(packageRow.category_id ?? '').trim();
+        const providerKind = String(packageRow.kind ?? '').trim();
+        const expectedKind = type === 'movies' ? 'vod' : type;
         const membership = packageStreams.get(String(section.package_id)) || { keys: new Set(), sourceAware: false };
+        const providerBacked = providerSourceId && providerCategoryId && providerKind === expectedKind;
         const entries = snapshots[type].filter(item => {
             const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
             const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
+            if (providerBacked) {
+                return sourceId === providerSourceId
+                    && String(item.raw_category_id ?? '') === providerCategoryId;
+            }
             return membership.sourceAware
                 ? membership.keys.has(`${sourceId}:${String(rawId)}`)
                 : membership.keys.has(String(rawId));

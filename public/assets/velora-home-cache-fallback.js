@@ -201,9 +201,25 @@
 
   function revealHomeFirstPaint() {
     var homeButton = document.querySelector('[data-bottom-nav="home"]');
-    var isHome = document.body.classList.contains("vel-home-empty-active") ||
+    var homePage = document.getElementById("vel-home-empty-page");
+    var homeIsActuallyVisible = !!homePage &&
+      !homePage.classList.contains("hidden") &&
+      homePage.getAttribute("aria-hidden") !== "true";
+    var isHome = homeIsActuallyVisible ||
+      document.body.classList.contains("vel-home-empty-active") ||
       (homeButton && homeButton.classList.contains("is-active") && !document.body.dataset.velTopLevel);
     if (!isHome) return;
+    var overlay = document.getElementById("catalog-loading-overlay");
+    if (overlay) {
+      overlay.classList.add("hidden");
+      overlay.setAttribute("aria-hidden", "true");
+    }
+  }
+
+  function releaseStaleHomeLoader() {
+    var homePage = document.getElementById("vel-home-empty-page");
+    var cards = document.querySelector("#vel-home-sections .vel-home-section__card");
+    if (!homePage || homePage.classList.contains("hidden") || !cards) return;
     var overlay = document.getElementById("catalog-loading-overlay");
     if (overlay) {
       overlay.classList.add("hidden");
@@ -279,10 +295,13 @@
       var attempts = 0;
       var timer = window.setInterval(function () {
         attempts += 1;
-        if (render(payload) || attempts >= 30) window.clearInterval(timer);
+        if (render(payload) || attempts >= 30) {
+          window.clearInterval(timer);
+          releaseStaleHomeLoader();
+        }
       }, 300);
       window.requestAnimationFrame(function () {
-        window.requestAnimationFrame(function () { render(payload); });
+        window.requestAnimationFrame(function () { render(payload); releaseStaleHomeLoader(); });
       });
     } catch (error) {}
   }
@@ -295,4 +314,6 @@
   } else {
     loadAndRender();
   }
+  window.setTimeout(releaseStaleHomeLoader, 1200);
+  window.setTimeout(releaseStaleHomeLoader, 3000);
 })();

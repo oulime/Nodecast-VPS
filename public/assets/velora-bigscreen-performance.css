@@ -299,28 +299,10 @@ body.velora-tv-mode .main--velora *::after {
 }
 
 /*
-  Reserve the live title/player footprint as soon as a live package opens.
+  Reserve the live player footprint as soon as a live package opens.
   Selecting the first channel then fills this space instead of pushing the
-  channel list down.
+  channel list down. Keep the hidden title hidden until a channel is selected.
 */
-.main--velora-live-package #now-playing.player-now-playing.hidden {
-  display: flex !important;
-  align-items: center;
-  justify-content: center;
-  min-height: 1.35rem;
-  visibility: visible !important;
-  pointer-events: none;
-}
-
-.main--velora-live-package #now-playing.player-now-playing.hidden::before {
-  content: "";
-  width: min(12rem, 46vw);
-  height: 0.72rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--vel-primary, #8b5cf6) 18%, rgba(255, 255, 255, 0.08));
-  opacity: 0.58;
-}
-
 .main--velora-live-package #player-container.player-container.hidden {
   display: block !important;
   visibility: visible !important;

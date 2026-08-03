@@ -203,6 +203,9 @@ const replacements = [
     ]
 ];
 
+const pagedCurationLoader = 'async function HF(s){const e=[],t=1e3;for(let r=0;;r+=t){const{data:n,error:i}=await s.from("admin_stream_curations").select("stream_id, country_id, target_package_id").range(r,r+t-1);if(i)throw i;const a=n??[];if(e.push(...a),a.length<t)break}return GF(e)}';
+const compactCurationLoader = 'async function HF(s){try{const e=await fetch("/api/velora-db/admin/stream-curation-map",{cache:"no-store"});if(!e.ok)throw new Error(`HTTP ${e.status}`);const t=await e.json(),r=Array.isArray(t.countries)?t.countries:[],n=Array.isArray(t.packages)?t.packages:[],i=new Map;for(const a of Array.isArray(t.rows)?t.rows:[]){const o=r[a[0]],l=Number(a[1]),c=n[a[2]];if(!o||!Number.isFinite(l)||!c)continue;let u=i.get(o);u||(u=new Map,i.set(o,u)),u.set(l,c)}return i}catch{const{data:e,error:t}=await s.from("admin_stream_curations").select("stream_id, country_id, target_package_id").range(0,99999);if(t)throw t;return GF(e??[])}}';
+
 let changed = false;
 for (const [before, after] of replacements) {
     if (after.includes(before) && source.includes(after)) continue;
@@ -212,6 +215,10 @@ for (const [before, after] of replacements) {
         continue;
     }
     if (source.includes(after)) continue;
+}
+if (source.includes(pagedCurationLoader)) {
+    source = source.replaceAll(pagedCurationLoader, compactCurationLoader);
+    changed = true;
 }
 
 const legacyLiveLogoLoader = 'const __velLiveLogoLoads=new Set;function __velLoadLivePackageLogo(s){if(__velLiveLogoLoads.has(s))return;__velLiveLogoLoads.add(s),sG(s).then(()=>{_&&Z==="packages"&&Nt()}).catch(e=>console.warn("[live-package-logo]",s,e))}';

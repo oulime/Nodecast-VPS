@@ -166,6 +166,46 @@ function saveRow(table, input, req) {
 
 router.use(express.json({ limit: '10mb' }));
 
+router.get('/admin/stream-curation-map', (req, res) => {
+    try {
+        const rows = getDb().prepare(`
+            SELECT
+                json_extract(data, '$.stream_id') AS stream_id,
+                json_extract(data, '$.country_id') AS country_id,
+                json_extract(data, '$.target_package_id') AS package_id
+            FROM velora_admin_rows
+            WHERE table_name = 'admin_stream_curations'
+        `).all();
+        const countries = [];
+        const packages = [];
+        const countryIndexes = new Map();
+        const packageIndexes = new Map();
+        const indexFor = (value, values, indexes) => {
+            const key = String(value || '');
+            if (indexes.has(key)) return indexes.get(key);
+            const index = values.length;
+            values.push(key);
+            indexes.set(key, index);
+            return index;
+        };
+        const compactRows = [];
+        for (const row of rows) {
+            const streamId = Number(row.stream_id);
+            if (!Number.isFinite(streamId) || !row.country_id || !row.package_id) continue;
+            compactRows.push([
+                indexFor(row.country_id, countries, countryIndexes),
+                streamId,
+                indexFor(row.package_id, packages, packageIndexes)
+            ]);
+        }
+        res.set('Cache-Control', 'no-store');
+        return res.json({ countries, packages, rows: compactRows });
+    } catch (error) {
+        console.error('[Velora data] Curation map failed:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
 function buildHomeCache() {
     const sections = sortRows(allRows('admin_home_sections'), 'section_order.asc');
     const curations = allRows('admin_stream_curations');
@@ -265,11 +305,39 @@ router.post('/admin/assign-package', (req, res) => {
 
         const db = getDb();
         const result = db.transaction(() => {
-            let target = allRows('admin_packages').find(row =>
-                String(row.country_id) === countryId && String(row.name) === packageName
+            const countryPackages = allRows('admin_packages').filter(row =>
+                String(row.country_id) === countryId
             );
+            let target = countryPackages.find(row =>
+                Number.parseInt(row.source_id, 10) === sourceId
+                && String(row.category_id || '') === categoryId
+                && String(row.kind || '') === kind
+            );
+            // Legacy rows had no catalogue identity. Claim one once and enrich it.
             if (!target) {
-                target = saveRow('admin_packages', { country_id: countryId, name: packageName }, req);
+                target = countryPackages.find(row =>
+                    String(row.name) === packageName
+                    && !String(row.source_id || '').trim()
+                    && !String(row.category_id || '').trim()
+                );
+            }
+            if (!target) {
+                target = saveRow('admin_packages', {
+                    country_id: countryId,
+                    name: packageName,
+                    source_id: sourceId,
+                    category_id: categoryId,
+                    kind
+                }, req);
+            } else if (Number.parseInt(target.source_id, 10) !== sourceId
+                || String(target.category_id || '') !== categoryId
+                || String(target.kind || '') !== kind) {
+                target = saveRow('admin_packages', {
+                    ...target,
+                    source_id: sourceId,
+                    category_id: categoryId,
+                    kind
+                }, req);
             }
 
             const itemIds = db.prepare(`

@@ -104,6 +104,77 @@ function allRows(table) {
     });
 }
 
+function catalogueItemType(kind) {
+    if (kind === 'vod' || kind === 'movies') return 'movie';
+    return kind === 'live' || kind === 'series' ? kind : null;
+}
+
+/**
+ * Return explicit curations plus current catalogue members for provider-backed
+ * packages. An explicit curation for the same country/item wins, so moving an
+ * item to another package (or the hidden package) is still respected.
+ */
+function effectiveCurations(packageIds = null) {
+    const db = getDb();
+    const packages = allRows('admin_packages');
+    const packageById = new Map(packages.map(row => [String(row.id), row]));
+    const explicit = allRows('admin_stream_curations').map(row => {
+        const packageRow = packageById.get(String(row.target_package_id || '')) || {};
+        return {
+            ...row,
+            source_id: row.source_id ?? packageRow.source_id ?? null,
+            kind: row.kind || packageRow.kind || null
+        };
+    });
+    const explicitKeys = new Set();
+    for (const row of explicit) {
+        const countryId = String(row.country_id || '');
+        const streamId = String(row.stream_id || '');
+        if (!countryId || !streamId) continue;
+        if (row.source_id != null && row.kind) {
+            explicitKeys.add(`${countryId}:${row.kind}:${row.source_id}:${streamId}`);
+        } else {
+            explicitKeys.add(`${countryId}:legacy:${streamId}`);
+        }
+    }
+
+    const wanted = packageIds ? new Set([...packageIds].map(String)) : null;
+    const effective = wanted
+        ? explicit.filter(row => wanted.has(String(row.target_package_id || '')))
+        : [...explicit];
+    const listItems = db.prepare(`
+        SELECT item_id
+        FROM playlist_items
+        WHERE source_id = ? AND type = ? AND category_id = ? AND is_hidden = 0
+    `);
+    for (const packageRow of packages) {
+        const packageId = String(packageRow.id || '');
+        if (wanted && !wanted.has(packageId)) continue;
+        const countryId = String(packageRow.country_id || '');
+        const sourceId = Number.parseInt(packageRow.source_id, 10);
+        const categoryId = String(packageRow.category_id || '').trim();
+        const kind = String(packageRow.kind || '').trim();
+        const itemType = catalogueItemType(kind);
+        if (!packageId || !countryId || !Number.isInteger(sourceId) || !categoryId || !itemType) continue;
+
+        for (const item of listItems.all(sourceId, itemType, categoryId)) {
+            const streamId = String(item.item_id);
+            const sourceKey = `${countryId}:${kind}:${sourceId}:${streamId}`;
+            const legacyKey = `${countryId}:legacy:${streamId}`;
+            if (explicitKeys.has(sourceKey) || explicitKeys.has(legacyKey)) continue;
+            effective.push({
+                id: `catalog:${packageId}:${sourceId}:${streamId}`,
+                stream_id: streamId,
+                country_id: countryId,
+                target_package_id: packageId,
+                source_id: sourceId,
+                kind
+            });
+        }
+    }
+    return effective;
+}
+
 function sortRows(rows, order) {
     if (!order) return rows;
     const clauses = String(order).split(',').map(value => {
@@ -168,19 +239,13 @@ router.use(express.json({ limit: '10mb' }));
 
 router.get('/admin/stream-curation-map', (req, res) => {
     try {
-        const rows = getDb().prepare(`
-            SELECT
-                json_extract(c.data, '$.stream_id') AS stream_id,
-                json_extract(c.data, '$.country_id') AS country_id,
-                json_extract(c.data, '$.target_package_id') AS package_id,
-                COALESCE(json_extract(c.data, '$.source_id'), json_extract(p.data, '$.source_id')) AS source_id,
-                COALESCE(json_extract(c.data, '$.kind'), json_extract(p.data, '$.kind')) AS kind
-            FROM velora_admin_rows c
-            LEFT JOIN velora_admin_rows p
-                ON p.table_name = 'admin_packages'
-                AND p.row_id = CAST(json_extract(c.data, '$.target_package_id') AS TEXT)
-            WHERE c.table_name = 'admin_stream_curations'
-        `).all();
+        const rows = effectiveCurations().map(row => ({
+            stream_id: row.stream_id,
+            country_id: row.country_id,
+            package_id: row.target_package_id,
+            source_id: row.source_id,
+            kind: row.kind
+        }));
         const countries = [];
         const packages = [];
         const countryIndexes = new Map();
@@ -215,7 +280,8 @@ router.get('/admin/stream-curation-map', (req, res) => {
 
 function buildHomeCache() {
     const sections = sortRows(allRows('admin_home_sections'), 'section_order.asc');
-    const curations = allRows('admin_stream_curations');
+    const sectionPackageIds = new Set(sections.map(section => String(section.package_id || '')));
+    const curations = effectiveCurations(sectionPackageIds);
     const packages = new Map(allRows('admin_packages').map(row => [String(row.id), row]));
     const packageStreams = new Map();
     for (const row of curations) {
@@ -308,6 +374,39 @@ router.post('/home-cache/rebuild', (req, res) => {
         return res.json({ ok: true, generatedAt: payload.generatedAt, sections: payload.sections.length,
             entries: payload.sections.reduce((total, section) => total + section.entries.length, 0) });
     } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/admin/sync-packages', (req, res) => {
+    try {
+        const db = getDb();
+        const countItems = db.prepare(`
+            SELECT COUNT(*) AS count
+            FROM playlist_items
+            WHERE source_id = ? AND type = ? AND category_id = ? AND is_hidden = 0
+        `);
+        let itemCount = 0;
+        let packageCount = 0;
+        for (const packageRow of allRows('admin_packages')) {
+            const sourceId = Number.parseInt(packageRow.source_id, 10);
+            const categoryId = String(packageRow.category_id || '').trim();
+            const itemType = catalogueItemType(String(packageRow.kind || '').trim());
+            if (!Number.isInteger(sourceId) || !categoryId || !itemType) continue;
+            packageCount += 1;
+            itemCount += Number(countItems.get(sourceId, itemType, categoryId)?.count || 0);
+        }
+        const homeCache = buildHomeCache();
+        return res.json({
+            ok: true,
+            packages: packageCount,
+            items: itemCount,
+            homeSections: homeCache.sections.length,
+            homeEntries: homeCache.sections.reduce((total, section) => total + section.entries.length, 0),
+            generatedAt: homeCache.generatedAt
+        });
+    } catch (error) {
+        console.error('[Velora data] Package synchronization failed:', error);
         return res.status(500).json({ error: error.message });
     }
 });

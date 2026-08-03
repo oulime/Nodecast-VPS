@@ -1513,11 +1513,11 @@
     <script src="/assets/velora-home-cache-fallback.js?v=provider-order-render-20260803"></script>
     <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=provider-media-order-v3-newest-first-20260803"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=lazy-provider-load-v2-20260803"></script>
-    <script defer src="/assets/manual-pays.js?v=20260803-duplicate-packages"></script>
+    <script defer src="/assets/manual-pays.js?v=20260803-global-package-sync"></script>
     <script defer src="/assets/paid-users-admin.js?v=20260801-vps-sqlite"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
-    <link rel="stylesheet" href="/assets/manual-pays.css?v=20260803-visible-filter">
+    <link rel="stylesheet" href="/assets/manual-pays.css?v=20260803-global-package-sync">
     <style>
       .manual-pays__pagination{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding:.7rem;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:rgba(14,11,20,.96);color:#aaa4b5;font-size:.75rem}
       .manual-pays__pagination button{border:1px solid rgba(167,139,250,.45);border-radius:8px;background:rgba(124,58,237,.2);color:#fff;padding:.45rem .7rem;cursor:pointer}
@@ -4066,7 +4066,10 @@
               <div><span class="manual-pays__eyebrow">ORGANISATION MANUELLE</span><h2><span id="mp-heading-loader" class="manual-pays__loader" aria-hidden="true"></span>Pays &amp; packages</h2>
                 <p>Choisissez un stream, recherchez un package, puis glissez-le vers le pays qui doit l'afficher.</p>
               </div>
-              <button id="mp-refresh" type="button" class="secondary">Actualiser</button>
+              <div class="manual-pays__heading-actions">
+                <button id="mp-sync-all" type="button" class="primary">Synchroniser tous les packages</button>
+                <button id="mp-refresh" type="button" class="secondary">Actualiser</button>
+              </div>
             </div>
             <p id="countries-admin-status" class="status" aria-live="polite">Chargement...</p>
             <div class="manual-pays__content-tabs" role="tablist" aria-label="Type de contenu">

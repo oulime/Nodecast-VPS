@@ -14,7 +14,12 @@ async function main() {
     const testId = `test_${Date.now()}`;
 
     try {
-        let response = await fetch(`${base}/admin_countries?select=id,name&name=eq.France`);
+        let response = await fetch(`${base.replace('/rest/v1', '')}/admin/stream-curation-map`);
+        assert.equal(response.status, 200);
+        const curationMap = await response.json();
+        assert.ok(Array.isArray(curationMap.rows));
+
+        response = await fetch(`${base}/admin_countries?select=id,name&name=eq.France`);
         assert.equal(response.status, 200);
         let rows = await response.json();
         assert.equal(rows[0].name, 'France');

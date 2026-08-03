@@ -16,41 +16,47 @@ router.get('/status', (req, res) => {
 router.get('/inventory', async (req, res) => {
     try {
         const sourceRows = await sources.getAll();
-        const sourceNames = new Map(sourceRows.map(source => [String(source.id), source.name || `Source ${source.id}`]));
-        const providers = new Map();
+        const cachedSourceIds = new Set((veloraCatalogCache.getStatus().sourceIds || []).map(String));
+        const providers = sourceRows.filter(source => cachedSourceIds.has(String(source.id))).map(source => ({
+            sourceId: String(source.id),
+            name: source.name || `Source ${source.id}`
+        })).sort((left, right) => left.name.localeCompare(right.name, 'fr'));
+        res.set('Cache-Control', 'no-store');
+        res.json({ generatedAt: veloraCatalogCache.getStatus().completedAt || null, providers });
+    } catch (error) {
+        res.status(500).json({ error: error.message || 'Unable to list catalogue providers' });
+    }
+});
+
+router.get('/inventory/:sourceId', (req, res) => {
+    try {
+        const sourceId = String(req.params.sourceId);
+        const packages = [];
         for (const [kind, [categoryAction, streamAction]] of Object.entries(INVENTORY_KINDS)) {
-            const categories = veloraCatalogCache.getSnapshot(categoryAction) || [];
+            const categories = (veloraCatalogCache.getSnapshot(categoryAction) || [])
+                .filter(category => String(category.source_id) === sourceId);
             const streams = veloraCatalogCache.getSnapshot(streamAction) || [];
             const counts = new Map();
             streams.forEach(item => {
-                const key = `${item.source_id}\u0000${item.raw_category_id ?? ''}`;
-                counts.set(key, (counts.get(key) || 0) + 1);
+                if (String(item.source_id) !== sourceId) return;
+                const categoryId = String(item.raw_category_id ?? '');
+                counts.set(categoryId, (counts.get(categoryId) || 0) + 1);
             });
             categories.forEach(category => {
-                const sourceId = String(category.source_id ?? '');
                 const categoryId = String(category.raw_category_id ?? '');
-                if (!sourceId || !categoryId) return;
-                if (!providers.has(sourceId)) providers.set(sourceId, {
-                    sourceId,
-                    name: sourceNames.get(sourceId) || `Source ${sourceId}`,
-                    packages: []
-                });
-                providers.get(sourceId).packages.push({
+                if (!categoryId) return;
+                packages.push({
                     kind,
                     categoryId,
                     name: String(category.category_name || `Package ${categoryId}`),
-                    itemCount: counts.get(`${sourceId}\u0000${categoryId}`) || 0
+                    itemCount: counts.get(categoryId) || 0
                 });
             });
         }
-        const result = [...providers.values()].map(provider => ({
-            ...provider,
-            packages: provider.packages.sort((left, right) => left.name.localeCompare(right.name, 'fr'))
-        })).sort((left, right) => left.name.localeCompare(right.name, 'fr'));
         res.set('Cache-Control', 'no-store');
-        res.json({ generatedAt: veloraCatalogCache.getStatus().completedAt || null, providers: result });
+        res.json({ sourceId, packages: packages.sort((left, right) => left.name.localeCompare(right.name, 'fr')) });
     } catch (error) {
-        res.status(500).json({ error: error.message || 'Unable to build catalogue inventory' });
+        res.status(500).json({ error: error.message || 'Unable to list provider packages' });
     }
 });
 

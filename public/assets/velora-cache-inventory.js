@@ -24,6 +24,10 @@
     return node;
   }
 
+  function searchKey(value) {
+    return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  }
+
   async function openPackage(button, provider, packageRow, content) {
     if (!content.hidden) {
       content.hidden = true;
@@ -63,36 +67,97 @@
     }
   }
 
+  function addPackageRows(packages, provider, packageRows) {
+    packages.replaceChildren();
+    packageRows.forEach(function (packageRow) {
+      var wrapper = element("div", "cache-inventory__package");
+      wrapper.dataset.search = searchKey(provider.name + " " + packageRow.name + " " + (kindLabels[packageRow.kind] || packageRow.kind));
+      var button = element(
+        "button",
+        "cache-inventory__package-button",
+        packageRow.name + " · " + (kindLabels[packageRow.kind] || packageRow.kind) + " · " + packageRow.itemCount + " contenu(s)"
+      );
+      button.type = "button";
+      button.setAttribute("aria-expanded", "false");
+      var content = element("div", "cache-inventory__content");
+      content.hidden = true;
+      button.addEventListener("click", function () { openPackage(button, provider, packageRow, content); });
+      wrapper.append(button, content);
+      packages.appendChild(wrapper);
+    });
+  }
+
+  async function toggleProvider(providerButton, packages, provider) {
+    if (!packages.hidden) {
+      packages.hidden = true;
+      providerButton.setAttribute("aria-expanded", "false");
+      return;
+    }
+    packages.hidden = false;
+    providerButton.setAttribute("aria-expanded", "true");
+    if (packages.dataset.loaded === "true") return;
+    packages.replaceChildren(element("p", "cache-inventory__loading", "Chargement des packages de ce fournisseur…"));
+    try {
+      var result = await request("/api/velora/catalog/inventory/" + encodeURIComponent(provider.sourceId));
+      var packageRows = Array.isArray(result.packages) ? result.packages : [];
+      packages.dataset.loaded = "true";
+      addPackageRows(packages, provider, packageRows);
+      if (!packageRows.length) packages.appendChild(element("p", "cache-inventory__empty", "Aucun package dans le cache pour ce fournisseur."));
+    } catch (_) {
+      packages.replaceChildren(element("p", "cache-inventory__empty", "Impossible de charger les packages de ce fournisseur."));
+    }
+  }
+
   function render(payload) {
     root.replaceChildren();
     var providers = payload && Array.isArray(payload.providers) ? payload.providers : [];
     if (!providers.length) {
-      root.appendChild(element("p", "cache-inventory__empty", "Aucun package trouvé dans le cache catalogue."));
+      root.appendChild(element("p", "cache-inventory__empty", "Aucun fournisseur trouvé dans le cache catalogue."));
       return;
     }
-    var summary = providers.reduce(function (total, provider) { return total + provider.packages.length; }, 0);
-    root.appendChild(element("h3", "cache-inventory__title", providers.length + " fournisseur(s) · " + summary + " package(s) chargés"));
+    root.appendChild(element("h3", "cache-inventory__title", providers.length + " fournisseur(s) disponibles"));
+    var filter = document.createElement("input");
+    filter.type = "search";
+    filter.className = "cache-inventory__filter";
+    filter.placeholder = "Filtrer les fournisseurs ou packages…";
+    filter.setAttribute("aria-label", "Filtrer les fournisseurs ou packages");
+    root.appendChild(filter);
     providers.forEach(function (provider) {
       var section = element("section", "cache-inventory__provider");
-      section.appendChild(element("h4", "", provider.name + " · " + provider.packages.length + " package(s)"));
+      section.dataset.search = searchKey(provider.name);
+      var providerButton = element("button", "cache-inventory__provider-button", provider.name);
+      providerButton.type = "button";
+      providerButton.setAttribute("aria-expanded", "false");
       var packages = element("div", "cache-inventory__packages");
-      provider.packages.forEach(function (packageRow) {
-        var wrapper = element("div", "cache-inventory__package");
-        var button = element(
-          "button",
-          "cache-inventory__package-button",
-          packageRow.name + " · " + (kindLabels[packageRow.kind] || packageRow.kind) + " · " + packageRow.itemCount + " contenu(s)"
-        );
-        button.type = "button";
-        button.setAttribute("aria-expanded", "false");
-        var content = element("div", "cache-inventory__content");
-        content.hidden = true;
-        button.addEventListener("click", function () { openPackage(button, provider, packageRow, content); });
-        wrapper.append(button, content);
-        packages.appendChild(wrapper);
+      packages.hidden = true;
+      providerButton.addEventListener("click", function () {
+        toggleProvider(providerButton, packages, provider);
       });
+      section.appendChild(providerButton);
       section.appendChild(packages);
       root.appendChild(section);
+    });
+    filter.addEventListener("input", function () {
+      var query = searchKey(filter.value);
+      root.querySelectorAll(".cache-inventory__provider").forEach(function (section) {
+        var packageList = section.querySelector(".cache-inventory__packages");
+        var providerButton = section.querySelector(".cache-inventory__provider-button");
+        var matches = 0;
+        section.querySelectorAll(".cache-inventory__package").forEach(function (packageNode) {
+          var visible = !query || packageNode.dataset.search.includes(query);
+          packageNode.hidden = !visible;
+          if (visible) matches += 1;
+        });
+        var providerMatch = !query || section.dataset.search.includes(query);
+        section.hidden = query ? !(providerMatch || matches > 0) : false;
+        if (query && !section.hidden && packageList.dataset.loaded === "true") {
+          packageList.hidden = false;
+          providerButton.setAttribute("aria-expanded", "true");
+        } else if (!query) {
+          packageList.hidden = true;
+          providerButton.setAttribute("aria-expanded", "false");
+        }
+      });
     });
   }
 
@@ -130,11 +195,11 @@
     root = document.getElementById("cache-package-inventory");
     if (!root) return;
     var style = document.createElement("style");
-    style.textContent = ".cache-package-inventory{margin-top:1rem}.cache-inventory__title{margin:0 0 .75rem}.cache-inventory__provider{margin:.75rem 0;padding:.75rem;border:1px solid rgba(255,255,255,.12);border-radius:12px}.cache-inventory__provider h4{margin:0 0 .6rem}.cache-inventory__packages{display:grid;gap:.4rem}.cache-inventory__package-button{width:100%;padding:.65rem .8rem;text-align:left;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:rgba(255,255,255,.06);color:inherit;cursor:pointer}.cache-inventory__package-button[aria-expanded=true]{border-color:#a855f7}.cache-inventory__content{padding:.6rem}.cache-inventory__items{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.45rem}.cache-inventory__item{display:flex;align-items:center;gap:.55rem;min-width:0;padding:.4rem;border-radius:7px;background:rgba(0,0,0,.24)}.cache-inventory__item img{width:38px;height:52px;object-fit:cover;border-radius:4px;flex:none}.cache-inventory__item span{overflow:hidden;text-overflow:ellipsis}.cache-inventory__loading,.cache-inventory__empty{margin:.6rem 0;color:#aeb0bd}";
+    style.textContent = ".cache-package-inventory{margin-top:1rem}.cache-inventory__title{margin:0 0 .75rem}.cache-inventory__filter{width:100%;margin:0 0 .75rem;padding:.7rem .8rem;border:1px solid rgba(255,255,255,.15);border-radius:9px;background:rgba(0,0,0,.26);color:inherit}.cache-inventory__provider{margin:.75rem 0;padding:.65rem;border:1px solid rgba(255,255,255,.12);border-radius:12px}.cache-inventory__provider-button{width:100%;padding:.65rem .75rem;text-align:left;border:0;border-radius:8px;background:rgba(255,255,255,.06);color:inherit;font-weight:800;cursor:pointer}.cache-inventory__provider-button:after{content:'▸';float:right}.cache-inventory__provider-button[aria-expanded=true]:after{content:'▾'}.cache-inventory__packages{display:grid;gap:.4rem;margin-top:.55rem}.cache-inventory__package-button{width:100%;padding:.65rem .8rem;text-align:left;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:rgba(255,255,255,.06);color:inherit;cursor:pointer}.cache-inventory__package-button[aria-expanded=true]{border-color:#a855f7}.cache-inventory__content{padding:.6rem}.cache-inventory__items{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.45rem}.cache-inventory__item{display:flex;align-items:center;gap:.55rem;min-width:0;padding:.4rem;border-radius:7px;background:rgba(0,0,0,.24)}.cache-inventory__item img{width:38px;height:52px;object-fit:cover;border-radius:4px;flex:none}.cache-inventory__item span{overflow:hidden;text-overflow:ellipsis}.cache-inventory__loading,.cache-inventory__empty{margin:.6rem 0;color:#aeb0bd}";
     document.head.appendChild(style);
     document.getElementById("cache-warm-run")?.addEventListener("click", followWarmup, true);
     document.addEventListener("click", function (event) {
-      if (event.target && event.target.closest && event.target.closest('[data-settings-tab="cache"]')) loadInventory();
+      if (event.target && event.target.closest && event.target.closest("#settings-tab-btn-cache")) loadInventory();
     });
   }
 

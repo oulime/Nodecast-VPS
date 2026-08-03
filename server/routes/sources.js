@@ -350,4 +350,42 @@ router.post('/sync-all', async (req, res) => {
     }
 });
 
+// Refresh the provider catalogue used by the "Pays & packages" organizer.
+// This deliberately does not warm the public snapshot: the dedicated cache
+// button owns that operation, while this request waits until fresh provider
+// categories and contents have actually reached SQLite.
+router.post('/sync-catalog', async (req, res) => {
+    try {
+        const catalogSources = (await sources.getAll())
+            .filter(source => source.enabled && source.type === 'xtream');
+        const results = [];
+
+        for (const source of catalogSources) {
+            await syncService.syncSource(source.id);
+            const state = getDb()
+                .prepare("SELECT status, error, last_sync FROM sync_status WHERE source_id = ? AND type = 'all'")
+                .get(source.id);
+            results.push({
+                sourceId: source.id,
+                name: source.name,
+                status: state?.status || 'unknown',
+                error: state?.error || null,
+                lastSync: state?.last_sync || null
+            });
+        }
+
+        const failed = results.filter(result => result.status === 'error');
+        res.status(failed.length ? 502 : 200).json({
+            success: failed.length === 0,
+            sources: results,
+            message: failed.length
+                ? `${failed.length} fournisseur(s) n'ont pas pu etre synchronises`
+                : `${results.length} fournisseur(s) synchronise(s)`
+        });
+    } catch (err) {
+        console.error('Error refreshing provider catalogue:', err);
+        res.status(500).json({ error: 'Failed to refresh provider catalogue', message: err.message });
+    }
+});
+
 module.exports = router;

@@ -2,16 +2,28 @@
   "use strict";
 
   var observer = null;
+  var flagObserver = null;
 
   function countryLogo() {
     var select = document.getElementById("country-select");
-    var name = String(select?.selectedOptions?.[0]?.textContent || "").trim().toLocaleLowerCase("fr");
-    var saved = String(window.__veloraCountryLogosByName?.[name] || "").trim();
+    var name = String(select?.selectedOptions?.[0]?.textContent || "").trim();
+    var normalized = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    var savedKey = normalized.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    var saved = String(window.__veloraCountryLogosByName?.[savedKey] || "").trim();
     if (saved) return saved;
+    if (normalized === "arabe") return "/logos/arabe.svg";
     var visibleFlag = document.getElementById("home-country-flag") ||
       document.getElementById("vel-brand-country-flag") ||
       document.getElementById("vel-bottom-country-flag");
-    return String(visibleFlag?.currentSrc || visibleFlag?.src || "").trim();
+    var visible = String(visibleFlag?.currentSrc || visibleFlag?.src || "").trim();
+    if (visible) return visible;
+    var countryKey = normalized.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    var codes = {
+      france: "fr", belgique: "be", suisse: "ch", maroc: "ma", algerie: "dz",
+      tunisie: "tn", espagne: "es", portugal: "pt", allemagne: "de", italie: "it",
+      "royaume-uni": "gb", angleterre: "gb", "etats-unis": "us", usa: "us", canada: "ca"
+    };
+    return codes[countryKey] ? "https://flagcdn.com/w160/" + codes[countryKey] + ".png" : "";
   }
 
   function prepare(card, logo) {
@@ -53,6 +65,13 @@
       });
       observer.observe(root, { childList: true, subtree: true });
     }
+    if (!flagObserver) {
+      flagObserver = new MutationObserver(function () { refresh(); });
+      ["home-country-flag", "vel-brand-country-flag", "vel-bottom-country-flag"].forEach(function (id) {
+        var flag = document.getElementById(id);
+        if (flag) flagObserver.observe(flag, { attributes: true, attributeFilter: ["src", "hidden"] });
+      });
+    }
   }
 
   document.addEventListener("velora-country-logos-changed", refresh);
@@ -63,4 +82,5 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", refresh, { once: true });
   else refresh();
   window.setTimeout(refresh, 1200);
+  window.setTimeout(refresh, 2500);
 })();

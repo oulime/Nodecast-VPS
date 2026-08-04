@@ -1,0 +1,21 @@
+.vel-package-card--live.vel-live-country-fallback {
+  background-image:
+    linear-gradient(145deg, rgba(6, 7, 15, 0.28), rgba(6, 7, 15, 0.72)),
+    var(--vel-live-country-logo) !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+}
+
+.vel-package-card--live.vel-live-country-fallback > img.vel-package-card__art {
+  opacity: 0 !important;
+}
+
+.vel-package-card--live:not(.vel-live-country-fallback) > img.vel-package-card__art {
+  opacity: 1;
+  transition: opacity 160ms ease;
+}
+
+.vel-package-card--live.vel-live-country-fallback > .vel-package-card__emoji {
+  display: none !important;
+}

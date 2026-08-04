@@ -57,7 +57,7 @@ function normalizeSubscriptionStart(value) {
 function subscriptionStatus(user) {
     if (!user || user.role === 'admin') return 'admin';
     if (user.subscriptionBlocked) return 'blocked';
-    if (!user.subscriptionEnd) return 'trial';
+    if (!user.subscriptionEnd) return 'active';
     const end = new Date(user.subscriptionEnd);
     if (Number.isNaN(end.getTime())) return 'expired';
     return end.getTime() > Date.now() ? 'active' : 'expired';

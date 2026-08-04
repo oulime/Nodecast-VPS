@@ -66,8 +66,8 @@
   }
 
   function badge(user) {
-    const s = user.subscriptionStatus || "trial";
-    const labels = { active: "Actif", expired: "Expire", blocked: "Bloque", admin: "Admin", trial: "Sans abonnement" };
+    const s = user.subscriptionStatus || "active";
+    const labels = { active: "Actif", expired: "Expire", blocked: "Bloque", admin: "Admin" };
     return `<span class="paid-users__badge paid-users__badge--${esc(s)}">${esc(labels[s] || s)}</span>`;
   }
 

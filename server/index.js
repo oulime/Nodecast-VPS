@@ -38,10 +38,6 @@ app.use(passport.session());
 const VPS_DATA_API_PATHS = [
     '/api/auth',
     '/api/admin/paid-users',
-    '/api/admin/my-ip',
-    '/api/admin/trial-reset',
-    '/api/trial-status',
-    '/api/trial-increment',
     '/api/sources',
     '/api/proxy',
     '/api/channels',
@@ -301,7 +297,15 @@ app.use('/api/velora/catalog', require('./routes/veloraCatalog'));
 app.use('/api/velora-db', require('./routes/veloraData'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api', require('./routes/packageCovers'));
-app.use('/api', require('./routes/veloraTrialProxy'));
+
+// Retired trial/IP endpoints must not fall through to the SPA HTML response.
+app.all([
+    '/api/trial-status',
+    '/api/trial-increment',
+    '/api/admin/trial-reset',
+    '/api/admin/trial-whitelist',
+    '/api/admin/my-ip'
+], (req, res) => res.status(404).json({ error: 'Not found' }));
 
 // Version endpoint
 app.get('/api/version', (req, res) => {
@@ -328,8 +332,8 @@ app.get('/nodecast-admin/', (req, res) => {
     res.sendFile(path.join(publicDir, 'nodecast-admin', 'index.html'));
 });
 
-// Trial visitors use this public entry point.
-app.get('/trial', sendVeloraApp);
+// Trial mode was removed. All viewers authenticate with username/password.
+app.get('/trial', (req, res) => res.redirect(302, '/login'));
 
 // SPA fallback - Velora is the public frontend; Nodecast remains the backend/API engine.
 app.get('*', sendVeloraApp);

@@ -12,7 +12,7 @@
         try {
           var url = new URL(window.location.href);
           var paidEntry = url.searchParams.get("paid") === "1";
-          var protectedEntry = url.pathname === "/" || paidEntry;
+          var protectedEntry = true;
           var authToken = window.localStorage.getItem("authToken");
           if (protectedEntry && !authToken) {
             window.location.replace("/login");
@@ -1478,42 +1478,12 @@
       rel="stylesheet"
     />
     <script src="/assets/local-velora-data.js?v=20260731-load-dedupe"></script>
-    <script>
-      (function () {
-        var originalFetch = window.fetch;
-        if (!originalFetch || originalFetch.__veloraPaidAccessPatched) return;
-        function isTrialApi(input) {
-          try {
-            var url = typeof input === "string" ? input : input && input.url;
-            if (!url) return false;
-            var target = new URL(url, window.location.origin);
-            return target.origin === window.location.origin && (target.pathname === "/api/trial-status" || target.pathname === "/api/trial-increment");
-          } catch (_) { return false; }
-        }
-        function token() {
-          try { return localStorage.getItem("authToken") || ""; } catch (_) { return ""; }
-        }
-        function isTrialEntry() {
-          try { return window.location.pathname.replace(/\/+$/, "") === "/trial"; } catch (_) { return false; }
-        }
-        window.fetch = function (input, init) {
-          if (!isTrialApi(input)) return originalFetch.apply(this, arguments);
-          var nextInit = Object.assign({}, init || {});
-          var headers = new Headers(nextInit.headers || (input && input.headers) || {});
-          var authToken = isTrialEntry() ? "" : token();
-          if (authToken && !headers.has("Authorization")) headers.set("Authorization", "Bearer " + authToken);
-          nextInit.headers = headers;
-          return originalFetch.call(this, input, nextInit);
-        };
-        window.fetch.__veloraPaidAccessPatched = true;
-      })();
-    </script>
     <script defer src="/assets/velora-home-sections.js?v=provider-order-home-content-20260804"></script>
     <script src="/assets/velora-home-cache-fallback.js?v=skeleton-only-provider-order-20260804"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=provider-order-package-content-20260804"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=username-password-only-20260804"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=lazy-provider-load-v2-20260803"></script>
     <script defer src="/assets/manual-pays.js?v=merged-sync-refresh-20260804"></script>
-    <script defer src="/assets/paid-users-admin.js?v=20260801-vps-sqlite"></script>
+    <script defer src="/assets/paid-users-admin.js?v=username-password-only-20260804"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
     <link rel="stylesheet" href="/assets/manual-pays.css?v=20260803-global-package-sync">
@@ -1528,6 +1498,15 @@
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=live-player-placeholder-no-title-20260803">
     <link rel="stylesheet" href="/assets/velora-home-sections.css?v=admin-country-filter-20260803">
     <style>
+      #settings-tab-btn-ip,
+      #settings-tab-ip,
+      #trial-timer-root,
+      #trial-expired-dialog,
+      .trial-offer-overlay,
+      .vel-promo-banner {
+        display: none !important;
+      }
+
       body:not(.vel-home-choice-picked) .main--velora .vel-futuristic-bg {
         display: block !important;
         opacity: 0.92 !important;

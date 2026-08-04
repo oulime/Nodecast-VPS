@@ -4,12 +4,30 @@
   const key = value => String(value || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
   const escapeHtml = value => String(value || "").replace(/[&<>"']/g, char => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[char]);
 
+  function refreshAppLogos() {
+    const select = document.getElementById("country-select");
+    const selectedName = select?.selectedOptions?.[0]?.textContent?.trim() || document.getElementById("home-country-value")?.textContent?.trim() || "";
+    const selectedLogo = window.__veloraCountryLogosByName?.[key(selectedName)] || "";
+    ["home-country-flag", "vel-brand-country-flag", "vel-bottom-country-flag"].forEach(id => {
+      const image = document.getElementById(id);
+      if (!image || !selectedLogo) return;
+      image.src = selectedLogo;
+      image.hidden = false;
+    });
+    document.querySelectorAll(".vel-home-country-picker__option, .vel-bottom-country-menu__option, #vel-bottom-country-options [role='option']").forEach(option => {
+      const logo = window.__veloraCountryLogosByName?.[key(option.textContent)] || "";
+      const image = option.querySelector("img");
+      if (logo && image) { image.src = logo; image.hidden = false; }
+    });
+  }
+
   function publish(logos) {
     window.__veloraCountryLogosByName = Object.create(null);
     (logos || []).forEach(logo => {
       byId.set(String(logo.countryId), logo);
       window.__veloraCountryLogosByName[key(logo.countryName)] = logo.path;
     });
+    refreshAppLogos();
     window.dispatchEvent(new CustomEvent("velora-country-logos-changed"));
   }
 
@@ -39,6 +57,7 @@
     if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
     byId.set(String(countryId), body.logo);
     window.__veloraCountryLogosByName[key(countryName)] = body.logo.path;
+    refreshAppLogos();
     window.dispatchEvent(new CustomEvent("velora-country-logos-changed"));
     return body.logo;
   }
@@ -134,7 +153,7 @@
     }, 400);
   }, true);
 
-  const observer = new MutationObserver(() => { enhanceForm(); enhanceCards(); });
+  const observer = new MutationObserver(() => { enhanceForm(); enhanceCards(); refreshAppLogos(); });
   function start() { enhanceForm(); enhanceCards(); observer.observe(document.documentElement, { childList: true, subtree: true }); load().then(enhanceCards).catch(() => {}); }
   document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", start, { once: true }) : start();
 })();

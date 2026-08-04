@@ -5122,6 +5122,7 @@
             .replace(/[\u0300-\u036f]/g, "")
             .toLowerCase()
             .trim();
+          if (normalized === "arabe") return "/logos/arabe.svg";
           var codes = {
             france: "fr",
             belgique: "be",
@@ -5458,6 +5459,7 @@
           }
 
           function homeCountryFlagUrl(name) {
+            if (homeCountryKey(name) === "arabe") return "/logos/arabe.svg";
             var code = {
               afghanistan: "af",
               albanie: "al",

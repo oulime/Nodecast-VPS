@@ -137,7 +137,7 @@ async function proxyRemoteAdmin(req, res) {
         const value = req.get(name);
         if (value) headers[name] = value;
     }
-    const remote = await fetch(target, { headers, cache: 'no-store' });
+    const remote = await fetch(target, { method: req.method, headers, cache: 'no-store' });
     const text = await remote.text();
     res.status(remote.status);
     const contentType = remote.headers.get('content-type');
@@ -397,6 +397,39 @@ async function deleteAnalyticsUserEvents({ userKey, days, scope, from, to }) {
                 const event = JSON.parse(line);
                 const inScope = eventInScope(event, { scope, from, to });
                 if (inScope && analyticsUserKey(event) === targetUserKey) {
+                    deleted += 1;
+                    changed = true;
+                    continue;
+                }
+                kept.push(JSON.stringify(event));
+            } catch {
+                kept.push(line);
+            }
+        }
+        if (changed) {
+            filesChanged += 1;
+            await fs.writeFile(file, kept.length ? `${kept.join('\n')}\n` : '', 'utf8');
+        }
+    }
+    return { deleted, filesChanged };
+}
+
+async function deleteAnalyticsPeriodEvents({ days, scope, from, to }) {
+    const files = await analyticsEventFiles({ days, from, to });
+    let deleted = 0;
+    let filesChanged = 0;
+    for (const file of files) {
+        const raw = await fs.readFile(file, 'utf8').catch((err) => {
+            if (err?.code === 'ENOENT') return '';
+            throw err;
+        });
+        const kept = [];
+        let changed = false;
+        for (const line of raw.split(/\r?\n/)) {
+            if (!line.trim()) continue;
+            try {
+                const event = JSON.parse(line);
+                if (eventInScope(event, { scope, from, to })) {
                     deleted += 1;
                     changed = true;
                     continue;
@@ -948,6 +981,25 @@ router.delete('/admin/user', requireAdmin, async (req, res) => {
     } catch (err) {
         console.error('[analytics] delete user failed:', err);
         res.status(500).json({ error: 'Analytics user cleanup failed' });
+    }
+});
+
+router.delete('/admin/period', requireAdmin, async (req, res) => {
+    try {
+        const scopeInfo = analyticsScope(req);
+        const { scope, days, from, to } = scopeInfo;
+        if (shouldProxyRemoteAdmin(req)) {
+            await proxyRemoteAdmin(req, res);
+            return;
+        }
+        const result = await deleteAnalyticsPeriodEvents({ days, scope, from, to });
+        if (scope === 'today' || scope === 'all' || (scope === 'range' && localDateKey() >= from && localDateKey() <= to)) {
+            liveSessions.clear();
+        }
+        res.json({ ok: true, scope, days, from, to, ...result });
+    } catch (err) {
+        console.error('[analytics] delete period failed:', err);
+        res.status(500).json({ error: 'Analytics period cleanup failed' });
     }
 });
 

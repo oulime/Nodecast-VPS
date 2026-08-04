@@ -7694,6 +7694,7 @@ if (target.closest(".trial-offer-button")) {
               '</div>',
               '</div>',
               '</div>',
+              '<button type="button" id="vel-analytics-clean-period" class="vel-analytics-refresh">Clean period</button>',
               '<button type="button" id="vel-analytics-refresh" class="vel-analytics-refresh">Refresh</button>',
               '</div>',
               '</div>',
@@ -7732,6 +7733,11 @@ if (target.closest(".trial-offer-button")) {
               event.preventDefault();
               event.stopPropagation();
               loadAnalytics();
+            });
+            panel.querySelector("#vel-analytics-clean-period").addEventListener("click", function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              cleanAnalyticsPeriod();
             });
             panel.querySelector("#vel-analytics-range-trigger").addEventListener("click", function (event) {
               event.preventDefault();
@@ -7909,6 +7915,32 @@ if (target.closest(".trial-offer-button")) {
             setStatus("Cleaned " + String(data.deleted || 0) + " analytics events for " + ip + ".");
           } catch (error) {
             setStatus("Clean failed: " + (error && error.message ? error.message : String(error)), true);
+          }
+        }
+
+        async function cleanAnalyticsPeriod() {
+          var rangeQuery = analyticsRangeQuery();
+          var label = analyticsRangeLabel();
+          if (!window.confirm("Clean all analytics for " + label + "? This cannot be undone.")) return;
+          var button = document.getElementById("vel-analytics-clean-period");
+          if (button) button.disabled = true;
+          setStatus("Cleaning analytics for " + label + "...");
+          try {
+            var res = await fetch("/api/analytics/admin/period?" + rangeQuery, {
+              method: "DELETE",
+              headers: adminHeaders(),
+              cache: "no-store"
+            });
+            var data = await res.json().catch(function () { return {}; });
+            if (!res.ok) throw new Error(data.error || "HTTP " + res.status);
+            analyticsSelectedIp = "";
+            analyticsOpenIps.clear();
+            await loadAnalytics();
+            setStatus("Cleaned " + String(data.deleted || 0) + " analytics events for " + label + ".");
+          } catch (error) {
+            setStatus("Clean failed: " + (error && error.message ? error.message : String(error)), true);
+          } finally {
+            if (button) button.disabled = false;
           }
         }
 

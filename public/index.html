@@ -6798,8 +6798,11 @@
           if (sessionClosed && type !== "session_start" && type !== "session_resume" && type !== "session_end") return;
           var payload = basePayload(type, extra);
           var body = JSON.stringify(payload);
+          var authToken = "";
+          try { authToken = localStorage.getItem("authToken") || ""; } catch (error) {}
+          if (!authToken) return;
           try {
-            if (navigator.sendBeacon) {
+            if (!authToken && navigator.sendBeacon) {
               var blob = new Blob([body], { type: "application/json" });
               if (navigator.sendBeacon("/api/analytics/event", blob)) return;
             }
@@ -6807,7 +6810,7 @@
           try {
             fetch("/api/analytics/event", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { "Content-Type": "application/json", "Authorization": "Bearer " + authToken },
               body: body,
               keepalive: true
             }).catch(function () {});
@@ -7185,6 +7188,20 @@ if (target.closest(".trial-offer-button")) {
           }
         }
 
+        function analyticsUserKey(item) {
+          return String(item && (item.userKey || (item.userId ? "user:" + item.userId : "") || item.sessionId) || "").trim();
+        }
+
+        function analyticsUserLabel(item) {
+          return String(item && (item.displayName || item.username || item.userLabel) || "Legacy session").trim();
+        }
+
+        function userButton(item, compact) {
+          var key = analyticsUserKey(item);
+          var label = analyticsUserLabel(item);
+          return '<button type="button" class="vel-analytics-ip' + (compact ? ' vel-analytics-ip--compact' : '') + '" data-analytics-ip="' + escapeHtml(key) + '">' + escapeHtml(label) + '</button>';
+        }
+
         function pageLabel(page, section) {
           var raw = String(page || section || "").toLowerCase();
           var sec = String(section || "").toLowerCase();
@@ -7278,7 +7295,7 @@ if (target.closest(".trial-offer-button")) {
         function mergeVisitorsByIp(items) {
           var byUser = new Map();
           (items || []).forEach(function (item) {
-            var key = String(item.ip || item.sessionId || "").trim();
+            var key = analyticsUserKey(item);
             if (!key) return;
             var existing = byUser.get(key);
             if (!existing) {
@@ -7315,21 +7332,20 @@ if (target.closest(".trial-offer-button")) {
           return [
             '<div class="vel-analytics-table-wrap">',
             '<table class="vel-analytics-table vel-analytics-table--visitors">',
-            '<thead><tr><th>IP</th><th>Package</th><th>Watching now</th><th>Trial</th><th>Watched</th><th>Left</th></tr></thead><tbody>',
+            '<thead><tr><th>User</th><th>Package</th><th>Watching now</th><th>Watched</th><th>Last active</th></tr></thead><tbody>',
             items.map(function (item) {
               var watching = item.channelName || item.mediaTitle || "-";
-              var trialRemaining = item.trialSecondsRemaining == null ? "n/a" : formatDuration(item.trialSecondsRemaining);
               var watch = formatDuration(item.totalWatchSeconds || item.trialSecondsUsed || 0);
+              var userKey = analyticsUserKey(item);
               var packageName = packageDisplay(item);
               var country = cleanCountryName(item.country);
               return [
-                '<tr' + (sameIp(item.ip, analyticsSelectedIp) ? ' class="is-selected" data-analytics-visitor-ip="' + escapeHtml(item.ip || "") + '"' : '') + '>',
-                '<td data-label="IP">' + ipButton(item.ip, true) + '</td>',
+                '<tr' + (sameIp(userKey, analyticsSelectedIp) ? ' class="is-selected" data-analytics-visitor-ip="' + escapeHtml(userKey) + '"' : '') + '>',
+                '<td data-label="User">' + userButton(item, true) + '</td>',
                 '<td data-label="Package"><div class="vel-analytics-now-title">' + escapeHtml(packageName) + (country ? '<span class="vel-analytics-subline">' + escapeHtml(country) + '</span>' : '') + '</div></td>',
                 '<td data-label="Watching"><div class="vel-analytics-now-title">' + escapeHtml(watching) + '</div></td>',
-                '<td data-label="Trial">' + escapeHtml(formatTime(item.trialStartedAt)) + '</td>',
                 '<td data-label="Watched">' + escapeHtml(watch) + '</td>',
-                '<td data-label="Left">' + escapeHtml(trialRemaining) + '</td>',
+                '<td data-label="Last active">' + escapeHtml(formatTime(item.lastSeen)) + '</td>',
                 '</tr>'
               ].join("");
             }).join(""),
@@ -7344,18 +7360,17 @@ if (target.closest(".trial-offer-button")) {
           return [
             '<div class="vel-analytics-table-wrap">',
             '<table class="vel-analytics-table vel-analytics-table--visitors">',
-            '<thead><tr><th>IP</th><th>Package</th><th>Last action</th><th>Left</th><th>Last</th><th>Watched</th></tr></thead><tbody>',
+            '<thead><tr><th>User</th><th>Package</th><th>Last action</th><th>Last</th><th>Watched</th></tr></thead><tbody>',
             items.map(function (item) {
               var watching = item.channelName || item.mediaTitle || pageLabel(item.page, item.section);
               var packageName = packageDisplay(item);
               var country = cleanCountryName(item.country);
-              var trialRemaining = item.trialSecondsRemaining == null ? "n/a" : formatDuration(item.trialSecondsRemaining);
+              var userKey = analyticsUserKey(item);
               return [
-                '<tr' + (sameIp(item.ip, analyticsSelectedIp) ? ' class="is-selected" data-analytics-visitor-ip="' + escapeHtml(item.ip || "") + '"' : '') + '>',
-                '<td data-label="IP">' + ipButton(item.ip, false) + '</td>',
+                '<tr' + (sameIp(userKey, analyticsSelectedIp) ? ' class="is-selected" data-analytics-visitor-ip="' + escapeHtml(userKey) + '"' : '') + '>',
+                '<td data-label="User">' + userButton(item, false) + '</td>',
                 '<td data-label="Package"><div class="vel-analytics-now-title">' + escapeHtml(packageName) + (country ? '<span class="vel-analytics-subline">' + escapeHtml(country) + '</span>' : '') + '</div></td>',
                 '<td data-label="Last action"><div class="vel-analytics-now-title">' + escapeHtml(watching) + '<span class="vel-analytics-subline">' + escapeHtml(eventLabel(item.lastEventType)) + '</span></div></td>',
-                '<td data-label="Left">' + escapeHtml(trialRemaining) + '</td>',
                 '<td data-label="Last">' + escapeHtml(formatTime(item.lastSeen)) + '</td>',
                 '<td data-label="Watched">' + escapeHtml(formatDuration(item.totalWatchSeconds || item.trialSecondsUsed || 0)) + '</td>',
                 '</tr>'
@@ -7386,7 +7401,7 @@ if (target.closest(".trial-offer-button")) {
             });
           }
           (groups || []).forEach(function (group) {
-            var key = String(group.ip || group.sessionId || "").trim();
+            var key = analyticsUserKey(group);
             if (!key) return;
             var existing = byUser.get(key);
             var actions = Array.isArray(group.actions) ? group.actions.filter(isVisibleUserAction) : [];
@@ -7442,13 +7457,13 @@ if (target.closest(".trial-offer-button")) {
           return [
             '<div class="vel-analytics-table-wrap">',
             '<table class="vel-analytics-table vel-analytics-table--button-clicks">',
-            '<thead><tr><th>Action</th><th>IP</th><th>Contexte</th><th>Heure</th></tr></thead><tbody>',
+            '<thead><tr><th>Action</th><th>User</th><th>Contexte</th><th>Heure</th></tr></thead><tbody>',
             items.map(function (item) {
               var meta = clickContextLabel(item);
               return [
                 '<tr>',
                 '<td data-label="Action"><div class="vel-analytics-now-title">' + escapeHtml(eventLabel(item.type)) + (meta ? '<span class="vel-analytics-subline">' + escapeHtml(meta) + '</span>' : '') + '</div></td>',
-                '<td data-label="IP">' + ipButton(item.ip || item.lastIp, false) + '</td>',
+                '<td data-label="User">' + userButton(item, false) + '</td>',
                 '<td data-label="Contexte">' + escapeHtml(packageDisplay(item)) + '</td>',
                 '<td data-label="Heure">' + escapeHtml(formatTime(item.ts || item.lastSeen)) + '</td>',
                 '</tr>'
@@ -7527,15 +7542,15 @@ if (target.closest(".trial-offer-button")) {
             '<div class="vel-analytics-user-actions">',
             shownGroups.map(function (user) {
               var actions = user.actions || [];
-              var actionLimit = Math.min(actions.length, analyticsVisibleActionsByIp[user.ip] || 25);
+              var userKey = analyticsUserKey(user);
+              var actionLimit = Math.min(actions.length, analyticsVisibleActionsByIp[userKey] || 25);
               var shownActions = actions.slice(0, actionLimit);
               var packageName = packageDisplay(user);
               var country = cleanCountryName(user.country);
               var lastContext = user.channelName || user.mediaTitle || pageLabel(user.page, user.section);
-              var trialRemaining = user.trialSecondsRemaining == null ? "n/a" : formatDuration(user.trialSecondsRemaining);
               var actionCount = user.actionCount || actions.length || 0;
               var sessionCount = Number(user.sessionCount || 0);
-              var userIp = String(user.ip || "").trim();
+              var userIp = userKey;
               var watchedTotal = Number(user.totalWatchSeconds || user.trialSecondsUsed || 0);
               var isNoise = actionCount === 0 && watchedTotal <= 0 && sessionCount >= 3;
               var userStateClass = isNoise ? " vel-analytics-user--noise" : watchedTotal > 0 ? " vel-analytics-user--watched" : "";
@@ -7543,12 +7558,12 @@ if (target.closest(".trial-offer-button")) {
               return [
                 '<details class="vel-analytics-user' + userStateClass + '" data-analytics-user-ip="' + escapeHtml(userIp) + '"' + openAttr + '>',
                 '<summary class="vel-analytics-user__summary">',
-                '<div class="vel-analytics-user__identity">' + ipButton(user.ip, false) + '<span class="vel-analytics-subline">' + escapeHtml(formatTime(user.lastSeen)) + '</span></div>',
+                '<div class="vel-analytics-user__identity">' + userButton(user, false) + '<span class="vel-analytics-subline">' + escapeHtml(formatTime(user.lastSeen)) + '</span></div>',
                 '<div class="vel-analytics-user__context"><div class="vel-analytics-now-title">' + escapeHtml(lastContext || "Browsing") + '</div><span class="vel-analytics-subline">' + escapeHtml(packageName) + (country ? " - " + escapeHtml(country) : "") + '</span>' + (isNoise ? '<span class="vel-analytics-noise-badge">Noisy landing</span>' : '') + '</div>',
                 '<div class="vel-analytics-user__stat">' + escapeHtml(String(actionCount)) + ' actions<span class="vel-analytics-subline">' + escapeHtml(formatDuration(watchedTotal)) + ' watched' + (sessionCount > 1 ? ' - ' + escapeHtml(String(sessionCount)) + ' sessions' : '') + '</span></div>',
-                '<div class="vel-analytics-user__stat">Left<span class="vel-analytics-subline">' + escapeHtml(trialRemaining) + '</span><button type="button" class="vel-analytics-user__delete" data-analytics-delete-ip="' + escapeHtml(user.ip || "") + '">Clean</button></div>',
+                '<div class="vel-analytics-user__stat">Account<span class="vel-analytics-subline">' + escapeHtml(user.username || user.displayName || "Legacy") + '</span><button type="button" class="vel-analytics-user__delete" data-analytics-delete-ip="' + escapeHtml(userKey) + '">Clean</button></div>',
                 '</summary>',
-                userWatchedMediaList(user.watchedMedia || [], user.ip),
+                userWatchedMediaList(user.watchedMedia || [], userKey),
                 actions.length
                   ? '<ol class="vel-analytics-user__actions">' + shownActions.map(function (action) {
                     var context = actionContextLabel(action);
@@ -7560,7 +7575,7 @@ if (target.closest(".trial-offer-button")) {
                       '<div><span class="vel-analytics-user__tag">' + escapeHtml(kind.label) + '</span><div class="vel-analytics-now-title">' + escapeHtml(eventLabel(action.type)) + '</div>' + (context ? '<span class="vel-analytics-subline">' + escapeHtml(context) + '</span>' : '') + (detail ? '<span class="vel-analytics-subline">' + escapeHtml(detail) + '</span>' : '') + '</div>',
                       '</li>'
                     ].join("");
-                  }).join("") + '</ol>' + (actionLimit < actions.length ? '<button type="button" class="vel-analytics-load-more" data-analytics-more-actions-ip="' + escapeHtml(user.ip || "") + '">Load more actions (' + escapeHtml(String(actions.length - actionLimit)) + ')</button>' : '')
+                  }).join("") + '</ol>' + (actionLimit < actions.length ? '<button type="button" class="vel-analytics-load-more" data-analytics-more-actions-ip="' + escapeHtml(userKey) + '">Load more actions (' + escapeHtml(String(actions.length - actionLimit)) + ')</button>' : '')
                   : '<p class="vel-analytics-empty">No important actions for this user.</p>',
                 '</details>'
               ].join("");
@@ -7601,14 +7616,14 @@ if (target.closest(".trial-offer-button")) {
           return [
             '<div class="vel-analytics-table-wrap">',
             '<table class="vel-analytics-table vel-analytics-table--channels">',
-            '<thead><tr><th>Content</th><th>Package</th><th>Opens</th><th>IPs</th><th>Last</th></tr></thead><tbody>',
+            '<thead><tr><th>Content</th><th>Package</th><th>Opens</th><th>Users</th><th>Last</th></tr></thead><tbody>',
             shownItems.map(function (item) {
               return [
                 '<tr>',
                 '<td data-label="Content"><div class="vel-analytics-now-title">' + escapeHtml(item.name || "Unknown") + '<span class="vel-analytics-subline">' + escapeHtml(item.mediaType || "content") + '</span></div></td>',
                 '<td data-label="Package">' + escapeHtml(item.packageName || "-") + (item.country ? '<span class="vel-analytics-subline">' + escapeHtml(cleanCountryName(item.country)) + '</span>' : '') + '</td>',
                 '<td data-label="Opens">' + escapeHtml(String(item.count || 0)) + '</td>',
-                '<td data-label="IPs" class="vel-analytics-muted">' + escapeHtml(String(item.ips || 0)) + '</td>',
+                '<td data-label="Users" class="vel-analytics-muted">' + escapeHtml(String(item.users || 0)) + '</td>',
                 '<td data-label="Last">' + escapeHtml(formatTime(item.lastSeen)) + '</td>',
                 '</tr>'
               ].join("");
@@ -7656,8 +7671,8 @@ if (target.closest(".trial-offer-button")) {
             panel.innerHTML = [
               '<div class="vel-analytics-hero">',
               '<div>',
-              '<h2 class="vel-analytics-title">Visitor analytics</h2>',
-              '<p class="vel-analytics-subtitle" id="vel-analytics-subtitle">Today visitors, country, package and watched channels. Saved as JSON on the VPS.</p>',
+              '<h2 class="vel-analytics-title">User analytics</h2>',
+              '<p class="vel-analytics-subtitle" id="vel-analytics-subtitle">Authenticated users, packages and watched content. Saved as JSON on the VPS.</p>',
               '</div>',
               '<div class="vel-analytics-actions">',
               '<div class="vel-analytics-range" id="vel-analytics-range">',
@@ -7685,8 +7700,8 @@ if (target.closest(".trial-offer-button")) {
               '<p id="vel-analytics-status" class="vel-analytics-status">Loading...</p>',
               '<div class="vel-analytics-grid">',
               '<div class="vel-analytics-card"><span class="vel-analytics-card__label">Live now</span><span id="va-live" class="vel-analytics-card__value">0</span><span class="vel-analytics-card__hint">last 90 seconds</span></div>',
-              '<div class="vel-analytics-card"><span class="vel-analytics-card__label">Visitors</span><span id="va-visitors" class="vel-analytics-card__value">0</span><span class="vel-analytics-card__hint">unique sessions</span></div>',
-              '<div class="vel-analytics-card"><span class="vel-analytics-card__label">IPs</span><span id="va-ips" class="vel-analytics-card__value">0</span><span class="vel-analytics-card__hint">unique addresses</span></div>',
+              '<div class="vel-analytics-card"><span class="vel-analytics-card__label">Users</span><span id="va-visitors" class="vel-analytics-card__value">0</span><span class="vel-analytics-card__hint">unique accounts</span></div>',
+              '<div class="vel-analytics-card"><span class="vel-analytics-card__label">Sessions</span><span id="va-ips" class="vel-analytics-card__value">0</span><span class="vel-analytics-card__hint">signed-in sessions</span></div>',
               '<div class="vel-analytics-card"><span class="vel-analytics-card__label">Watch time</span><span id="va-watch" class="vel-analytics-card__value">0s</span><span class="vel-analytics-card__hint">tracked total</span></div>',
               '</div>',
               '<div class="vel-analytics-subtabs" role="tablist" aria-label="Analytics details">',
@@ -7881,7 +7896,7 @@ if (target.closest(".trial-offer-button")) {
           var rangeQuery = analyticsRangeQuery();
           setStatus("Cleaning analytics for " + ip + "...");
           try {
-            var res = await fetch("/api/analytics/admin/user?" + rangeQuery + "&ip=" + encodeURIComponent(ip), {
+            var res = await fetch("/api/analytics/admin/user?" + rangeQuery + "&userKey=" + encodeURIComponent(ip), {
               method: "DELETE",
               headers: adminHeaders(),
               cache: "no-store"
@@ -7984,12 +7999,12 @@ if (target.closest(".trial-offer-button")) {
             var subtitle = document.getElementById("vel-analytics-subtitle");
             var visitorsTitle = document.getElementById("va-visitors-title");
             if (subtitle) {
-              subtitle.textContent = "Visitors, country, package and watched channels from " + scopeLabel + ". Saved as JSON on the VPS.";
+              subtitle.textContent = "Authenticated users, packages and watched content from " + scopeLabel + ". Saved as JSON on the VPS.";
             }
             if (visitorsTitle) visitorsTitle.textContent = "Visiteurs " + scopeLabel;
             document.getElementById("va-live").textContent = String(liveWatchingVisitors(live.visitors || []).length);
-            document.getElementById("va-visitors").textContent = String(summary.uniqueVisitors || 0);
-            document.getElementById("va-ips").textContent = String(summary.uniqueIps || 0);
+            document.getElementById("va-visitors").textContent = String(summary.uniqueUsers || summary.uniqueVisitors || 0);
+            document.getElementById("va-ips").textContent = String(summary.uniqueSessions || 0);
             document.getElementById("va-watch").textContent = formatDuration(summary.totalWatchSeconds || 0);
 
             renderAnalyticsData();

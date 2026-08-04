@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const fs = require('fs/promises');
 const path = require('path');
+const { requireAuth } = require('../auth');
 
 const router = express.Router();
 
@@ -197,6 +198,20 @@ async function appendEvent(event) {
     return appendQueue;
 }
 
+function analyticsUserKey(event) {
+    const userId = cleanString(event?.userId, 160);
+    if (userId) return `user:${userId}`;
+    const username = cleanString(event?.username, 160);
+    if (username) return `username:${username.toLowerCase()}`;
+    const sessionId = cleanString(event?.sessionId, 160);
+    return sessionId ? `legacy-session:${sessionId}` : '';
+}
+
+function analyticsUserLabel(event) {
+    return cleanString(event?.displayName || event?.username, 200)
+        || (event?.sessionId ? `Legacy session ${String(event.sessionId).slice(0, 8)}` : 'Unknown user');
+}
+
 function updateLiveSession(event) {
     const sessionId = event.sessionId;
     if (!sessionId) return;
@@ -212,7 +227,11 @@ function updateLiveSession(event) {
     const isStoppedWatchingEvent = ['video_stop', 'video_end'].includes(event.type);
     liveSessions.set(sessionId, {
         sessionId,
-        ip: event.ip,
+        userKey: analyticsUserKey(event),
+        userId: event.userId,
+        username: event.username,
+        displayName: event.displayName,
+        userLabel: analyticsUserLabel(event),
         userAgent: event.userAgent,
         device: Object.keys(event.device || {}).length ? event.device : existing?.device || {},
         page: event.page || event.path || existing?.page || '/',
@@ -261,7 +280,9 @@ function publicEventFromRequest(req) {
         ts: new Date().toISOString(),
         type,
         sessionId,
-        ip: clientIp(req),
+        userId: cleanString(req.user?.id, 160),
+        username: cleanString(req.user?.username, 160),
+        displayName: cleanString(req.user?.displayName || req.user?.name || req.user?.username, 200),
         userAgent: cleanString(req.get('user-agent'), 220),
         device: cleanObject(body.device),
         path: cleanPath(body.path || req.get('referer'), 260),
@@ -357,9 +378,9 @@ async function readEvents({ days = 7, limit = MAX_EVENTS_FOR_SUMMARY, from, to }
     return events;
 }
 
-async function deleteAnalyticsUserEvents({ ip, days, scope, from, to }) {
-    const targetIp = normalizeIp(ip);
-    if (!targetIp) return { deleted: 0, filesChanged: 0 };
+async function deleteAnalyticsUserEvents({ userKey, days, scope, from, to }) {
+    const targetUserKey = cleanString(userKey, 240);
+    if (!targetUserKey) return { deleted: 0, filesChanged: 0 };
     const files = await analyticsEventFiles({ days, from, to });
     let deleted = 0;
     let filesChanged = 0;
@@ -375,7 +396,7 @@ async function deleteAnalyticsUserEvents({ ip, days, scope, from, to }) {
             try {
                 const event = JSON.parse(line);
                 const inScope = eventInScope(event, { scope, from, to });
-                if (inScope && sameAnalyticsIp(event.ip, targetIp)) {
+                if (inScope && analyticsUserKey(event) === targetUserKey) {
                     deleted += 1;
                     changed = true;
                     continue;
@@ -391,10 +412,6 @@ async function deleteAnalyticsUserEvents({ ip, days, scope, from, to }) {
         }
     }
     return { deleted, filesChanged };
-}
-
-function sameAnalyticsIp(a, b) {
-    return normalizeIp(a) === normalizeIp(b);
 }
 
 function localDateKey(value = new Date()) {
@@ -472,8 +489,8 @@ function countBy(events, keyFn, { limit = 12, seconds = false } = {}) {
 
 function summarize(events) {
     events = events.filter((event) => !isLocalEvent(event));
-    const visitors = new Set(events.map((event) => event.sessionId).filter(Boolean));
-    const ips = new Set(events.map((event) => event.ip).filter(Boolean));
+    const users = new Set(events.map(analyticsUserKey).filter(Boolean));
+    const sessions = new Set(events.map((event) => event.sessionId).filter(Boolean));
     const watchEvents = events.filter((event) => ['video_progress', 'video_stop', 'video_end'].includes(event.type));
     const totalWatchSeconds = watchEvents.reduce((sum, event) => {
         const delta = Number(event.watchDeltaSeconds);
@@ -482,8 +499,9 @@ function summarize(events) {
     }, 0);
     return {
         totalEvents: events.length,
-        uniqueVisitors: visitors.size,
-        uniqueIps: ips.size,
+        uniqueUsers: users.size,
+        uniqueVisitors: users.size,
+        uniqueSessions: sessions.size,
         totalWatchSeconds,
         visitors: summarizeVisitors(events),
         buttonClicks: summarizeButtonClicks(events),
@@ -548,7 +566,7 @@ function summarizeProblemMedia(events, limit = 200) {
             packageName: event.packageName,
             country: event.country,
             count: 0,
-            ips: new Set(),
+            users: new Set(),
             sessions: new Set(),
             firstSeen: event.ts,
             lastSeen: event.ts
@@ -560,13 +578,14 @@ function summarizeProblemMedia(events, limit = 200) {
         existing.mediaId = event.mediaId || existing.mediaId;
         existing.firstSeen = String(existing.firstSeen || event.ts) < String(event.ts || '') ? existing.firstSeen : event.ts || existing.firstSeen;
         existing.lastSeen = String(existing.lastSeen || '').localeCompare(String(event.ts || '')) >= 0 ? existing.lastSeen : event.ts || existing.lastSeen;
-        if (event.ip) existing.ips.add(event.ip);
+        const userKey = analyticsUserKey(event);
+        if (userKey) existing.users.add(userKey);
         if (event.sessionId) existing.sessions.add(event.sessionId);
         problems.set(key, existing);
     }
 
     for (const event of events) {
-        const sessionKey = event.sessionId || event.ip;
+        const sessionKey = event.sessionId;
         if (!sessionKey) continue;
         if (event.type === 'media_open') {
             record(pending.get(sessionKey));
@@ -588,7 +607,7 @@ function summarizeProblemMedia(events, limit = 200) {
     return [...problems.values()]
         .map((item) => ({
             ...item,
-            ips: item.ips.size,
+            users: item.users.size,
             sessions: item.sessions.size
         }))
         .sort((a, b) => b.count - a.count || String(b.lastSeen || '').localeCompare(String(a.lastSeen || '')))
@@ -598,11 +617,15 @@ function summarizeProblemMedia(events, limit = 200) {
 function summarizeUserActions(events, limit = 200) {
     const users = new Map();
     for (const event of events) {
-        const key = event.ip || event.sessionId;
+        const key = analyticsUserKey(event);
         if (!key) continue;
         const existing = users.get(key) || {
             sessionId: event.sessionId,
-            ip: event.ip,
+            userKey: key,
+            userId: event.userId,
+            username: event.username,
+            displayName: event.displayName,
+            userLabel: analyticsUserLabel(event),
             sessionIds: new Set(),
             firstSeen: event.ts,
             lastSeen: event.ts,
@@ -614,7 +637,10 @@ function summarizeUserActions(events, limit = 200) {
         };
         if (event.sessionId) existing.sessionIds.add(event.sessionId);
         existing.sessionId = event.sessionId || existing.sessionId;
-        existing.ip = event.ip || existing.ip;
+        existing.userId = event.userId || existing.userId;
+        existing.username = event.username || existing.username;
+        existing.displayName = event.displayName || existing.displayName;
+        existing.userLabel = analyticsUserLabel(existing);
         existing.page = event.page || event.path || existing.page;
         existing.section = event.section || existing.section;
         existing.country = event.country || existing.country;
@@ -681,9 +707,10 @@ function summarizeButtonClicks(events, limit = 16) {
             type: key,
             count: 0,
             visitors: new Set(),
-            ips: new Set(),
+            users: new Set(),
             lastSeen: event.ts,
-            lastIp: event.ip,
+            lastUserKey: analyticsUserKey(event),
+            lastUserLabel: analyticsUserLabel(event),
             lastPage: event.page,
             cta: event.cta,
             action: event.action,
@@ -692,9 +719,11 @@ function summarizeButtonClicks(events, limit = 16) {
         };
         existing.count += 1;
         if (event.sessionId) existing.visitors.add(event.sessionId);
-        if (event.ip) existing.ips.add(event.ip);
+        const userKey = analyticsUserKey(event);
+        if (userKey) existing.users.add(userKey);
         existing.lastSeen = event.ts || existing.lastSeen;
-        existing.lastIp = event.ip || existing.lastIp;
+        existing.lastUserKey = userKey || existing.lastUserKey;
+        existing.lastUserLabel = analyticsUserLabel(event) || existing.lastUserLabel;
         existing.lastPage = event.page || existing.lastPage;
         existing.cta = event.cta || existing.cta;
         existing.action = event.action || existing.action;
@@ -706,7 +735,7 @@ function summarizeButtonClicks(events, limit = 16) {
         .map((item) => ({
             ...item,
             visitors: item.visitors.size,
-            ips: item.ips.size
+            users: item.users.size
         }))
         .sort((a, b) => b.count - a.count || String(b.lastSeen || '').localeCompare(String(a.lastSeen || '')))
         .slice(0, limit);
@@ -720,7 +749,10 @@ function recentButtonClicks(events, limit = 50) {
         .map((event) => ({
             ts: event.ts,
             type: event.type,
-            ip: event.ip,
+            userKey: analyticsUserKey(event),
+            userId: event.userId,
+            username: event.username,
+            userLabel: analyticsUserLabel(event),
             sessionId: event.sessionId,
             page: event.page,
             section: event.section,
@@ -738,11 +770,15 @@ function recentButtonClicks(events, limit = 50) {
 function summarizeVisitors(events, limit = 200) {
     const visitors = new Map();
     for (const event of events) {
-        const key = event.ip || event.sessionId;
+        const key = analyticsUserKey(event);
         if (!key) continue;
         const existing = visitors.get(key) || {
             sessionId: event.sessionId,
-            ip: event.ip,
+            userKey: key,
+            userId: event.userId,
+            username: event.username,
+            displayName: event.displayName,
+            userLabel: analyticsUserLabel(event),
             sessionIds: new Set(),
             userAgent: event.userAgent,
             device: event.device || {},
@@ -753,7 +789,10 @@ function summarizeVisitors(events, limit = 200) {
         };
         if (event.sessionId) existing.sessionIds.add(event.sessionId);
         existing.sessionId = event.sessionId || existing.sessionId;
-        existing.ip = event.ip || existing.ip;
+        existing.userId = event.userId || existing.userId;
+        existing.username = event.username || existing.username;
+        existing.displayName = event.displayName || existing.displayName;
+        existing.userLabel = analyticsUserLabel(existing);
         existing.userAgent = event.userAgent || existing.userAgent;
         existing.device = Object.keys(event.device || {}).length ? event.device : existing.device;
         existing.page = event.page || event.path || existing.page;
@@ -787,7 +826,7 @@ function summarizeVisitors(events, limit = 200) {
         }));
 }
 
-router.post('/event', async (req, res) => {
+router.post('/event', requireAuth, async (req, res) => {
     try {
         if (shouldIgnoreLocalAnalytics(req)) {
             res.status(204).end();
@@ -812,8 +851,7 @@ router.get('/admin/live', requireAdmin, (req, res) => {
         return;
     }
     pruneLiveSessions();
-    const visitors = [...liveSessions.values()]
-        .sort((a, b) => String(b.lastSeen).localeCompare(String(a.lastSeen)));
+    const visitors = summarizeVisitors([...liveSessions.values()]);
     res.json({
         activeWindowSeconds: ACTIVE_WINDOW_MS / 1000,
         total: visitors.length,
@@ -873,9 +911,9 @@ router.delete('/admin/user', requireAdmin, async (req, res) => {
     try {
         const scopeInfo = analyticsScope(req);
         const { scope, days, from, to } = scopeInfo;
-        const ip = cleanString(req.query.ip || req.body?.ip, 120);
-        if (!ip) {
-            res.status(400).json({ error: 'Missing ip' });
+        const userKey = cleanString(req.query.userKey || req.body?.userKey, 240);
+        if (!userKey) {
+            res.status(400).json({ error: 'Missing userKey' });
             return;
         }
         if (shouldProxyRemoteAdmin(req)) {
@@ -888,7 +926,7 @@ router.delete('/admin/user', requireAdmin, async (req, res) => {
             } else {
                 target.searchParams.set('days', String(days));
             }
-            target.searchParams.set('ip', ip);
+            target.searchParams.set('userKey', userKey);
             const headers = {};
             for (const name of ['authorization', 'x-velora-admin-access', 'x-admin-access']) {
                 const value = req.get(name);
@@ -902,11 +940,11 @@ router.delete('/admin/user', requireAdmin, async (req, res) => {
             res.send(text);
             return;
         }
-        const result = await deleteAnalyticsUserEvents({ ip, days, scope, from, to });
+        const result = await deleteAnalyticsUserEvents({ userKey, days, scope, from, to });
         for (const [sessionId, session] of liveSessions.entries()) {
-            if (sameAnalyticsIp(session.ip, ip)) liveSessions.delete(sessionId);
+            if (analyticsUserKey(session) === userKey) liveSessions.delete(sessionId);
         }
-        res.json({ ok: true, ip: normalizeIp(ip), ...result });
+        res.json({ ok: true, userKey, ...result });
     } catch (err) {
         console.error('[analytics] delete user failed:', err);
         res.status(500).json({ error: 'Analytics user cleanup failed' });

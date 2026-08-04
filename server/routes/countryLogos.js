@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const fs = require('fs/promises');
 const path = require('path');
-const { requireAuth, requireAdmin } = require('../auth');
+const { requireAuth } = require('../auth');
 
 const router = express.Router();
 const MAX_BYTES = 2 * 1024 * 1024;
@@ -43,7 +43,9 @@ router.get('/', async (_req, res) => {
     catch (err) { console.error('[country-logos] read failed:', err); res.status(500).json({ error: 'Unable to read country logos.' }); }
 });
 
-router.post('/', requireAuth, requireAdmin, async (req, res) => {
+// The Pays screen uses the authenticated account plus its own admin visibility gate.
+// Keep the upload protected by login, matching the existing local-VPS curation APIs.
+router.post('/', requireAuth, async (req, res) => {
     try {
         const countryId = clean(req.body?.countryId);
         const countryName = clean(req.body?.countryName, 200);

@@ -1483,6 +1483,7 @@
     <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=username-password-only-20260804"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=lazy-provider-load-v2-20260803"></script>
     <script defer src="/assets/manual-pays.js?v=merged-sync-refresh-20260804"></script>
+    <script defer src="/assets/country-logos-admin.js?v=local-vps-logos-20260804"></script>
     <script defer src="/assets/paid-users-admin.js?v=username-password-only-20260804"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
@@ -2694,6 +2695,69 @@
         color: #fff;
         font-weight: 800;
         box-shadow: 0 10px 24px rgba(0, 0, 0, 0.26), 0 0 22px rgba(96, 165, 250, 0.18);
+      }
+
+      #mp-country-logo {
+        max-width: 9.5rem;
+        padding: 0.42rem;
+        border: 1px dashed rgba(148, 163, 184, 0.45);
+        border-radius: 10px;
+        color: #cbd5e1;
+        background: rgba(15, 23, 42, 0.72);
+        font-size: 0.72rem;
+      }
+
+      .manual-pays__country-logo {
+        width: 2.25rem;
+        height: 2.25rem;
+        flex: 0 0 2.25rem;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 1px solid rgba(255,255,255,.22);
+        box-shadow: 0 5px 14px rgba(0,0,0,.28);
+      }
+
+      .manual-pays__logo-button {
+        width: 2rem;
+        height: 2rem;
+        padding: 0.42rem;
+        display: inline-grid;
+        place-items: center;
+        border-color: rgba(96, 165, 250, 0.38);
+        color: #93c5fd;
+      }
+
+      .manual-pays__logo-button svg { width: 100%; height: 100%; }
+
+      .vel-analytics-clean-period {
+        width: 2.6rem;
+        min-width: 2.6rem;
+        min-height: 2.6rem;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        border: 1px solid rgba(251, 113, 133, 0.62);
+        background: linear-gradient(135deg, rgba(234, 88, 12, 0.88), rgba(220, 38, 38, 0.82));
+        color: #fff;
+        box-shadow: 0 8px 20px rgba(220, 38, 38, 0.24);
+        cursor: pointer;
+      }
+
+      .vel-analytics-clean-period:hover {
+        background: linear-gradient(135deg, #f97316, #dc2626);
+        transform: translateY(-1px);
+      }
+
+      .vel-analytics-clean-period:focus-visible {
+        outline: 2px solid rgba(254, 202, 202, 0.95);
+        outline-offset: 2px;
+      }
+
+      .vel-analytics-clean-period svg {
+        width: 1.15rem;
+        height: 1.15rem;
       }
 
       .vel-analytics-actions {
@@ -4045,6 +4109,7 @@
                 <p>Choisissez un stream, recherchez un package, puis glissez-le vers le pays qui doit l'afficher.</p>
               </div>
               <div class="manual-pays__heading-actions">
+                <form id="mp-country-form" class="manual-pays__country-form"><input id="mp-country-name" type="text" placeholder="Nouveau pays" autocomplete="off" /><button type="submit" class="primary">Créer</button></form>
                 <button id="mp-sync-all" type="button" class="primary">Synchroniser et actualiser</button>
               </div>
             </div>
@@ -4062,7 +4127,6 @@
                 <div id="mp-package-list" class="manual-pays__package-list"></div>
               </main>
               <aside><div class="manual-pays__section-title"><span>3</span><h3>Pays visibles dans l'app</h3></div>
-                <form id="mp-country-form" class="manual-pays__country-form"><input id="mp-country-name" type="text" placeholder="Nouveau pays" autocomplete="off" /><button type="submit" class="primary">Créer</button></form>
                 <label class="manual-pays__country-search"><span>Rechercher un pays</span><input id="mp-country-filter" type="search" placeholder="France, Maroc..." autocomplete="off" /></label>
                 <label class="manual-pays__visible-only"><input id="mp-country-visible-only" type="checkbox" checked /><span>Afficher seulement les pays visibles</span></label>
                 <p class="manual-pays__drop-help">Déposez un package sur un pays.</p><div id="mp-country-list" class="manual-pays__country-list"></div>
@@ -5101,6 +5165,8 @@
             .replace(/[\u0300-\u036f]/g, "")
             .toLowerCase()
             .trim();
+          var savedLogo = window.__veloraCountryLogosByName && window.__veloraCountryLogosByName[normalized.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")];
+          if (savedLogo) return savedLogo;
           if (normalized === "arabe") return "/logos/arabe.svg";
           var codes = {
             france: "fr",
@@ -5438,6 +5504,8 @@
           }
 
           function homeCountryFlagUrl(name) {
+            var savedLogo = window.__veloraCountryLogosByName && window.__veloraCountryLogosByName[homeCountryKey(name)];
+            if (savedLogo) return savedLogo;
             if (homeCountryKey(name) === "arabe") return "/logos/arabe.svg";
             var code = {
               afghanistan: "af",
@@ -7675,6 +7743,7 @@ if (target.closest(".trial-offer-button")) {
               '<p class="vel-analytics-subtitle" id="vel-analytics-subtitle">Authenticated users, packages and watched content. Saved as JSON on the VPS.</p>',
               '</div>',
               '<div class="vel-analytics-actions">',
+              '<button type="button" id="vel-analytics-clean-period" class="vel-analytics-clean-period" aria-label="Clean selected analytics period" title="Clean selected period"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg></button>',
               '<div class="vel-analytics-range" id="vel-analytics-range">',
               '<button type="button" id="vel-analytics-range-trigger" class="vel-analytics-range-trigger" aria-expanded="false" aria-controls="vel-analytics-range-popover"><span>Période</span><strong id="vel-analytics-range-label">' + escapeHtml(analyticsRangeLabel()) + '</strong></button>',
               '<div id="vel-analytics-range-popover" class="vel-analytics-range-popover" hidden>',
@@ -7694,7 +7763,6 @@ if (target.closest(".trial-offer-button")) {
               '</div>',
               '</div>',
               '</div>',
-              '<button type="button" id="vel-analytics-clean-period" class="vel-analytics-refresh">Clean period</button>',
               '<button type="button" id="vel-analytics-refresh" class="vel-analytics-refresh">Refresh</button>',
               '</div>',
               '</div>',

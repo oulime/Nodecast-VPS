@@ -297,6 +297,7 @@ app.use('/api/velora/catalog', require('./routes/veloraCatalog'));
 app.use('/api/velora-db', require('./routes/veloraData'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api', require('./routes/packageCovers'));
+app.use('/api/country-logos', require('./routes/countryLogos'));
 
 // Retired trial/IP endpoints must not fall through to the SPA HTML response.
 app.all([

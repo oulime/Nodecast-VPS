@@ -1482,12 +1482,12 @@
     <script defer src="/assets/velora-home-sections.js?v=country-switch-ready-20260804"></script>
     <script defer src="/assets/velora-home-cache-fallback.js?v=protected-default-home-20260804b"></script>
     <script defer src="/assets/home-empty-rescue.js?v=20260804b"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=defer-empty-live-filter-20260804"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=country-live-bounded-20260804"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=lazy-provider-load-v2-20260803"></script>
     <script defer src="/assets/manual-pays.js?v=merged-sync-refresh-20260804"></script>
     <script defer src="/assets/country-logos-admin.js?v=local-vps-logos-20260804d"></script>
     <script defer src="/assets/live-package-country-fallback.js?v=20260804d"></script>
-    <script defer src="/assets/country-switch-loader.js?v=full-load-20260804c"></script>
+    <script defer src="/assets/country-switch-loader.js?v=full-load-20260804e"></script>
     <script defer src="/assets/paid-users-admin.js?v=username-password-only-20260804"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
@@ -3855,6 +3855,14 @@
         visibility: visible !important;
         pointer-events: auto !important;
       }
+
+      /* Country transitions are independent from the first-visit home gate. */
+      body.vel-country-switch-loading #catalog-loading-overlay,
+      body.vel-country-switch-loading #catalog-loading-overlay.hidden {
+        display: flex !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+      }
     </style>
   </head>
   <body class="vite-autoconnect vel-home-choice-loading vel-home-choice-catalog-pending">
@@ -5696,13 +5704,28 @@
           function applyHomeCountry(value) {
             var mainCountrySelect = getMainCountrySelect();
             if (!homeCountrySelect || !mainCountrySelect) return;
+            if (mainCountrySelect.value === value) {
+              setHomeCountryMenuOpen(false);
+              return;
+            }
+            var selectedOption = Array.prototype.find.call(homeCountrySelect.options, function (option) {
+              return option.value === value;
+            });
+            var selectedName = selectedOption ? String(selectedOption.textContent || "").trim() : "";
+            document.dispatchEvent(new CustomEvent("velora-country-switch-start", {
+              detail: { countryName: selectedName, countryValue: value }
+            }));
             homeCountrySelect.dataset.syncing = "true";
             homeCountrySelect.value = value;
             mainCountrySelect.value = value;
-            mainCountrySelect.dispatchEvent(new Event("change", { bubbles: true }));
             homeCountrySelect.dataset.syncing = "false";
             setHomeCountryMenuOpen(false);
-            window.setTimeout(syncHomeCountryOptions, 80);
+            window.requestAnimationFrame(function () {
+              window.requestAnimationFrame(function () {
+                mainCountrySelect.dispatchEvent(new Event("change", { bubbles: true }));
+                window.setTimeout(syncHomeCountryOptions, 80);
+              });
+            });
           }
 
           function renderHomeCountryMenu() {

@@ -3,6 +3,7 @@
   let runId = 0;
   let lastMutationAt = 0;
   let lastHomeRenderedAt = 0;
+  let pendingCountryValue = "";
   const overlay = () => document.getElementById("catalog-loading-overlay");
 
   function show(countryName) {
@@ -18,12 +19,23 @@
     document.body.classList.add("vel-home-choice-loading", "vel-country-switch-loading");
   }
 
+  function start(countryName, countryValue) {
+    const id = ++runId;
+    pendingCountryValue = String(countryValue || "");
+    lastMutationAt = Date.now();
+    lastHomeRenderedAt = 0;
+    show(countryName);
+    finishWhenStable(id);
+    return id;
+  }
+
   function hide(id) {
     if (id !== runId) return;
     const node = overlay();
     node?.classList.add("hidden");
     node?.setAttribute("aria-hidden", "true");
     document.body.classList.remove("vel-home-choice-loading", "vel-home-choice-catalog-pending", "vel-country-switch-loading");
+    pendingCountryValue = "";
   }
 
   function visibleImages() {
@@ -73,18 +85,21 @@
     return true;
   }
 
+  document.addEventListener("velora-country-switch-start", event => {
+    const detail = event.detail || {};
+    start(String(detail.countryName || ""), String(detail.countryValue || ""));
+  });
+
   document.addEventListener("change", event => {
     if (event.target?.id !== "country-select") return;
     const select = event.target;
     const name = select.selectedOptions?.[0]?.textContent?.trim() || "";
-    const id = ++runId;
-    lastMutationAt = Date.now();
-    lastHomeRenderedAt = 0;
-    window.setTimeout(() => {
-      if (id !== runId) return;
-      show(name);
-      finishWhenStable(id);
-    }, 0);
+    const value = String(select.value || "");
+    if (pendingCountryValue === value && document.body.classList.contains("vel-country-switch-loading")) {
+      lastMutationAt = Date.now();
+      return;
+    }
+    start(name, value);
   }, true);
 
   document.addEventListener("velora-home-country-rendered", () => { lastHomeRenderedAt = Date.now(); lastMutationAt = Date.now(); });

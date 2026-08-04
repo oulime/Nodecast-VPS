@@ -219,8 +219,7 @@
           if (!select || !select.options || select.selectedIndex < 0) return false;
           var option = select.options[select.selectedIndex];
           if (!option || option.disabled || !String(option.value || "").trim()) return false;
-          return hadPersistedCountryAtStartup ||
-            normalizeCountryName(option.textContent) === "france";
+          return startupCountryRestored;
         };
         window.veloraIsStartupContentReady = function (select) {
           return window.veloraIsStartupCountryReady(select) &&
@@ -1509,9 +1508,9 @@
         window.fetch.__veloraPaidAccessPatched = true;
       })();
     </script>
-    <script defer src="/assets/velora-home-sections.js?v=atomic-home-render-v13-20260803"></script>
-    <script src="/assets/velora-home-cache-fallback.js?v=provider-order-render-20260803"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=preserve-tab-country-change-20260803"></script>
+    <script defer src="/assets/velora-home-sections.js?v=provider-order-home-content-20260804"></script>
+    <script src="/assets/velora-home-cache-fallback.js?v=skeleton-only-provider-order-20260804"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=provider-order-package-content-20260804"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=lazy-provider-load-v2-20260803"></script>
     <script defer src="/assets/manual-pays.js?v=20260803-normalized-country-visibility-v3"></script>
     <script defer src="/assets/paid-users-admin.js?v=20260801-vps-sqlite"></script>

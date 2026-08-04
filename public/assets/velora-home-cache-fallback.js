@@ -290,6 +290,16 @@
   }
 
   async function loadAndRender() {
+    var countrySelect = document.getElementById("country-select");
+    if (typeof window.veloraIsStartupCountryReady === "function" &&
+        !window.veloraIsStartupCountryReady(countrySelect)) {
+      if (countrySelect && countrySelect.options && countrySelect.options.length) {
+        window.setTimeout(function () {
+          if (window.veloraIsStartupCountryReady(countrySelect)) loadAndRender();
+        }, 0);
+      }
+      return;
+    }
     try {
       var stored = sessionStorage.getItem(storageKey);
       if (stored) renderSkeleton(JSON.parse(stored));
@@ -303,17 +313,9 @@
       document.dispatchEvent(new CustomEvent("velora-home-cache-ready", {
         detail: { countryId: activeCountryId() }
       }));
-      var attempts = 0;
-      var timer = window.setInterval(function () {
-        attempts += 1;
-        if (render(payload) || attempts >= 30) {
-          window.clearInterval(timer);
-          releaseStaleHomeLoader();
-        }
-      }, 300);
-      window.requestAnimationFrame(function () {
-        window.requestAnimationFrame(function () { render(payload); releaseStaleHomeLoader(); });
-      });
+      // The cache may have been built before package content switched to
+      // provider order. Keep its fast skeleton, but let the canonical home
+      // renderer paint the real cards atomically in the current package order.
     } catch (error) {}
   }
 
@@ -327,8 +329,4 @@
   }
   window.setTimeout(releaseStaleHomeLoader, 1200);
   window.setTimeout(releaseStaleHomeLoader, 3000);
-  window.setTimeout(function () {
-    var root = document.getElementById("vel-home-sections");
-    if (cachePayload && root && !root.querySelector(".vel-home-section__card")) render(cachePayload);
-  }, 6000);
 })();

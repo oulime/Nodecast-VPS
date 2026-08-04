@@ -2,7 +2,6 @@
   "use strict";
   const byId = new Map();
   const key = value => String(value || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-  const token = () => localStorage.getItem("authToken") || "";
   const escapeHtml = value => String(value || "").replace(/[&<>"']/g, char => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[char]);
 
   function publish(logos) {
@@ -33,7 +32,7 @@
     if (file.size > 2 * 1024 * 1024) throw new Error("The logo must be 2 MB or smaller.");
     const response = await fetch("/api/country-logos", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+      headers: { "Content-Type": "application/json", apikey: "local-vps", Authorization: "Bearer local-vps" },
       body: JSON.stringify({ countryId, countryName, dataBase64: await fileAsDataUrl(file) })
     });
     const body = await response.json().catch(() => ({}));

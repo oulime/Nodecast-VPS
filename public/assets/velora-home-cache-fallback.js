@@ -8,6 +8,7 @@
   var nativeTouchGesture = null;
   var lastDirectTouchCard = null;
   var lastDirectTouchAt = 0;
+  var homeRootObserver = null;
 
   function activateDirectTouch(card, payload) {
     var now = Date.now();
@@ -289,6 +290,17 @@
     return !!root.querySelector(".vel-home-section__card");
   }
 
+  function protectRenderedHome(payload) {
+    var root = document.getElementById("vel-home-sections");
+    if (!root || homeRootObserver) return;
+    homeRootObserver = new MutationObserver(function () {
+      window.setTimeout(function () {
+        if (!root.querySelector(".vel-home-section__card")) render(payload);
+      }, 80);
+    });
+    homeRootObserver.observe(root, { childList: true, subtree: true });
+  }
+
   async function loadAndRender() {
     var countrySelect = document.getElementById("country-select");
     if (typeof window.veloraIsStartupCountryReady === "function" &&
@@ -306,6 +318,7 @@
     } catch (error) {}
     try {
       var payload = await window.veloraLoadHomeCache(false);
+      protectRenderedHome(payload);
       try { sessionStorage.setItem(storageKey, JSON.stringify(payload)); } catch (error) {}
       renderSkeleton(payload);
       window.veloraHomeCacheFirstPaintReady = true;
@@ -313,9 +326,14 @@
       document.dispatchEvent(new CustomEvent("velora-home-cache-ready", {
         detail: { countryId: activeCountryId() }
       }));
-      // The cache may have been built before package content switched to
-      // provider order. Keep its fast skeleton, but let the canonical home
-      // renderer paint the real cards atomically in the current package order.
+      // Give the canonical renderer a brief chance to paint the provider-ordered
+      // cards. If it was interrupted by another startup script, never leave Home
+      // empty (or stuck on skeletons): the cache is already stored in provider
+      // order and is a safe real-content fallback.
+      window.setTimeout(function () {
+        var root = document.getElementById("vel-home-sections");
+        if (!root || !root.querySelector(".vel-home-section__card")) render(payload);
+      }, 350);
     } catch (error) {}
   }
 
@@ -327,6 +345,11 @@
   } else {
     loadAndRender();
   }
+  // Country options are populated asynchronously by the bundled application.
+  // Its ready event can happen before this listener is attached, so always run
+  // a couple of idempotent late passes as well.
+  window.setTimeout(loadAndRender, 500);
+  window.setTimeout(loadAndRender, 1800);
   window.setTimeout(releaseStaleHomeLoader, 1200);
   window.setTimeout(releaseStaleHomeLoader, 3000);
 })();

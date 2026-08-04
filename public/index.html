@@ -1478,12 +1478,14 @@
       rel="stylesheet"
     />
     <script src="/assets/local-velora-data.js?v=20260731-load-dedupe"></script>
-    <script defer src="/assets/velora-home-sections.js?v=provider-order-home-content-20260804"></script>
-    <script src="/assets/velora-home-cache-fallback.js?v=skeleton-only-provider-order-20260804"></script>
+    <script defer src="/assets/velora-home-sections.js?v=country-switch-ready-20260804"></script>
+    <script defer src="/assets/velora-home-cache-fallback.js?v=protected-default-home-20260804b"></script>
+    <script defer src="/assets/home-empty-rescue.js?v=20260804b"></script>
     <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=username-password-only-20260804"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=lazy-provider-load-v2-20260803"></script>
     <script defer src="/assets/manual-pays.js?v=merged-sync-refresh-20260804"></script>
     <script defer src="/assets/country-logos-admin.js?v=local-vps-logos-20260804d"></script>
+    <script defer src="/assets/country-switch-loader.js?v=full-load-20260804c"></script>
     <script defer src="/assets/paid-users-admin.js?v=username-password-only-20260804"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
@@ -5423,7 +5425,9 @@
                 return;
               }
               if (Date.now() - started >= maxWait) {
-                setLoadingStatus("Sélection de la France…");
+                setLoadingStatus("Ouverture de l’application…");
+                finish();
+                return;
               }
             }
 
@@ -6756,7 +6760,8 @@
           var select = document.getElementById("country-select");
           if (!select) return "";
           var option = select.options[select.selectedIndex];
-          return option ? text(option) || select.value : select.value;
+          var selected = option ? text(option) || select.value : select.value;
+          return /aucun pays|choisir|chargement/i.test(selected) ? "" : selected;
         }
 
         function cleanCountryName(value) {
@@ -6902,7 +6907,7 @@
         function setCurrentPackageFromCard(card, sendOpen) {
           if (!card) return false;
           var id = card.dataset.packageId || "";
-          var name = titleFromPackage(card);
+          var name = card.dataset.packageName || titleFromPackage(card);
           if (!id && !name) return false;
           stopActivePlayback("video_stop");
           currentPackage = { id: id, name: name };
@@ -6928,6 +6933,7 @@
           var content = document.getElementById("content-view");
           if (packages && isVisible(packages)) {
             if (Date.now() - (lastPackageCapture.at || 0) < 1200) return;
+            if (currentMedia.title) return;
             stopActivePlayback("video_stop");
             currentPackage = { id: "", name: "" };
             currentMedia = { type: "", id: "", title: "" };
@@ -6946,8 +6952,9 @@
             text(el.querySelector(".vel-media-item-row__title")) ||
             text(el.querySelector(".vel-vod-detail__episode-title")) ||
             text(el);
+          var contentType = String(el.dataset.contentType || activeSection()).toLowerCase();
           return {
-            type: activeSection() === "movies" ? "movie" : activeSection() === "series" ? "series" : "live",
+            type: contentType === "movies" || contentType === "vod" ? "movie" : contentType === "series" ? "series" : "live",
             id: el.dataset.streamId || el.dataset.episodeStreamId || el.dataset.mediaId || el.dataset.id || "",
             title: title
           };
@@ -7050,14 +7057,18 @@ if (target.closest(".trial-offer-button")) {
             return;
           }
 
-          var media = target.closest(".media-item, .vel-media-item-row, .vel-vod-movie-card, .vel-vod-detail__watch, .vel-vod-detail__episode");
+          var media = target.closest(".media-item, .vel-media-item-row, .vel-vod-movie-card, .vel-vod-detail__watch, .vel-vod-detail__episode, .vel-home-section__card");
           if (media) {
+            if (media.dataset.packageId || media.dataset.packageName) setCurrentPackageFromCard(media, false);
             currentMedia = mediaFromElement(media);
             send("media_open", {
               mediaType: currentMedia.type,
               mediaId: currentMedia.id,
               mediaTitle: currentMedia.title,
-              channelName: currentMedia.type === "live" ? currentMedia.title : undefined
+              channelName: currentMedia.type === "live" ? currentMedia.title : undefined,
+              packageId: currentPackage.id || undefined,
+              packageName: currentPackage.name || undefined,
+              country: media.dataset.countryName || selectedCountry()
             });
           }
 

@@ -87,18 +87,24 @@
   document.addEventListener("click", event => {
     const button = event.target.closest?.("[data-country-logo-pick]");
     if (!button) return;
-    event.preventDefault(); event.stopPropagation();
+    event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation();
     const card = button.closest("[data-country]");
     const picker = document.createElement("input");
     picker.type = "file"; picker.accept = "image/png,image/jpeg,image/webp,image/gif";
+    picker.style.display = "none";
+    document.body.appendChild(picker);
     picker.onchange = async () => {
       try {
         button.disabled = true;
         const name = card.querySelector(".manual-pays__country-head strong")?.textContent?.trim() || "Country";
-        await upload(card.dataset.country, name, picker.files?.[0]);
+        const saved = await upload(card.dataset.country, name, picker.files?.[0]);
         enhanceCards();
+        const status = document.getElementById("countries-admin-status");
+        if (status) status.textContent = `Logo de ${name} enregistré sur le VPS.`;
+        const preview = card.querySelector(".manual-pays__country-logo");
+        if (preview) { preview.src = `${saved.path}?v=${Date.now()}`; preview.hidden = false; }
       } catch (error) { alert(error.message); }
-      finally { button.disabled = false; }
+      finally { button.disabled = false; picker.remove(); }
     };
     picker.click();
   }, true);

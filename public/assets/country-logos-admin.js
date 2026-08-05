@@ -62,6 +62,19 @@
     return body.logo;
   }
 
+  async function remove(countryId, countryName) {
+    const response = await fetch(`/api/country-logos/${encodeURIComponent(countryId)}`, {
+      method: "DELETE",
+      headers: { apikey: "local-vps", Authorization: "Bearer local-vps" }
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+    byId.delete(String(countryId));
+    delete window.__veloraCountryLogosByName[key(countryName)];
+    refreshAppLogos();
+    window.dispatchEvent(new CustomEvent("velora-country-logos-changed"));
+  }
+
   function enhanceForm() {
     const form = document.getElementById("mp-country-form");
     if (!form || document.getElementById("mp-country-logo")) return;
@@ -73,6 +86,33 @@
     form.insertBefore(input, form.querySelector("button"));
   }
 
+  function actionList(actions) {
+    let list = actions.querySelector(".manual-pays__country-action-list");
+    if (list) return list;
+    const menu = document.createElement("details");
+    menu.className = "manual-pays__country-action-menu";
+    const summary = document.createElement("summary");
+    summary.textContent = "Options";
+    summary.addEventListener("click", event => event.stopPropagation());
+    list = document.createElement("div");
+    list.className = "manual-pays__country-action-list";
+    [...actions.children].forEach(child => list.appendChild(child));
+    menu.append(summary, list);
+    actions.appendChild(menu);
+    return list;
+  }
+
+  function labelActions(card, list) {
+    const hidden = card.classList.contains("is-hidden-country");
+    list.querySelectorAll("button").forEach(button => {
+      button.classList.add("manual-pays__country-action");
+      if (button.matches("[data-toggle-country]")) button.textContent = hidden ? "Afficher le pays" : "Masquer le pays";
+      if (button.matches("[data-delete-country]")) button.textContent = "Supprimer le pays";
+      if (button.matches("[data-country-logo-pick]")) button.textContent = "Ajouter / modifier l’image";
+      if (button.matches("[data-country-logo-delete]")) button.textContent = "Supprimer l’image";
+    });
+  }
+
   function enhanceCards() {
     document.querySelectorAll("#mp-country-list [data-country]").forEach(card => {
       const id = String(card.dataset.country || "");
@@ -80,6 +120,7 @@
       const head = card.querySelector(".manual-pays__country-head");
       const actions = card.querySelector(".manual-pays__country-actions");
       if (!head || !actions) return;
+      const list = actionList(actions);
       let preview = card.querySelector(".manual-pays__country-logo");
       if (!preview) {
         preview = document.createElement("img");
@@ -90,7 +131,12 @@
       const logo = byId.get(id);
       preview.src = logo?.path || window.__veloraCountryLogosByName?.[key(name)] || "";
       preview.hidden = !preview.src;
-      if (card.querySelector("[data-country-logo-pick]")) return;
+      if (card.querySelector("[data-country-logo-pick]")) {
+        const existingDelete = card.querySelector("[data-country-logo-delete]");
+        if (existingDelete) existingDelete.hidden = !logo;
+        labelActions(card, list);
+        return;
+      }
       const button = document.createElement("button");
       button.type = "button";
       button.dataset.countryLogoPick = id;
@@ -98,11 +144,37 @@
       button.title = `Changer le logo de ${name}`;
       button.setAttribute("aria-label", button.title);
       button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 5h3l1.2-2h7.6L17 5h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm8 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0-2.2a2.8 2.8 0 1 1 0-5.6 2.8 2.8 0 0 1 0 5.6Z"/></svg>';
-      actions.insertBefore(button, actions.firstChild);
+      list.appendChild(button);
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.dataset.countryLogoDelete = id;
+      deleteButton.className = "manual-pays__logo-button";
+      deleteButton.title = `Supprimer le logo de ${name}`;
+      deleteButton.setAttribute("aria-label", deleteButton.title);
+      deleteButton.textContent = "×";
+      deleteButton.hidden = !logo;
+      list.appendChild(deleteButton);
+      labelActions(card, list);
     });
   }
 
   document.addEventListener("click", event => {
+    const deleteButton = event.target.closest?.("[data-country-logo-delete]");
+    if (deleteButton) {
+      event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation();
+      const card = deleteButton.closest("[data-country]");
+      const name = card?.querySelector(".manual-pays__country-head strong")?.textContent?.trim() || "ce pays";
+      if (!window.confirm(`Supprimer le logo de ${name} ?`)) return;
+      deleteButton.disabled = true;
+      remove(deleteButton.dataset.countryLogoDelete, name).then(() => {
+        const preview = card?.querySelector(".manual-pays__country-logo");
+        if (preview) { preview.removeAttribute("src"); preview.hidden = true; }
+        deleteButton.hidden = true;
+        const status = document.getElementById("countries-admin-status");
+        if (status) status.textContent = `Logo de ${name} supprimé.`;
+      }).catch(error => { alert(error.message); deleteButton.disabled = false; });
+      return;
+    }
     const button = event.target.closest?.("[data-country-logo-pick]");
     if (!button) return;
     event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation();

@@ -3,6 +3,33 @@
 
   var observer = null;
 
+  // The compiled grid sets an image URL before it appends the image to its
+  // package card. A MutationObserver therefore runs too late: the browser has
+  // already started downloading the first channel logo. Delay property-based
+  // image sources for one microtask, inspect the final parent, and never set a
+  // source for default live package artwork.
+  var imageSrc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "src");
+  var delayedSources = new WeakMap();
+  if (imageSrc && imageSrc.get && imageSrc.set) {
+    Object.defineProperty(HTMLImageElement.prototype, "src", {
+      configurable: true,
+      enumerable: imageSrc.enumerable,
+      get: imageSrc.get,
+      set: function (value) {
+        var image = this;
+        var source = String(value || "");
+        delayedSources.set(image, source);
+        queueMicrotask(function () {
+          if (delayedSources.get(image) !== source) return;
+          delayedSources.delete(image);
+          var card = image.closest && image.closest(".vel-package-card--live-default-art");
+          if (card && image.classList.contains("vel-package-card__art")) return;
+          imageSrc.set.call(image, source);
+        });
+      }
+    });
+  }
+
   function countryLogo() {
     var select = document.getElementById("country-select");
     var name = String(select?.selectedOptions?.[0]?.textContent || "").trim();

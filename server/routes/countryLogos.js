@@ -78,4 +78,23 @@ router.post('/', requirePaysAdmin, async (req, res) => {
     }
 });
 
+router.delete('/:countryId', requirePaysAdmin, async (req, res) => {
+    try {
+        const countryId = clean(req.params.countryId);
+        if (!countryId) return res.status(400).json({ error: 'Country is required.' });
+        const map = await readMap();
+        const existing = map[countryId];
+        if (!existing) return res.status(404).json({ error: 'Country logo not found.' });
+        delete map[countryId];
+        await writeMap(map);
+        if (existing.path?.startsWith(`${PUBLIC_PATH}/`)) {
+            await fs.unlink(path.join(UPLOAD_DIR, path.basename(existing.path))).catch(() => {});
+        }
+        return res.json({ ok: true, countryId });
+    } catch (err) {
+        console.error('[country-logos] delete failed:', err);
+        return res.status(500).json({ error: 'Country logo deletion failed.' });
+    }
+});
+
 module.exports = router;

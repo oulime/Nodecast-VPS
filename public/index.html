@@ -1482,11 +1482,11 @@
     <script defer src="/assets/velora-home-sections.js?v=performance-20260805"></script>
     <script defer src="/assets/velora-home-cache-fallback.js?v=performance-20260805"></script>
     <link rel="stylesheet" href="/assets/live-package-country-fallback.css?v=package-logo-only-20260805">
-    <script defer src="/assets/live-package-country-fallback.js?v=package-logo-only-20260805"></script>
+    <script src="/assets/live-package-country-fallback.js?v=package-logo-only-20260805b"></script>
     <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=country-live-bounded-20260804"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=lazy-provider-load-v2-20260803"></script>
     <script defer src="/assets/manual-pays.js?v=merged-sync-refresh-20260804"></script>
-    <script defer src="/assets/country-logos-admin.js?v=local-vps-logos-20260804d"></script>
+    <script defer src="/assets/country-logos-admin.js?v=country-actions-labels-20260805"></script>
     <script defer src="/assets/country-switch-loader.js?v=full-load-20260804e"></script>
     <script defer src="/assets/paid-users-admin.js?v=username-password-only-20260804"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
@@ -2729,6 +2729,57 @@
         place-items: center;
         border-color: rgba(96, 165, 250, 0.38);
         color: #93c5fd;
+      }
+
+      .manual-pays__country-action-menu {
+        position: relative;
+      }
+
+      .manual-pays__country-action-menu > summary {
+        list-style: none;
+        cursor: pointer;
+        padding: .38rem .58rem;
+        border: 1px solid rgba(148, 163, 184, .34);
+        border-radius: 8px;
+        color: #dbeafe;
+        font-size: .72rem;
+        font-weight: 700;
+      }
+
+      .manual-pays__country-action-menu > summary::-webkit-details-marker { display: none; }
+
+      .manual-pays__country-action-list {
+        position: absolute;
+        right: 0;
+        top: calc(100% + .35rem);
+        z-index: 12;
+        display: grid;
+        gap: .35rem;
+        min-width: 10rem;
+        padding: .45rem;
+        border: 1px solid rgba(148, 163, 184, .28);
+        border-radius: 10px;
+        background: #151222;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, .42);
+      }
+
+      .manual-pays__country-action-list > button { width: 100%; justify-content: center; }
+
+      .manual-pays__country-action-list > .manual-pays__country-action {
+        width: 100% !important;
+        height: auto !important;
+        min-height: 2.25rem;
+        padding: .45rem .65rem !important;
+        border-radius: 7px !important;
+        color: #e9e5ff;
+        font-size: .78rem;
+        text-align: left;
+      }
+
+      .manual-pays__country-action-list > [data-delete-country],
+      .manual-pays__country-action-list > [data-country-logo-delete] {
+        border-color: rgba(251, 113, 133, .38) !important;
+        color: #fecdd3;
       }
 
       .manual-pays__logo-button svg { width: 100%; height: 100%; }

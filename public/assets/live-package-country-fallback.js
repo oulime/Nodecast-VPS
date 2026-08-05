@@ -2,7 +2,6 @@
   "use strict";
 
   var observer = null;
-  var flagObserver = null;
 
   function countryLogo() {
     var select = document.getElementById("country-select");
@@ -28,23 +27,19 @@
 
   function prepare(card, logo) {
     if (!(card instanceof HTMLElement) || !card.classList.contains("vel-package-card--live")) return;
-    if (!logo) {
-      card.classList.remove("vel-live-country-fallback");
-      card.style.removeProperty("--vel-live-country-logo");
-      return;
-    }
-    card.style.setProperty("--vel-live-country-logo", `url("${logo.replace(/["\\]/g, "")}")`);
-    var image = card.querySelector("img:not(.vel-live-country-fallback__probe)");
-    var showFallback = function () { card.classList.add("vel-live-country-fallback"); };
-    var showChannel = function () {
-      if (image.naturalWidth > 0) card.classList.remove("vel-live-country-fallback");
-      else showFallback();
-    };
-    showFallback();
-    if (!image) return;
-    image.addEventListener("load", showChannel, { once: true });
-    image.addEventListener("error", showFallback, { once: true });
-    if (image.complete) showChannel();
+    // Default live artwork is the first channel logo. It is not a package
+    // cover, so discard it immediately: keeping it hidden still downloads it.
+    if (!card.classList.contains("vel-package-card--live-default-art")) return;
+    card.querySelectorAll("img.vel-package-card__art").forEach(function (image) {
+      image.removeAttribute("src");
+      image.remove();
+    });
+    card.querySelectorAll(".vel-package-card__title").forEach(function (title) {
+      title.style.removeProperty("display");
+    });
+    card.classList.add("vel-live-country-fallback");
+    if (logo) card.style.setProperty("--vel-live-country-logo", `url("${logo.replace(/["\\]/g, "")}")`);
+    else card.style.removeProperty("--vel-live-country-logo");
   }
 
   function refresh() {
@@ -65,13 +60,6 @@
       });
       observer.observe(root, { childList: true, subtree: true });
     }
-    if (!flagObserver) {
-      flagObserver = new MutationObserver(function () { refresh(); });
-      ["home-country-flag", "vel-brand-country-flag", "vel-bottom-country-flag"].forEach(function (id) {
-        var flag = document.getElementById(id);
-        if (flag) flagObserver.observe(flag, { attributes: true, attributeFilter: ["src", "hidden"] });
-      });
-    }
   }
 
   document.addEventListener("velora-country-logos-changed", refresh);
@@ -82,5 +70,4 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", refresh, { once: true });
   else refresh();
   window.setTimeout(refresh, 1200);
-  window.setTimeout(refresh, 2500);
 })();

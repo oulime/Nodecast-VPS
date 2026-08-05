@@ -7,15 +7,6 @@
   background-size: cover !important;
 }
 
-.vel-package-card--live.vel-live-country-fallback > img.vel-package-card__art {
-  opacity: 0 !important;
-}
-
-.vel-package-card--live:not(.vel-live-country-fallback) > img.vel-package-card__art {
-  opacity: 1;
-  transition: opacity 160ms ease;
-}
-
 .vel-package-card--live.vel-live-country-fallback > .vel-package-card__emoji {
   display: none !important;
 }

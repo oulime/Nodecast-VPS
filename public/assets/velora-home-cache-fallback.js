@@ -3,12 +3,15 @@
   var storageKey = "velora.home-cache.first-paint.v1";
   var cachePayload = null;
   var cacheRequest = null;
+  var cacheUpdatedAt = 0;
   var registeredHomeCards = new WeakMap();
   var homeTouchGesture = null;
   var nativeTouchGesture = null;
   var lastDirectTouchCard = null;
   var lastDirectTouchAt = 0;
   var homeRootObserver = null;
+  var renderVersion = 0;
+  var railPageSize = 36;
 
   function activateDirectTouch(card, payload) {
     var now = Date.now();
@@ -74,15 +77,19 @@
   document.addEventListener("touchcancel", function () { nativeTouchGesture = null; }, { capture: true, passive: true });
 
   window.veloraLoadHomeCache = function (force) {
-    if (cachePayload && !force) return Promise.resolve(cachePayload);
-    if (cacheRequest && !force) return cacheRequest;
-    cacheRequest = fetch("/api/velora-db/home-cache" + (force ? "?t=" + Date.now() : ""), {
-      cache: force ? "no-store" : "force-cache"
+    // Several legacy modules ask for a "forced" load during startup.  Treat
+    // those as the same request when the payload was just obtained; an actual
+    // admin invalidation still refreshes after this small coalescing window.
+    if (cachePayload && (!force || Date.now() - cacheUpdatedAt < 1000)) return Promise.resolve(cachePayload);
+    if (cacheRequest) return cacheRequest;
+    cacheRequest = fetch("/api/velora-db/home-cache", {
+      cache: force ? "reload" : "force-cache"
     }).then(function (response) {
       if (!response.ok) throw new Error("HTTP " + response.status);
       return response.json();
     }).then(function (payload) {
       cachePayload = payload;
+      cacheUpdatedAt = Date.now();
       window.veloraHomeCachePayload = payload;
       return payload;
     }).finally(function () { cacheRequest = null; });
@@ -157,9 +164,10 @@
     if (entry.thumbUrl) {
       media = document.createElement("img");
       card.classList.add("is-poster-loading");
-      media.src = entry.thumbUrl;
       media.alt = "";
       media.loading = "lazy";
+      media.decoding = "async";
+      media.src = entry.thumbUrl;
       media.addEventListener("load", function () {
         card.classList.remove("is-poster-loading");
         card.classList.add("is-poster-ready");
@@ -256,11 +264,29 @@
     return true;
   }
 
+  function appendRailPage(rail, section, entries, start) {
+    var end = Math.min(entries.length, start + railPageSize);
+    var fragment = document.createDocumentFragment();
+    for (var index = start; index < end; index += 1) fragment.appendChild(createCard(section, entries[index]));
+    rail.appendChild(fragment);
+    if (end >= entries.length) return;
+    var more = document.createElement("button");
+    more.type = "button";
+    more.className = "vel-home-section__more";
+    more.textContent = "Voir plus";
+    more.addEventListener("click", function () {
+      more.remove();
+      window.setTimeout(function () { appendRailPage(rail, section, entries, end); }, 0);
+    }, { once: true });
+    rail.appendChild(more);
+  }
+
   function render(payload) {
     var root = document.getElementById("vel-home-sections");
-    if (!root || root.querySelector(".vel-home-section__card")) return true;
+    if (!root) return false;
+    var version = ++renderVersion;
     var matching = matchingSections(payload);
-    root.replaceChildren();
+    var fragment = document.createDocumentFragment();
     matching.forEach(function (section) {
       var block = document.createElement("section");
       block.className = "vel-home-section";
@@ -278,14 +304,15 @@
       var dominantSource = Object.keys(sourceCounts).sort(function (a, b) {
         return sourceCounts[b] - sourceCounts[a];
       })[0];
-      entries.filter(function (entry) {
+      var filteredEntries = entries.filter(function (entry) {
         return !dominantSource || String(entry.sourceId || "") === dominantSource;
-      }).forEach(function (entry) {
-        rail.appendChild(createCard(section, entry));
       });
+      appendRailPage(rail, section, filteredEntries, 0);
       block.append(heading, rail);
-      root.appendChild(block);
+      fragment.appendChild(block);
     });
+    if (version !== renderVersion) return false;
+    root.replaceChildren(fragment);
     revealHomeFirstPaint();
     return !!root.querySelector(".vel-home-section__card");
   }

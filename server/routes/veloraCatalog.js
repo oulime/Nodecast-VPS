@@ -64,17 +64,21 @@ router.get('/inventory/:sourceId/:kind/:categoryId', (req, res) => {
     const actions = INVENTORY_KINDS[req.params.kind];
     if (!actions) return res.status(400).json({ error: 'Unknown catalogue kind' });
     const rows = veloraCatalogCache.getSnapshot(actions[1]) || [];
-    const items = rows.filter(item => (
+    const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 100, 1), 500);
+    const offset = Math.max(Number.parseInt(req.query.offset, 10) || 0, 0);
+    const matching = rows.filter(item => (
         String(item.source_id) === String(req.params.sourceId) &&
         String(item.raw_category_id ?? '') === String(req.params.categoryId)
-    )).map(item => ({
+    ));
+    const items = matching.slice(offset, offset + limit).map(item => ({
         id: item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id,
         name: String(item.name || item.title || item.series_name || ''),
         image: String(item.stream_icon || item.cover || ''),
         added: item.added || null
     }));
-    res.set('Cache-Control', 'no-store');
-    res.json({ sourceId: req.params.sourceId, kind: req.params.kind, categoryId: req.params.categoryId, count: items.length, items });
+    res.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
+    res.json({ sourceId: req.params.sourceId, kind: req.params.kind, categoryId: req.params.categoryId,
+        count: matching.length, offset, limit, hasMore: offset + items.length < matching.length, items });
 });
 
 router.post('/warm', (req, res) => {

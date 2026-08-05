@@ -13,6 +13,8 @@
     const parsed = new URL(url, window.location.href);
     if (parsed.pathname === "/api/proxy/xtream/all/live_streams") return 5 * 60 * 1000;
     if (parsed.pathname === "/api/velora-db/rest/v1/admin_stream_curations") return 30 * 1000;
+    if (parsed.pathname === "/api/velora-db/home-cache") return 5 * 60 * 1000;
+    if (parsed.pathname.startsWith("/api/velora-db/rest/v1/admin_")) return 30 * 1000;
     return 0;
   }
 

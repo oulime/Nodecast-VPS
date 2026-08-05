@@ -2,7 +2,8 @@
   "use strict";
   var storageKey = "velora.home-cache.first-paint.v1";
   var cachePayload = null;
-  var cacheRequest = null;
+  var cacheRequests = new Map();
+  var cacheCountryId = "";
   var cacheUpdatedAt = 0;
   var registeredHomeCards = new WeakMap();
   var homeTouchGesture = null;
@@ -80,21 +81,41 @@
     // Several legacy modules ask for a "forced" load during startup.  Treat
     // those as the same request when the payload was just obtained; an actual
     // admin invalidation still refreshes after this small coalescing window.
-    if (cachePayload && (!force || Date.now() - cacheUpdatedAt < 1000)) return Promise.resolve(cachePayload);
-    if (cacheRequest) return cacheRequest;
-    cacheRequest = fetch("/api/velora-db/home-cache", {
+    var countryId = activeCountryId();
+    if (cachePayload && cacheCountryId === countryId && (!force || Date.now() - cacheUpdatedAt < 1000)) return Promise.resolve(cachePayload);
+    if (cacheRequests.has(countryId)) return cacheRequests.get(countryId);
+    var request = fetch("/api/velora-db/home-cache?country_id=" + encodeURIComponent(countryId) + "&limit=10", {
       cache: force ? "reload" : "force-cache"
     }).then(function (response) {
       if (!response.ok) throw new Error("HTTP " + response.status);
       return response.json();
     }).then(function (payload) {
-      cachePayload = payload;
-      cacheUpdatedAt = Date.now();
-      window.veloraHomeCachePayload = payload;
+      // A late response for the old country must never replace the current
+      // country view or its cache entry.
+      if (activeCountryId() === countryId) {
+        cachePayload = payload;
+        cacheCountryId = countryId;
+        cacheUpdatedAt = Date.now();
+        window.veloraHomeCachePayload = payload;
+      }
       return payload;
-    }).finally(function () { cacheRequest = null; });
-    return cacheRequest;
+    }).finally(function () { cacheRequests.delete(countryId); });
+    cacheRequests.set(countryId, request);
+    return request;
   };
+
+  function loadSectionPage(section, offset) {
+    var countryId = activeCountryId();
+    return fetch("/api/velora-db/home-cache?country_id=" + encodeURIComponent(countryId) +
+      "&section_id=" + encodeURIComponent(section.id) + "&offset=" + offset + "&limit=10", {
+      cache: "force-cache"
+    }).then(function (response) {
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      return response.json();
+    }).then(function (payload) {
+      return Array.isArray(payload.sections) && payload.sections[0] ? payload.sections[0] : null;
+    });
+  }
 
   function activeCountryId() {
     var select = document.getElementById("country-select");
@@ -269,14 +290,22 @@
     var fragment = document.createDocumentFragment();
     for (var index = start; index < end; index += 1) fragment.appendChild(createCard(section, entries[index]));
     rail.appendChild(fragment);
-    if (end >= entries.length) return;
+    var total = Number(section.entryCount || entries.length);
+    if (end >= total) return;
     var more = document.createElement("button");
     more.type = "button";
     more.className = "vel-home-section__more";
     more.textContent = "Voir plus";
     more.addEventListener("click", function () {
+      more.disabled = true;
+      more.textContent = "Chargement…";
       more.remove();
-      window.setTimeout(function () { appendRailPage(rail, section, entries, end); }, 0);
+      loadSectionPage(section, end).then(function (page) {
+        if (!page) return;
+        var nextEntries = entries.concat(Array.isArray(page.entries) ? page.entries : []);
+        section.entryCount = page.entryCount || total;
+        window.setTimeout(function () { appendRailPage(rail, section, nextEntries, end); }, 0);
+      }).catch(function () {});
     }, { once: true });
     rail.appendChild(more);
   }
@@ -330,6 +359,7 @@
 
   async function loadAndRender() {
     var countrySelect = document.getElementById("country-select");
+    var requestedCountry = activeCountryId();
     if (typeof window.veloraIsStartupCountryReady === "function" &&
         !window.veloraIsStartupCountryReady(countrySelect)) {
       if (countrySelect && countrySelect.options && countrySelect.options.length) {
@@ -345,6 +375,7 @@
     } catch (error) {}
     try {
       var payload = await window.veloraLoadHomeCache(false);
+      if (activeCountryId() !== requestedCountry) return;
       protectRenderedHome(payload);
       try { sessionStorage.setItem(storageKey, JSON.stringify(payload)); } catch (error) {}
       renderSkeleton(payload);

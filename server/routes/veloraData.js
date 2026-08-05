@@ -356,8 +356,30 @@ router.get('/home-cache', (req, res) => {
         const payload = fs.existsSync(homeCachePath)
             ? JSON.parse(fs.readFileSync(homeCachePath, 'utf8'))
             : buildHomeCache();
+        const countryId = String(req.query.country_id || '').trim();
+        const sectionId = String(req.query.section_id || '').trim();
+        const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 10, 1), 100);
+        const offset = Math.max(Number.parseInt(req.query.offset, 10) || 0, 0);
+        let sections = Array.isArray(payload.sections) ? payload.sections : [];
+        if (countryId) {
+            const countrySections = sections.filter(section =>
+                section.published !== false && String(section.country_id || '') === countryId
+            );
+            sections = countrySections.length ? countrySections : sections.filter(section =>
+                section.published !== false && (!section.country_id || section.country_id === 'default')
+            );
+        }
+        if (sectionId) sections = sections.filter(section => String(section.id) === sectionId);
+        sections = sections.map(section => {
+            const entries = Array.isArray(section.entries) ? section.entries : [];
+            return {
+                ...section,
+                entryCount: entries.length,
+                entries: entries.slice(offset, offset + limit)
+            };
+        });
         res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=600');
-        return res.json(payload);
+        return res.json({ generatedAt: payload.generatedAt, sections });
     } catch (error) {
         return res.status(500).json({ error: error.message });
     }

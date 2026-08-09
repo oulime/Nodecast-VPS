@@ -11,6 +11,7 @@ const path = require('path');
 const zlib = require('zlib');
 const { getDb } = require('../db/sqlite');
 const { sources } = require('../db');
+const xtreamApi = require('./xtreamApi');
 
 const cacheDir = path.join(__dirname, '..', '..', 'data', 'velora-cache');
 const vodPosterCachePath = path.join(__dirname, '..', '..', 'data', 'vod-poster-cache.json');
@@ -228,6 +229,62 @@ function enrichVodPostersFromCurrentCatalogue(streams) {
     return streams;
 }
 
+function vodPosterFromProviderItem(item) {
+    return String(
+        item?.stream_icon || item?.cover || item?.cover_big || item?.movie_image || ''
+    ).trim();
+}
+
+async function refreshVodPostersFromProviders(enabledSources, attempts = 2) {
+    const db = getDb();
+    const posterCache = readJson(vodPosterCachePath) || {};
+    let posterCacheChanged = false;
+
+    for (const source of enabledSources) {
+        if (source.type !== 'xtream') continue;
+
+        const posters = new Map();
+        const api = xtreamApi.createFromSource(source);
+        for (let attempt = 1; attempt <= attempts; attempt += 1) {
+            try {
+                const rows = await api.getVodStreams();
+                if (!Array.isArray(rows)) throw new Error('Provider returned a non-array VOD catalogue');
+                for (const item of rows) {
+                    const itemId = String(item?.stream_id ?? '').trim();
+                    const poster = vodPosterFromProviderItem(item);
+                    if (itemId && poster && !posters.has(itemId)) posters.set(itemId, poster);
+                }
+                console.log(`[Velora cache] ${source.name} poster pass ${attempt}/${attempts}: ${posters.size} unique posters collected`);
+            } catch (error) {
+                console.warn(`[Velora cache] ${source.name} poster pass ${attempt}/${attempts} failed:`, error.message);
+            }
+            await new Promise(resolve => setImmediate(resolve));
+        }
+
+        const updatePoster = db.prepare(`
+            UPDATE playlist_items
+            SET stream_icon = ?
+            WHERE source_id = ? AND type = 'movie' AND item_id = ?
+        `);
+        const savePosters = db.transaction(entries => {
+            let updated = 0;
+            for (const [itemId, poster] of entries) {
+                updated += updatePoster.run(poster, source.id, itemId).changes;
+                const key = `${source.id}:${itemId}`;
+                if (posterCache[key] !== poster) {
+                    posterCache[key] = poster;
+                    posterCacheChanged = true;
+                }
+            }
+            return updated;
+        });
+        const updated = savePosters(posters);
+        console.log(`[Velora cache] ${source.name}: persisted ${updated} poster record(s); empty responses never delete saved posters`);
+    }
+
+    if (posterCacheChanged) writeJsonAtomic(vodPosterCachePath, posterCache);
+}
+
 function preserveVodPostersFromPreviousSnapshot(streams) {
     const previous = loadSnapshotFromDisk()?.vod_streams;
     if (!Array.isArray(previous) || !previous.length) return streams;
@@ -428,6 +485,12 @@ async function buildSnapshot(reason) {
     const enabledSources = (await sources.getAll())
         .filter(source => source.enabled && (source.type === 'xtream' || source.type === 'm3u'));
     const sourceIds = enabledSources.map(source => source.id);
+
+    // Some Xtream providers intermittently omit different poster fields from a
+    // bulk catalogue response. Merge two independent passes into the durable
+    // poster store before replacing the snapshot. Existing posters are never
+    // removed when either response is blank.
+    await refreshVodPostersFromProviders(enabledSources, 2);
 
     const liveStreams = listStreams(sourceIds, 'live');
     await new Promise(resolve => setImmediate(resolve));

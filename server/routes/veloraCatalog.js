@@ -8,6 +8,8 @@ const { sources } = require('../db');
 const { getDb } = require('../db/sqlite');
 const xtreamApi = require('../services/xtreamApi');
 const { requireAuth } = require('../auth');
+const auth = require('../auth');
+const paidUsersStore = require('../services/paidUsersStore');
 
 const vodPosterCachePath = path.join(__dirname, '..', '..', 'data', 'vod-poster-cache.json');
 const activePosterRefreshes = new Set();
@@ -89,6 +91,110 @@ function requireSettingsAdmin(req, res, next) {
     }
     next();
 }
+
+const PAID_PLAN_MONTHS = new Set([1, 3, 6, 12, 24]);
+
+function paidPlanMonths(value) {
+    const months = Number.parseInt(value, 10);
+    if (!PAID_PLAN_MONTHS.has(months)) throw new Error('Period must be 1, 3, 6, 12, or 24 months');
+    return months;
+}
+
+function addPaidMonths(date, months) {
+    const next = new Date(date.getTime());
+    const day = next.getDate();
+    next.setMonth(next.getMonth() + months);
+    if (next.getDate() !== day) next.setDate(0);
+    return next;
+}
+
+function paidText(value, maxLength = 160) {
+    if (typeof value !== 'string') return null;
+    const text = value.trim();
+    return text ? text.slice(0, maxLength) : null;
+}
+
+function paidSubscriptionStatus(user) {
+    if (user.subscriptionBlocked) return 'blocked';
+    const end = user.subscriptionEnd ? new Date(user.subscriptionEnd) : null;
+    return end && Number.isFinite(end.getTime()) && end.getTime() <= Date.now() ? 'expired' : 'active';
+}
+
+function publicPaidUser(user) {
+    if (!user) return null;
+    const { passwordHash, ...safe } = user;
+    return { ...safe, subscriptionStatus: paidSubscriptionStatus(safe) };
+}
+
+function paidAdminHandler(handler) {
+    return (req, res, next) => { void Promise.resolve(handler(req, res, next)).catch(next); };
+}
+
+router.get('/admin/paid-users', requireAuth, requireSettingsAdmin, paidAdminHandler(async (req, res) => {
+    const users = await paidUsersStore.getAll();
+    res.set('Cache-Control', 'no-store');
+    res.json(users.filter(user => user.role !== 'admin').map(publicPaidUser));
+}));
+
+router.post('/admin/paid-users', requireAuth, requireSettingsAdmin, paidAdminHandler(async (req, res) => {
+    const username = paidText(req.body?.username, 80);
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
+    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    const months = paidPlanMonths(req.body?.subscriptionPlanMonths || 1);
+    const start = new Date();
+    const user = await paidUsersStore.create({
+        username,
+        passwordHash: await auth.hashPassword(password),
+        role: 'viewer',
+        displayName: paidText(req.body?.displayName),
+        subscriptionStart: start.toISOString(),
+        subscriptionEnd: addPaidMonths(start, months).toISOString(),
+        subscriptionPlanMonths: months,
+        subscriptionBlocked: false
+    });
+    res.status(201).json(publicPaidUser(user));
+}));
+
+router.put('/admin/paid-users/:id', requireAuth, requireSettingsAdmin, paidAdminHandler(async (req, res) => {
+    const existing = await paidUsersStore.getById(req.params.id);
+    if (!existing || existing.role === 'admin') return res.status(404).json({ error: 'User not found' });
+    const updates = {};
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'displayName')) updates.displayName = paidText(req.body.displayName);
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'username')) {
+        updates.username = paidText(req.body.username, 80);
+        if (!updates.username) return res.status(400).json({ error: 'Username is required' });
+    }
+    if (req.body?.password) {
+        if (String(req.body.password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+        updates.passwordHash = await auth.hashPassword(String(req.body.password));
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'subscriptionBlocked')) updates.subscriptionBlocked = Boolean(req.body.subscriptionBlocked);
+    res.json(publicPaidUser(await paidUsersStore.update(req.params.id, updates)));
+}));
+
+router.post('/admin/paid-users/:id/renew', requireAuth, requireSettingsAdmin, paidAdminHandler(async (req, res) => {
+    const existing = await paidUsersStore.getById(req.params.id);
+    if (!existing || existing.role === 'admin') return res.status(404).json({ error: 'User not found' });
+    const months = paidPlanMonths(req.body?.subscriptionPlanMonths || 1);
+    const now = new Date();
+    const currentEnd = existing.subscriptionEnd ? new Date(existing.subscriptionEnd) : null;
+    const start = currentEnd && currentEnd.getTime() > now.getTime() ? currentEnd : now;
+    const user = await paidUsersStore.update(req.params.id, {
+        subscriptionStart: existing.subscriptionStart || now.toISOString(),
+        subscriptionEnd: addPaidMonths(start, months).toISOString(),
+        subscriptionPlanMonths: months,
+        subscriptionBlocked: false
+    });
+    res.json(publicPaidUser(user));
+}));
+
+router.delete('/admin/paid-users/:id', requireAuth, requireSettingsAdmin, paidAdminHandler(async (req, res) => {
+    const existing = await paidUsersStore.getById(req.params.id);
+    if (!existing || existing.role === 'admin') return res.status(404).json({ error: 'User not found' });
+    await paidUsersStore.delete(req.params.id);
+    res.json({ success: true });
+}));
 
 function getInventoryPosterIndex() {
     const version = veloraCatalogCache.getStatus().snapshotVersion || '';

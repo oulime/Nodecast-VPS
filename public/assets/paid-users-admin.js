@@ -19,6 +19,10 @@
       const token = localStorage.getItem("authToken") || "";
       if (token) headers.Authorization = `Bearer ${token}`;
     } catch {}
+    try {
+      const adminToken = sessionStorage.getItem("velora_catalog_admin_token") || "";
+      if (adminToken) headers["X-Velora-Catalog-Admin"] = adminToken;
+    } catch {}
     return headers;
   }
 
@@ -31,6 +35,29 @@
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
     return body;
+  }
+
+  function extractUserList(payload) {
+    const queue = [payload];
+    const seen = new Set();
+    const listKeys = ["users", "paidUsers", "paid_users", "clients", "subscriptions", "data", "items", "results", "records", "rows", "payload", "content", "value"];
+    const isUser = (value) => value && typeof value === "object" && !Array.isArray(value)
+      && ("username" in value || "subscriptionStatus" in value || "subscriptionEnd" in value);
+    while (queue.length) {
+      const value = queue.shift();
+      if (Array.isArray(value)) return value.filter((user) => user && typeof user === "object");
+      if (!value || typeof value !== "object" || seen.has(value)) continue;
+      seen.add(value);
+      const records = Object.values(value).filter(isUser);
+      if (records.length && records.length === Object.values(value).filter((item) => item && typeof item === "object").length) return records;
+      for (const key of listKeys) {
+        const nested = value[key];
+        if (Array.isArray(nested)) return nested.filter((user) => user && typeof user === "object");
+        if (nested && typeof nested === "object") queue.push(nested);
+      }
+    }
+    const keys = payload && typeof payload === "object" ? Object.keys(payload).slice(0, 8).join(", ") : typeof payload;
+    throw new Error(`Format de liste utilisateurs invalide (${keys || "vide"})`);
   }
 
   function status(text, bad = false) {
@@ -138,11 +165,7 @@
   }
 
   async function loadStorage() {
-    try {
-      state.storage = await api("/admin/paid-users/storage");
-    } catch (err) {
-      state.storage = { mode: "local", error: err.message };
-    }
+    state.storage = { mode: "sqlite", database: "data/content.db", table: "users" };
     renderStorage();
   }
 
@@ -150,7 +173,7 @@
     status("Chargement des clients...");
     try {
       if (!state.storage) await loadStorage();
-      state.users = await api("/admin/paid-users");
+      state.users = extractUserList(await api("/velora/catalog/admin/paid-users"));
       renderUsers();
       status(`${state.users.length} client(s) payant(s).`);
     } catch (err) {
@@ -208,8 +231,8 @@
     submit.disabled = true;
     dialogStatus(state.editingId ? "Enregistrement..." : "Creation...");
     try {
-      if (state.editingId) await api(`/admin/paid-users/${encodeURIComponent(state.editingId)}`, { method: "PUT", body: JSON.stringify(payload) });
-      else await api("/admin/paid-users", { method: "POST", body: JSON.stringify(payload) });
+      if (state.editingId) await api(`/velora/catalog/admin/paid-users/${encodeURIComponent(state.editingId)}`, { method: "PUT", body: JSON.stringify(payload) });
+      else await api("/velora/catalog/admin/paid-users", { method: "POST", body: JSON.stringify(payload) });
       closeDialog($("paid-user-dialog"));
       await loadUsers();
       status(state.editingId ? "Client modifie." : "Client cree.");
@@ -228,7 +251,7 @@
     if (nextBlocked && !confirm(`Bloquer ${user.displayName || user.username} ? Il ne pourra plus regarder.`)) return;
     status(nextBlocked ? "Blocage..." : "Deblocage...");
     try {
-      await api(`/admin/paid-users/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify({ subscriptionBlocked: nextBlocked }) });
+      await api(`/velora/catalog/admin/paid-users/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify({ subscriptionBlocked: nextBlocked }) });
       await loadUsers();
       status(nextBlocked ? "Client bloque." : "Client debloque.");
     } catch (err) {
@@ -256,7 +279,7 @@
     submit.disabled = true;
     renewStatus("Renouvellement...");
     try {
-      await api(`/admin/paid-users/${encodeURIComponent(state.renewingId)}/renew`, { method: "POST", body: JSON.stringify({ subscriptionPlanMonths: months }) });
+      await api(`/velora/catalog/admin/paid-users/${encodeURIComponent(state.renewingId)}/renew`, { method: "POST", body: JSON.stringify({ subscriptionPlanMonths: months }) });
       const label = planLabel(months);
       closeDialog($("paid-renew-dialog"));
       state.renewingId = null;
@@ -275,7 +298,7 @@
     if (!confirm(`Supprimer definitivement ${user.displayName || user.username} ?`)) return;
     status("Suppression...");
     try {
-      await api(`/admin/paid-users/${encodeURIComponent(id)}`, { method: "DELETE" });
+      await api(`/velora/catalog/admin/paid-users/${encodeURIComponent(id)}`, { method: "DELETE" });
       await loadUsers();
       status("Client supprime.");
     } catch (err) {

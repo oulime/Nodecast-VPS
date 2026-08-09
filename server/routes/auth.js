@@ -268,6 +268,7 @@ router.post('/users', auth.requireAuth, auth.requireAdmin, async (req, res) => {
             username: username.trim(),
             passwordHash,
             role,
+            displayName: sanitizeOptionalText(req.body.displayName),
             ...subscriptionFields
         });
 

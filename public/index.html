@@ -1519,6 +1519,7 @@
     <link rel="stylesheet" href="/assets/live-package-country-fallback.css?v=package-logo-only-20260805">
     <script src="/assets/live-package-country-fallback.js?v=package-logo-only-20260805b"></script>
     <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=provider-safe-live-packages-v3-20260809"></script>
+    <script defer src="/assets/subscription-access-guard.js?v=subscription-expiry-guard-20260809"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=package-poster-refresh-secure-v4-20260809"></script>
     <script defer src="/assets/manual-pays.js?v=sync-catalog-post-fix-20260809"></script>
     <script defer src="/assets/country-logos-admin.js?v=shared-app-country-flags-20260809"></script>
@@ -1536,6 +1537,21 @@
       .manual-pays__pagination button:disabled{opacity:.4;cursor:not-allowed}
     </style>
     <link rel="stylesheet" href="/assets/paid-users-admin.css?v=20260801-vps-sqlite">
+    <style>
+      .vel-subscription-expired[hidden]{display:none!important}
+      .vel-subscription-expired{position:fixed;inset:0;z-index:2147483600;display:grid;place-items:center;padding:20px;background:rgba(3,3,8,.82);backdrop-filter:blur(14px)}
+      .vel-subscription-expired__card{width:min(100%,470px);padding:30px;border:1px solid rgba(255,255,255,.14);border-radius:24px;background:linear-gradient(145deg,rgba(31,20,47,.98),rgba(11,10,18,.99));box-shadow:0 28px 90px rgba(0,0,0,.62);color:#fff;text-align:center}
+      .vel-subscription-expired__icon{display:grid;place-items:center;width:58px;height:58px;margin:0 auto 16px;border-radius:18px;background:linear-gradient(135deg,#ff8a3d,#e53066);box-shadow:0 12px 35px rgba(229,48,102,.28);font-size:32px;font-weight:900}
+      .vel-subscription-expired__eyebrow{margin:0 0 7px;color:#ffb38a;font-size:11px;font-weight:900;letter-spacing:.18em}
+      .vel-subscription-expired h2{margin:0;font-size:clamp(25px,6vw,34px);line-height:1.1}
+      .vel-subscription-expired__copy{margin:14px auto 20px;color:rgba(255,255,255,.72);font-size:15px;line-height:1.55}
+      .vel-subscription-expired__contact{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 20px;padding:13px 15px;border:1px solid rgba(37,211,102,.28);border-radius:14px;background:rgba(37,211,102,.08);color:#b7f7ce;text-align:left}
+      .vel-subscription-expired__contact span{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}.vel-subscription-expired__contact strong{color:#fff;font-size:14px}
+      .vel-subscription-expired__actions{display:grid;gap:10px}.vel-subscription-expired__actions a,.vel-subscription-expired__actions button{min-height:48px;border-radius:13px;font:inherit;font-weight:800;cursor:pointer}
+      .vel-subscription-expired__whatsapp{display:flex;align-items:center;justify-content:center;background:#25d366;color:#071d10;text-decoration:none}.vel-subscription-expired__whatsapp:hover{background:#3ce278}
+      .vel-subscription-expired__retry{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff}.vel-subscription-expired__close{border:0;background:transparent;color:rgba(255,255,255,.58)}
+      .vel-subscription-expired__retry:disabled{opacity:.55;cursor:wait}
+    </style>
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css">
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=live-player-placeholder-no-title-20260803">
     <link rel="stylesheet" href="/assets/velora-home-sections.css?v=admin-country-filter-20260803">

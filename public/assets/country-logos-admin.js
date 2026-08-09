@@ -104,6 +104,12 @@
 
   function labelActions(card, list) {
     const hidden = card.classList.contains("is-hidden-country");
+    const state = hidden ? "hidden" : "visible";
+    // This runs from a document-wide MutationObserver. Rewriting identical
+    // button text creates another child-list mutation, so make the decoration
+    // idempotent before touching the DOM.
+    if (list.dataset.actionLabelsState === state) return;
+    list.dataset.actionLabelsState = state;
     list.querySelectorAll("button").forEach(button => {
       button.classList.add("manual-pays__country-action");
       if (button.matches("[data-toggle-country]")) button.textContent = hidden ? "Afficher le pays" : "Masquer le pays";

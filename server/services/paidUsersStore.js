@@ -8,6 +8,7 @@ const COLUMN_MAP = {
     subscriptionStart: 'subscription_start',
     subscriptionEnd: 'subscription_end',
     subscriptionPlanMonths: 'subscription_plan_months',
+    subscriptionPlanMinutes: 'subscription_plan_minutes',
     subscriptionBlocked: 'subscription_blocked',
     oidcId: 'oidc_id',
     email: 'email'
@@ -24,6 +25,7 @@ function toUser(row) {
         subscriptionStart: row.subscription_start || null,
         subscriptionEnd: row.subscription_end || null,
         subscriptionPlanMonths: row.subscription_plan_months || null,
+        subscriptionPlanMinutes: row.subscription_plan_minutes || null,
         subscriptionBlocked: Boolean(row.subscription_blocked),
         oidcId: row.oidc_id || null,
         email: row.email || null,
@@ -68,9 +70,9 @@ const paidUsersStore = {
         const result = getDb().prepare(`
             INSERT INTO users (
                 username, password_hash, role, display_name,
-                subscription_start, subscription_end, subscription_plan_months,
+                subscription_start, subscription_end, subscription_plan_months, subscription_plan_minutes,
                 subscription_blocked, oidc_id, email, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
             String(userData.username || '').trim(),
             userData.passwordHash || null,
@@ -79,6 +81,7 @@ const paidUsersStore = {
             userData.subscriptionStart || null,
             userData.subscriptionEnd || null,
             userData.subscriptionPlanMonths || null,
+            userData.subscriptionPlanMinutes || null,
             userData.subscriptionBlocked ? 1 : 0,
             userData.oidcId || null,
             userData.email || null,

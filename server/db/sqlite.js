@@ -219,6 +219,7 @@ function initSchema() {
             subscription_start TEXT,
             subscription_end TEXT,
             subscription_plan_months INTEGER,
+            subscription_plan_minutes INTEGER,
             subscription_blocked INTEGER NOT NULL DEFAULT 0,
             oidc_id TEXT UNIQUE,
             email TEXT,
@@ -240,6 +241,11 @@ function initSchema() {
         CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
         CREATE INDEX IF NOT EXISTS idx_favorites_user_type ON favorites(user_id, item_type);
     `);
+
+    const userColumns = db.prepare(`PRAGMA table_info(users)`).all();
+    if (!userColumns.some(column => column.name === 'subscription_plan_minutes')) {
+        db.exec(`ALTER TABLE users ADD COLUMN subscription_plan_minutes INTEGER`);
+    }
 
     // One-time compatibility import from the former JSON user store. Existing
     // IDs and password hashes are preserved so issued JWTs keep working.

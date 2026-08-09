@@ -24,6 +24,7 @@ auth.configureSessionSerialization(findLoginUserById);
 
 
 const SUBSCRIPTION_PLAN_MONTHS = [1, 3, 6, 12, 24];
+const SUBSCRIPTION_PLAN_MINUTES = [1, 10];
 
 function sanitizeOptionalText(value, maxLength = 160) {
     if (typeof value !== 'string') return null;
@@ -45,6 +46,14 @@ function normalizePlanMonths(value) {
         throw new Error('Subscription period must be 1, 3, 6, 12, or 24 months');
     }
     return months;
+}
+
+function normalizePlanMinutes(value) {
+    const minutes = Number.parseInt(value, 10);
+    if (!SUBSCRIPTION_PLAN_MINUTES.includes(minutes)) {
+        throw new Error('Subscription period must be 1 or 10 minutes');
+    }
+    return minutes;
 }
 
 function normalizeSubscriptionStart(value) {
@@ -72,6 +81,7 @@ function publicUser(user) {
         subscriptionStart: safe.subscriptionStart || null,
         subscriptionEnd: safe.subscriptionEnd || null,
         subscriptionPlanMonths: safe.subscriptionPlanMonths || null,
+        subscriptionPlanMinutes: safe.subscriptionPlanMinutes || null,
         subscriptionBlocked: Boolean(safe.subscriptionBlocked),
         subscriptionStatus: subscriptionStatus(safe)
     };
@@ -87,20 +97,27 @@ function buildSubscriptionFields(body, existing = null) {
     }
 
     const planProvided = Object.prototype.hasOwnProperty.call(body, 'subscriptionPlanMonths') && body.subscriptionPlanMonths !== '' && body.subscriptionPlanMonths !== null;
+    const minutesProvided = Object.prototype.hasOwnProperty.call(body, 'subscriptionPlanMinutes') && body.subscriptionPlanMinutes !== '' && body.subscriptionPlanMinutes !== null;
     const startProvided = Object.prototype.hasOwnProperty.call(body, 'subscriptionStart') && body.subscriptionStart;
     const extendFromCurrent = body.extendFromCurrent === true;
 
-    if (planProvided || startProvided) {
-        const planMonths = planProvided
+    if (minutesProvided || planProvided || startProvided) {
+        const planMinutes = minutesProvided
+            ? normalizePlanMinutes(body.subscriptionPlanMinutes)
+            : (!planProvided && existing?.subscriptionPlanMinutes ? normalizePlanMinutes(existing.subscriptionPlanMinutes) : null);
+        const planMonths = planMinutes ? null : (planProvided
             ? normalizePlanMonths(body.subscriptionPlanMonths)
-            : normalizePlanMonths(existing?.subscriptionPlanMonths || 1);
+            : normalizePlanMonths(existing?.subscriptionPlanMonths || 1));
         const currentEnd = existing?.subscriptionEnd ? new Date(existing.subscriptionEnd) : null;
         const base = extendFromCurrent && currentEnd && currentEnd.getTime() > Date.now()
             ? currentEnd
             : normalizeSubscriptionStart(startProvided ? body.subscriptionStart : existing?.subscriptionStart);
         updates.subscriptionPlanMonths = planMonths;
+        updates.subscriptionPlanMinutes = planMinutes;
         updates.subscriptionStart = base.toISOString();
-        updates.subscriptionEnd = addMonths(base, planMonths).toISOString();
+        updates.subscriptionEnd = planMinutes
+            ? new Date(base.getTime() + planMinutes * 60 * 1000).toISOString()
+            : addMonths(base, planMonths).toISOString();
     }
 
     return updates;
@@ -255,13 +272,12 @@ router.post('/users', auth.requireAuth, auth.requireAdmin, async (req, res) => {
             return res.status(400).json({ error: 'Role must be either "admin" or "viewer"' });
         }
 
-        const subscriptionFields = role === 'admin'
-            ? {}
-            : buildSubscriptionFields({
-                ...req.body,
-                subscriptionPlanMonths: req.body.subscriptionPlanMonths || 1,
-                subscriptionStart: req.body.subscriptionStart || new Date().toISOString()
-            });
+        const subscriptionBody = {
+            ...req.body,
+            subscriptionStart: req.body.subscriptionStart || new Date().toISOString()
+        };
+        if (!req.body.subscriptionPlanMinutes && !req.body.subscriptionPlanMonths) subscriptionBody.subscriptionPlanMonths = 1;
+        const subscriptionFields = role === 'admin' ? {} : buildSubscriptionFields(subscriptionBody);
 
         const passwordHash = await auth.hashPassword(password);
         const newUser = await paidUsersStore.create({

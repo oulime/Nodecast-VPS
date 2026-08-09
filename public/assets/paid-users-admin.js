@@ -2,11 +2,13 @@
   "use strict";
 
   const PLANS = [
-    { months: 1, label: "1 mois" },
-    { months: 3, label: "3 mois" },
-    { months: 6, label: "6 mois" },
-    { months: 12, label: "1 an" },
-    { months: 24, label: "2 ans" }
+    { value: "minutes:1", minutes: 1, label: "1 minute" },
+    { value: "minutes:10", minutes: 10, label: "10 minutes" },
+    { value: "months:1", months: 1, label: "1 mois" },
+    { value: "months:3", months: 3, label: "3 mois" },
+    { value: "months:6", months: 6, label: "6 mois" },
+    { value: "months:12", months: 12, label: "1 an" },
+    { value: "months:24", months: 24, label: "2 ans" }
   ];
   const state = { users: [], storage: null, editingId: null, renewingId: null, ready: false };
   const $ = (id) => document.getElementById(id);
@@ -88,8 +90,18 @@
     return date.toLocaleDateString("fr-FR", { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
   }
 
-  function planLabel(months) {
-    return (PLANS.find((p) => p.months === Number(months)) || {}).label || "-";
+  function selectedPlan(selectId) {
+    const plan = PLANS.find((item) => item.value === $(selectId).value) || PLANS[2];
+    return plan.minutes
+      ? { subscriptionPlanMinutes: plan.minutes }
+      : { subscriptionPlanMonths: plan.months };
+  }
+
+  function planLabel(user) {
+    const plan = user.subscriptionPlanMinutes
+      ? PLANS.find((item) => item.minutes === Number(user.subscriptionPlanMinutes))
+      : PLANS.find((item) => item.months === Number(user.subscriptionPlanMonths));
+    return plan?.label || "-";
   }
 
   function badge(user) {
@@ -137,7 +149,7 @@
         <td data-label="Statut">${badge(u)}</td>
         <td data-label="Debut">${esc(formatDate(u.subscriptionStart))}</td>
         <td data-label="Fin">${esc(formatDate(u.subscriptionEnd))}</td>
-        <td data-label="Periode">${esc(planLabel(u.subscriptionPlanMonths))}</td>
+        <td data-label="Periode">${esc(planLabel(u))}</td>
         <td data-label="Actions" class="paid-users__actions">
           <details class="paid-users__menu">
             <summary aria-label="Actions client" title="Actions">...</summary>
@@ -187,7 +199,7 @@
     $("paid-display-name").value = "";
     $("paid-username").value = "";
     $("paid-password").value = "";
-    $("paid-plan").value = "1";
+    $("paid-plan").value = "months:1";
     $("paid-plan-row").hidden = false;
     $("paid-dialog-title").textContent = "Creer un client";
     $("paid-dialog-copy").textContent = "L'abonnement commence au moment ou vous cliquez sur Creer.";
@@ -226,7 +238,7 @@
     };
     const password = $("paid-password").value;
     if (password) payload.password = password;
-    if (!state.editingId) payload.subscriptionPlanMonths = Number($("paid-plan").value);
+    if (!state.editingId) Object.assign(payload, selectedPlan("paid-plan"));
     if (!state.editingId && !password) return dialogStatus("Password obligatoire pour creer un client.", true);
     submit.disabled = true;
     dialogStatus(state.editingId ? "Enregistrement..." : "Creation...");
@@ -263,7 +275,7 @@
     const user = state.users.find((u) => String(u.id) === String(id));
     if (!user) return;
     state.renewingId = user.id;
-    $("paid-renew-plan").value = "1";
+    $("paid-renew-plan").value = "months:1";
     $("paid-renew-client").textContent = user.displayName || user.username;
     $("paid-renew-current").textContent = `Fin actuelle: ${formatDate(user.subscriptionEnd)}. La periode choisie sera ajoutee au temps restant si le client est encore actif.`;
     renewStatus("");
@@ -275,12 +287,12 @@
     event.preventDefault();
     if (!state.renewingId) return;
     const submit = $("paid-renew-submit");
-    const months = Number($("paid-renew-plan").value);
+    const plan = selectedPlan("paid-renew-plan");
     submit.disabled = true;
     renewStatus("Renouvellement...");
     try {
-      await api(`/velora/catalog/admin/paid-users/${encodeURIComponent(state.renewingId)}/renew`, { method: "POST", body: JSON.stringify({ subscriptionPlanMonths: months }) });
-      const label = planLabel(months);
+      await api(`/velora/catalog/admin/paid-users/${encodeURIComponent(state.renewingId)}/renew`, { method: "POST", body: JSON.stringify(plan) });
+      const label = planLabel(plan);
       closeDialog($("paid-renew-dialog"));
       state.renewingId = null;
       await loadUsers();
@@ -379,7 +391,7 @@
               <div><label for="paid-display-name">Nom client</label><input id="paid-display-name" type="text" placeholder="Ex. Samad telephone" autocomplete="off" /></div>
               <div><label for="paid-username">Username</label><input id="paid-username" type="text" required autocomplete="off" /></div>
               <div><label for="paid-password">Password</label><input id="paid-password" type="text" minlength="6" placeholder="Minimum 6 caracteres" autocomplete="new-password" /></div>
-              <div id="paid-plan-row"><label for="paid-plan">Periode</label><select id="paid-plan">${PLANS.map((p) => `<option value="${p.months}">${p.label}</option>`).join("")}</select></div>
+              <div id="paid-plan-row"><label for="paid-plan">Periode</label><select id="paid-plan">${PLANS.map((p) => `<option value="${p.value}">${p.label}</option>`).join("")}</select></div>
             </div>
             <p id="paid-dialog-status" class="paid-users-dialog__status" aria-live="polite"></p>
             <div class="paid-users-dialog__actions"><button type="button" class="secondary" data-paid-close>Annuler</button><button id="paid-submit" type="submit" class="primary">Creer</button></div>
@@ -394,7 +406,7 @@
             </div>
             <p id="paid-renew-current" class="paid-users-renew__copy"></p>
             <div class="paid-users-dialog__grid paid-users-dialog__grid--one">
-              <div><label for="paid-renew-plan">Ajouter</label><select id="paid-renew-plan">${PLANS.map((p) => `<option value="${p.months}">${p.label}</option>`).join("")}</select></div>
+              <div><label for="paid-renew-plan">Ajouter</label><select id="paid-renew-plan">${PLANS.map((p) => `<option value="${p.value}">${p.label}</option>`).join("")}</select></div>
             </div>
             <p id="paid-renew-status" class="paid-users-dialog__status" aria-live="polite"></p>
             <div class="paid-users-dialog__actions"><button type="button" class="secondary" data-paid-renew-close>Annuler</button><button id="paid-renew-submit" type="submit" class="primary">Renouveler</button></div>

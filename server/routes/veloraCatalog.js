@@ -93,6 +93,7 @@ function requireSettingsAdmin(req, res, next) {
 }
 
 const PAID_PLAN_MONTHS = new Set([1, 3, 6, 12, 24]);
+const PAID_PLAN_MINUTES = new Set([1, 10]);
 
 function paidPlanMonths(value) {
     const months = Number.parseInt(value, 10);
@@ -106,6 +107,20 @@ function addPaidMonths(date, months) {
     next.setMonth(next.getMonth() + months);
     if (next.getDate() !== day) next.setDate(0);
     return next;
+}
+
+function paidPlan(body) {
+    if (Object.prototype.hasOwnProperty.call(body || {}, 'subscriptionPlanMinutes')) {
+        const minutes = Number.parseInt(body.subscriptionPlanMinutes, 10);
+        if (!PAID_PLAN_MINUTES.has(minutes)) throw new Error('Period must be 1 or 10 minutes');
+        return { subscriptionPlanMinutes: minutes, subscriptionPlanMonths: null, milliseconds: minutes * 60 * 1000 };
+    }
+    const months = paidPlanMonths(body?.subscriptionPlanMonths || 1);
+    return { subscriptionPlanMinutes: null, subscriptionPlanMonths: months, months };
+}
+
+function addPaidPlan(date, plan) {
+    return plan.months ? addPaidMonths(date, plan.months) : new Date(date.getTime() + plan.milliseconds);
 }
 
 function paidText(value, maxLength = 160) {
@@ -141,7 +156,7 @@ router.post('/admin/paid-users', requireAuth, requireSettingsAdmin, paidAdminHan
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
     if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
     if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
-    const months = paidPlanMonths(req.body?.subscriptionPlanMonths || 1);
+    const plan = paidPlan(req.body);
     const start = new Date();
     const user = await paidUsersStore.create({
         username,
@@ -149,8 +164,9 @@ router.post('/admin/paid-users', requireAuth, requireSettingsAdmin, paidAdminHan
         role: 'viewer',
         displayName: paidText(req.body?.displayName),
         subscriptionStart: start.toISOString(),
-        subscriptionEnd: addPaidMonths(start, months).toISOString(),
-        subscriptionPlanMonths: months,
+        subscriptionEnd: addPaidPlan(start, plan).toISOString(),
+        subscriptionPlanMonths: plan.subscriptionPlanMonths,
+        subscriptionPlanMinutes: plan.subscriptionPlanMinutes,
         subscriptionBlocked: false
     });
     res.status(201).json(publicPaidUser(user));
@@ -176,14 +192,15 @@ router.put('/admin/paid-users/:id', requireAuth, requireSettingsAdmin, paidAdmin
 router.post('/admin/paid-users/:id/renew', requireAuth, requireSettingsAdmin, paidAdminHandler(async (req, res) => {
     const existing = await paidUsersStore.getById(req.params.id);
     if (!existing || existing.role === 'admin') return res.status(404).json({ error: 'User not found' });
-    const months = paidPlanMonths(req.body?.subscriptionPlanMonths || 1);
+    const plan = paidPlan(req.body);
     const now = new Date();
     const currentEnd = existing.subscriptionEnd ? new Date(existing.subscriptionEnd) : null;
     const start = currentEnd && currentEnd.getTime() > now.getTime() ? currentEnd : now;
     const user = await paidUsersStore.update(req.params.id, {
         subscriptionStart: existing.subscriptionStart || now.toISOString(),
-        subscriptionEnd: addPaidMonths(start, months).toISOString(),
-        subscriptionPlanMonths: months,
+        subscriptionEnd: addPaidPlan(start, plan).toISOString(),
+        subscriptionPlanMonths: plan.subscriptionPlanMonths,
+        subscriptionPlanMinutes: plan.subscriptionPlanMinutes,
         subscriptionBlocked: false
     });
     res.json(publicPaidUser(user));

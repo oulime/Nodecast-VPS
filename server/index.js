@@ -162,7 +162,15 @@ if (USE_VPS_DATA_API) {
         const controller = new AbortController();
         let timedOut = false;
         let clientDisconnected = false;
-        const requestTimeoutMs = req.method === 'POST' && req.path === '/api/velora-db/home-cache/rebuild' ? 120000 : 30000;
+        const isHomeCacheRebuild = req.method === 'POST'
+            && req.path === '/api/velora-db/home-cache/rebuild';
+        const isFullCatalogSync = req.method === 'POST'
+            && req.path === '/api/sources/sync-catalog';
+        const requestTimeoutMs = isFullCatalogSync
+            ? 10 * 60 * 1000
+            : isHomeCacheRebuild
+                ? 2 * 60 * 1000
+                : 30000;
         const timeout = setTimeout(() => {
             timedOut = true;
             controller.abort();

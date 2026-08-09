@@ -9,6 +9,7 @@
   const responseCache = new Map();
   const inFlight = new Map();
   let cacheGeneration = 0;
+  let bypassHttpCacheUntil = 0;
 
   function optimizedGetTtl(url) {
     const parsed = new URL(url, window.location.href);
@@ -20,7 +21,10 @@
   }
 
   function cacheFriendlyInit(init) {
-    const next = { ...(init || {}), cache: "force-cache" };
+    const next = {
+      ...(init || {}),
+      cache: Date.now() < bypassHttpCacheUntil ? "reload" : "force-cache"
+    };
     const headers = new Headers(next.headers || {});
     headers.delete("cache-control");
     headers.delete("pragma");
@@ -74,6 +78,9 @@
     return nativeFetch(target, init).then(response => {
       if (method !== "GET" && method !== "HEAD" && response.ok) {
         cacheGeneration += 1;
+        // A successful write invalidates both our memory cache and the
+        // browser HTTP cache. This keeps admin lists synchronized immediately.
+        bypassHttpCacheUntil = Date.now() + 5000;
         responseCache.clear();
         inFlight.clear();
       }

@@ -73,15 +73,16 @@
       const tab = activeTab();
       const id = String(event.target.value || "");
       if (!MEDIA_TABS.has(tab) || !id) return;
-      selectedPackages.set(cacheKey(tab), id);
-      openingKey = `${cacheKey(tab)}::${id}`;
-      const card = packageCardCache.get(cacheKey(tab))?.get(id);
+      const key = cacheKey(tab);
+      const requestedOpeningKey = `${key}::${id}`;
+      selectedPackages.set(key, id);
+      openingKey = requestedOpeningKey;
+      const card = packageCardCache.get(key)?.get(id);
       if (!card) return;
-      packagesView.appendChild(card);
+      if (!packagesView.contains(card)) packagesView.appendChild(card);
       card.click();
-      card.remove();
       window.setTimeout(() => {
-        if (openingKey.endsWith(`::${id}`)) openingKey = "";
+        if (openingKey === requestedOpeningKey) openingKey = "";
         scheduleUpdate();
       }, 1200);
     });

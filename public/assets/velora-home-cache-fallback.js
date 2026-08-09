@@ -238,6 +238,7 @@
   }
 
   function revealHomeFirstPaint() {
+    if (document.body.classList.contains("vel-country-switch-loading")) return;
     var homeButton = document.querySelector('[data-bottom-nav="home"]');
     var homePage = document.getElementById("vel-home-empty-page");
     var homeIsActuallyVisible = !!homePage &&
@@ -255,6 +256,7 @@
   }
 
   function releaseStaleHomeLoader() {
+    if (document.body.classList.contains("vel-country-switch-loading")) return;
     var homePage = document.getElementById("vel-home-empty-page");
     var cards = document.querySelector("#vel-home-sections .vel-home-section__card");
     if (!homePage || homePage.classList.contains("hidden") || !cards) return;

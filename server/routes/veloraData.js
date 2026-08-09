@@ -103,6 +103,80 @@ const NATURAL_KEYS = {
     canonical_countries: ['match_key']
 };
 
+function normalizedPackageName(value) {
+    return String(value || '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+// Resolve old packages in memory without rewriting user data. Provider stream
+// IDs are not globally unique; a legacy package must be tied to one provider
+// before its curations can safely be exposed to the player.
+function resolvedAdminPackages(packages, curations) {
+    const db = getDb();
+    const categories = db.prepare(`
+        SELECT source_id, category_id, type, name
+        FROM categories WHERE is_hidden = 0
+    `).all();
+    const orders = allRows('admin_country_package_order');
+    const kindsByPackage = new Map();
+    for (const order of orders) {
+        const kind = order.ui_tab === 'movies' ? 'vod' : String(order.ui_tab || '');
+        if (!['live', 'vod', 'series'].includes(kind)) continue;
+        for (const packageId of Array.isArray(order.package_order) ? order.package_order : []) {
+            const key = String(packageId);
+            if (!kindsByPackage.has(key)) kindsByPackage.set(key, new Set());
+            kindsByPackage.get(key).add(kind);
+        }
+    }
+    const curationsByPackage = new Map();
+    for (const row of curations) {
+        const packageId = String(row.target_package_id || '');
+        if (!curationsByPackage.has(packageId)) curationsByPackage.set(packageId, []);
+        curationsByPackage.get(packageId).push(row);
+    }
+    const categoryItems = db.prepare(`
+        SELECT item_id FROM playlist_items
+        WHERE source_id = ? AND type = ? AND category_id = ? AND is_hidden = 0
+    `);
+
+    return packages.map(packageRow => {
+        if (String(packageRow.source_id ?? '').trim()
+            && String(packageRow.category_id ?? '').trim()
+            && String(packageRow.kind ?? '').trim()) return packageRow;
+
+        const packageId = String(packageRow.id);
+        const expectedKinds = kindsByPackage.get(packageId);
+        const legacyIds = new Set((curationsByPackage.get(packageId) || [])
+            .map(row => String(row.stream_id || '')).filter(Boolean));
+        const candidates = categories.filter(category => {
+            const kind = category.type === 'movie' ? 'vod' : category.type;
+            return normalizedPackageName(category.name) === normalizedPackageName(packageRow.name)
+                && (!expectedKinds?.size || expectedKinds.has(kind));
+        }).map(category => {
+            const items = categoryItems.all(category.source_id, category.type, String(category.category_id));
+            return {
+                category,
+                score: items.reduce(
+                    (total, item) => total + (legacyIds.has(String(item.item_id)) ? 1 : 0), 0
+                ),
+                itemCount: items.length
+            };
+        }).sort((left, right) => right.score - left.score || right.itemCount - left.itemCount);
+
+        const best = candidates[0];
+        const runnerUp = candidates[1];
+        if (!best || (candidates.length > 1 && best.score <= (runnerUp?.score || 0))) {
+            return packageRow;
+        }
+        return {
+            ...packageRow,
+            source_id: best.category.source_id,
+            category_id: String(best.category.category_id),
+            kind: best.category.type === 'movie' ? 'vod' : best.category.type,
+            identity_inferred: true
+        };
+    });
+}
+
 function decodeValue(value) {
     try {
         return decodeURIComponent(String(value));
@@ -181,9 +255,10 @@ function catalogueItemType(kind) {
  */
 function effectiveCurations(packageIds = null) {
     const db = getDb();
-    const packages = allRows('admin_packages');
+    const rawCurations = allRows('admin_stream_curations');
+    const packages = resolvedAdminPackages(allRows('admin_packages'), rawCurations);
     const packageById = new Map(packages.map(row => [String(row.id), row]));
-    const explicit = allRows('admin_stream_curations').map(row => {
+    const explicit = rawCurations.map(row => {
         const packageRow = packageById.get(String(row.target_package_id || '')) || {};
         return {
             ...row,
@@ -204,9 +279,10 @@ function effectiveCurations(packageIds = null) {
     }
 
     const wanted = packageIds ? new Set([...packageIds].map(String)) : null;
+    const sourceAwareExplicit = explicit.filter(row => row.source_id != null && row.kind);
     const effective = wanted
-        ? explicit.filter(row => wanted.has(String(row.target_package_id || '')))
-        : [...explicit];
+        ? sourceAwareExplicit.filter(row => wanted.has(String(row.target_package_id || '')))
+        : [...sourceAwareExplicit];
     const listItems = db.prepare(`
         SELECT item_id
         FROM playlist_items
@@ -225,8 +301,7 @@ function effectiveCurations(packageIds = null) {
         for (const item of listItems.all(sourceId, itemType, categoryId)) {
             const streamId = String(item.item_id);
             const sourceKey = `${countryId}:${kind}:${sourceId}:${streamId}`;
-            const legacyKey = `${countryId}:legacy:${streamId}`;
-            if (explicitKeys.has(sourceKey) || explicitKeys.has(legacyKey)) continue;
+            if (explicitKeys.has(sourceKey)) continue;
             effective.push({
                 id: `catalog:${packageId}:${sourceId}:${streamId}`,
                 stream_id: streamId,
@@ -347,7 +422,11 @@ function buildHomeCache() {
     const sections = sortRows(allRows('admin_home_sections'), 'section_order.asc');
     const sectionPackageIds = new Set(sections.map(section => String(section.package_id || '')));
     const curations = effectiveCurations(sectionPackageIds);
-    const packages = new Map(allRows('admin_packages').map(row => [String(row.id), row]));
+    const resolvedPackages = resolvedAdminPackages(
+        allRows('admin_packages'),
+        allRows('admin_stream_curations')
+    );
+    const packages = new Map(resolvedPackages.map(row => [String(row.id), row]));
     const packageStreams = new Map();
     for (const row of curations) {
         const packageId = String(row.target_package_id || '').trim();
@@ -486,7 +565,11 @@ router.post('/admin/sync-packages', (req, res) => {
         `);
         let itemCount = 0;
         let packageCount = 0;
-        for (const packageRow of allRows('admin_packages')) {
+        const resolvedPackages = resolvedAdminPackages(
+            allRows('admin_packages'),
+            allRows('admin_stream_curations')
+        );
+        for (const packageRow of resolvedPackages) {
             const sourceId = Number.parseInt(packageRow.source_id, 10);
             const categoryId = String(packageRow.category_id || '').trim();
             const itemType = catalogueItemType(String(packageRow.kind || '').trim());
@@ -684,6 +767,13 @@ router.all('/rest/v1/:table', (req, res) => {
                 `DELETE FROM velora_admin_rows WHERE table_name = ? AND row_id = ?`
             );
             getDb().transaction(() => rows.forEach(row => remove.run(table, String(row.id))))();
+            if (table === 'admin_home_sections' && rows.length > 0) {
+                try {
+                    buildHomeCache();
+                } catch (error) {
+                    console.error('[Velora data] Home cache rebuild after section deletion failed:', error);
+                }
+            }
             const representation = String(req.get('Prefer') || '').includes('return=representation');
             return representation ? res.json(rows) : res.status(204).end();
         }

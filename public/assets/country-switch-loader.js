@@ -4,6 +4,8 @@
   let lastMutationAt = 0;
   let lastHomeRenderedAt = 0;
   let pendingCountryValue = "";
+  let switchStartedAt = 0;
+  const MIN_VISIBLE_MS = 1500;
   const overlay = () => document.getElementById("catalog-loading-overlay");
 
   function show(countryName) {
@@ -15,16 +17,42 @@
     node.style.removeProperty("visibility");
     node.style.removeProperty("pointer-events");
     const status = node.querySelector("#catalog-loading-status");
-    if (status) status.textContent = `Chargement de ${countryName || "ce pays"}…`;
+    if (status) status.textContent = `Chargement de ${countryName || "ce pays"}\u2026`;
     document.body.classList.add("vel-home-choice-loading", "vel-country-switch-loading");
+    document.documentElement.classList.add("vel-country-switch-loading");
   }
 
-  function start(countryName, countryValue) {
+  function maintainOverlay(id, countryName) {
+    if (id !== runId || !document.body.classList.contains("vel-country-switch-loading")) return;
+    const node = overlay();
+    if (node) {
+      if (node.classList.contains("hidden")) node.classList.remove("hidden");
+      if (node.getAttribute("aria-hidden") !== "false") node.setAttribute("aria-hidden", "false");
+      const status = node.querySelector("#catalog-loading-status");
+      const expectedStatus = `Chargement de ${countryName || "ce pays"}\u2026`;
+      if (status && status.textContent !== expectedStatus) status.textContent = expectedStatus;
+    }
+    requestAnimationFrame(() => maintainOverlay(id, countryName));
+  }
+
+  function startCountrySwitch(countryName, countryValue) {
+    const nextValue = String(countryValue || "");
+    if (
+      nextValue &&
+      nextValue === pendingCountryValue &&
+      document.body.classList.contains("vel-country-switch-loading")
+    ) {
+      lastMutationAt = Date.now();
+      show(countryName);
+      return runId;
+    }
     const id = ++runId;
-    pendingCountryValue = String(countryValue || "");
-    lastMutationAt = Date.now();
+    pendingCountryValue = nextValue;
+    switchStartedAt = Date.now();
+    lastMutationAt = switchStartedAt;
     lastHomeRenderedAt = 0;
     show(countryName);
+    requestAnimationFrame(() => maintainOverlay(id, countryName));
     finishWhenStable(id);
     return id;
   }
@@ -35,6 +63,7 @@
     node?.classList.add("hidden");
     node?.setAttribute("aria-hidden", "true");
     document.body.classList.remove("vel-home-choice-loading", "vel-home-choice-catalog-pending", "vel-country-switch-loading");
+    document.documentElement.classList.remove("vel-country-switch-loading");
     pendingCountryValue = "";
   }
 
@@ -66,6 +95,8 @@
       await new Promise(resolve => setTimeout(resolve, 120));
     }
     await waitForImages(id);
+    const remainingMinimum = MIN_VISIBLE_MS - (Date.now() - switchStartedAt);
+    if (remainingMinimum > 0) await new Promise(resolve => setTimeout(resolve, remainingMinimum));
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     hide(id);
   }
@@ -87,7 +118,7 @@
 
   document.addEventListener("velora-country-switch-start", event => {
     const detail = event.detail || {};
-    start(String(detail.countryName || ""), String(detail.countryValue || ""));
+    startCountrySwitch(String(detail.countryName || ""), String(detail.countryValue || ""));
   });
 
   document.addEventListener("change", event => {
@@ -99,12 +130,12 @@
       lastMutationAt = Date.now();
       return;
     }
-    start(name, value);
+    startCountrySwitch(name, value);
   }, true);
 
   document.addEventListener("velora-home-country-rendered", () => { lastHomeRenderedAt = Date.now(); lastMutationAt = Date.now(); });
   const observer = new MutationObserver(() => { lastMutationAt = Date.now(); });
-  function start() {
+  function initialize() {
     [document.getElementById("vel-home-sections"), document.getElementById("packages-view")].filter(Boolean)
       .forEach(node => observer.observe(node, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "src"] }));
     let attempts = 0;
@@ -114,5 +145,5 @@
     }, 200);
     releaseReadyStartupLoader();
   }
-  document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", start, { once: true }) : start();
+  document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", initialize, { once: true }) : initialize();
 })();

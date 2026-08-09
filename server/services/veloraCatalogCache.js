@@ -11,7 +11,6 @@ const path = require('path');
 const zlib = require('zlib');
 const { getDb } = require('../db/sqlite');
 const { sources } = require('../db');
-const xtreamApi = require('./xtreamApi');
 
 const cacheDir = path.join(__dirname, '..', '..', 'data', 'velora-cache');
 const vodPosterCachePath = path.join(__dirname, '..', '..', 'data', 'vod-poster-cache.json');
@@ -241,75 +240,6 @@ function enrichVodPostersFromCurrentCatalogue(streams) {
     return streams;
 }
 
-function vodPosterFromProviderItem(item) {
-    return String(
-        item?.stream_icon || item?.cover || item?.cover_big || item?.movie_image || ''
-    ).trim();
-}
-
-async function refreshVodPostersFromProviders(enabledSources) {
-    const db = getDb();
-    const posterCache = readJson(vodPosterCachePath) || {};
-    let posterCacheChanged = false;
-    const providerStats = [];
-
-    for (const source of enabledSources) {
-        if (source.type !== 'xtream') continue;
-
-        const posters = new Map();
-        const api = xtreamApi.createFromSource(source);
-        const providerStat = {
-            sourceId: String(source.id),
-            provider: source.name || `Source ${source.id}`,
-            receivedMovies: 0,
-            receivedPosters: 0,
-            error: null
-        };
-        try {
-            const rows = await api.getVodStreams(null, {
-                signal: AbortSignal.timeout(90000)
-            });
-            if (!Array.isArray(rows)) throw new Error('Provider returned a non-array VOD catalogue');
-            providerStat.receivedMovies = rows.length;
-            for (const item of rows) {
-                const itemId = String(item?.stream_id ?? '').trim();
-                const poster = vodPosterFromProviderItem(item);
-                if (itemId && poster && !posters.has(itemId)) posters.set(itemId, poster);
-            }
-            providerStat.receivedPosters = posters.size;
-            console.log(`[Velora cache] ${source.name}: ${rows.length} movies, ${posters.size} posters received`);
-        } catch (error) {
-            providerStat.error = error.message;
-            console.warn(`[Velora cache] ${source.name} poster catalogue call failed:`, error.message);
-        }
-        providerStats.push(providerStat);
-        await new Promise(resolve => setImmediate(resolve));
-
-        const updatePoster = db.prepare(`
-            UPDATE playlist_items
-            SET stream_icon = ?
-            WHERE source_id = ? AND type = 'movie' AND item_id = ?
-        `);
-        const savePosters = db.transaction(entries => {
-            let updated = 0;
-            for (const [itemId, poster] of entries) {
-                updated += updatePoster.run(poster, source.id, itemId).changes;
-                const key = `${source.id}:${itemId}`;
-                if (posterCache[key] !== poster) {
-                    posterCache[key] = poster;
-                    posterCacheChanged = true;
-                }
-            }
-            return updated;
-        });
-        const updated = savePosters(posters);
-        console.log(`[Velora cache] ${source.name}: persisted ${updated} poster record(s); empty responses never delete saved posters`);
-    }
-
-    if (posterCacheChanged) writeJsonAtomic(vodPosterCachePath, posterCache);
-    return providerStats;
-}
-
 function preserveVodPostersFromPreviousSnapshot(streams) {
     const previous = loadSnapshotFromDisk()?.vod_streams;
     if (!Array.isArray(previous) || !previous.length) return streams;
@@ -512,10 +442,6 @@ async function buildSnapshot(reason) {
         .filter(source => source.enabled && (source.type === 'xtream' || source.type === 'm3u'));
     const sourceIds = enabledSources.map(source => source.id);
 
-    // Fetch each provider catalogue exactly once. Non-empty posters are merged
-    // into durable storage; blank fields never erase posters from older runs.
-    const providerPosterStats = await refreshVodPostersFromProviders(enabledSources);
-
     const liveStreams = listStreams(sourceIds, 'live');
     await new Promise(resolve => setImmediate(resolve));
     const vodStreams = enrichVodPostersFromCurrentCatalogue(
@@ -525,18 +451,23 @@ async function buildSnapshot(reason) {
     const series = listStreams(sourceIds, 'series');
     await new Promise(resolve => setImmediate(resolve));
 
-    const posterStats = providerPosterStats.map(providerStat => {
-        const providerMovies = vodStreams.filter(item => String(item.source_id) === providerStat.sourceId);
-        const posters = providerMovies.reduce((total, item) => (
-            total + (String(item.stream_icon || item.cover || '').trim() ? 1 : 0)
-        ), 0);
-        return {
-            ...providerStat,
-            movies: providerMovies.length,
-            posters,
-            missingPosters: providerMovies.length - posters
-        };
-    });
+    const providerStatsById = new Map(enabledSources.map(source => [String(source.id), {
+        sourceId: String(source.id),
+        provider: source.name || `Source ${source.id}`,
+        movies: 0,
+        posters: 0,
+        missingPosters: 0
+    }]));
+    for (const item of vodStreams) {
+        const providerStat = providerStatsById.get(String(item.source_id));
+        if (!providerStat) continue;
+        providerStat.movies += 1;
+        if (String(item.stream_icon || item.cover || '').trim()) providerStat.posters += 1;
+    }
+    const posterStats = [...providerStatsById.values()].map(providerStat => ({
+        ...providerStat,
+        missingPosters: providerStat.movies - providerStat.posters
+    }));
 
     const snapshot = {
         live_categories: removeEmptyCategories(listCategories(sourceIds, 'live'), liveStreams),

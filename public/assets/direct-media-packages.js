@@ -147,9 +147,9 @@
         return;
       }
       target.card.click();
-      if (scheduledGeneration === navigationGeneration && activeTab() === tab) {
-        packagesView.replaceChildren();
-      }
+      // The main app owns the transition from packages to content. Clearing the
+      // cards here can produce a blank page when a first-load click is ignored
+      // because another media tab is still finishing its catalogue request.
     });
     window.setTimeout(() => {
       if (openingKey === `${key}::${target.id}`) openingKey = "";

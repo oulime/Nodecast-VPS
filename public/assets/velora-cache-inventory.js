@@ -63,9 +63,19 @@
       status.textContent = result.providerMovies + " films recus - " + result.providerPosters +
         " affiches recues - " + result.addedPosters + " nouvelle(s) - " +
         result.missingPosters + " manquante(s). Reconstruction du cache...";
+      var statusFailures = 0;
       for (var attempt = 0; attempt < 60; attempt += 1) {
         await new Promise(function (resolve) { window.setTimeout(resolve, 2000); });
-        var cacheStatus = await request("/api/velora/catalog/status");
+        var cacheStatus = null;
+        try {
+          cacheStatus = await request("/api/velora/catalog/status");
+          statusFailures = 0;
+        } catch (_) {
+          statusFailures += 1;
+          if (statusFailures < 4) continue;
+          status.textContent = "Affiches sauvegardees. Le cache continue en arriere-plan.";
+          return;
+        }
         if (!cacheStatus.running) {
           if (cacheStatus.error) throw new Error(cacheStatus.error);
           content.hidden = true;
@@ -172,6 +182,8 @@
       var packageRows = Array.isArray(result.packages) ? result.packages : [];
       packages.dataset.loaded = "true";
       addPackageRows(packages, provider, packageRows);
+      var activeFilter = root && root.querySelector(".cache-inventory__filter");
+      if (activeFilter && activeFilter.value) activeFilter.dispatchEvent(new Event("input"));
       if (!packageRows.length) packages.appendChild(element("p", "cache-inventory__empty", "Aucun package dans le cache pour ce fournisseur."));
     } catch (_) {
       packages.replaceChildren(element("p", "cache-inventory__empty", "Impossible de charger les packages de ce fournisseur."));

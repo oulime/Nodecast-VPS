@@ -216,12 +216,6 @@ if (USE_VPS_DATA_API) {
                 if (Array.isArray(items)) await enrichVpsVodPosters(items, vodRoute[1] === 'all' ? '' : vodRoute[1], headers);
                 return res.json(items);
             }
-            const inventoryRoute = req.path.match(/^\/api\/velora\/catalog\/inventory\/([^/]+)\/vod\/[^/]+$/i);
-            if (upstream.ok && inventoryRoute && /application\/json/i.test(String(upstream.headers.get('content-type') || ''))) {
-                const payload = await upstream.json();
-                if (Array.isArray(payload?.items)) await enrichVpsVodPosters(payload.items, inventoryRoute[1], headers);
-                return res.json(payload);
-            }
             if (!upstream.body || req.method === 'HEAD') return res.end();
             await pipeline(Readable.fromWeb(upstream.body), res);
         } catch (err) {

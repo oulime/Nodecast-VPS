@@ -279,7 +279,7 @@ class SyncService {
             ON CONFLICT(id) DO UPDATE SET
                 name = excluded.name,
                 category_id = excluded.category_id,
-                stream_icon = excluded.stream_icon,
+                stream_icon = COALESCE(NULLIF(TRIM(excluded.stream_icon), ''), playlist_items.stream_icon),
                 container_extension = excluded.container_extension,
                 provider_order = excluded.provider_order,
                 data = excluded.data
@@ -302,7 +302,7 @@ class SyncService {
                     itemId = item.stream_id;
                     name = item.name || `Movie ${item.stream_id}`;
                     catId = item.category_id;
-                    icon = item.stream_icon; // or cover
+                    icon = item.stream_icon || item.cover || item.cover_big || item.movie_image;
                     container = item.container_extension;
                     rating = item.rating;
                     added = item.added;

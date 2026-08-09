@@ -10,12 +10,48 @@
     <script>
       (function () {
         try {
+          var redirectingToLogin = false;
+          function redirectToLogin() {
+            if (redirectingToLogin) return;
+            redirectingToLogin = true;
+            window.localStorage.removeItem("authToken");
+            window.location.replace("/login");
+          }
+
+          function tokenHasExpired(token) {
+            try {
+              var payloadPart = token.split(".")[1];
+              if (!payloadPart) return true;
+              var normalized = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
+              normalized += "=".repeat((4 - normalized.length % 4) % 4);
+              var payload = JSON.parse(window.atob(normalized));
+              return typeof payload.exp === "number" && payload.exp * 1000 <= Date.now();
+            } catch (_) {
+              return true;
+            }
+          }
+
+          // Authentication can expire after the initial /me check while the app is
+          // still loading. Handle every later unauthorized API response as well.
+          var nativeFetch = window.fetch.bind(window);
+          window.fetch = function (input, init) {
+            return nativeFetch(input, init).then(function (response) {
+              try {
+                var requestUrl = new URL(typeof input === "string" ? input : input.url, window.location.href);
+                var isApiRequest = requestUrl.origin === window.location.origin && requestUrl.pathname.indexOf("/api/") === 0;
+                var isLoginRequest = /^\/api\/auth\/(login|setup|setup-required)$/.test(requestUrl.pathname);
+                if (isApiRequest && !isLoginRequest && response.status === 401) redirectToLogin();
+              } catch (_) {}
+              return response;
+            });
+          };
+
           var url = new URL(window.location.href);
           var paidEntry = url.searchParams.get("paid") === "1";
           var protectedEntry = true;
           var authToken = window.localStorage.getItem("authToken");
-          if (protectedEntry && !authToken) {
-            window.location.replace("/login");
+          if (protectedEntry && (!authToken || tokenHasExpired(authToken))) {
+            redirectToLogin();
             return;
           }
           if (protectedEntry && authToken) {
@@ -25,8 +61,7 @@
             }).then(function (response) {
               if (response.ok) return;
               if (response.status === 401 || response.status === 403 || response.status === 404) {
-                window.localStorage.removeItem("authToken");
-                window.location.replace("/login");
+                redirectToLogin();
               }
             }).catch(function () {
               /* Keep the session during a temporary VPS/network outage. */

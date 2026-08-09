@@ -7,6 +7,7 @@
   const selectedPackages = new Map();
   let updateQueued = false;
   let openingKey = "";
+  let navigationGeneration = 0;
 
   const packagesView = document.getElementById("packages-view");
   const contentView = document.getElementById("content-view");
@@ -129,11 +130,26 @@
     const preferredId = selectedPackages.get(key);
     const target = cards.find(item => item.id === preferredId) || cards[0];
     if (!target || openingKey === `${key}::${target.id}`) return;
+    const scheduledGeneration = navigationGeneration;
     selectedPackages.set(key, target.id);
     openingKey = `${key}::${target.id}`;
     window.requestAnimationFrame(() => {
+      // A rapid Films/Series switch can leave this callback queued for the old
+      // tab. Never let stale work click an old card or clear the new tab's DOM.
+      if (
+        scheduledGeneration !== navigationGeneration ||
+        activeTab() !== tab ||
+        cacheKey(tab) !== key ||
+        !packagesView.contains(target.card)
+      ) {
+        if (openingKey === `${key}::${target.id}`) openingKey = "";
+        scheduleUpdate();
+        return;
+      }
       target.card.click();
-      packagesView.replaceChildren();
+      if (scheduledGeneration === navigationGeneration && activeTab() === tab) {
+        packagesView.replaceChildren();
+      }
     });
     window.setTimeout(() => {
       if (openingKey === `${key}::${target.id}`) openingKey = "";
@@ -154,6 +170,7 @@
     attributeFilter: ["class", "data-vel-active-tab"]
   });
   countrySelect?.addEventListener("change", () => {
+    navigationGeneration += 1;
     openingKey = "";
     scheduleUpdate();
   });
@@ -167,6 +184,10 @@
     event.stopImmediatePropagation();
     document.querySelector('[data-bottom-nav="home"]')?.click();
   }, true);
-  document.addEventListener("velora-home-tab", scheduleUpdate);
+  document.addEventListener("velora-home-tab", () => {
+    navigationGeneration += 1;
+    openingKey = "";
+    scheduleUpdate();
+  });
   scheduleUpdate();
 })();

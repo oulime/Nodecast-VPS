@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const router = express.Router();
@@ -6,7 +7,7 @@ const veloraCatalogCache = require('../services/veloraCatalogCache');
 const { sources } = require('../db');
 const { getDb } = require('../db/sqlite');
 const xtreamApi = require('../services/xtreamApi');
-const { requireAuth, requireAdmin } = require('../auth');
+const { requireAuth } = require('../auth');
 
 const vodPosterCachePath = path.join(__dirname, '..', '..', 'data', 'vod-poster-cache.json');
 const activePosterRefreshes = new Set();
@@ -40,6 +41,53 @@ function writePosterCache(cache) {
 
 function providerPoster(item) {
     return String(item?.stream_icon || item?.cover || item?.cover_big || item?.movie_image || '').trim();
+}
+
+function settingsAdminCredentialsAreValid(username, password) {
+    const expectedUsername = String(process.env.VITE_ADMIN_USERNAME || 'admin');
+    const expectedPassword = String(process.env.VITE_ADMIN_PASSWORD || '131313');
+    const sentUsername = Buffer.from(String(username || ''));
+    const sentPassword = Buffer.from(String(password || ''));
+    const userBytes = Buffer.from(expectedUsername);
+    const passwordBytes = Buffer.from(expectedPassword);
+    return sentUsername.length === userBytes.length && sentPassword.length === passwordBytes.length
+        && crypto.timingSafeEqual(sentUsername, userBytes)
+        && crypto.timingSafeEqual(sentPassword, passwordBytes);
+}
+
+function catalogAdminSecret() {
+    return String(process.env.JWT_SECRET || 'keyboard cat');
+}
+
+function signCatalogAdminToken(userId) {
+    const payload = Buffer.from(JSON.stringify({
+        userId: String(userId),
+        expiresAt: Date.now() + (4 * 60 * 60 * 1000)
+    })).toString('base64url');
+    const signature = crypto.createHmac('sha256', catalogAdminSecret()).update(payload).digest('base64url');
+    return `${payload}.${signature}`;
+}
+
+function requireSettingsAdmin(req, res, next) {
+    if (req.user?.role === 'admin') return next();
+    const token = String(req.get('x-velora-catalog-admin') || '');
+    const [payload, signature] = token.split('.');
+    if (!payload || !signature) return res.status(403).json({ error: 'Settings Admin session required' });
+    const expected = crypto.createHmac('sha256', catalogAdminSecret()).update(payload).digest('base64url');
+    const sentBytes = Buffer.from(signature);
+    const expectedBytes = Buffer.from(expected);
+    if (sentBytes.length !== expectedBytes.length || !crypto.timingSafeEqual(sentBytes, expectedBytes)) {
+        return res.status(403).json({ error: 'Invalid Settings Admin session' });
+    }
+    try {
+        const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+        if (String(claims.userId) !== String(req.user?.id) || Number(claims.expiresAt) <= Date.now()) {
+            return res.status(403).json({ error: 'Expired Settings Admin session' });
+        }
+    } catch (_) {
+        return res.status(403).json({ error: 'Invalid Settings Admin session' });
+    }
+    next();
 }
 
 function getInventoryPosterIndex() {
@@ -132,7 +180,15 @@ router.get('/inventory/:sourceId/:kind/:categoryId', (req, res) => {
         count: matching.length, posterCount, offset, limit, hasMore: offset + items.length < matching.length, items });
 });
 
-router.post('/inventory/:sourceId/vod/:categoryId/posters/refresh', requireAuth, requireAdmin, async (req, res) => {
+router.post('/admin-session', requireAuth, (req, res) => {
+    if (!settingsAdminCredentialsAreValid(req.body?.username, req.body?.password)) {
+        return res.status(403).json({ error: 'Invalid Settings Admin credentials' });
+    }
+    res.set('Cache-Control', 'no-store');
+    return res.json({ token: signCatalogAdminToken(req.user.id), expiresInSeconds: 14400 });
+});
+
+router.post('/inventory/:sourceId/vod/:categoryId/posters/refresh', requireAuth, requireSettingsAdmin, async (req, res) => {
     const sourceId = String(req.params.sourceId);
     const categoryId = String(req.params.categoryId);
     const refreshKey = `${sourceId}:${categoryId}`;

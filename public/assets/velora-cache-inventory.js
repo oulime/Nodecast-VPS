@@ -7,8 +7,24 @@
 
   function headers() {
     var token = "";
+    var adminToken = "";
     try { token = localStorage.getItem("authToken") || ""; } catch (_) {}
-    return token ? { Authorization: "Bearer " + token } : {};
+    try { adminToken = sessionStorage.getItem("velora_catalog_admin_token") || ""; } catch (_) {}
+    var result = token ? { Authorization: "Bearer " + token } : {};
+    if (adminToken) result["X-Velora-Catalog-Admin"] = adminToken;
+    return result;
+  }
+
+  async function createCatalogAdminSession(username, password) {
+    var response = await fetch("/api/velora/catalog/admin-session", {
+      method: "POST",
+      cache: "no-store",
+      headers: Object.assign({ "Content-Type": "application/json" }, headers()),
+      body: JSON.stringify({ username: username, password: password })
+    });
+    var payload = await response.json();
+    if (!response.ok || !payload.token) throw new Error(payload.error || "Admin session unavailable");
+    sessionStorage.setItem("velora_catalog_admin_token", payload.token);
   }
 
   async function request(path, options) {
@@ -253,6 +269,18 @@
     style.textContent += ".cache-inventory__tools{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;margin:0 0 .7rem}.cache-inventory__refresh{padding:.58rem .75rem;border:1px solid rgba(168,85,247,.65);border-radius:8px;background:rgba(168,85,247,.16);color:inherit;font-weight:750;cursor:pointer}.cache-inventory__refresh:disabled{opacity:.55;cursor:wait}.cache-inventory__refresh-status{font-size:.88rem;color:#b9bbc8}.cache-inventory__refresh-status.is-error{color:#ff8b8b}";
     document.head.appendChild(style);
     document.getElementById("cache-warm-run")?.addEventListener("click", followWarmup, true);
+    document.addEventListener("submit", function (event) {
+      var form = event.target;
+      if (!form || form.id !== "vel-admin-login-form") return;
+      var username = form.querySelector("#vel-admin-username");
+      var password = form.querySelector("#vel-admin-password");
+      var usernameValue = username ? username.value : "";
+      var passwordValue = password ? password.value : "";
+      window.setTimeout(function () {
+        if (sessionStorage.getItem("velora_admin_settings") !== "1") return;
+        createCatalogAdminSession(usernameValue, passwordValue).catch(function () {});
+      }, 0);
+    }, true);
     document.addEventListener("click", function (event) {
       if (event.target && event.target.closest && event.target.closest("#settings-tab-btn-cache")) loadInventory();
     });

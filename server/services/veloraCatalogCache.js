@@ -13,6 +13,7 @@ const { getDb } = require('../db/sqlite');
 const { sources } = require('../db');
 
 const cacheDir = path.join(__dirname, '..', '..', 'data', 'velora-cache');
+const vodPosterCachePath = path.join(__dirname, '..', '..', 'data', 'vod-poster-cache.json');
 const snapshotsDir = path.join(cacheDir, 'snapshots');
 const statusPath = path.join(cacheDir, 'status.json');
 const AUTO_WARM_HOURS = Math.max(1, parseInt(process.env.VELORA_CATALOG_WARM_INTERVAL_HOURS, 10) || 24);
@@ -31,6 +32,7 @@ let currentSnapshot = null;
 let activeWarm = null;
 let pendingWarmReason = null;
 let autoWarmTimer = null;
+const snapshotReadyHandlers = new Set();
 let status = readJson(statusPath) || {
     running: false,
     ready: false,
@@ -41,6 +43,22 @@ let status = readJson(statusPath) || {
     snapshotVersion: null,
     counts: {}
 };
+
+function onSnapshotReady(handler) {
+    if (typeof handler !== 'function') throw new TypeError('Snapshot-ready handler must be a function');
+    snapshotReadyHandlers.add(handler);
+    return () => snapshotReadyHandlers.delete(handler);
+}
+
+async function notifySnapshotReady(snapshotStatus) {
+    for (const handler of snapshotReadyHandlers) {
+        try {
+            await handler(snapshotStatus);
+        } catch (error) {
+            console.error('[Velora cache] Post-build task failed:', error);
+        }
+    }
+}
 
 function ensureDirs() {
     fs.mkdirSync(snapshotsDir, { recursive: true });
@@ -119,6 +137,7 @@ function listCategories(sourceIds, type) {
 
 function listStreams(sourceIds, type) {
     if (!sourceIds.length) return [];
+    const posterCache = type === 'movie' ? (readJson(vodPosterCachePath) || {}) : {};
     const placeholders = sourceIds.map(() => '?').join(',');
     return getDb().prepare(`
         SELECT source_id, item_id, name, stream_icon, stream_url, added_at, rating, container_extension, year, category_id, provider_order, data
@@ -136,6 +155,7 @@ function listStreams(sourceIds, type) {
             }
             const globalStreamId = encodeGlobalId(item.source_id, item.item_id);
             const globalCategoryId = encodeGlobalId(item.source_id, item.category_id);
+            const poster = String(item.stream_icon || posterCache[`${item.source_id}:${item.item_id}`] || '').trim();
             return {
                 ...data,
                 source_id: item.source_id,
@@ -145,9 +165,9 @@ function listStreams(sourceIds, type) {
                 raw_series_id: type === 'series' ? item.item_id : undefined,
                 series_id: type === 'series' ? globalStreamId : undefined,
                 name: item.name,
-                stream_icon: item.stream_icon,
+                stream_icon: poster,
                 stream_url: item.stream_url || data.stream_url || data.url,
-                cover: item.stream_icon,
+                cover: poster,
                 added: item.added_at,
                 rating: item.rating,
                 container_extension: item.container_extension,
@@ -184,6 +204,28 @@ function getSnapshotFilePath(action, gzip = false) {
     if (!snapshotVersion || !ACTIONS.includes(action)) return null;
     const filePath = path.join(snapshotsDir, snapshotVersion, `${action}.json${gzip ? '.gz' : ''}`);
     return fs.existsSync(filePath) ? filePath : null;
+}
+
+function normalizedPosterTitle(value) {
+    return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+        .replace(/^\s*[^-]{1,14}\s+-\s+/, '').replace(/\s+/g, ' ').trim();
+}
+
+function enrichVodPostersFromCurrentCatalogue(streams) {
+    const posters = new Map();
+    for (const item of streams) {
+        const poster = String(item.stream_icon || item.cover || '').trim();
+        const title = normalizedPosterTitle(item.name || item.title);
+        if (poster && title && !posters.has(title)) posters.set(title, poster);
+    }
+    for (const item of streams) {
+        if (String(item.stream_icon || item.cover || '').trim()) continue;
+        const poster = posters.get(normalizedPosterTitle(item.name || item.title));
+        if (!poster) continue;
+        item.stream_icon = poster;
+        item.cover = poster;
+    }
+    return streams;
 }
 
 function isSnapshotFresh() {
@@ -360,7 +402,7 @@ async function buildSnapshot(reason) {
 
     const liveStreams = listStreams(sourceIds, 'live');
     await new Promise(resolve => setImmediate(resolve));
-    const vodStreams = listStreams(sourceIds, 'movie');
+    const vodStreams = enrichVodPostersFromCurrentCatalogue(listStreams(sourceIds, 'movie'));
     await new Promise(resolve => setImmediate(resolve));
     const series = listStreams(sourceIds, 'series');
     await new Promise(resolve => setImmediate(resolve));
@@ -397,6 +439,7 @@ async function buildSnapshot(reason) {
     writeStatus();
     cleanupOldSnapshots(version);
     console.log('[Velora cache] Snapshot ready', status.counts);
+    await notifySnapshotReady({ ...status });
     return {
         ...status,
         cacheDir,
@@ -464,5 +507,6 @@ module.exports = {
     sendSnapshotResponse,
     startAutoWarmTimer,
     startWarm,
+    onSnapshotReady,
     warm
 };

@@ -104,6 +104,14 @@
     return request;
   };
 
+  window.veloraInvalidateHomeCache = function () {
+    cachePayload = null;
+    cacheCountryId = "";
+    cacheUpdatedAt = 0;
+    cacheRequests.clear();
+    window.veloraHomeCachePayload = null;
+  };
+
   function loadSectionPage(section, offset) {
     var countryId = activeCountryId();
     return fetch("/api/velora-db/home-cache?country_id=" + encodeURIComponent(countryId) +

@@ -3,10 +3,75 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { getDb } = require('../db/sqlite');
+const { sources } = require('../db');
+const xtreamApi = require('../services/xtreamApi');
 const veloraCatalogCache = require('../services/veloraCatalogCache');
 
 const router = express.Router();
 const homeCachePath = path.join(__dirname, '..', '..', 'data', 'velora-cache', 'home-sections.json');
+const vodPosterCachePath = path.join(__dirname, '..', '..', 'data', 'vod-poster-cache.json');
+
+function normalizedPosterTitle(value) {
+    return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+        .replace(/^\s*[^-]{1,14}\s+-\s+/, '').replace(/\s+/g, ' ').trim();
+}
+
+async function enrichHomeCacheMoviePosters(payload) {
+    const movieEntries = payload.sections
+        .filter(section => section?.content_type === 'movies')
+        .flatMap(section => Array.isArray(section.entries) ? section.entries : []);
+    const currentPosters = new Map();
+    for (const item of veloraCatalogCache.getSnapshot('vod_streams') || []) {
+        const poster = String(item.stream_icon || item.cover || item.cover_big || '').trim();
+        const title = normalizedPosterTitle(item.name || item.title);
+        if (poster && title && !currentPosters.has(title)) currentPosters.set(title, poster);
+    }
+    for (const entry of movieEntries) {
+        if (String(entry?.thumbUrl || '').trim()) continue;
+        const poster = currentPosters.get(normalizedPosterTitle(entry?.name));
+        if (poster) entry.thumbUrl = poster;
+    }
+    const entries = movieEntries
+        .filter(entry => entry?.sourceId && entry?.streamId && !String(entry.thumbUrl || '').trim());
+    if (!entries.length) return payload;
+
+    let posterCache = {};
+    try { posterCache = JSON.parse(fs.readFileSync(vodPosterCachePath, 'utf8')) || {}; } catch (_) {}
+    const sourceRows = await sources.getAll();
+    const sourceMap = new Map(sourceRows.map(source => [String(source.id), source]));
+    const apiMap = new Map();
+    let cursor = 0;
+    let changed = false;
+    async function worker() {
+        while (cursor < entries.length) {
+            const entry = entries[cursor++];
+            const sourceId = String(entry.sourceId);
+            const streamId = String(entry.streamId);
+            const key = `${sourceId}:${streamId}`;
+            let poster = typeof posterCache[key] === 'string' ? posterCache[key] : '';
+            if (!poster) {
+                const source = sourceMap.get(sourceId);
+                if (!source || source.type !== 'xtream') continue;
+                if (!apiMap.has(sourceId)) apiMap.set(sourceId, xtreamApi.createFromSource(source));
+                try {
+                    const details = await Promise.race([
+                        apiMap.get(sourceId).getVodInfo(streamId),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('poster timeout')), 2500))
+                    ]);
+                    poster = String(details?.info?.movie_image || details?.info?.cover_big || details?.movie_data?.stream_icon || '').trim();
+                    if (poster) {
+                        posterCache[key] = poster;
+                        changed = true;
+                    }
+                } catch (_) {}
+            }
+            if (poster) entry.thumbUrl = poster;
+        }
+    }
+    await Promise.all(Array.from({ length: Math.min(64, entries.length) }, worker));
+    if (changed) fs.writeFileSync(vodPosterCachePath, JSON.stringify(posterCache));
+    return payload;
+}
 
 const ALLOWED_TABLES = new Set([
     'admin_channel_name_prefixes',
@@ -385,7 +450,7 @@ router.get('/home-cache', (req, res) => {
     }
 });
 
-router.post('/home-cache/rebuild', (req, res) => {
+router.post('/home-cache/rebuild', async (req, res) => {
     try {
         let payload;
         if (req.body && Array.isArray(req.body.sections)) {
@@ -396,6 +461,7 @@ router.post('/home-cache/rebuild', (req, res) => {
                     entries: Array.isArray(section.entries) ? section.entries.slice(0, 500) : []
                 }))
             };
+            await enrichHomeCacheMoviePosters(payload);
             fs.mkdirSync(path.dirname(homeCachePath), { recursive: true });
             const temporaryPath = `${homeCachePath}.${process.pid}.tmp`;
             fs.writeFileSync(temporaryPath, JSON.stringify(payload));

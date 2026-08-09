@@ -1,6 +1,7 @@
 const express = require('express');
 require('dotenv').config();
 const path = require('path');
+const fs = require('fs');
 const { Readable } = require('stream');
 const { pipeline } = require('stream/promises');
 const passport = require('passport');
@@ -14,6 +15,105 @@ const VPS_DATA_API_BASE = String(
 ).trim().replace(/\/+$/, '');
 const USE_VPS_DATA_API = process.env.NODE_ENV !== 'production'
     && !/^(1|true|yes)$/i.test(String(process.env.VPS_DATA_API_DISABLED || '').trim());
+const VOD_POSTER_CACHE_PATH = path.join(__dirname, '..', 'data', 'vod-poster-cache.json');
+let vodPosterCache = {};
+let vodPosterSaveTimer = null;
+try { vodPosterCache = JSON.parse(fs.readFileSync(VOD_POSTER_CACHE_PATH, 'utf8')) || {}; } catch (_) {}
+
+function decodeCatalogId(value) {
+    try {
+        const decoded = Buffer.from(String(value || ''), 'base64url').toString('utf8');
+        const separator = decoded.indexOf(':');
+        return separator > 0 ? { sourceId: decoded.slice(0, separator), vodId: decoded.slice(separator + 1) } : null;
+    } catch (_) { return null; }
+}
+
+function saveVodPostersSoon() {
+    if (vodPosterSaveTimer) return;
+    vodPosterSaveTimer = setTimeout(() => {
+        vodPosterSaveTimer = null;
+        fs.promises.writeFile(VOD_POSTER_CACHE_PATH, JSON.stringify(vodPosterCache))
+            .catch(error => console.warn('[VOD posters] Cache save failed:', error.message));
+    }, 200);
+    vodPosterSaveTimer.unref?.();
+}
+
+async function enrichVpsVodPosters(items, routeSourceId, headers) {
+    const missing = items.map(item => {
+        const decoded = item.raw_stream_id ? null : decodeCatalogId(item.stream_id);
+        const sourceId = String(item.source_id ?? item.sourceId ?? decoded?.sourceId ?? routeSourceId ?? '').trim();
+        const vodId = String(item.raw_stream_id ?? item.streamId ?? item.id ?? decoded?.vodId ?? item.stream_id ?? '').trim();
+        return { item, sourceId, vodId };
+    }).filter(entry => entry.sourceId && entry.vodId && !String(entry.item.image || entry.item.thumbUrl || entry.item.stream_icon || entry.item.cover || entry.item.cover_big || '').trim());
+    let cursor = 0;
+    let changed = false;
+    async function worker() {
+        while (cursor < missing.length) {
+            const { item, sourceId, vodId } = missing[cursor++];
+            const key = `${sourceId}:${vodId}`;
+            let poster = Object.prototype.hasOwnProperty.call(vodPosterCache, key) ? vodPosterCache[key] : undefined;
+            if (poster === null) poster = undefined;
+            if (poster === undefined) {
+                try {
+                    const detailUrl = new URL(`/api/proxy/xtream/${encodeURIComponent(sourceId)}/vod_info`, `${VPS_DATA_API_BASE}/`);
+                    detailUrl.searchParams.set('vod_id', vodId);
+                    const detailResponse = await fetch(detailUrl, { headers, cache: 'no-store', signal: AbortSignal.timeout(2500) });
+                    if (detailResponse.ok) {
+                        const detail = await detailResponse.json();
+                        poster = String(detail?.info?.movie_image || detail?.info?.cover_big || detail?.movie_data?.stream_icon || '').trim();
+                        if (poster) {
+                            vodPosterCache[key] = poster;
+                            changed = true;
+                        } else if (Object.prototype.hasOwnProperty.call(vodPosterCache, key)) {
+                            delete vodPosterCache[key];
+                            changed = true;
+                        }
+                    }
+                } catch (_) { poster = ''; }
+            }
+            if (poster) {
+                item.image = poster;
+                item.thumbUrl = poster;
+                item.stream_icon = poster;
+                item.cover = poster;
+                item.cover_big = poster;
+            }
+        }
+    }
+    await Promise.all(Array.from({ length: Math.min(64, missing.length) }, worker));
+    if (changed) saveVodPostersSoon();
+    return items;
+}
+
+function normalizedPosterTitle(value) {
+    return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+        .replace(/^\s*[^-]{1,14}\s+-\s+/, '').replace(/\s+/g, ' ').trim();
+}
+
+async function enrichVpsHomePosterMatches(entries, headers) {
+    const missing = entries.filter(entry => !String(entry?.thumbUrl || '').trim() && entry?.name);
+    if (!missing.length) return entries;
+    try {
+        const url = new URL('/api/proxy/xtream/all/vod_streams', `${VPS_DATA_API_BASE}/`);
+        const response = await fetch(url, { headers, cache: 'no-store', signal: AbortSignal.timeout(60000) });
+        if (!response.ok) return entries;
+        const catalogue = await response.json();
+        if (!Array.isArray(catalogue)) return entries;
+        const posters = new Map();
+        for (const item of catalogue) {
+            const poster = String(item.stream_icon || item.cover || item.cover_big || '').trim();
+            const title = normalizedPosterTitle(item.name || item.title);
+            if (poster && title && !posters.has(title)) posters.set(title, poster);
+        }
+        for (const entry of missing) {
+            const poster = posters.get(normalizedPosterTitle(entry.name));
+            if (poster) entry.thumbUrl = poster;
+        }
+    } catch (error) {
+        console.warn('[Home cache] Current catalogue poster matching failed:', error.message);
+    }
+    return entries;
+}
 
 // Trust proxy headers (X-Forwarded-Proto, X-Forwarded-For, etc.)
 // Required for correct protocol detection behind reverse proxies (nginx, Caddy, etc.)
@@ -62,10 +162,11 @@ if (USE_VPS_DATA_API) {
         const controller = new AbortController();
         let timedOut = false;
         let clientDisconnected = false;
+        const requestTimeoutMs = req.method === 'POST' && req.path === '/api/velora-db/home-cache/rebuild' ? 120000 : 30000;
         const timeout = setTimeout(() => {
             timedOut = true;
             controller.abort();
-        }, 30000);
+        }, requestTimeoutMs);
         const clearRequest = () => clearTimeout(timeout);
         res.once('finish', clearRequest);
         res.once('close', () => {
@@ -82,6 +183,15 @@ if (USE_VPS_DATA_API) {
             delete headers.host;
             delete headers['content-length'];
             delete headers['accept-encoding'];
+
+            if (req.method === 'POST' && req.path === '/api/velora-db/home-cache/rebuild'
+                && Array.isArray(req.body?.sections)) {
+                const movieEntries = req.body.sections
+                    .filter(section => section?.content_type === 'movies')
+                    .flatMap(section => Array.isArray(section.entries) ? section.entries : []);
+                await enrichVpsHomePosterMatches(movieEntries, headers);
+                await enrichVpsVodPosters(movieEntries, '', headers);
+            }
 
             const hasBody = !['GET', 'HEAD'].includes(req.method) && req.body !== undefined;
             const upstream = await fetch(target, {
@@ -100,6 +210,18 @@ if (USE_VPS_DATA_API) {
             });
             res.setHeader('X-Nodecast-Data-Source', VPS_DATA_API_BASE);
 
+            const vodRoute = req.path.match(/^\/api\/proxy\/xtream\/([^/]+)\/vod_streams$/i);
+            if (upstream.ok && vodRoute && req.query.category_id && /application\/json/i.test(String(upstream.headers.get('content-type') || ''))) {
+                const items = await upstream.json();
+                if (Array.isArray(items)) await enrichVpsVodPosters(items, vodRoute[1] === 'all' ? '' : vodRoute[1], headers);
+                return res.json(items);
+            }
+            const inventoryRoute = req.path.match(/^\/api\/velora\/catalog\/inventory\/([^/]+)\/vod\/[^/]+$/i);
+            if (upstream.ok && inventoryRoute && /application\/json/i.test(String(upstream.headers.get('content-type') || ''))) {
+                const payload = await upstream.json();
+                if (Array.isArray(payload?.items)) await enrichVpsVodPosters(payload.items, inventoryRoute[1], headers);
+                return res.json(payload);
+            }
             if (!upstream.body || req.method === 'HEAD') return res.end();
             await pipeline(Readable.fromWeb(upstream.body), res);
         } catch (err) {
@@ -199,7 +321,6 @@ app.locals.ffmpegPath = findFFmpeg();
 app.locals.ffprobePath = findFFprobe();
 
 // Dynamic services loader - collects exports from files in ./services
-const fs = require('fs');
 const services = {};
 try {
     const servicesDir = path.join(__dirname, 'services');
@@ -294,7 +415,13 @@ app.use('/api/settings', require('./routes/settings'));
 app.use('/api/history', require('./routes/history'));
 app.use('/api/search', require('./routes/search'));
 app.use('/api/velora/catalog', require('./routes/veloraCatalog'));
-app.use('/api/velora-db', require('./routes/veloraData'));
+const veloraDataRouter = require('./routes/veloraData');
+app.use('/api/velora-db', veloraDataRouter);
+veloraCatalogCache.onSnapshotReady(snapshotStatus => {
+    const homeCache = veloraDataRouter.buildHomeCache();
+    const entryCount = homeCache.sections.reduce((total, section) => total + section.entries.length, 0);
+    console.log(`[Home cache] Rebuilt after catalogue ${snapshotStatus.snapshotVersion}: ${homeCache.sections.length} sections, ${entryCount} entries`);
+});
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api', require('./routes/packageCovers'));
 app.use('/api/country-logos', require('./routes/countryLogos'));

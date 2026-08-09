@@ -8,6 +8,7 @@
   const nativeFetch = window.fetch.bind(window);
   const responseCache = new Map();
   const inFlight = new Map();
+  let cacheGeneration = 0;
 
   function optimizedGetTtl(url) {
     const parsed = new URL(url, window.location.href);
@@ -29,6 +30,7 @@
 
   async function optimizedGet(url, init, ttl) {
     const key = String(url);
+    const generation = cacheGeneration;
     const cached = responseCache.get(key);
     if (cached && cached.expiresAt > Date.now()) return cached.response.clone();
 
@@ -36,7 +38,7 @@
     if (pending) return (await pending).clone();
 
     const request = nativeFetch(url, cacheFriendlyInit(init)).then(response => {
-      if (response.ok) {
+      if (response.ok && generation === cacheGeneration) {
         responseCache.set(key, {
           expiresAt: Date.now() + ttl,
           response: response.clone()
@@ -68,7 +70,15 @@
       ? String(target)
       : String(target && target.url || "");
     const ttl = method === "GET" ? optimizedGetTtl(targetUrl) : 0;
-    return ttl ? optimizedGet(targetUrl, init, ttl) : nativeFetch(target, init);
+    if (ttl) return optimizedGet(targetUrl, init, ttl);
+    return nativeFetch(target, init).then(response => {
+      if (method !== "GET" && method !== "HEAD" && response.ok) {
+        cacheGeneration += 1;
+        responseCache.clear();
+        inFlight.clear();
+      }
+      return response;
+    });
   };
 
   window.__veloraDataBackend = "vps-sqlite";

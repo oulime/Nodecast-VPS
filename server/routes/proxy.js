@@ -23,6 +23,119 @@ const REMOTE_CATALOG_DISABLED = /^(1|true|yes)$/i.test(String(process.env.VELORA
 const REMOTE_CATALOG_BASE = String(process.env.VELORA_CATALOG_REMOTE_BASE || DEFAULT_REMOTE_CATALOG_BASE).trim().replace(/\/+$/, '');
 const STREAM_PROXY_SETTINGS_CACHE_MS = 60 * 1000;
 const STREAM_PROXY_DEBUG = /^(1|true|yes)$/i.test(String(process.env.VELORA_STREAM_PROXY_DEBUG || ''));
+const VOD_POSTER_CACHE_PATH = path.join(__dirname, '..', '..', 'data', 'vod-poster-cache.json');
+let vodPosterCache = {};
+let vodPosterCacheSaveTimer = null;
+let localPosterTitleIndex = new Map();
+let localPosterTitleIndexVersion = null;
+
+try {
+    vodPosterCache = JSON.parse(fs.readFileSync(VOD_POSTER_CACHE_PATH, 'utf8')) || {};
+} catch (_) {
+    vodPosterCache = {};
+}
+
+function scheduleVodPosterCacheSave() {
+    if (vodPosterCacheSaveTimer) return;
+    vodPosterCacheSaveTimer = setTimeout(() => {
+        vodPosterCacheSaveTimer = null;
+        fs.promises.mkdir(path.dirname(VOD_POSTER_CACHE_PATH), { recursive: true })
+            .then(() => fs.promises.writeFile(VOD_POSTER_CACHE_PATH, JSON.stringify(vodPosterCache)))
+            .catch(error => console.warn('[VOD posters] Cache save failed:', error.message));
+    }, 250);
+    vodPosterCacheSaveTimer.unref?.();
+}
+
+function normalizedPosterTitle(value) {
+    return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+        .replace(/^\s*[^-]{1,14}\s+-\s+/, '').replace(/\s+/g, ' ').trim();
+}
+
+function getLocalPosterTitleIndex() {
+    const version = veloraCatalogCache.getStatus().snapshotVersion || '';
+    if (version === localPosterTitleIndexVersion) return localPosterTitleIndex;
+    const index = new Map();
+    for (const item of veloraCatalogCache.getSnapshot('vod_streams') || []) {
+        const poster = String(item.stream_icon || item.cover || item.cover_big || '').trim();
+        const title = normalizedPosterTitle(item.name || item.title);
+        if (poster && title && !index.has(title)) index.set(title, poster);
+    }
+    localPosterTitleIndex = index;
+    localPosterTitleIndexVersion = version;
+    return index;
+}
+
+function rawVodIdentity(item, routeSourceId) {
+    let sourceId = String(item.source_id ?? routeSourceId ?? '').trim();
+    let vodId = String(item.raw_stream_id ?? '').trim();
+    if (!vodId) {
+        const decoded = decodeGlobalId(item.stream_id);
+        if (decoded) {
+            sourceId = String(decoded.sourceId);
+            vodId = String(decoded.itemId);
+        } else {
+            vodId = String(item.stream_id ?? '').trim();
+        }
+    }
+    return sourceId && vodId ? { sourceId, vodId } : null;
+}
+
+async function enrichRemoteVodPosters(items, routeSourceId, headers) {
+    const initiallyMissing = items.map((item, index) => ({ item, index, identity: rawVodIdentity(item, routeSourceId) }))
+        .filter(entry => entry.identity && !String(entry.item.stream_icon || entry.item.cover || entry.item.cover_big || '').trim());
+    if (!initiallyMissing.length) return items;
+    const titleIndex = getLocalPosterTitleIndex();
+    for (const entry of initiallyMissing) {
+        const poster = titleIndex.get(normalizedPosterTitle(entry.item.name || entry.item.title));
+        if (!poster) continue;
+        entry.item.stream_icon = poster;
+        entry.item.cover = poster;
+        entry.item.cover_big = poster;
+        vodPosterCache[`${entry.identity.sourceId}:${entry.identity.vodId}`] = poster;
+    }
+    scheduleVodPosterCacheSave();
+    const missing = initiallyMissing.filter(entry => !String(entry.item.stream_icon || entry.item.cover || entry.item.cover_big || '').trim());
+
+    let cursor = 0;
+    let changed = false;
+    async function worker() {
+        while (cursor < missing.length) {
+            const entry = missing[cursor++];
+            const { sourceId, vodId } = entry.identity;
+            const cacheKey = `${sourceId}:${vodId}`;
+            let poster = Object.prototype.hasOwnProperty.call(vodPosterCache, cacheKey) ? vodPosterCache[cacheKey] : undefined;
+            if (poster === null) poster = undefined;
+            if (poster === undefined) {
+                try {
+                    const url = new URL(`/api/proxy/xtream/${encodeURIComponent(sourceId)}/vod_info`, REMOTE_CATALOG_BASE);
+                    url.searchParams.set('vod_id', vodId);
+                    const response = await fetch(url, { headers, cache: 'no-store', signal: AbortSignal.timeout(2500) });
+                    if (response.ok) {
+                        const details = await response.json();
+                        poster = String(details?.info?.movie_image || details?.info?.cover_big || details?.movie_data?.stream_icon || '').trim();
+                        if (poster) {
+                            vodPosterCache[cacheKey] = poster;
+                            changed = true;
+                        } else if (Object.prototype.hasOwnProperty.call(vodPosterCache, cacheKey)) {
+                            delete vodPosterCache[cacheKey];
+                            changed = true;
+                        }
+                    }
+                } catch (_) {
+                    poster = '';
+                }
+            }
+            if (poster) {
+                entry.item.stream_icon = poster;
+                entry.item.cover = poster;
+                entry.item.cover_big = poster;
+            }
+        }
+    }
+    await Promise.all(Array.from({ length: Math.min(64, missing.length) }, worker));
+    if (changed) scheduleVodPosterCacheSave();
+    return items;
+}
 
 let streamProxySettingsCache = {
     expiresAt: 0,
@@ -52,10 +165,22 @@ async function proxyRemoteCatalog(req, res) {
             if (value) headers[name] = value;
         }
         const upstream = await fetch(target, { headers, cache: 'no-store' });
-        const body = Buffer.from(await upstream.arrayBuffer());
+        let body = Buffer.from(await upstream.arrayBuffer());
+        const routeMatch = target.pathname.match(/\/api\/proxy\/xtream\/([^/]+)\/vod_streams$/i);
+        const contentType = upstream.headers.get('content-type');
+        if (upstream.ok && routeMatch && target.searchParams.has('category_id') && /application\/json/i.test(String(contentType || ''))) {
+            try {
+                const items = JSON.parse(body.toString('utf8'));
+                if (Array.isArray(items)) {
+                    await enrichRemoteVodPosters(items, routeMatch[1] === 'all' ? '' : routeMatch[1], headers);
+                    body = Buffer.from(JSON.stringify(items));
+                }
+            } catch (error) {
+                console.warn('[VOD posters] Remote catalogue enrichment failed:', error.message);
+            }
+        }
         res.status(upstream.status);
         res.set('X-Velora-Catalog-Remote', REMOTE_CATALOG_BASE);
-        const contentType = upstream.headers.get('content-type');
         const cacheControl = upstream.headers.get('cache-control');
         if (contentType) res.set('Content-Type', contentType);
         if (cacheControl) res.set('Cache-Control', cacheControl);

@@ -8,6 +8,27 @@ const INVENTORY_KINDS = {
     vod: ['vod_categories', 'vod_streams'],
     series: ['series_categories', 'series']
 };
+let inventoryPosterIndex = new Map();
+let inventoryPosterIndexVersion = null;
+
+function normalizedPosterTitle(value) {
+    return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+        .replace(/^\s*[^-]{1,14}\s+-\s+/, '').replace(/\s+/g, ' ').trim();
+}
+
+function getInventoryPosterIndex() {
+    const version = veloraCatalogCache.getStatus().snapshotVersion || '';
+    if (version === inventoryPosterIndexVersion) return inventoryPosterIndex;
+    const index = new Map();
+    for (const item of veloraCatalogCache.getSnapshot('vod_streams') || []) {
+        const poster = String(item.stream_icon || item.cover || item.cover_big || '').trim();
+        const title = normalizedPosterTitle(item.name || item.title);
+        if (poster && title && !index.has(title)) index.set(title, poster);
+    }
+    inventoryPosterIndex = index;
+    inventoryPosterIndexVersion = version;
+    return index;
+}
 
 router.get('/status', (req, res) => {
     res.json(veloraCatalogCache.getStatus());
@@ -70,10 +91,11 @@ router.get('/inventory/:sourceId/:kind/:categoryId', (req, res) => {
         String(item.source_id) === String(req.params.sourceId) &&
         String(item.raw_category_id ?? '') === String(req.params.categoryId)
     ));
+    const posterIndex = req.params.kind === 'vod' ? getInventoryPosterIndex() : null;
     const items = matching.slice(offset, offset + limit).map(item => ({
         id: item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id,
         name: String(item.name || item.title || item.series_name || ''),
-        image: String(item.stream_icon || item.cover || ''),
+        image: String(item.stream_icon || item.cover || posterIndex?.get(normalizedPosterTitle(item.name || item.title)) || ''),
         added: item.added || null
     }));
     res.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');

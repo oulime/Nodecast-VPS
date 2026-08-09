@@ -276,10 +276,9 @@
       var password = form.querySelector("#vel-admin-password");
       var usernameValue = username ? username.value : "";
       var passwordValue = password ? password.value : "";
-      window.setTimeout(function () {
-        if (sessionStorage.getItem("velora_admin_settings") !== "1") return;
-        createCatalogAdminSession(usernameValue, passwordValue).catch(function () {});
-      }, 0);
+      createCatalogAdminSession(usernameValue, passwordValue).catch(function (error) {
+        console.warn("[Cache posters] Unable to create Settings Admin session:", error.message);
+      });
     }, true);
     document.addEventListener("click", function (event) {
       if (event.target && event.target.closest && event.target.closest("#settings-tab-btn-cache")) loadInventory();

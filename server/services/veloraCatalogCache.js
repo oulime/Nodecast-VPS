@@ -228,6 +228,35 @@ function enrichVodPostersFromCurrentCatalogue(streams) {
     return streams;
 }
 
+function preserveVodPostersFromPreviousSnapshot(streams) {
+    const previous = loadSnapshotFromDisk()?.vod_streams;
+    if (!Array.isArray(previous) || !previous.length) return streams;
+
+    const postersByIdentity = new Map();
+    const postersByTitle = new Map();
+    for (const item of previous) {
+        const poster = String(item.stream_icon || item.cover || item.cover_big || '').trim();
+        if (!poster) continue;
+        const sourceId = String(item.source_id ?? '').trim();
+        const rawId = String(item.raw_stream_id ?? item.stream_id ?? '').trim();
+        if (sourceId && rawId) postersByIdentity.set(`${sourceId}:${rawId}`, poster);
+        const title = normalizedPosterTitle(item.name || item.title);
+        if (title && !postersByTitle.has(title)) postersByTitle.set(title, poster);
+    }
+
+    for (const item of streams) {
+        if (String(item.stream_icon || item.cover || item.cover_big || '').trim()) continue;
+        const sourceId = String(item.source_id ?? '').trim();
+        const rawId = String(item.raw_stream_id ?? item.stream_id ?? '').trim();
+        const poster = postersByIdentity.get(`${sourceId}:${rawId}`)
+            || postersByTitle.get(normalizedPosterTitle(item.name || item.title));
+        if (!poster) continue;
+        item.stream_icon = poster;
+        item.cover = poster;
+    }
+    return streams;
+}
+
 function isSnapshotFresh() {
     if (!status.ready || !status.completedAt) return false;
     const completedAt = Date.parse(status.completedAt);
@@ -402,7 +431,9 @@ async function buildSnapshot(reason) {
 
     const liveStreams = listStreams(sourceIds, 'live');
     await new Promise(resolve => setImmediate(resolve));
-    const vodStreams = enrichVodPostersFromCurrentCatalogue(listStreams(sourceIds, 'movie'));
+    const vodStreams = enrichVodPostersFromCurrentCatalogue(
+        preserveVodPostersFromPreviousSnapshot(listStreams(sourceIds, 'movie'))
+    );
     await new Promise(resolve => setImmediate(resolve));
     const series = listStreams(sourceIds, 'series');
     await new Promise(resolve => setImmediate(resolve));

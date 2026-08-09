@@ -1521,7 +1521,7 @@
     <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=utf8-text-repair-20260809"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=package-poster-refresh-secure-v4-20260809"></script>
     <script defer src="/assets/manual-pays.js?v=shared-vod-posters-20260809"></script>
-    <script defer src="/assets/country-logos-admin.js?v=country-actions-observer-fix-20260809"></script>
+    <script defer src="/assets/country-logos-admin.js?v=shared-app-country-flags-20260809"></script>
     <script defer src="/assets/direct-media-packages.js?v=20260809-initial-media-load-race-v3"></script>
     <script defer src="/assets/country-switch-loader.js?v=full-load-20260804e"></script>
     <script defer src="/assets/paid-users-admin.js?v=username-password-only-20260804"></script>
@@ -5721,6 +5721,8 @@
             }[homeCountryKey(name)];
             return code ? "https://flagcdn.com/w40/" + code + ".png" : "";
           }
+
+          window.__veloraCountryFlagUrl = homeCountryFlagUrl;
 
           function syncBrandCountryFlag(countryName) {
             if (!brandCountryFlag) return;

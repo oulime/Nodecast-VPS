@@ -4,10 +4,27 @@
   const key = value => String(value || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
   const escapeHtml = value => String(value || "").replace(/[&<>"']/g, char => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[char]);
 
+  function resolvedLogo(countryId, countryName) {
+    const custom = byId.get(String(countryId || ""))?.path || window.__veloraCountryLogosByName?.[key(countryName)] || "";
+    if (custom) return custom;
+    return typeof window.__veloraCountryFlagUrl === "function" ? window.__veloraCountryFlagUrl(countryName) : "";
+  }
+
+  function setImageSource(image, source) {
+    if (!image) return;
+    if (source) {
+      image.src = source;
+      image.hidden = false;
+    } else {
+      image.removeAttribute("src");
+      image.hidden = true;
+    }
+  }
+
   function refreshAppLogos() {
     const select = document.getElementById("country-select");
     const selectedName = select?.selectedOptions?.[0]?.textContent?.trim() || document.getElementById("home-country-value")?.textContent?.trim() || "";
-    const selectedLogo = window.__veloraCountryLogosByName?.[key(selectedName)] || "";
+    const selectedLogo = resolvedLogo("", selectedName);
     ["home-country-flag", "vel-brand-country-flag", "vel-bottom-country-flag"].forEach(id => {
       const image = document.getElementById(id);
       if (!image || !selectedLogo) return;
@@ -15,7 +32,7 @@
       image.hidden = false;
     });
     document.querySelectorAll(".vel-home-country-picker__option, .vel-bottom-country-menu__option, #vel-bottom-country-options [role='option']").forEach(option => {
-      const logo = window.__veloraCountryLogosByName?.[key(option.textContent)] || "";
+      const logo = resolvedLogo("", option.textContent);
       const image = option.querySelector("img");
       if (logo && image) { image.src = logo; image.hidden = false; }
     });
@@ -135,8 +152,7 @@
         head.insertBefore(preview, head.firstChild);
       }
       const logo = byId.get(id);
-      preview.src = logo?.path || window.__veloraCountryLogosByName?.[key(name)] || "";
-      preview.hidden = !preview.src;
+      setImageSource(preview, resolvedLogo(id, name));
       if (card.querySelector("[data-country-logo-pick]")) {
         const existingDelete = card.querySelector("[data-country-logo-delete]");
         if (existingDelete) existingDelete.hidden = !logo;
@@ -174,7 +190,7 @@
       deleteButton.disabled = true;
       remove(deleteButton.dataset.countryLogoDelete, name).then(() => {
         const preview = card?.querySelector(".manual-pays__country-logo");
-        if (preview) { preview.removeAttribute("src"); preview.hidden = true; }
+        setImageSource(preview, resolvedLogo(card?.dataset.country, name));
         deleteButton.hidden = true;
         const status = document.getElementById("countries-admin-status");
         if (status) status.textContent = `Logo de ${name} supprimé.`;

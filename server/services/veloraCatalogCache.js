@@ -101,12 +101,13 @@ function writeStatus() {
 
 // A process restart cannot leave an in-memory warm-up running. Recover a
 // persisted in-progress flag so Admin can immediately retry the build.
-if (status.running) {
+if (status.running || status.error === 'Previous catalogue build was interrupted by a server restart') {
     status = {
         ...status,
         running: false,
         completedAt: new Date().toISOString(),
-        error: 'Previous catalogue build was interrupted by a server restart'
+        error: null,
+        interruptedAt: new Date().toISOString()
     };
     writeStatus();
 }

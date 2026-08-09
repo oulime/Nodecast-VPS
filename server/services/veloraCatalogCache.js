@@ -100,6 +100,18 @@ function writeStatus() {
     writeJsonAtomic(statusPath, status);
 }
 
+// A process restart cannot leave an in-memory warm-up running. Recover a
+// persisted in-progress flag so Admin can immediately retry the build.
+if (status.running) {
+    status = {
+        ...status,
+        running: false,
+        completedAt: new Date().toISOString(),
+        error: 'Previous catalogue build was interrupted by a server restart'
+    };
+    writeStatus();
+}
+
 function encodeGlobalId(sourceId, itemId) {
     return Buffer.from(`${sourceId}:${itemId}`).toString('base64url');
 }
@@ -247,7 +259,9 @@ async function refreshVodPostersFromProviders(enabledSources, attempts = 2) {
         const api = xtreamApi.createFromSource(source);
         for (let attempt = 1; attempt <= attempts; attempt += 1) {
             try {
-                const rows = await api.getVodStreams();
+                const rows = await api.getVodStreams(null, {
+                    signal: AbortSignal.timeout(90000)
+                });
                 if (!Array.isArray(rows)) throw new Error('Provider returned a non-array VOD catalogue');
                 for (const item of rows) {
                     const itemId = String(item?.stream_id ?? '').trim();

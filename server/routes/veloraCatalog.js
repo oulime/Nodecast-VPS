@@ -1,7 +1,15 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const router = express.Router();
 const veloraCatalogCache = require('../services/veloraCatalogCache');
 const { sources } = require('../db');
+const { getDb } = require('../db/sqlite');
+const xtreamApi = require('../services/xtreamApi');
+const { requireAuth, requireAdmin } = require('../auth');
+
+const vodPosterCachePath = path.join(__dirname, '..', '..', 'data', 'vod-poster-cache.json');
+const activePosterRefreshes = new Set();
 
 const INVENTORY_KINDS = {
     live: ['live_categories', 'live_streams'],
@@ -14,6 +22,24 @@ let inventoryPosterIndexVersion = null;
 function normalizedPosterTitle(value) {
     return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
         .replace(/^\s*[^-]{1,14}\s+-\s+/, '').replace(/\s+/g, ' ').trim();
+}
+
+function readPosterCache() {
+    try {
+        return JSON.parse(fs.readFileSync(vodPosterCachePath, 'utf8')) || {};
+    } catch (_) {
+        return {};
+    }
+}
+
+function writePosterCache(cache) {
+    const tmpPath = `${vodPosterCachePath}.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(tmpPath, JSON.stringify(cache));
+    fs.renameSync(tmpPath, vodPosterCachePath);
+}
+
+function providerPoster(item) {
+    return String(item?.stream_icon || item?.cover || item?.cover_big || item?.movie_image || '').trim();
 }
 
 function getInventoryPosterIndex() {
@@ -92,6 +118,9 @@ router.get('/inventory/:sourceId/:kind/:categoryId', (req, res) => {
         String(item.raw_category_id ?? '') === String(req.params.categoryId)
     ));
     const posterIndex = req.params.kind === 'vod' ? getInventoryPosterIndex() : null;
+    const posterCount = req.params.kind === 'vod' ? matching.reduce((total, item) => (
+        total + (String(item.stream_icon || item.cover || posterIndex?.get(normalizedPosterTitle(item.name || item.title)) || '').trim() ? 1 : 0)
+    ), 0) : null;
     const items = matching.slice(offset, offset + limit).map(item => ({
         id: item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id,
         name: String(item.name || item.title || item.series_name || ''),
@@ -100,7 +129,95 @@ router.get('/inventory/:sourceId/:kind/:categoryId', (req, res) => {
     }));
     res.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
     res.json({ sourceId: req.params.sourceId, kind: req.params.kind, categoryId: req.params.categoryId,
-        count: matching.length, offset, limit, hasMore: offset + items.length < matching.length, items });
+        count: matching.length, posterCount, offset, limit, hasMore: offset + items.length < matching.length, items });
+});
+
+router.post('/inventory/:sourceId/vod/:categoryId/posters/refresh', requireAuth, requireAdmin, async (req, res) => {
+    const sourceId = String(req.params.sourceId);
+    const categoryId = String(req.params.categoryId);
+    const refreshKey = `${sourceId}:${categoryId}`;
+    if (activePosterRefreshes.has(refreshKey)) {
+        return res.status(409).json({ error: 'A poster refresh is already running for this package' });
+    }
+
+    activePosterRefreshes.add(refreshKey);
+    try {
+        const source = await sources.getById(sourceId);
+        if (!source || source.type !== 'xtream' || !source.enabled) {
+            return res.status(404).json({ error: 'Enabled Xtream provider not found' });
+        }
+
+        const db = getDb();
+        const localRows = db.prepare(`
+            SELECT item_id, stream_icon
+            FROM playlist_items
+            WHERE source_id = ? AND type = 'movie' AND category_id = ? AND is_hidden = 0
+        `).all(sourceId, categoryId);
+        const localIds = new Set(localRows.map(item => String(item.item_id)));
+        const posterCache = readPosterCache();
+        const postersBefore = localRows.reduce((total, item) => (
+            total + (String(item.stream_icon || posterCache[`${sourceId}:${item.item_id}`] || '').trim() ? 1 : 0)
+        ), 0);
+
+        const providerRows = await xtreamApi.createFromSource(source).getVodStreams(categoryId, {
+            signal: AbortSignal.timeout(45000)
+        });
+        if (!Array.isArray(providerRows)) throw new Error('Provider returned a non-array VOD package');
+
+        const posters = new Map();
+        for (const item of providerRows) {
+            const itemId = String(item?.stream_id ?? '').trim();
+            const poster = providerPoster(item);
+            if (itemId && poster && !posters.has(itemId)) posters.set(itemId, poster);
+        }
+
+        const updatePoster = db.prepare(`
+            UPDATE playlist_items
+            SET stream_icon = ?
+            WHERE source_id = ? AND type = 'movie' AND item_id = ?
+        `);
+        const persist = db.transaction(entries => {
+            let matchedPosters = 0;
+            for (const [itemId, poster] of entries) {
+                if (localIds.has(itemId)) matchedPosters += 1;
+                updatePoster.run(poster, sourceId, itemId);
+                posterCache[`${sourceId}:${itemId}`] = poster;
+            }
+            return matchedPosters;
+        });
+        const matchedPosters = persist(posters);
+        writePosterCache(posterCache);
+
+        const postersAfter = new Set(localRows
+            .filter(item => String(item.stream_icon || posterCache[`${sourceId}:${item.item_id}`] || '').trim())
+            .map(item => String(item.item_id)));
+        for (const itemId of posters.keys()) {
+            if (localIds.has(itemId)) postersAfter.add(itemId);
+        }
+
+        const warmJob = veloraCatalogCache.startWarm({ reason: `poster-package:${refreshKey}` });
+        warmJob.promise.catch(() => {});
+        return res.status(202).json({
+            ok: true,
+            provider: source.name || `Source ${sourceId}`,
+            sourceId,
+            categoryId,
+            movies: localRows.length,
+            providerMovies: providerRows.length,
+            providerPosters: posters.size,
+            matchedPosters,
+            postersBefore,
+            postersAfter: postersAfter.size,
+            addedPosters: Math.max(0, postersAfter.size - postersBefore),
+            missingPosters: Math.max(0, localRows.length - postersAfter.size),
+            cacheRebuildStarted: warmJob.started
+        });
+    } catch (error) {
+        const status = error?.name === 'TimeoutError' ? 504 : 502;
+        return res.status(status).json({ error: error.message || 'Unable to refresh package posters' });
+    } finally {
+        activePosterRefreshes.delete(refreshKey);
+    }
 });
 
 router.post('/warm', (req, res) => {

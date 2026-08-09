@@ -32,9 +32,9 @@ class XtreamApi {
     /**
      * Make API request
      */
-    async request(action, params = {}) {
+    async request(action, params = {}, options = {}) {
         const url = this.buildApiUrl(action, params);
-        const response = await fetch(url);
+        const response = await fetch(url, { signal: options.signal });
         if (!response.ok) {
             throw new Error(`Xtream API error: ${response.status} ${response.statusText}`);
         }
@@ -76,8 +76,8 @@ class XtreamApi {
     /**
      * Get VOD streams, optionally filtered by category
      */
-    async getVodStreams(categoryId = null) {
-        return this.request('get_vod_streams', { category_id: categoryId });
+    async getVodStreams(categoryId = null, options = {}) {
+        return this.request('get_vod_streams', { category_id: categoryId }, options);
     }
 
     /**

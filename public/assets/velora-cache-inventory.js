@@ -11,10 +11,16 @@
     return token ? { Authorization: "Bearer " + token } : {};
   }
 
-  async function request(path) {
-    var response = await fetch(path, { cache: "no-store", headers: headers() });
-    if (!response.ok) throw new Error("HTTP " + response.status);
-    return response.json();
+  async function request(path, options) {
+    var response = await fetch(path, {
+      method: options && options.method ? options.method : "GET",
+      cache: "no-store",
+      headers: headers()
+    });
+    var payload = null;
+    try { payload = await response.json(); } catch (_) {}
+    if (!response.ok) throw new Error(payload && payload.error ? payload.error : "HTTP " + response.status);
+    return payload || {};
   }
 
   function element(tag, className, text) {
@@ -26,6 +32,39 @@
 
   function searchKey(value) {
     return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  }
+
+  async function refreshPackagePosters(refreshButton, status, button, provider, packageRow, content) {
+    refreshButton.disabled = true;
+    status.classList.remove("is-error");
+    status.textContent = "Actualisation des affiches du package...";
+    try {
+      var result = await request(
+        "/api/velora/catalog/inventory/" + encodeURIComponent(provider.sourceId) +
+        "/vod/" + encodeURIComponent(packageRow.categoryId) + "/posters/refresh",
+        { method: "POST" }
+      );
+      status.textContent = result.providerMovies + " films recus - " + result.providerPosters +
+        " affiches recues - " + result.addedPosters + " nouvelle(s) - " +
+        result.missingPosters + " manquante(s). Reconstruction du cache...";
+      for (var attempt = 0; attempt < 60; attempt += 1) {
+        await new Promise(function (resolve) { window.setTimeout(resolve, 2000); });
+        var cacheStatus = await request("/api/velora/catalog/status");
+        if (!cacheStatus.running) {
+          if (cacheStatus.error) throw new Error(cacheStatus.error);
+          content.hidden = true;
+          button.setAttribute("aria-expanded", "false");
+          await openPackage(button, provider, packageRow, content);
+          return;
+        }
+      }
+      status.textContent = "Affiches sauvegardees. Le cache continue en arriere-plan.";
+    } catch (error) {
+      status.textContent = "Impossible d'actualiser les affiches : " + error.message;
+      status.classList.add("is-error");
+    } finally {
+      refreshButton.disabled = false;
+    }
   }
 
   async function openPackage(button, provider, packageRow, content) {
@@ -44,6 +83,21 @@
       );
       content.replaceChildren();
       var items = Array.isArray(result.items) ? result.items : [];
+      if (packageRow.kind === "vod") {
+        var tools = element("div", "cache-inventory__tools");
+        var refreshButton = element("button", "cache-inventory__refresh", "Actualiser les affiches de ce package");
+        var refreshStatus = element(
+          "span",
+          "cache-inventory__refresh-status",
+          (result.posterCount || 0) + " / " + (result.count || 0) + " affiches en cache"
+        );
+        refreshButton.type = "button";
+        refreshButton.addEventListener("click", function () {
+          refreshPackagePosters(refreshButton, refreshStatus, button, provider, packageRow, content);
+        });
+        tools.append(refreshButton, refreshStatus);
+        content.appendChild(tools);
+      }
       if (!items.length) {
         content.appendChild(element("p", "cache-inventory__empty", "Aucun contenu chargé dans ce package."));
         return;
@@ -196,6 +250,7 @@
     if (!root) return;
     var style = document.createElement("style");
     style.textContent = ".cache-package-inventory{margin-top:1rem}.cache-inventory__title{margin:0 0 .75rem}.cache-inventory__filter{width:100%;margin:0 0 .75rem;padding:.7rem .8rem;border:1px solid rgba(255,255,255,.15);border-radius:9px;background:rgba(0,0,0,.26);color:inherit}.cache-inventory__provider{margin:.75rem 0;padding:.65rem;border:1px solid rgba(255,255,255,.12);border-radius:12px}.cache-inventory__provider-button{width:100%;padding:.65rem .75rem;text-align:left;border:0;border-radius:8px;background:rgba(255,255,255,.06);color:inherit;font-weight:800;cursor:pointer}.cache-inventory__provider-button:after{content:'▸';float:right}.cache-inventory__provider-button[aria-expanded=true]:after{content:'▾'}.cache-inventory__packages{display:grid;gap:.4rem;margin-top:.55rem}.cache-inventory__package-button{width:100%;padding:.65rem .8rem;text-align:left;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:rgba(255,255,255,.06);color:inherit;cursor:pointer}.cache-inventory__package-button[aria-expanded=true]{border-color:#a855f7}.cache-inventory__content{padding:.6rem}.cache-inventory__items{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.45rem}.cache-inventory__item{display:flex;align-items:center;gap:.55rem;min-width:0;padding:.4rem;border-radius:7px;background:rgba(0,0,0,.24)}.cache-inventory__item img{width:38px;height:52px;object-fit:cover;border-radius:4px;flex:none}.cache-inventory__item span{overflow:hidden;text-overflow:ellipsis}.cache-inventory__loading,.cache-inventory__empty{margin:.6rem 0;color:#aeb0bd}";
+    style.textContent += ".cache-inventory__tools{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;margin:0 0 .7rem}.cache-inventory__refresh{padding:.58rem .75rem;border:1px solid rgba(168,85,247,.65);border-radius:8px;background:rgba(168,85,247,.16);color:inherit;font-weight:750;cursor:pointer}.cache-inventory__refresh:disabled{opacity:.55;cursor:wait}.cache-inventory__refresh-status{font-size:.88rem;color:#b9bbc8}.cache-inventory__refresh-status.is-error{color:#ff8b8b}";
     document.head.appendChild(style);
     document.getElementById("cache-warm-run")?.addEventListener("click", followWarmup, true);
     document.addEventListener("click", function (event) {

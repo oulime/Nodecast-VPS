@@ -247,33 +247,43 @@ function vodPosterFromProviderItem(item) {
     ).trim();
 }
 
-async function refreshVodPostersFromProviders(enabledSources, attempts = 2) {
+async function refreshVodPostersFromProviders(enabledSources) {
     const db = getDb();
     const posterCache = readJson(vodPosterCachePath) || {};
     let posterCacheChanged = false;
+    const providerStats = [];
 
     for (const source of enabledSources) {
         if (source.type !== 'xtream') continue;
 
         const posters = new Map();
         const api = xtreamApi.createFromSource(source);
-        for (let attempt = 1; attempt <= attempts; attempt += 1) {
-            try {
-                const rows = await api.getVodStreams(null, {
-                    signal: AbortSignal.timeout(90000)
-                });
-                if (!Array.isArray(rows)) throw new Error('Provider returned a non-array VOD catalogue');
-                for (const item of rows) {
-                    const itemId = String(item?.stream_id ?? '').trim();
-                    const poster = vodPosterFromProviderItem(item);
-                    if (itemId && poster && !posters.has(itemId)) posters.set(itemId, poster);
-                }
-                console.log(`[Velora cache] ${source.name} poster pass ${attempt}/${attempts}: ${posters.size} unique posters collected`);
-            } catch (error) {
-                console.warn(`[Velora cache] ${source.name} poster pass ${attempt}/${attempts} failed:`, error.message);
+        const providerStat = {
+            sourceId: String(source.id),
+            provider: source.name || `Source ${source.id}`,
+            receivedMovies: 0,
+            receivedPosters: 0,
+            error: null
+        };
+        try {
+            const rows = await api.getVodStreams(null, {
+                signal: AbortSignal.timeout(90000)
+            });
+            if (!Array.isArray(rows)) throw new Error('Provider returned a non-array VOD catalogue');
+            providerStat.receivedMovies = rows.length;
+            for (const item of rows) {
+                const itemId = String(item?.stream_id ?? '').trim();
+                const poster = vodPosterFromProviderItem(item);
+                if (itemId && poster && !posters.has(itemId)) posters.set(itemId, poster);
             }
-            await new Promise(resolve => setImmediate(resolve));
+            providerStat.receivedPosters = posters.size;
+            console.log(`[Velora cache] ${source.name}: ${rows.length} movies, ${posters.size} posters received`);
+        } catch (error) {
+            providerStat.error = error.message;
+            console.warn(`[Velora cache] ${source.name} poster catalogue call failed:`, error.message);
         }
+        providerStats.push(providerStat);
+        await new Promise(resolve => setImmediate(resolve));
 
         const updatePoster = db.prepare(`
             UPDATE playlist_items
@@ -297,6 +307,7 @@ async function refreshVodPostersFromProviders(enabledSources, attempts = 2) {
     }
 
     if (posterCacheChanged) writeJsonAtomic(vodPosterCachePath, posterCache);
+    return providerStats;
 }
 
 function preserveVodPostersFromPreviousSnapshot(streams) {
@@ -492,7 +503,8 @@ async function buildSnapshot(reason) {
         reason,
         startedAt: new Date().toISOString(),
         completedAt: null,
-        error: null
+        error: null,
+        posterStats: null
     };
     writeStatus();
 
@@ -500,11 +512,9 @@ async function buildSnapshot(reason) {
         .filter(source => source.enabled && (source.type === 'xtream' || source.type === 'm3u'));
     const sourceIds = enabledSources.map(source => source.id);
 
-    // Some Xtream providers intermittently omit different poster fields from a
-    // bulk catalogue response. Merge two independent passes into the durable
-    // poster store before replacing the snapshot. Existing posters are never
-    // removed when either response is blank.
-    await refreshVodPostersFromProviders(enabledSources, 2);
+    // Fetch each provider catalogue exactly once. Non-empty posters are merged
+    // into durable storage; blank fields never erase posters from older runs.
+    const providerPosterStats = await refreshVodPostersFromProviders(enabledSources);
 
     const liveStreams = listStreams(sourceIds, 'live');
     await new Promise(resolve => setImmediate(resolve));
@@ -514,6 +524,19 @@ async function buildSnapshot(reason) {
     await new Promise(resolve => setImmediate(resolve));
     const series = listStreams(sourceIds, 'series');
     await new Promise(resolve => setImmediate(resolve));
+
+    const posterStats = providerPosterStats.map(providerStat => {
+        const providerMovies = vodStreams.filter(item => String(item.source_id) === providerStat.sourceId);
+        const posters = providerMovies.reduce((total, item) => (
+            total + (String(item.stream_icon || item.cover || '').trim() ? 1 : 0)
+        ), 0);
+        return {
+            ...providerStat,
+            movies: providerMovies.length,
+            posters,
+            missingPosters: providerMovies.length - posters
+        };
+    });
 
     const snapshot = {
         live_categories: removeEmptyCategories(listCategories(sourceIds, 'live'), liveStreams),
@@ -542,7 +565,8 @@ async function buildSnapshot(reason) {
         error: null,
         snapshotVersion: version,
         sourceIds,
-        counts: Object.fromEntries(ACTIONS.map(action => [action, snapshot[action].length]))
+        counts: Object.fromEntries(ACTIONS.map(action => [action, snapshot[action].length])),
+        posterStats
     };
     writeStatus();
     cleanupOldSnapshots(version);

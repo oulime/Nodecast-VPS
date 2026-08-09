@@ -38,6 +38,19 @@
   function askDeleteCountry(id){const c=st.countries.find(x=>x.id===id);if(!c)return;st.pendingDeleteCountry=id;$("mp-delete-country-message").textContent=`Vous êtes sur le point de supprimer « ${c.name} ». `;$("mp-delete-country-dialog").showModal()}
   async function deleteCountry(id){const c=st.countries.find(x=>x.id===id);if(!c)return;const button=$("mp-delete-country-confirm");button.disabled=true;button.textContent="Suppression...";status(`Suppression de ${c.name}...`);try{const packages=st.assigned.get(id)||[];for(const p of packages)await sb("admin_stream_curations",`?target_package_id=eq.${encodeURIComponent(p.id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});await sb("admin_packages",`?country_id=eq.${encodeURIComponent(id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});await sb("admin_countries",`?id=eq.${encodeURIComponent(id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});await sb("canonical_countries",`?display_name=eq.${encodeURIComponent(c.name)}&match_key=like.__*`,{method:"DELETE",headers:{Prefer:"return=minimal"}});if(st.activeCountry===id){st.activeCountry=null;$("mp-country-dialog")?.close()}st.pendingDeleteCountry=null;$("mp-delete-country-dialog").close();await countries();status(`${c.name} a été supprimé de l'app.`)}finally{button.disabled=false;button.textContent="Supprimer définitivement"}}
   function dialogStatus(msg,bad=false){const n=$("mp-dialog-status");if(n){n.textContent=msg;n.classList.toggle("error",bad)}}
+  function base64Url(value){const bytes=new TextEncoder().encode(String(value)),binary=Array.from(bytes,byte=>String.fromCharCode(byte)).join("");return btoa(binary).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")}
+  async function persistPackageDeletion(row){
+    const countryId=String(row.country_id||st.activeCountry||""),tab=uiTab(String(row.kind||st.kind)),sourceId=String(row.source_id||"").trim(),categoryId=String(row.category_id||"").trim();
+    if(sourceId&&categoryId&&countryId){
+      const catalogueId=base64Url(`${sourceId}:${categoryId}`),packageIds=new Set([`${tab}::${countryId}::${catalogueId}`,`${tab}::${countryId}::${categoryId}`]);
+      for(const package_id of packageIds)await sb("admin_package_covers","?on_conflict=package_id",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({package_id,deleted:true})})
+    }
+    const orderKey=`${countryId}::${tab}`,current=st.packageOrders.get(orderKey)||[],next=current.filter(id=>String(id)!==String(row.id));
+    if(next.length!==current.length){
+      await sb("admin_country_package_order","?on_conflict=country_id,ui_tab",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({country_id:countryId,ui_tab:tab,package_order:next,updated_at:new Date().toISOString()})});
+      st.packageOrders.set(orderKey,next)
+    }
+  }
   function drawDialog(){
     const c=st.countries.find(x=>x.id===st.activeCountry),list=$("mp-dialog-package-list"),select=$("mp-dialog-package-select");if(!c||!list||!select)return;
     $("mp-dialog-title").textContent=`${c.name} — ${st.kind==="live"?"Live":st.kind==="vod"?"Movies":"Series"}`;const rows=visiblePackages(c.id);
@@ -50,7 +63,7 @@
   function openCountry(id){st.activeCountry=id;drawDialog();dialogStatus(`${visiblePackages(id).length} package(s) dans cet onglet.`);$("mp-country-dialog").showModal()}
   async function removePackage(id){
     const row=(st.assigned.get(st.activeCountry)||[]).find(x=>x.id===id);if(!row||!confirm(`Supprimer « ${row.name} » de ce pays ?`))return;
-    dialogStatus("Suppression...");await sb("admin_stream_curations",`?target_package_id=eq.${encodeURIComponent(id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});await sb("admin_packages",`?id=eq.${encodeURIComponent(id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});await countries();dialogStatus(`« ${row.name} » a été supprimé.`)
+    dialogStatus("Suppression...");await persistPackageDeletion(row);await sb("admin_stream_curations",`?target_package_id=eq.${encodeURIComponent(id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});await sb("admin_packages",`?id=eq.${encodeURIComponent(id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});await countries();window.dispatchEvent(new CustomEvent("velora-admin-curation-changed"));window.dispatchEvent(new CustomEvent("velora-home-cache-invalidated"));dialogStatus(`« ${row.name} » a été supprimé définitivement.`)
   }
   async function editPackage(id){
     const row=(st.assigned.get(st.activeCountry)||[]).find(x=>x.id===id);if(!row)return;const name=prompt("Nouveau nom du package :",row.name)?.trim();if(!name||name===row.name)return;

@@ -3,6 +3,7 @@
 
   const MEDIA_TABS = new Set(["movies", "series"]);
   const packageCache = new Map();
+  const packageCardCache = new Map();
   const selectedPackages = new Map();
   let updateQueued = false;
   let openingKey = "";
@@ -10,7 +11,8 @@
   const packagesView = document.getElementById("packages-view");
   const contentView = document.getElementById("content-view");
   const countrySelect = document.getElementById("country-select");
-  if (!packagesView || !contentView) return;
+  const headerContext = document.getElementById("vel-header-context-title");
+  if (!packagesView || !contentView || !headerContext) return;
 
   function activeTab() {
     return document.body.dataset.velActiveTab || "live";
@@ -44,7 +46,11 @@
 
   function rememberPackages(tab) {
     const packages = visiblePackageCards();
-    if (packages.length) packageCache.set(cacheKey(tab), packages.map(({ id, name }) => ({ id, name })));
+    if (packages.length) {
+      const key = cacheKey(tab);
+      packageCache.set(key, packages.map(({ id, name }) => ({ id, name })));
+      packageCardCache.set(key, new Map(packages.map(({ id, card }) => [id, card])));
+    }
     return packages;
   }
 
@@ -56,22 +62,23 @@
     picker.id = "vel-media-package-picker";
     picker.className = "vel-media-package-picker";
     picker.innerHTML = [
-      '<label for="vel-media-package-select">Package</label>',
       '<div class="vel-media-package-picker__control">',
       '<select id="vel-media-package-select" aria-label="Choisir un package"></select>',
       '<span aria-hidden="true">⌄</span>',
       "</div>"
     ].join("");
-    contentView.insertBefore(picker, contentView.firstChild);
+    headerContext.appendChild(picker);
     picker.querySelector("select").addEventListener("change", event => {
       const tab = activeTab();
       const id = String(event.target.value || "");
       if (!MEDIA_TABS.has(tab) || !id) return;
       selectedPackages.set(cacheKey(tab), id);
       openingKey = `${cacheKey(tab)}::${id}`;
-      const card = [...packagesView.querySelectorAll(".vel-package-card[data-package-id]")]
-        .find(node => String(node.dataset.packageId || "") === id);
-      card?.click();
+      const card = packageCardCache.get(cacheKey(tab))?.get(id);
+      if (!card) return;
+      packagesView.appendChild(card);
+      card.click();
+      card.remove();
       window.setTimeout(() => {
         if (openingKey.endsWith(`::${id}`)) openingKey = "";
         scheduleUpdate();
@@ -86,6 +93,7 @@
     const packages = packageCache.get(cacheKey(tab)) || [];
     const show = MEDIA_TABS.has(tab) && !contentView.classList.contains("hidden") && packages.length > 0;
     picker.hidden = !show;
+    headerContext.classList.toggle("vel-header-context-title--package-picker", show);
     if (!show) return;
 
     const signature = packages.map(item => `${item.id}\u0000${item.name}`).join("\u0001");
@@ -108,6 +116,7 @@
     if (!MEDIA_TABS.has(tab)) {
       const picker = document.getElementById("vel-media-package-picker");
       if (picker) picker.hidden = true;
+      headerContext.classList.remove("vel-header-context-title--package-picker");
       return;
     }
 
@@ -122,7 +131,10 @@
     if (!target || openingKey === `${key}::${target.id}`) return;
     selectedPackages.set(key, target.id);
     openingKey = `${key}::${target.id}`;
-    window.requestAnimationFrame(() => target.card.click());
+    window.requestAnimationFrame(() => {
+      target.card.click();
+      packagesView.replaceChildren();
+    });
     window.setTimeout(() => {
       if (openingKey === `${key}::${target.id}`) openingKey = "";
       scheduleUpdate();

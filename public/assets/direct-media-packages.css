@@ -1,32 +1,27 @@
+body[data-vel-active-tab="movies"] #packages-view,
+body[data-vel-active-tab="series"] #packages-view,
+body[data-vel-active-tab="movies"] #vel-packages-section-heading,
+body[data-vel-active-tab="series"] #vel-packages-section-heading {
+  display: none !important;
+}
+
 .vel-media-package-picker {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin: 0 0 1rem;
-  padding: 0.8rem 1rem;
-  border: 1px solid rgba(167, 139, 250, 0.28);
-  border-radius: 14px;
-  background: rgba(18, 14, 28, 0.88);
-  backdrop-filter: blur(14px);
+  display: block;
+  width: min(34rem, 52vw);
 }
 
 .vel-media-package-picker[hidden] {
   display: none;
 }
 
-.vel-media-package-picker > label {
-  flex: 0 0 auto;
-  color: #cfc8dd;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.vel-header-context-title--package-picker > #vel-header-context-title-text,
+.vel-header-context-title--package-picker > .vel-category-heading__accent-line {
+  display: none;
 }
 
 .vel-media-package-picker__control {
   position: relative;
-  flex: 1 1 20rem;
-  max-width: 34rem;
+  width: 100%;
 }
 
 .vel-media-package-picker select {
@@ -58,13 +53,6 @@
 
 @media (max-width: 640px) {
   .vel-media-package-picker {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 0.45rem;
-  }
-
-  .vel-media-package-picker__control {
-    flex-basis: auto;
-    max-width: none;
+    width: min(100%, 62vw);
   }
 }

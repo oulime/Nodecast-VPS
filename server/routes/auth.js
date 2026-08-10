@@ -237,6 +237,35 @@ router.get('/me', auth.requireAuth, async (req, res) => {
 });
 
 /**
+ * Change the password of the signed-in user
+ * POST /api/auth/change-password
+ */
+router.post('/change-password', auth.requireAuth, async (req, res) => {
+    try {
+        const currentPassword = typeof req.body?.currentPassword === 'string' ? req.body.currentPassword : '';
+        const newPassword = typeof req.body?.newPassword === 'string' ? req.body.newPassword : '';
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: 'Le mot de passe actuel et le nouveau mot de passe sont obligatoires.' });
+        }
+        if (newPassword.length < 6) {
+            return res.status(400).json({ error: 'Le nouveau mot de passe doit contenir au moins 6 caractères.' });
+        }
+        const user = await paidUsersStore.getById(req.user.id);
+        if (!user || !user.passwordHash) {
+            return res.status(400).json({ error: "La modification du mot de passe n'est pas disponible pour ce compte." });
+        }
+        if (!await auth.verifyPassword(currentPassword, user.passwordHash)) {
+            return res.status(400).json({ error: 'Le mot de passe actuel est incorrect.' });
+        }
+        await paidUsersStore.update(user.id, { passwordHash: await auth.hashPassword(newPassword) });
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error changing password:', err);
+        res.status(500).json({ error: 'Impossible de modifier le mot de passe.' });
+    }
+});
+
+/**
  * Get all users (admin only)
  * GET /api/auth/users
  */

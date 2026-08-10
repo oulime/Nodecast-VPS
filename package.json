@@ -7,7 +7,7 @@
     "scripts": {
         "start": "node server/index.js",
         "dev": "node --watch server/index.js",
-        "build": "node --check server/index.js && node --check server/auth.js && node --check server/routes/auth.js && node --check server/services/paidUsersStore.js && node --check server/routes/analytics.js && node --check server/routes/veloraTrialProxy.js && node --check public/assets/main-JkackQV-.js && node --check public/assets/ios-native-fullscreen.js && node --check public/assets/paid-users-admin.js && node --check public/assets/subscription-access-guard.js",
+        "build": "node --check server/index.js && node --check server/auth.js && node --check server/routes/auth.js && node --check server/services/paidUsersStore.js && node --check server/routes/analytics.js && node --check server/routes/veloraTrialProxy.js && node --check public/assets/main-JkackQV-.js && node --check public/assets/ios-native-fullscreen.js && node --check public/assets/paid-users-admin.js && node --check public/assets/subscription-access-guard.js && node --check public/assets/profile-account.js",
         "test:velora-data": "node scripts/test-velora-data.js",
         "test:ios-fullscreen": "node scripts/test-ios-native-fullscreen.js",
         "clean:transcode-cache": "node scripts/clean-transcode-cache.js"

@@ -131,6 +131,7 @@ function paidText(value, maxLength = 160) {
 
 function paidSubscriptionStatus(user) {
     if (user.subscriptionBlocked) return 'blocked';
+    if (!user.subscriptionStart && !user.subscriptionEnd && (user.subscriptionPlanMinutes || user.subscriptionPlanMonths)) return 'pending';
     const end = user.subscriptionEnd ? new Date(user.subscriptionEnd) : null;
     return end && Number.isFinite(end.getTime()) && end.getTime() <= Date.now() ? 'expired' : 'active';
 }
@@ -157,14 +158,13 @@ router.post('/admin/paid-users', requireAuth, requireSettingsAdmin, paidAdminHan
     if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
     if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
     const plan = paidPlan(req.body);
-    const start = new Date();
     const user = await paidUsersStore.create({
         username,
         passwordHash: await auth.hashPassword(password),
         role: 'viewer',
         displayName: paidText(req.body?.displayName),
-        subscriptionStart: start.toISOString(),
-        subscriptionEnd: addPaidPlan(start, plan).toISOString(),
+        subscriptionStart: null,
+        subscriptionEnd: null,
         subscriptionPlanMonths: plan.subscriptionPlanMonths,
         subscriptionPlanMinutes: plan.subscriptionPlanMinutes,
         subscriptionBlocked: false

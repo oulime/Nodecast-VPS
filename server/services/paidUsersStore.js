@@ -103,6 +103,19 @@ const paidUsersStore = {
         return withoutPassword(getById(id));
     },
 
+    async activateSubscription(id, subscriptionStart, subscriptionEnd) {
+        const now = new Date().toISOString();
+        const result = getDb().prepare(`
+            UPDATE users
+            SET subscription_start = ?, subscription_end = ?, updated_at = ?
+            WHERE id = ? AND subscription_start IS NULL AND subscription_end IS NULL
+        `).run(subscriptionStart, subscriptionEnd, now, id);
+        return {
+            activated: result.changes > 0,
+            user: withoutPassword(getById(id))
+        };
+    },
+
     async delete(id) {
         const user = getById(id);
         if (!user) throw new Error('User not found');

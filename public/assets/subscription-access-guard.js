@@ -57,7 +57,7 @@
 
   function contactNumber() {
     const configured = document.querySelector('meta[name="velora-whatsapp-number"]')?.content || "";
-    return configured.trim();
+    return configured.trim() || "+33 7 53 54 16 25";
   }
 
   function whatsappUrl() {
@@ -84,7 +84,13 @@
         <p class="vel-subscription-expired__copy">Votre période d'abonnement est terminée. Contactez le service client via WhatsApp pour renouveler votre accès.</p>
         <p class="vel-subscription-expired__contact"><span>WhatsApp</span><strong>${contactNumber() || "Service client"}</strong></p>
         <div class="vel-subscription-expired__actions">
-          <a class="vel-subscription-expired__whatsapp" href="${whatsappUrl()}" target="_blank" rel="noopener noreferrer">Contacter sur WhatsApp</a>
+          <a class="vel-subscription-expired__whatsapp" href="${whatsappUrl()}" target="_blank" rel="noopener noreferrer" aria-label="Contacter le ${contactNumber()} sur WhatsApp">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.5 11.7a8.5 8.5 0 0 1-12.6 7.4L3.5 20.5l1.4-4.2A8.5 8.5 0 1 1 20.5 11.7Z" />
+              <path d="M8.2 7.7c.2-.5.5-.5.8-.5h.5c.2 0 .4.1.5.4l.8 1.9c.1.3 0 .5-.2.7l-.6.7c-.2.2-.1.4 0 .6.7 1.2 1.7 2.2 3 2.8.2.1.4.1.6-.1l.8-1c.2-.2.4-.3.7-.2l2 .9c.3.1.4.3.4.6 0 .4-.2 1.4-.9 1.9-.6.5-1.4.8-2.3.6-1.1-.2-2.8-.8-4.7-2.5-1.5-1.4-2.6-3.1-2.9-4.3-.3-1.1 0-2 .5-2.5Z" />
+            </svg>
+            <span>${contactNumber()}</span>
+          </a>
           <button type="button" class="vel-subscription-expired__retry">J'ai renouvelé — Réessayer</button>
           <button type="button" class="vel-subscription-expired__close">Fermer</button>
         </div>

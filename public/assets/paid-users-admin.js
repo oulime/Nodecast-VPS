@@ -106,7 +106,7 @@
 
   function badge(user) {
     const s = user.subscriptionStatus || "active";
-    const labels = { active: "Actif", expired: "Expire", blocked: "Bloque", admin: "Admin" };
+    const labels = { active: "Actif", pending: "En attente", expired: "Expire", blocked: "Bloque", admin: "Admin" };
     return `<span class="paid-users__badge paid-users__badge--${esc(s)}">${esc(labels[s] || s)}</span>`;
   }
 
@@ -128,6 +128,7 @@
 
   function renderStats() {
     const active = state.users.filter((u) => u.subscriptionStatus === "active").length;
+    const pending = state.users.filter((u) => u.subscriptionStatus === "pending").length;
     const expired = state.users.filter((u) => u.subscriptionStatus === "expired").length;
     const blocked = state.users.filter((u) => u.subscriptionStatus === "blocked").length;
     const stats = $("paid-users-stats");
@@ -135,6 +136,7 @@
     stats.innerHTML = [
       ["Clients", state.users.length],
       ["Actifs", active],
+      ["En attente", pending],
       ["Expires", expired],
       ["Bloques", blocked]
     ].map(([label, value]) => `<div class="paid-users__stat"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join("");

@@ -66,10 +66,44 @@ function normalizeSubscriptionStart(value) {
 function subscriptionStatus(user) {
     if (!user || user.role === 'admin') return 'admin';
     if (user.subscriptionBlocked) return 'blocked';
+    if (!user.subscriptionStart && !user.subscriptionEnd && (user.subscriptionPlanMinutes || user.subscriptionPlanMonths)) return 'pending';
     if (!user.subscriptionEnd) return 'active';
     const end = new Date(user.subscriptionEnd);
     if (Number.isNaN(end.getTime())) return 'expired';
     return end.getTime() > Date.now() ? 'active' : 'expired';
+}
+
+function pendingSubscriptionFields(body) {
+    const minutesProvided = Object.prototype.hasOwnProperty.call(body || {}, 'subscriptionPlanMinutes')
+        && body.subscriptionPlanMinutes !== '' && body.subscriptionPlanMinutes !== null;
+    if (minutesProvided) {
+        return {
+            subscriptionStart: null,
+            subscriptionEnd: null,
+            subscriptionPlanMonths: null,
+            subscriptionPlanMinutes: normalizePlanMinutes(body.subscriptionPlanMinutes)
+        };
+    }
+    return {
+        subscriptionStart: null,
+        subscriptionEnd: null,
+        subscriptionPlanMonths: normalizePlanMonths(body?.subscriptionPlanMonths || 1),
+        subscriptionPlanMinutes: null
+    };
+}
+
+async function activatePendingSubscription(user) {
+    if (!user || user.role === 'admin' || user.subscriptionStart || user.subscriptionEnd) {
+        return { activated: false, user };
+    }
+    if (!user.subscriptionPlanMinutes && !user.subscriptionPlanMonths) {
+        return { activated: false, user };
+    }
+    const start = new Date();
+    const end = user.subscriptionPlanMinutes
+        ? new Date(start.getTime() + Number(user.subscriptionPlanMinutes) * 60 * 1000)
+        : addMonths(start, Number(user.subscriptionPlanMonths));
+    return paidUsersStore.activateSubscription(user.id, start.toISOString(), end.toISOString());
 }
 
 function publicUser(user) {
@@ -187,7 +221,7 @@ router.post('/setup', async (req, res) => {
  * POST /api/auth/login
  */
 router.post('/login', (req, res, next) => {
-    auth.passport.authenticate('local', { session: false }, (err, user, info) => {
+    auth.passport.authenticate('local', { session: false }, async (err, user, info) => {
         if (err) {
             console.error('Login error:', err);
             return res.status(500).json({ error: 'Server error' });
@@ -197,13 +231,19 @@ router.post('/login', (req, res, next) => {
             return res.status(401).json({ error: info?.message || 'Invalid credentials' });
         }
 
-        // Generate JWT token
-        const token = auth.generateToken(user);
-
-        res.json({
-            token,
-            user: publicUser(user)
-        });
+        try {
+            const activation = await activatePendingSubscription(user);
+            const authenticatedUser = activation.user || user;
+            const token = auth.generateToken(authenticatedUser);
+            res.json({
+                token,
+                user: publicUser(authenticatedUser),
+                subscriptionActivated: activation.activated
+            });
+        } catch (activationError) {
+            console.error('Subscription activation error:', activationError);
+            res.status(500).json({ error: 'Impossible d’activer l’abonnement' });
+        }
     })(req, res, next);
 });
 
@@ -301,12 +341,7 @@ router.post('/users', auth.requireAuth, auth.requireAdmin, async (req, res) => {
             return res.status(400).json({ error: 'Role must be either "admin" or "viewer"' });
         }
 
-        const subscriptionBody = {
-            ...req.body,
-            subscriptionStart: req.body.subscriptionStart || new Date().toISOString()
-        };
-        if (!req.body.subscriptionPlanMinutes && !req.body.subscriptionPlanMonths) subscriptionBody.subscriptionPlanMonths = 1;
-        const subscriptionFields = role === 'admin' ? {} : buildSubscriptionFields(subscriptionBody);
+        const subscriptionFields = role === 'admin' ? {} : pendingSubscriptionFields(req.body);
 
         const passwordHash = await auth.hashPassword(password);
         const newUser = await paidUsersStore.create({

@@ -339,6 +339,18 @@
                 }
 
                 localStorage.setItem('authToken', data.token);
+                try {
+                    sessionStorage.removeItem('velora_subscription_welcome');
+                    if (data.subscriptionActivated && data.user) {
+                        sessionStorage.setItem('velora_subscription_welcome', JSON.stringify({
+                            username: data.user.username || '',
+                            displayName: data.user.displayName || '',
+                            subscriptionEnd: data.user.subscriptionEnd || null,
+                            subscriptionPlanMonths: data.user.subscriptionPlanMonths || null,
+                            subscriptionPlanMinutes: data.user.subscriptionPlanMinutes || null
+                        }));
+                    }
+                } catch (storageError) {}
                 window.location.replace('/?paid=1');
             } catch (err) {
                 errorMessage.textContent = err.message;

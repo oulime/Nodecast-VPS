@@ -10116,6 +10116,20 @@ if (target.closest(".trial-offer-button")) {
         display: block;
       }
 
+      /* Home always owns the full desktop grid, even after leaving a live package. */
+      body.vel-home-empty-active .main--velora .vel-dashboard {
+        grid-template-columns: minmax(0, 1fr) !important;
+        column-gap: 0 !important;
+      }
+
+      body.vel-home-empty-active .main--velora .vel-body,
+      body.vel-home-empty-active .vel-home-empty-page,
+      body.vel-home-empty-active .vel-home-sections {
+        width: 100% !important;
+        max-width: none !important;
+        min-width: 0 !important;
+      }
+
       /* Accueil owns the full page; never leak a previous media header into it. */
       html body.vel-home-empty-active .main--velora:has(#vel-home-empty-page) .vel-sticky-top,
       html body.vel-home-empty-active .main--velora:has(#vel-home-empty-page) .vel-header {
@@ -10379,7 +10393,10 @@ if (target.closest(".trial-offer-button")) {
           document.body.classList.add("vel-home-empty-active");
           window.scrollTo(0, 0);
           var main = document.querySelector(".main--velora");
-          if (main) main.scrollTop = 0;
+          if (main) {
+            main.classList.remove("main--velora-in-package", "main--velora-live-package");
+            main.scrollTop = 0;
+          }
           setActive("home");
         }
 

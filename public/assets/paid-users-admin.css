@@ -2,3 +2,9 @@
 
 .paid-users__storage{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;margin:.75rem 0 0;color:#d8d1e6}.paid-users__storage span{display:inline-flex;align-items:center;gap:.35rem;padding:.38rem .6rem;border:1px solid rgba(110,231,183,.22);border-radius:999px;background:rgba(6,78,59,.14);font-size:.78rem}.paid-users__storage strong{color:#6ee7b7}.paid-users__storage small{color:#9d96aa}
 .paid-users__badge--pending{background:rgba(245,158,11,.14)!important;color:#fcd34d!important}
+.paid-users-dialog__share{margin-top:1rem;padding:.85rem;border:1px solid rgba(167,139,250,.3);border-radius:8px;background:rgba(124,58,237,.08)}
+.paid-users-dialog__share summary{color:#ddd6fe;font-size:.8rem;font-weight:700;cursor:pointer}
+.paid-users-dialog__share[open] summary{margin-bottom:.75rem}
+.paid-users-dialog__share textarea{box-sizing:border-box;width:100%;min-height:12rem;padding:.75rem;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:#08070d;color:#f7f2ff;line-height:1.5;resize:vertical;outline:none}
+.paid-users-dialog__share textarea:focus{border-color:rgba(167,139,250,.72);box-shadow:0 0 0 3px rgba(124,58,237,.18)}
+.paid-users-dialog__share button{margin-top:.65rem}

@@ -48,8 +48,7 @@
         <div class="vel-subscription-welcome__icon" aria-hidden="true">✓</div>
         <p class="vel-subscription-welcome__eyebrow">COMPTE ACTIVÉ</p>
         <h2 id="vel-subscription-welcome-title">Bienvenue ${esc(name)}</h2>
-        <p class="vel-subscription-welcome__copy">Votre abonnement vient de démarrer. Votre compte est actif pour <strong>${esc(durationLabel(data))}</strong>.</p>
-        <div class="vel-subscription-welcome__expiration"><span>Expiration</span><strong>${esc(expirationLabel(data.subscriptionEnd))}</strong></div>
+        <p class="vel-subscription-welcome__copy"><strong>Votre test vient de commencer.</strong><br>Profitez de votre accès pour découvrir le service.</p>
         <button type="button" class="vel-subscription-welcome__start">Commencer à regarder</button>
       </section>`;
     document.body.appendChild(overlay);

@@ -97,6 +97,36 @@
       : { subscriptionPlanMonths: plan.months };
   }
 
+  function generateSecurePassword() {
+    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+    const randomValues = new Uint32Array(8);
+    window.crypto.getRandomValues(randomValues);
+    const randomPart = Array.from(randomValues, (value) => alphabet[value % alphabet.length]).join("");
+    return `V!9a${randomPart}`;
+  }
+
+  function updateGeneratedAccessMessage() {
+    const container = $("paid-generated-share");
+    const message = $("paid-generated-message");
+    if (!container || !message || container.hidden) return;
+    const username = $("paid-username").value.trim();
+    const password = $("paid-password").value;
+    message.value = `Voici vos accès :\n\n🌐 Lien : https://nodecast.veloravip.net/\n\n👤 Nom d’utilisateur : ${username}\n🔑 Mot de passe : ${password}\n\nCliquez sur le lien puis renseignez votre nom d’utilisateur et votre mot de passe pour vous connecter.\n\nBonne utilisation 😊`;
+  }
+
+  async function copyGeneratedAccessMessage() {
+    const message = $("paid-generated-message");
+    if (!message?.value) return;
+    try {
+      await navigator.clipboard.writeText(message.value);
+    } catch {
+      message.focus();
+      message.select();
+      document.execCommand("copy");
+    }
+    dialogStatus("Message copié automatiquement.");
+  }
+
   function planLabel(user) {
     const plan = user.subscriptionPlanMinutes
       ? PLANS.find((item) => item.minutes === Number(user.subscriptionPlanMinutes))
@@ -203,6 +233,10 @@
     $("paid-password").value = "";
     $("paid-plan").value = "months:1";
     $("paid-plan-row").hidden = false;
+    $("paid-autofill").hidden = false;
+    $("paid-generated-share").hidden = true;
+    $("paid-generated-share").open = false;
+    $("paid-generated-message").value = "";
     $("paid-dialog-title").textContent = "Creer un client";
     $("paid-dialog-copy").textContent = "L'abonnement commence au moment ou vous cliquez sur Creer.";
     $("paid-submit").textContent = "Creer";
@@ -224,6 +258,7 @@
     $("paid-display-name").value = user.displayName || "";
     $("paid-username").value = user.username || "";
     $("paid-plan-row").hidden = true;
+    $("paid-autofill").hidden = true;
     $("paid-dialog-title").textContent = "Modifier le client";
     $("paid-dialog-copy").textContent = "Changez le nom, username ou password. Pour ajouter du temps, utilisez Renouveler.";
     $("paid-submit").textContent = "Enregistrer";
@@ -255,6 +290,36 @@
       dialogStatus(err.message, true);
     } finally {
       submit.disabled = false;
+    }
+  }
+
+  async function autofillUser() {
+    const button = $("paid-autofill");
+    button.disabled = true;
+    dialogStatus("Génération des identifiants...");
+    try {
+      const users = extractUserList(await api("/velora/catalog/admin/paid-users"));
+      const lastNumber = users.reduce((maximum, user) => {
+        for (const value of [user.username, user.displayName]) {
+          const match = String(value || "").trim().match(/^User(\d+)$/i);
+          if (match) maximum = Math.max(maximum, Number.parseInt(match[1], 10));
+        }
+        return maximum;
+      }, 4499);
+      const nextNumber = lastNumber + 1;
+      const generatedName = `User${nextNumber}`;
+      $("paid-display-name").value = generatedName;
+      $("paid-username").value = generatedName;
+      $("paid-password").value = generateSecurePassword();
+      $("paid-plan").value = "minutes:10";
+      $("paid-generated-share").hidden = false;
+      $("paid-generated-share").open = false;
+      updateGeneratedAccessMessage();
+      await copyGeneratedAccessMessage();
+    } catch (err) {
+      dialogStatus(`Génération impossible : ${err.message}`, true);
+    } finally {
+      button.disabled = false;
     }
   }
 
@@ -335,6 +400,18 @@
     loadUsers();
   }
 
+  function makePaidTabDefaultOnAdminOpen() {
+    const shell = $("settings-shell");
+    if (!shell) return;
+    let wasOpen = !shell.classList.contains("hidden");
+    if (wasOpen) activatePaidTab();
+    new MutationObserver(() => {
+      const isOpen = !shell.classList.contains("hidden");
+      if (isOpen && !wasOpen) activatePaidTab();
+      wasOpen = isOpen;
+    }).observe(shell, { attributes: true, attributeFilter: ["class"] });
+  }
+
   function closeDialogsOnBackdrop(panel) {
     panel.querySelectorAll("dialog.paid-users-dialog").forEach((dialog) => {
       dialog.addEventListener("click", (event) => {
@@ -395,6 +472,12 @@
               <div><label for="paid-password">Password</label><input id="paid-password" type="text" minlength="6" placeholder="Minimum 6 caracteres" autocomplete="new-password" /></div>
               <div id="paid-plan-row"><label for="paid-plan">Periode</label><select id="paid-plan">${PLANS.map((p) => `<option value="${p.value}">${p.label}</option>`).join("")}</select></div>
             </div>
+            <button id="paid-autofill" type="button" class="secondary">Générer un test</button>
+            <details id="paid-generated-share" class="paid-users-dialog__share" hidden>
+              <summary>Message copié automatiquement</summary>
+              <textarea id="paid-generated-message" rows="10" readonly></textarea>
+              <button id="paid-copy-message" type="button" class="secondary">Copier à nouveau</button>
+            </details>
             <p id="paid-dialog-status" class="paid-users-dialog__status" aria-live="polite"></p>
             <div class="paid-users-dialog__actions"><button type="button" class="secondary" data-paid-close>Annuler</button><button id="paid-submit" type="submit" class="primary">Creer</button></div>
           </form>
@@ -418,6 +501,10 @@
       panel.querySelector("#paid-user-form").addEventListener("submit", saveUser);
       panel.querySelector("#paid-renew-form").addEventListener("submit", renewUser);
       panel.querySelector("#paid-new").addEventListener("click", openCreateDialog);
+      panel.querySelector("#paid-autofill").addEventListener("click", autofillUser);
+      panel.querySelector("#paid-copy-message").addEventListener("click", copyGeneratedAccessMessage);
+      panel.querySelector("#paid-username").addEventListener("input", updateGeneratedAccessMessage);
+      panel.querySelector("#paid-password").addEventListener("input", updateGeneratedAccessMessage);
       panel.querySelector("#paid-refresh").addEventListener("click", () => { state.storage = null; loadUsers(); });
       panel.querySelectorAll("[data-paid-close]").forEach((btn) => btn.addEventListener("click", () => closeDialog($("paid-user-dialog"))));
       panel.querySelectorAll("[data-paid-renew-close]").forEach((btn) => btn.addEventListener("click", () => { state.renewingId = null; closeDialog($("paid-renew-dialog")); }));
@@ -442,4 +529,5 @@
     if (event.target.closest("#btn-admin-settings, #cc-open-settings, [data-settings-open]")) setTimeout(ensurePanel, 0);
   }, true);
   ensurePanel();
+  makePaidTabDefaultOnAdminOpen();
 })();

@@ -1514,24 +1514,24 @@
       rel="stylesheet"
     />
     <script src="/assets/local-velora-data.js?v=20260809-admin-sync-v2"></script>
-    <script defer src="/assets/velora-home-sections.js?v=delete-section-sync-v2-20260809"></script>
-    <script defer src="/assets/velora-home-cache-fallback.js?v=country-switch-guard-20260809"></script>
+    <script defer src="/assets/velora-home-sections.js?v=home-demand-loading-v2-20260810"></script>
+    <script defer src="/assets/velora-home-cache-fallback.js?v=home-country-cache-v2-20260810"></script>
     <link rel="stylesheet" href="/assets/live-package-country-fallback.css?v=package-logo-only-20260805">
     <script src="/assets/live-package-country-fallback.js?v=package-logo-only-20260805b"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=provider-safe-live-packages-v3-20260809"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=country-demand-loading-v1-20260810"></script>
     <script defer src="/assets/subscription-access-guard.js?v=subscription-whatsapp-number-v2-20260810"></script>
     <script defer src="/assets/subscription-welcome.js?v=first-login-test-message-v1-20260810"></script>
     <script defer src="/assets/profile-account.js?v=profile-account-menu-v2-20260810"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=package-poster-refresh-secure-v4-20260809"></script>
     <script defer src="/assets/manual-pays.js?v=sync-catalog-post-fix-20260809"></script>
     <script defer src="/assets/country-logos-admin.js?v=shared-app-country-flags-20260809"></script>
-    <script defer src="/assets/direct-media-packages.js?v=20260809-package-dropdown-selection-v4"></script>
-    <script defer src="/assets/country-switch-loader.js?v=country-switch-20260809f"></script>
+    <script defer src="/assets/direct-media-packages.js?v=20260810-latest-navigation-wins-v2"></script>
+    <script defer src="/assets/country-switch-loader.js?v=country-switch-fast-v2-20260810"></script>
     <script defer src="/assets/paid-users-admin.js?v=settings-admin-autocopy-test-v2-20260810"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
     <link rel="stylesheet" href="/assets/manual-pays.css?v=20260803-global-package-sync">
-    <link rel="stylesheet" href="/assets/direct-media-packages.css?v=20260809-slim-picker">
+    <link rel="stylesheet" href="/assets/direct-media-packages.css?v=20260810-latest-navigation-wins-v2">
     <style>
       .manual-pays__pagination{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding:.7rem;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:rgba(14,11,20,.96);color:#aaa4b5;font-size:.75rem}
       .manual-pays__pagination button{border:1px solid rgba(167,139,250,.45);border-radius:8px;background:rgba(124,58,237,.2);color:#fff;padding:.45rem .7rem;cursor:pointer}
@@ -1562,7 +1562,7 @@
       .vel-profile-account__primary,.vel-profile-account__secondary{min-height:46px;border-radius:13px;font:inherit;font-weight:800;cursor:pointer}.vel-profile-account__primary{width:100%;border:0;background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff}.vel-profile-account__secondary{border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);color:#fff}.vel-profile-account__password{display:grid;gap:12px;margin-top:16px;padding:16px;border:1px solid rgba(139,92,246,.25);border-radius:16px;background:rgba(12,9,21,.62);text-align:left}.vel-profile-account__password[hidden]{display:none}.vel-profile-account__password label{display:grid;gap:6px;color:rgba(255,255,255,.72);font-size:12px;font-weight:800}.vel-profile-account__password input{width:100%;min-height:44px;box-sizing:border-box;border:1px solid rgba(255,255,255,.14);border-radius:11px;background:rgba(255,255,255,.07);color:#fff;padding:0 12px;font:inherit}.vel-profile-account__password-actions{display:grid;grid-template-columns:1fr 1.4fr;gap:9px}.vel-profile-account__status{min-height:18px;margin:0;color:#86efac;font-size:12px}.vel-profile-account__status.is-error{color:#fca5a5}@media(max-width:520px){.vel-profile-account__card{padding:24px 17px}.vel-profile-account__password-actions{grid-template-columns:1fr}}
     </style>
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css">
-    <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=live-player-placeholder-no-title-20260803">
+    <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=large-package-virtualization-v1-20260810">
     <link rel="stylesheet" href="/assets/velora-home-sections.css?v=admin-country-filter-20260803">
     <style>
       #settings-tab-btn-ip,
@@ -8983,12 +8983,18 @@ if (target.closest(".trial-offer-button")) {
           if (mobileQuery.addEventListener) mobileQuery.addEventListener("change", scheduleUpdate);
           else if (mobileQuery.addListener) mobileQuery.addListener(scheduleUpdate);
 
-          new MutationObserver(scheduleMutationUpdate).observe(document.body, {
-            attributes: true,
-            attributeFilter: ["class"]
-          });
-          new MutationObserver(scheduleMutationUpdate).observe(packages, { childList: true, subtree: true });
-          new MutationObserver(scheduleMutationUpdate).observe(list, { childList: true, subtree: true });
+          if (document.body && document.body.nodeType) {
+            new MutationObserver(scheduleMutationUpdate).observe(document.body, {
+              attributes: true,
+              attributeFilter: ["class"]
+            });
+          }
+          if (packages && packages.nodeType) {
+            new MutationObserver(scheduleMutationUpdate).observe(packages, { childList: true, subtree: true });
+          }
+          if (list && list.nodeType) {
+            new MutationObserver(scheduleMutationUpdate).observe(list, { childList: true, subtree: true });
+          }
 
           scheduleUpdate();
         }

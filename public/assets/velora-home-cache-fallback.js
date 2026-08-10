@@ -3,6 +3,8 @@
   var storageKey = "velora.home-cache.first-paint.v1";
   var cachePayload = null;
   var cacheRequests = new Map();
+  var cachePayloads = new Map();
+  var cacheUpdatedAtByCountry = new Map();
   var cacheCountryId = "";
   var cacheUpdatedAt = 0;
   var registeredHomeCards = new WeakMap();
@@ -82,7 +84,15 @@
     // those as the same request when the payload was just obtained; an actual
     // admin invalidation still refreshes after this small coalescing window.
     var countryId = activeCountryId();
-    if (cachePayload && cacheCountryId === countryId && (!force || Date.now() - cacheUpdatedAt < 1000)) return Promise.resolve(cachePayload);
+    var countryPayload = cachePayloads.get(countryId);
+    var countryUpdatedAt = cacheUpdatedAtByCountry.get(countryId) || 0;
+    if (countryPayload && (!force || Date.now() - countryUpdatedAt < 60000)) {
+      cachePayload = countryPayload;
+      cacheCountryId = countryId;
+      cacheUpdatedAt = countryUpdatedAt;
+      window.veloraHomeCachePayload = countryPayload;
+      return Promise.resolve(countryPayload);
+    }
     if (cacheRequests.has(countryId)) return cacheRequests.get(countryId);
     var request = fetch("/api/velora-db/home-cache?country_id=" + encodeURIComponent(countryId) + "&limit=10", {
       cache: force ? "reload" : "force-cache"
@@ -98,6 +108,8 @@
         cacheUpdatedAt = Date.now();
         window.veloraHomeCachePayload = payload;
       }
+      cachePayloads.set(countryId, payload);
+      cacheUpdatedAtByCountry.set(countryId, Date.now());
       return payload;
     }).finally(function () { cacheRequests.delete(countryId); });
     cacheRequests.set(countryId, request);
@@ -109,6 +121,8 @@
     cacheCountryId = "";
     cacheUpdatedAt = 0;
     cacheRequests.clear();
+    cachePayloads.clear();
+    cacheUpdatedAtByCountry.clear();
     window.veloraHomeCachePayload = null;
   };
 
@@ -352,6 +366,9 @@
     });
     if (version !== renderVersion) return false;
     root.replaceChildren(fragment);
+    document.dispatchEvent(new CustomEvent("velora-home-country-rendered", {
+      detail: { countryId: activeCountryId() }
+    }));
     revealHomeFirstPaint();
     return !!root.querySelector(".vel-home-section__card");
   }

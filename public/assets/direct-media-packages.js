@@ -8,6 +8,9 @@
   let updateQueued = false;
   let openingKey = "";
   let navigationGeneration = 0;
+  let requestedTab = "";
+  let requestedTabLockedUntil = 0;
+  let lastIntentAt = 0;
 
   const packagesView = document.getElementById("packages-view");
   const contentView = document.getElementById("content-view");
@@ -17,6 +20,37 @@
 
   function activeTab() {
     return document.body.dataset.velActiveTab || "live";
+  }
+
+  function tabFromNavigationControl(target) {
+    const control = target?.closest?.("[data-bottom-nav], [data-home-tab], #main-tabs [data-tab]");
+    if (!control) return "";
+    return control.dataset.bottomNav || control.dataset.homeTab || control.dataset.tab || "";
+  }
+
+  function rememberNavigationIntent(tab) {
+    if (!tab) return;
+    const now = performance.now();
+    requestedTab = tab;
+    requestedTabLockedUntil = now + 4000;
+    // pointerdown and click describe the same user action. Do not invalidate
+    // our own reconciliation callbacks twice for that single action.
+    if (now - lastIntentAt > 80) navigationGeneration += 1;
+    lastIntentAt = now;
+    openingKey = "";
+    if (tab !== "live" && !MEDIA_TABS.has(tab)) return;
+    const generation = navigationGeneration;
+    [80, 300, 900, 1800].forEach(delay => {
+      window.setTimeout(() => {
+        if (generation !== navigationGeneration || requestedTab !== tab) return;
+        // A slower, older catalogue load must never remain selected after a
+        // newer Films/Series click. Re-assert only the latest user intent.
+        if (activeTab() !== tab) {
+          document.dispatchEvent(new CustomEvent("velora-home-tab", { detail: { tab } }));
+        }
+        scheduleUpdate();
+      }, delay);
+    });
   }
 
   function countryKey() {
@@ -175,6 +209,15 @@
     openingKey = "";
     scheduleUpdate();
   });
+  document.addEventListener("pointerdown", event => {
+    rememberNavigationIntent(tabFromNavigationControl(event.target));
+  }, true);
+  document.addEventListener("click", event => {
+    // Covers keyboard/remote activation. Synthetic clicks on the hidden legacy
+    // home hooks are ignored so they cannot replace the real latest user click.
+    if (!event.isTrusted) return;
+    rememberNavigationIntent(tabFromNavigationControl(event.target));
+  }, true);
   document.addEventListener("click", event => {
     const back = event.target.closest?.("#btn-header-back, #btn-back-home");
     const tab = activeTab();
@@ -185,8 +228,14 @@
     event.stopImmediatePropagation();
     document.querySelector('[data-bottom-nav="home"]')?.click();
   }, true);
-  document.addEventListener("velora-home-tab", () => {
-    navigationGeneration += 1;
+  document.addEventListener("velora-home-tab", event => {
+    const tab = String(event.detail?.tab || "");
+    if (
+      (tab === "live" || MEDIA_TABS.has(tab)) &&
+      (!requestedTab || performance.now() >= requestedTabLockedUntil)
+    ) {
+      requestedTab = tab;
+    }
     openingKey = "";
     scheduleUpdate();
   });

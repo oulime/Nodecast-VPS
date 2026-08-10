@@ -5,7 +5,7 @@
   let lastHomeRenderedAt = 0;
   let pendingCountryValue = "";
   let switchStartedAt = 0;
-  const MIN_VISIBLE_MS = 1500;
+  const MIN_VISIBLE_MS = 300;
   const overlay = () => document.getElementById("catalog-loading-overlay");
 
   function show(countryName) {
@@ -32,7 +32,7 @@
       const expectedStatus = `Chargement de ${countryName || "ce pays"}\u2026`;
       if (status && status.textContent !== expectedStatus) status.textContent = expectedStatus;
     }
-    requestAnimationFrame(() => maintainOverlay(id, countryName));
+    window.setTimeout(() => maintainOverlay(id, countryName), 250);
   }
 
   function startCountrySwitch(countryName, countryValue) {
@@ -52,7 +52,7 @@
     lastMutationAt = switchStartedAt;
     lastHomeRenderedAt = 0;
     show(countryName);
-    requestAnimationFrame(() => maintainOverlay(id, countryName));
+    window.setTimeout(() => maintainOverlay(id, countryName), 250);
     finishWhenStable(id);
     return id;
   }
@@ -74,27 +74,15 @@
     });
   }
 
-  async function waitForImages(id) {
-    const images = visibleImages().filter(image => !image.complete);
-    if (!images.length || id !== runId) return;
-    await Promise.race([
-      Promise.all(images.map(image => new Promise(resolve => {
-        image.addEventListener("load", resolve, { once: true });
-        image.addEventListener("error", resolve, { once: true });
-      }))),
-      new Promise(resolve => setTimeout(resolve, 5000))
-    ]);
-  }
-
   async function finishWhenStable(id) {
     const started = Date.now();
-    while (id === runId && Date.now() - started < 15000) {
+    while (id === runId && Date.now() - started < 5000) {
       const skeletons = document.querySelector("#vel-home-sections .vel-home-section__skeleton, #packages-view .vel-package-skeleton, .item-list--media-loading");
-      const homeFinished = lastHomeRenderedAt > 0 || Date.now() - started >= 5000;
-      if (homeFinished && !skeletons && Date.now() - lastMutationAt >= 450) break;
-      await new Promise(resolve => setTimeout(resolve, 120));
+      const homeFinished = lastHomeRenderedAt > 0 || Date.now() - started >= 1500;
+      if (homeFinished && !skeletons && Date.now() - lastMutationAt >= 180) break;
+      await new Promise(resolve => setTimeout(resolve, 80));
     }
-    await waitForImages(id);
+    // Posters are lazy and must never keep the whole application blocked.
     const remainingMinimum = MIN_VISIBLE_MS - (Date.now() - switchStartedAt);
     if (remainingMinimum > 0) await new Promise(resolve => setTimeout(resolve, remainingMinimum));
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -137,7 +125,7 @@
   const observer = new MutationObserver(() => { lastMutationAt = Date.now(); });
   function initialize() {
     [document.getElementById("vel-home-sections"), document.getElementById("packages-view")].filter(Boolean)
-      .forEach(node => observer.observe(node, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "src"] }));
+      .forEach(node => observer.observe(node, { childList: true, subtree: true }));
     let attempts = 0;
     const startupGuard = window.setInterval(() => {
       attempts += 1;

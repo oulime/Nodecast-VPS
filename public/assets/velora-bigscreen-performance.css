@@ -181,7 +181,6 @@
 }
 
 @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
-  .main--velora .vel-package-card,
   .main--velora .vel-vod-movie-card,
   .main--velora .media-item,
   .main--velora .vel-media-item-row,
@@ -189,6 +188,13 @@
     contain: none !important;
     content-visibility: visible !important;
     contain-intrinsic-size: auto !important;
+  }
+
+  /* Large package grids must not lay out and paint every off-screen card. */
+  .main--velora #packages-view .vel-package-card {
+    contain: layout style paint !important;
+    content-visibility: auto !important;
+    contain-intrinsic-size: auto 220px !important;
   }
 }
 

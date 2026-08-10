@@ -134,11 +134,6 @@
             <button type="submit" class="vel-profile-account__primary">Enregistrer</button>
           </div>
         </form>
-        <div class="vel-profile-account__shortcuts">
-          <button type="button" data-profile-action="favorites">Favoris</button>
-          <button type="button" data-profile-action="adult">Adulte +18</button>
-          <button type="button" data-profile-action="logout" class="is-danger">Déconnexion</button>
-        </div>
       </section>`;
     document.body.appendChild(modal);
     modal.querySelector(".vel-profile-account__close").addEventListener("click", closeModal);
@@ -146,18 +141,6 @@
     $("vel-profile-password-open").addEventListener("click", function () { showPasswordForm(true); });
     modal.querySelector("[data-profile-password-cancel]").addEventListener("click", function () { showPasswordForm(false); });
     $("vel-profile-password-form").addEventListener("submit", changePassword);
-    modal.querySelector("[data-profile-action='favorites']").addEventListener("click", function () {
-      closeModal();
-      $("vel-profile-favorites")?.click();
-    });
-    modal.querySelector("[data-profile-action='adult']").addEventListener("click", function () {
-      closeModal();
-      $("btn-adult-portal")?.click();
-    });
-    modal.querySelector("[data-profile-action='logout']").addEventListener("click", function () {
-      try { localStorage.removeItem("authToken"); } catch (_) {}
-      window.location.replace("/login");
-    });
     return modal;
   }
 
@@ -200,9 +183,17 @@
       trigger.classList.remove("is-active");
       trigger.removeAttribute("aria-current");
     }
-    if (state.previousNav && state.previousNav.isConnected) {
-      state.previousNav.classList.add("is-active");
-      state.previousNav.setAttribute("aria-current", "page");
+    let previous = state.previousNav;
+    if (!previous || !previous.isConnected) {
+      const activeTab = document.body.dataset.velActiveTab;
+      const name = document.body.classList.contains("vel-home-empty-active")
+        ? "home"
+        : (document.body.classList.contains("vel-home-choice-picked") && activeTab ? activeTab : "home");
+      previous = document.querySelector(`[data-bottom-nav='${name}']`);
+    }
+    if (previous) {
+      previous.classList.add("is-active");
+      previous.setAttribute("aria-current", "page");
     }
     state.previousNav = null;
   }
@@ -241,7 +232,8 @@
   }
 
   function init() {
-    document.addEventListener("velora-profile-account-open", function () { void openModal(); });
+    const trigger = $("vel-profile-account-open");
+    if (trigger) trigger.addEventListener("click", function () { void openModal(); });
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape" && !$("vel-profile-account-modal")?.hidden) closeModal();
     });

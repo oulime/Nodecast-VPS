@@ -1518,14 +1518,14 @@
     <script defer src="/assets/velora-home-cache-fallback.js?v=home-country-cache-v2-20260810"></script>
     <link rel="stylesheet" href="/assets/live-package-country-fallback.css?v=package-logo-only-20260805">
     <script src="/assets/live-package-country-fallback.js?v=package-logo-only-20260805b"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=country-demand-loading-v1-20260810"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=fresh-media-package-grid-v1-20260811"></script>
     <script defer src="/assets/subscription-access-guard.js?v=subscription-whatsapp-number-v2-20260810"></script>
     <script defer src="/assets/subscription-welcome.js?v=first-login-test-message-v1-20260810"></script>
     <script defer src="/assets/profile-account.js?v=profile-account-menu-v2-20260810"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=package-poster-refresh-secure-v4-20260809"></script>
     <script defer src="/assets/manual-pays.js?v=sync-catalog-post-fix-20260809"></script>
     <script defer src="/assets/country-logos-admin.js?v=shared-app-country-flags-20260809"></script>
-    <script defer src="/assets/direct-media-packages.js?v=20260810-latest-navigation-wins-v2"></script>
+    <script defer src="/assets/direct-media-packages.js?v=20260811-package-grid-owner-v4"></script>
     <script defer src="/assets/country-switch-loader.js?v=country-switch-fast-v2-20260810"></script>
     <script defer src="/assets/paid-users-admin.js?v=settings-admin-autocopy-test-v2-20260810"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
@@ -10354,8 +10354,9 @@ if (target.closest(".trial-offer-button")) {
           var homeControl = document.querySelector('#vel-home-choice [data-home-tab="' + tab + '"]');
           if (homeControl) {
             homeControl.click();
+          } else {
+            document.dispatchEvent(new CustomEvent("velora-home-tab", { detail: { tab: tab } }));
           }
-          document.dispatchEvent(new CustomEvent("velora-home-tab", { detail: { tab: tab } }));
           setActive(tab);
         }
 

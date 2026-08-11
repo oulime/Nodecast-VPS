@@ -3,14 +3,9 @@
 
   const MEDIA_TABS = new Set(["movies", "series"]);
   const packageCache = new Map();
-  const packageCardCache = new Map();
   const selectedPackages = new Map();
   let updateQueued = false;
-  let openingKey = "";
-  let navigationGeneration = 0;
-  let requestedTab = "";
-  let requestedTabLockedUntil = 0;
-  let lastIntentAt = 0;
+  let pendingOpen = "";
 
   const packagesView = document.getElementById("packages-view");
   const contentView = document.getElementById("content-view");
@@ -22,43 +17,17 @@
     return document.body.dataset.velActiveTab || "live";
   }
 
-  function tabFromNavigationControl(target) {
-    const control = target?.closest?.("[data-bottom-nav], [data-home-tab], #main-tabs [data-tab]");
-    if (!control) return "";
-    return control.dataset.bottomNav || control.dataset.homeTab || control.dataset.tab || "";
-  }
-
-  function rememberNavigationIntent(tab) {
-    if (!tab) return;
-    const now = performance.now();
-    requestedTab = tab;
-    requestedTabLockedUntil = now + 4000;
-    // pointerdown and click describe the same user action. Do not invalidate
-    // our own reconciliation callbacks twice for that single action.
-    if (now - lastIntentAt > 80) navigationGeneration += 1;
-    lastIntentAt = now;
-    openingKey = "";
-    if (tab !== "live" && !MEDIA_TABS.has(tab)) return;
-    const generation = navigationGeneration;
-    [80, 300, 900, 1800].forEach(delay => {
-      window.setTimeout(() => {
-        if (generation !== navigationGeneration || requestedTab !== tab) return;
-        // A slower, older catalogue load must never remain selected after a
-        // newer Films/Series click. Re-assert only the latest user intent.
-        if (activeTab() !== tab) {
-          document.dispatchEvent(new CustomEvent("velora-home-tab", { detail: { tab } }));
-        }
-        scheduleUpdate();
-      }, delay);
-    });
-  }
-
   function countryKey() {
     return String(countrySelect?.value || "all");
   }
 
   function cacheKey(tab = activeTab()) {
     return `${countryKey()}::${tab}`;
+  }
+
+  function gridBelongsTo(tab) {
+    const renderKey = String(packagesView.dataset.renderedGridKey || "");
+    return renderKey.startsWith(`${tab}|`);
   }
 
   function packageName(card) {
@@ -68,7 +37,8 @@
       .trim();
   }
 
-  function visiblePackageCards() {
+  function currentPackageCards(tab) {
+    if (!gridBelongsTo(tab)) return [];
     return [...packagesView.querySelectorAll(".vel-package-card[data-package-id]")]
       .filter(card => card instanceof HTMLElement && !card.hidden)
       .map(card => ({
@@ -80,13 +50,11 @@
   }
 
   function rememberPackages(tab) {
-    const packages = visiblePackageCards();
-    if (packages.length) {
-      const key = cacheKey(tab);
-      packageCache.set(key, packages.map(({ id, name }) => ({ id, name })));
-      packageCardCache.set(key, new Map(packages.map(({ id, card }) => [id, card])));
+    const cards = currentPackageCards(tab);
+    if (cards.length) {
+      packageCache.set(cacheKey(tab), cards.map(({ id, name }) => ({ id, name })));
     }
-    return packages;
+    return cards;
   }
 
   function ensurePicker() {
@@ -103,22 +71,16 @@
       "</div>"
     ].join("");
     headerContext.appendChild(picker);
+
     picker.querySelector("select").addEventListener("change", event => {
       const tab = activeTab();
       const id = String(event.target.value || "");
-      if (!MEDIA_TABS.has(tab) || !id) return;
-      const key = cacheKey(tab);
-      const requestedOpeningKey = `${key}::${id}`;
-      selectedPackages.set(key, id);
-      openingKey = requestedOpeningKey;
-      const card = packageCardCache.get(key)?.get(id);
-      if (!card) return;
-      if (!packagesView.contains(card)) packagesView.appendChild(card);
-      card.click();
-      window.setTimeout(() => {
-        if (openingKey === requestedOpeningKey) openingKey = "";
-        scheduleUpdate();
-      }, 1200);
+      if (!MEDIA_TABS.has(tab) || !id || !gridBelongsTo(tab)) return;
+      const target = currentPackageCards(tab).find(item => item.id === id);
+      if (!target) return;
+      selectedPackages.set(cacheKey(tab), id);
+      pendingOpen = `${cacheKey(tab)}::${id}`;
+      target.card.click();
     });
     return picker;
   }
@@ -142,8 +104,38 @@
       }));
       select.dataset.signature = signature;
     }
+
     const selected = selectedPackages.get(cacheKey(tab));
     if (selected && packages.some(item => item.id === selected)) select.value = selected;
+  }
+
+  function openSelectedPackage(tab, cards) {
+    if (
+      !MEDIA_TABS.has(tab) ||
+      packagesView.classList.contains("hidden") ||
+      !contentView.classList.contains("hidden") ||
+      !gridBelongsTo(tab) ||
+      !cards.length
+    ) return;
+
+    const key = cacheKey(tab);
+    const selected = selectedPackages.get(key);
+    const target = cards.find(item => item.id === selected) || cards[0];
+    const openKey = `${key}::${target.id}`;
+    if (pendingOpen === openKey) return;
+
+    selectedPackages.set(key, target.id);
+    pendingOpen = openKey;
+    window.requestAnimationFrame(() => {
+      if (
+        activeTab() !== tab ||
+        packagesView.classList.contains("hidden") ||
+        !contentView.classList.contains("hidden") ||
+        !gridBelongsTo(tab) ||
+        !packagesView.contains(target.card)
+      ) return;
+      target.card.click();
+    });
   }
 
   function update() {
@@ -158,38 +150,7 @@
 
     const cards = rememberPackages(tab);
     syncPicker(tab);
-    const packageListIsOpen = !packagesView.classList.contains("hidden") && cards.length > 0;
-    if (!packageListIsOpen) return;
-
-    const key = cacheKey(tab);
-    const preferredId = selectedPackages.get(key);
-    const target = cards.find(item => item.id === preferredId) || cards[0];
-    if (!target || openingKey === `${key}::${target.id}`) return;
-    const scheduledGeneration = navigationGeneration;
-    selectedPackages.set(key, target.id);
-    openingKey = `${key}::${target.id}`;
-    window.requestAnimationFrame(() => {
-      // A rapid Films/Series switch can leave this callback queued for the old
-      // tab. Never let stale work click an old card or clear the new tab's DOM.
-      if (
-        scheduledGeneration !== navigationGeneration ||
-        activeTab() !== tab ||
-        cacheKey(tab) !== key ||
-        !packagesView.contains(target.card)
-      ) {
-        if (openingKey === `${key}::${target.id}`) openingKey = "";
-        scheduleUpdate();
-        return;
-      }
-      target.card.click();
-      // The main app owns the transition from packages to content. Clearing the
-      // cards here can produce a blank page when a first-load click is ignored
-      // because another media tab is still finishing its catalogue request.
-    });
-    window.setTimeout(() => {
-      if (openingKey === `${key}::${target.id}`) openingKey = "";
-      scheduleUpdate();
-    }, 1200);
+    openSelectedPackage(tab, cards);
   }
 
   function scheduleUpdate() {
@@ -202,22 +163,19 @@
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ["class", "data-vel-active-tab"]
+    attributeFilter: ["class", "data-vel-active-tab", "data-rendered-grid-key"]
   });
+
   countrySelect?.addEventListener("change", () => {
-    navigationGeneration += 1;
-    openingKey = "";
+    pendingOpen = "";
     scheduleUpdate();
   });
-  document.addEventListener("pointerdown", event => {
-    rememberNavigationIntent(tabFromNavigationControl(event.target));
-  }, true);
-  document.addEventListener("click", event => {
-    // Covers keyboard/remote activation. Synthetic clicks on the hidden legacy
-    // home hooks are ignored so they cannot replace the real latest user click.
-    if (!event.isTrusted) return;
-    rememberNavigationIntent(tabFromNavigationControl(event.target));
-  }, true);
+
+  document.addEventListener("velora-home-tab", () => {
+    pendingOpen = "";
+    scheduleUpdate();
+  });
+
   document.addEventListener("click", event => {
     const back = event.target.closest?.("#btn-header-back, #btn-back-home");
     const tab = activeTab();
@@ -228,16 +186,6 @@
     event.stopImmediatePropagation();
     document.querySelector('[data-bottom-nav="home"]')?.click();
   }, true);
-  document.addEventListener("velora-home-tab", event => {
-    const tab = String(event.detail?.tab || "");
-    if (
-      (tab === "live" || MEDIA_TABS.has(tab)) &&
-      (!requestedTab || performance.now() >= requestedTabLockedUntil)
-    ) {
-      requestedTab = tab;
-    }
-    openingKey = "";
-    scheduleUpdate();
-  });
+
   scheduleUpdate();
 })();

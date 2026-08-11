@@ -213,7 +213,12 @@ const HOP_BY_HOP = new Set([
 function copyUpstreamHeaders(upstream, res) {
     upstream.headers.forEach((value, key) => {
         const lk = key.toLowerCase();
-        if (HOP_BY_HOP.has(lk)) return;
+        // Node's fetch transparently decompresses gzip/br/deflate responses,
+        // but keeps the upstream encoding and compressed length headers.
+        // Forwarding either header makes the client decode an already decoded
+        // body (or stop at the compressed byte length). Large JSON catalogues
+        // are the common trigger because upstream only compresses those.
+        if (HOP_BY_HOP.has(lk) || lk === 'content-encoding' || lk === 'content-length') return;
         try {
             res.setHeader(key, value);
         } catch {

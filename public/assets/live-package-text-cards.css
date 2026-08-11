@@ -102,7 +102,15 @@ body[data-vel-active-tab="live"]
   overflow-wrap: anywhere !important;
   word-break: normal !important;
   text-overflow: clip !important;
-  background: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  filter: none !important;
   color: #f7f5fb !important;
   -webkit-text-fill-color: #f7f5fb !important;
   font-family: "Inter", "Segoe UI", ui-sans-serif, system-ui, sans-serif !important;
@@ -111,7 +119,7 @@ body[data-vel-active-tab="live"]
   line-height: 1.22 !important;
   letter-spacing: 0.006em !important;
   text-align: center !important;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18) !important;
+  text-shadow: none !important;
 }
 
 @media (hover: hover) and (pointer: fine) {

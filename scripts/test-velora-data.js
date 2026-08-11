@@ -18,6 +18,14 @@ async function main() {
         assert.equal(response.status, 200);
         const curationMap = await response.json();
         assert.ok(Array.isArray(curationMap.rows));
+        assert.equal(response.headers.get('x-velora-country-package-cache'), 'vps-local-derived');
+
+        response = await fetch(`${base.replace('/rest/v1', '')}/country-package-cache`);
+        assert.equal(response.status, 200);
+        let countryPackageCache = await response.json();
+        assert.equal(countryPackageCache.version, 1);
+        assert.ok(Array.isArray(countryPackageCache.packages));
+        assert.ok(Array.isArray(countryPackageCache.memberships.rows));
 
         response = await fetch(`${base}/admin_countries?select=id,name&name=eq.France`);
         assert.equal(response.status, 200);
@@ -50,6 +58,11 @@ async function main() {
         assert.equal(response.status, 201);
         rows = await response.json();
         assert.equal(rows[0].id, testId);
+
+        response = await fetch(`${base.replace('/rest/v1', '')}/country-package-cache`);
+        assert.equal(response.status, 200);
+        countryPackageCache = await response.json();
+        assert.ok(countryPackageCache.countries.some(row => row.id === testId));
 
         response = await fetch(`${base}/admin_countries?id=eq.${testId}`, {
             method: 'PATCH',
@@ -94,6 +107,11 @@ async function main() {
             method: 'DELETE'
         });
         assert.equal(response.status, 204);
+
+        response = await fetch(`${base.replace('/rest/v1', '')}/country-package-cache`);
+        assert.equal(response.status, 200);
+        countryPackageCache = await response.json();
+        assert.ok(!countryPackageCache.countries.some(row => row.id === testId));
 
         console.log('Velora local SQLite data API tests passed');
     } finally {

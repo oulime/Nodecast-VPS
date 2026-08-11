@@ -420,8 +420,10 @@ app.use('/api/velora/catalog', require('./routes/veloraCatalog'));
 const veloraDataRouter = require('./routes/veloraData');
 app.use('/api/velora-db', veloraDataRouter);
 veloraCatalogCache.onSnapshotReady(snapshotStatus => {
+    const countryPackageCache = veloraDataRouter.buildCountryPackageCache();
     const homeCache = veloraDataRouter.buildHomeCache();
     const entryCount = homeCache.sections.reduce((total, section) => total + section.entries.length, 0);
+    console.log(`[Country/package cache] Rebuilt after catalogue ${snapshotStatus.snapshotVersion}: ${countryPackageCache.counts.packages} packages, ${countryPackageCache.counts.memberships} memberships`);
     console.log(`[Home cache] Rebuilt after catalogue ${snapshotStatus.snapshotVersion}: ${homeCache.sections.length} sections, ${entryCount} entries`);
 });
 app.use('/api/analytics', require('./routes/analytics'));

@@ -9,7 +9,40 @@ const veloraCatalogCache = require('../services/veloraCatalogCache');
 
 const router = express.Router();
 const homeCachePath = path.join(__dirname, '..', '..', 'data', 'velora-cache', 'home-sections.json');
+const countryPackageCachePath = path.join(
+    __dirname, '..', '..', 'data', 'velora-cache', 'country-packages.json'
+);
 const vodPosterCachePath = path.join(__dirname, '..', '..', 'data', 'vod-poster-cache.json');
+const COUNTRY_PACKAGE_TABLES = new Set([
+    'admin_countries',
+    'canonical_countries',
+    'admin_country_package_order',
+    'admin_package_channel_order',
+    'admin_package_covers',
+    'admin_packages',
+    'admin_stream_curations'
+]);
+
+let currentCountryPackageCache = null;
+
+function removeCacheFile(filePath) {
+    try {
+        fs.rmSync(filePath, { force: true });
+    } catch (error) {
+        console.warn('[Velora data] Could not invalidate cache', filePath, error.message);
+    }
+}
+
+function invalidateCountryPackageCache() {
+    currentCountryPackageCache = null;
+    removeCacheFile(countryPackageCachePath);
+    // Home sections are another derived view of the same package memberships.
+    removeCacheFile(homeCachePath);
+}
+
+function invalidateHomeCache() {
+    removeCacheFile(homeCachePath);
+}
 
 function normalizedPosterTitle(value) {
     return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
@@ -317,6 +350,104 @@ function effectiveCurations(packageIds = null) {
     return effective;
 }
 
+function compactMemberships(curations) {
+    const countries = [];
+    const packages = [];
+    const countryIndexes = new Map();
+    const packageIndexes = new Map();
+    const indexFor = (value, values, indexes) => {
+        const key = String(value || '');
+        if (indexes.has(key)) return indexes.get(key);
+        const index = values.length;
+        values.push(key);
+        indexes.set(key, index);
+        return index;
+    };
+    const rows = [];
+    for (const row of curations) {
+        const countryId = String(row.country_id || '');
+        const packageId = String(row.target_package_id || '');
+        const streamId = String(row.stream_id ?? '').trim();
+        if (!countryId || !packageId || !streamId) continue;
+        rows.push([
+            indexFor(countryId, countries, countryIndexes),
+            streamId,
+            indexFor(packageId, packages, packageIndexes),
+            row.source_id ?? null,
+            row.kind || null,
+            row.origin_package_id || null
+        ]);
+    }
+    return { countries, packages, rows };
+}
+
+function expandMemberships(compact) {
+    const countries = Array.isArray(compact?.countries) ? compact.countries : [];
+    const packages = Array.isArray(compact?.packages) ? compact.packages : [];
+    return (Array.isArray(compact?.rows) ? compact.rows : []).map(row => ({
+        country_id: countries[row[0]],
+        stream_id: row[1],
+        target_package_id: packages[row[2]],
+        source_id: row[3] ?? null,
+        kind: row[4] || null,
+        origin_package_id: row[5] || null
+    })).filter(row => row.country_id && row.target_package_id && row.stream_id !== '');
+}
+
+function writeJsonAtomic(filePath, payload) {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(temporaryPath, JSON.stringify(payload));
+    fs.renameSync(temporaryPath, filePath);
+}
+
+function buildCountryPackageCache() {
+    const rawCurations = allRows('admin_stream_curations');
+    const packages = resolvedAdminPackages(allRows('admin_packages'), rawCurations);
+    const memberships = compactMemberships(effectiveCurations());
+    const countries = allRows('admin_countries');
+    const payload = {
+        version: 1,
+        generatedAt: new Date().toISOString(),
+        catalogSnapshotVersion: veloraCatalogCache.getStatus().snapshotVersion || null,
+        countries,
+        canonicalCountries: allRows('canonical_countries'),
+        packages,
+        packageOrders: allRows('admin_country_package_order'),
+        packageChannelOrders: allRows('admin_package_channel_order'),
+        packageCovers: allRows('admin_package_covers'),
+        memberships,
+        counts: {
+            countries: countries.length,
+            packages: packages.length,
+            memberships: memberships.rows.length
+        }
+    };
+    writeJsonAtomic(countryPackageCachePath, payload);
+    currentCountryPackageCache = payload;
+    return payload;
+}
+
+function getCountryPackageCache() {
+    const snapshotVersion = veloraCatalogCache.getStatus().snapshotVersion || null;
+    if (currentCountryPackageCache?.catalogSnapshotVersion === snapshotVersion) {
+        return currentCountryPackageCache;
+    }
+    currentCountryPackageCache = null;
+    try {
+        if (fs.existsSync(countryPackageCachePath)) {
+            const payload = JSON.parse(fs.readFileSync(countryPackageCachePath, 'utf8'));
+            if (payload?.version === 1 && payload.catalogSnapshotVersion === snapshotVersion) {
+                currentCountryPackageCache = payload;
+                return payload;
+            }
+        }
+    } catch (error) {
+        console.warn('[Velora data] Country/package cache read failed:', error.message);
+    }
+    return buildCountryPackageCache();
+}
+
 function liveChannelsForCurations(curations, packageById) {
     const findItem = getDb().prepare(`
         SELECT item_id, name, stream_icon, provider_order
@@ -468,11 +599,9 @@ router.use(express.json({ limit: '10mb' }));
 
 router.get('/admin/resolved-packages', (req, res) => {
     try {
-        const rows = resolvedAdminPackages(
-            allRows('admin_packages'),
-            allRows('admin_stream_curations')
-        );
+        const rows = getCountryPackageCache().packages;
         res.set('Cache-Control', 'no-store');
+        res.set('X-Velora-Country-Package-Cache', 'vps-local-derived');
         return res.json(rows);
     } catch (error) {
         console.error('[Velora data] Resolved packages failed:', error);
@@ -574,6 +703,7 @@ router.post('/admin/channel-membership', (req, res) => {
             WHERE source_id = ? AND type = 'live' AND item_id = ? AND is_hidden = 0
         `).get(sourceId, streamId);
         if (!item) return res.status(404).json({ error: 'Channel not found in the catalogue' });
+        invalidateCountryPackageCache();
         const row = saveChannelCuration(
             { countryId, sourceId, streamId, targetPackageId },
             packages,
@@ -589,41 +719,28 @@ router.post('/admin/channel-membership', (req, res) => {
 
 router.get('/admin/stream-curation-map', (req, res) => {
     try {
-        const rows = effectiveCurations().map(row => ({
-            stream_id: row.stream_id,
-            country_id: row.country_id,
-            package_id: row.target_package_id,
-            source_id: row.source_id,
-            kind: row.kind
-        }));
-        const countries = [];
-        const packages = [];
-        const countryIndexes = new Map();
-        const packageIndexes = new Map();
-        const indexFor = (value, values, indexes) => {
-            const key = String(value || '');
-            if (indexes.has(key)) return indexes.get(key);
-            const index = values.length;
-            values.push(key);
-            indexes.set(key, index);
-            return index;
-        };
-        const compactRows = [];
-        for (const row of rows) {
-            const streamId = Number(row.stream_id);
-            if (!Number.isFinite(streamId) || !row.country_id || !row.package_id) continue;
-            compactRows.push([
-                indexFor(row.country_id, countries, countryIndexes),
-                streamId,
-                indexFor(row.package_id, packages, packageIndexes),
-                row.source_id ?? null,
-                row.kind || null
-            ]);
-        }
+        const cached = getCountryPackageCache().memberships;
+        const compactRows = cached.rows.map(row => {
+            const streamId = Number(row[1]);
+            return Number.isFinite(streamId) ? [row[0], streamId, row[2], row[3], row[4]] : null;
+        }).filter(Boolean);
         res.set('Cache-Control', 'no-store');
-        return res.json({ countries, packages, rows: compactRows });
+        res.set('X-Velora-Country-Package-Cache', 'vps-local-derived');
+        return res.json({ countries: cached.countries, packages: cached.packages, rows: compactRows });
     } catch (error) {
         console.error('[Velora data] Curation map failed:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+router.get('/country-package-cache', (req, res) => {
+    try {
+        const payload = getCountryPackageCache();
+        res.set('Cache-Control', 'private, no-cache');
+        res.set('X-Velora-Country-Package-Cache', 'vps-local-derived');
+        return res.json(payload);
+    } catch (error) {
+        console.error('[Velora data] Country/package cache failed:', error);
         return res.status(500).json({ error: error.message });
     }
 });
@@ -631,11 +748,10 @@ router.get('/admin/stream-curation-map', (req, res) => {
 function buildHomeCache() {
     const sections = sortRows(allRows('admin_home_sections'), 'section_order.asc');
     const sectionPackageIds = new Set(sections.map(section => String(section.package_id || '')));
-    const curations = effectiveCurations(sectionPackageIds);
-    const resolvedPackages = resolvedAdminPackages(
-        allRows('admin_packages'),
-        allRows('admin_stream_curations')
-    );
+    const countryPackageCache = getCountryPackageCache();
+    const curations = expandMemberships(countryPackageCache.memberships)
+        .filter(row => sectionPackageIds.has(String(row.target_package_id || '')));
+    const resolvedPackages = countryPackageCache.packages;
     const packages = new Map(resolvedPackages.map(row => [String(row.id), row]));
     const packageStreams = new Map();
     for (const row of curations) {
@@ -698,10 +814,7 @@ function buildHomeCache() {
         return { ...section, content_type: type, entries };
     });
     const payload = { generatedAt: new Date().toISOString(), sections: output };
-    fs.mkdirSync(path.dirname(homeCachePath), { recursive: true });
-    const temporaryPath = `${homeCachePath}.${process.pid}.tmp`;
-    fs.writeFileSync(temporaryPath, JSON.stringify(payload));
-    fs.renameSync(temporaryPath, homeCachePath);
+    writeJsonAtomic(homeCachePath, payload);
     return payload;
 }
 
@@ -751,10 +864,7 @@ router.post('/home-cache/rebuild', async (req, res) => {
                 }))
             };
             await enrichHomeCacheMoviePosters(payload);
-            fs.mkdirSync(path.dirname(homeCachePath), { recursive: true });
-            const temporaryPath = `${homeCachePath}.${process.pid}.tmp`;
-            fs.writeFileSync(temporaryPath, JSON.stringify(payload));
-            fs.renameSync(temporaryPath, homeCachePath);
+            writeJsonAtomic(homeCachePath, payload);
         } else {
             payload = buildHomeCache();
         }
@@ -767,6 +877,7 @@ router.post('/home-cache/rebuild', async (req, res) => {
 
 router.post('/admin/sync-packages', (req, res) => {
     try {
+        invalidateCountryPackageCache();
         const db = getDb();
         const countItems = db.prepare(`
             SELECT COUNT(*) AS count
@@ -787,6 +898,7 @@ router.post('/admin/sync-packages', (req, res) => {
             packageCount += 1;
             itemCount += Number(countItems.get(sourceId, itemType, categoryId)?.count || 0);
         }
+        const countryPackageCache = buildCountryPackageCache();
         const homeCache = buildHomeCache();
         return res.json({
             ok: true,
@@ -794,6 +906,7 @@ router.post('/admin/sync-packages', (req, res) => {
             items: itemCount,
             homeSections: homeCache.sections.length,
             homeEntries: homeCache.sections.reduce((total, section) => total + section.entries.length, 0),
+            mappedMemberships: countryPackageCache.counts.memberships,
             generatedAt: homeCache.generatedAt
         });
     } catch (error) {
@@ -815,6 +928,7 @@ router.post('/admin/assign-package', (req, res) => {
             return res.status(400).json({ error: 'countryId, packageName, sourceId, categoryId and kind are required' });
         }
 
+        invalidateCountryPackageCache();
         const db = getDb();
         const result = db.transaction(() => {
             const countryPackages = allRows('admin_packages').filter(row =>
@@ -957,6 +1071,8 @@ router.all('/rest/v1/:table', (req, res) => {
         }
 
         if (req.method === 'POST') {
+            if (COUNTRY_PACKAGE_TABLES.has(table)) invalidateCountryPackageCache();
+            else if (table === 'admin_home_sections') invalidateHomeCache();
             const values = Array.isArray(req.body) ? req.body : [req.body];
             const saved = getDb().transaction(() => values.map(value => saveRow(table, value, req)))();
             const representation = String(req.get('Prefer') || '').includes('return=representation');
@@ -965,6 +1081,8 @@ router.all('/rest/v1/:table', (req, res) => {
 
         const rows = allRows(table).filter(row => matches(row, req.query));
         if (req.method === 'PATCH') {
+            if (COUNTRY_PACKAGE_TABLES.has(table) && rows.length) invalidateCountryPackageCache();
+            else if (table === 'admin_home_sections' && rows.length) invalidateHomeCache();
             const saved = getDb().transaction(() =>
                 rows.map(row => saveRow(table, { ...row, ...req.body }, req))
             )();
@@ -973,6 +1091,8 @@ router.all('/rest/v1/:table', (req, res) => {
         }
 
         if (req.method === 'DELETE') {
+            if (COUNTRY_PACKAGE_TABLES.has(table) && rows.length) invalidateCountryPackageCache();
+            else if (table === 'admin_home_sections' && rows.length) invalidateHomeCache();
             const remove = getDb().prepare(
                 `DELETE FROM velora_admin_rows WHERE table_name = ? AND row_id = ?`
             );
@@ -1000,3 +1120,5 @@ router.all('/rest/v1/:table', (req, res) => {
 
 module.exports = router;
 module.exports.buildHomeCache = buildHomeCache;
+module.exports.buildCountryPackageCache = buildCountryPackageCache;
+module.exports.invalidateCountryPackageCache = invalidateCountryPackageCache;

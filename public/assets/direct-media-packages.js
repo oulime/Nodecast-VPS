@@ -294,7 +294,8 @@
     if (!MEDIA_TABS.has(tab) || contentView.classList.contains("hidden") || isDetail) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    document.querySelector('[data-bottom-nav="home"]')?.click();
+    pendingOpen = "";
+    document.dispatchEvent(new CustomEvent("velora-show-home"));
   }, true);
 
   document.addEventListener("keydown", event => {

@@ -1512,17 +1512,17 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
       rel="stylesheet"
     />
-    <script src="/assets/local-velora-data.js?v=20260809-admin-sync-v2"></script>
+    <script src="/assets/local-velora-data.js?v=20260811-live-package-session-cache-v5"></script>
     <script defer src="/assets/velora-home-sections.js?v=home-demand-loading-v2-20260810"></script>
     <script defer src="/assets/velora-home-cache-fallback.js?v=home-country-cache-v2-20260810"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=package-visibility-20260811"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=instant-live-category-cache-v12-20260811"></script>
     <script defer src="/assets/subscription-access-guard.js?v=subscription-whatsapp-number-v2-20260810"></script>
     <script defer src="/assets/subscription-welcome.js?v=first-login-test-message-v1-20260810"></script>
     <script defer src="/assets/profile-account.js?v=profile-account-menu-v2-20260810"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=package-poster-refresh-secure-v4-20260809"></script>
     <script defer src="/assets/manual-pays-visible-memberships.js?v=channel-return-only-20260811"></script>
     <script defer src="/assets/country-logos-admin.js?v=shared-app-country-flags-20260809"></script>
-    <script defer src="/assets/direct-media-packages.js?v=20260811-inline-live-parent-v3"></script>
+    <script defer src="/assets/direct-media-packages.js?v=20260811-media-back-home-v4"></script>
     <script defer src="/assets/country-switch-loader.js?v=country-switch-fast-v2-20260810"></script>
     <script defer src="/assets/paid-users-admin.js?v=settings-admin-autocopy-test-v2-20260810"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
@@ -1561,7 +1561,7 @@
     </style>
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css">
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=large-package-virtualization-v1-20260810">
-    <link rel="stylesheet" href="/assets/live-package-text-cards.css?v=glass-pane-cards-v6-20260811">
+    <link rel="stylesheet" href="/assets/live-package-text-cards.css?v=glass-media-controls-v8-20260811">
     <link rel="stylesheet" href="/assets/velora-home-sections.css?v=admin-country-filter-20260803">
     <style>
       #settings-tab-btn-ip,
@@ -6240,15 +6240,34 @@
               }
 
               var contentView = document.getElementById("content-view");
+              var packagesView = document.getElementById("packages-view");
+              var activeCatalogTab = document.body.dataset.velActiveTab;
+              var isCatalogTab = activeCatalogTab === "live" || activeCatalogTab === "movies" || activeCatalogTab === "series";
+              var isDetailView = !!(contentView && !contentView.classList.contains("hidden") && (
+                contentView.classList.contains("content-view--vod-film-detail") || contentView.querySelector(
+                  ".vel-vod-detail, .vel-series-detail, .vel-vod-series-detail"
+                )
+              ));
+
+              if (isCatalogTab && packagesView && packagesView.dataset.parentPackageId) {
+                var parentPackageBack = packagesView.querySelector(".vel-parent-package-view__back");
+                if (parentPackageBack) {
+                  parentPackageBack.click();
+                  return;
+                }
+              }
+
+              if (isCatalogTab && !isDetailView) {
+                document.dispatchEvent(new CustomEvent("velora-show-home"));
+                return;
+              }
+
               if (contentView && !contentView.classList.contains("hidden")) {
                 if (document.body.dataset.veloraReturnHome === "true") {
                   delete document.body.dataset.veloraReturnHome;
                   document.dispatchEvent(new CustomEvent("velora-return-home"));
                   return;
                 }
-                var isDetailView = contentView.classList.contains("content-view--vod-film-detail") || !!contentView.querySelector(
-                  ".vel-vod-detail, .vel-series-detail, .vel-vod-series-detail"
-                );
                 if (!isDetailView) {
                   document.dispatchEvent(new CustomEvent("velora-home-tab", {
                     detail: { tab: document.body.dataset.velActiveTab || "live" }

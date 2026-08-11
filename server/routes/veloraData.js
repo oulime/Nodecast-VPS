@@ -314,10 +314,9 @@ function effectiveCurations(packageIds = null) {
     }
 
     const wanted = packageIds ? new Set([...packageIds].map(String)) : null;
-    const sourceAwareExplicit = explicit.filter(row => row.source_id != null && row.kind);
     const effective = wanted
-        ? sourceAwareExplicit.filter(row => wanted.has(String(row.target_package_id || '')))
-        : [...sourceAwareExplicit];
+        ? explicit.filter(row => wanted.has(String(row.target_package_id || '')))
+        : [...explicit];
     const listItems = db.prepare(`
         SELECT item_id
         FROM playlist_items
@@ -407,7 +406,7 @@ function buildCountryPackageCache() {
     const memberships = compactMemberships(effectiveCurations());
     const countries = allRows('admin_countries');
     const payload = {
-        version: 1,
+        version: 2,
         generatedAt: new Date().toISOString(),
         catalogSnapshotVersion: veloraCatalogCache.getStatus().snapshotVersion || null,
         countries,
@@ -437,7 +436,7 @@ function getCountryPackageCache() {
     try {
         if (fs.existsSync(countryPackageCachePath)) {
             const payload = JSON.parse(fs.readFileSync(countryPackageCachePath, 'utf8'));
-            if (payload?.version === 1 && payload.catalogSnapshotVersion === snapshotVersion) {
+            if (payload?.version === 2 && payload.catalogSnapshotVersion === snapshotVersion) {
                 currentCountryPackageCache = payload;
                 return payload;
             }
@@ -613,10 +612,8 @@ router.get('/admin/package-live-channels', (req, res) => {
     try {
         const countryId = String(req.query.countryId || '').trim();
         const packageId = String(req.query.packageId || '').trim();
-        const packages = resolvedAdminPackages(
-            allRows('admin_packages'),
-            allRows('admin_stream_curations')
-        );
+        const cached = getCountryPackageCache();
+        const packages = cached.packages;
         const packageById = new Map(packages.map(row => [String(row.id), row]));
         const packageRow = packageById.get(packageId);
         if (!countryId || !packageId) return res.status(400).json({ error: 'countryId and packageId are required' });
@@ -624,13 +621,14 @@ router.get('/admin/package-live-channels', (req, res) => {
             return res.status(400).json({ error: 'This package is not an editable live package in this country' });
         }
         const channels = liveChannelsForCurations(
-            effectiveCurations(new Set([packageId])).filter(row =>
+            expandMemberships(cached.memberships).filter(row =>
                 String(row.country_id || '') === countryId
                 && String(row.target_package_id || '') === packageId
             ),
             packageById
         );
         res.set('Cache-Control', 'no-store');
+        res.set('X-Velora-Country-Package-Cache', 'vps-local-derived');
         return res.json({ package: packageRow, channels });
     } catch (error) {
         console.error('[Velora data] Package live channels failed:', error);

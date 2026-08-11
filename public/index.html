@@ -1505,7 +1505,6 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/logos/favicon-16x16.png" />
     <link rel="apple-touch-icon" href="/logos/apple-touch-icon.png" />
     <link rel="manifest" href="/logos/site.webmanifest" />
-    <link rel="stylesheet" href="/assets/live-package-country-fallback.css?v=20260804a" />
     <meta name="theme-color" content="#0b0b0f" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -1516,21 +1515,19 @@
     <script src="/assets/local-velora-data.js?v=20260809-admin-sync-v2"></script>
     <script defer src="/assets/velora-home-sections.js?v=home-demand-loading-v2-20260810"></script>
     <script defer src="/assets/velora-home-cache-fallback.js?v=home-country-cache-v2-20260810"></script>
-    <link rel="stylesheet" href="/assets/live-package-country-fallback.css?v=package-logo-only-20260805">
-    <script src="/assets/live-package-country-fallback.js?v=package-logo-only-20260805b"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=fresh-media-package-grid-v1-20260811"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=text-only-live-packages-v1-20260811"></script>
     <script defer src="/assets/subscription-access-guard.js?v=subscription-whatsapp-number-v2-20260810"></script>
     <script defer src="/assets/subscription-welcome.js?v=first-login-test-message-v1-20260810"></script>
     <script defer src="/assets/profile-account.js?v=profile-account-menu-v2-20260810"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=package-poster-refresh-secure-v4-20260809"></script>
-    <script defer src="/assets/manual-pays.js?v=sync-catalog-post-fix-20260809"></script>
+    <script defer src="/assets/manual-pays.js?v=stable-package-order-20260811"></script>
     <script defer src="/assets/country-logos-admin.js?v=shared-app-country-flags-20260809"></script>
     <script defer src="/assets/direct-media-packages.js?v=20260811-package-grid-owner-v4"></script>
     <script defer src="/assets/country-switch-loader.js?v=country-switch-fast-v2-20260810"></script>
     <script defer src="/assets/paid-users-admin.js?v=settings-admin-autocopy-test-v2-20260810"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
-    <link rel="stylesheet" href="/assets/manual-pays.css?v=20260803-global-package-sync">
+    <link rel="stylesheet" href="/assets/manual-pays.css?v=original-package-name-20260811">
     <link rel="stylesheet" href="/assets/direct-media-packages.css?v=20260810-latest-navigation-wins-v2">
     <style>
       .manual-pays__pagination{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding:.7rem;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:rgba(14,11,20,.96);color:#aaa4b5;font-size:.75rem}
@@ -1563,7 +1560,7 @@
     </style>
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css">
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=large-package-virtualization-v1-20260810">
-    <link rel="stylesheet" href="/assets/live-package-rectangles.css?v=compact-live-packages-v4-20260810">
+    <link rel="stylesheet" href="/assets/live-package-text-cards.css?v=text-only-live-packages-v1-20260811">
     <link rel="stylesheet" href="/assets/velora-home-sections.css?v=admin-country-filter-20260803">
     <style>
       #settings-tab-btn-ip,
@@ -4277,12 +4274,25 @@
                   <label for="mp-dialog-package-select">Ajouter depuis le stream sélectionné</label>
                   <div><select id="mp-dialog-package-select"></select><button id="mp-dialog-add" type="button" class="primary">Ajouter</button></div>
                 </div>
-                <div class="manual-pays-dialog__merge">
-                  <span id="mp-dialog-merge-count">Sélectionnez au moins 2 packages</span>
-                  <button id="mp-dialog-merge" type="button" class="primary" disabled>Fusionner la sélection</button>
-                </div>
                 <div id="mp-dialog-package-list" class="manual-pays-dialog__list"></div>
               </div>
+            </dialog>
+            <dialog id="mp-edit-package-dialog" class="manual-pays-dialog manual-pays-edit-dialog">
+              <form id="mp-edit-package-form" class="manual-pays-dialog__panel">
+                <header class="manual-pays-dialog__header">
+                  <div><span class="manual-pays__eyebrow">MODIFIER LE PACKAGE</span><h2>Changer le nom</h2></div>
+                  <button id="mp-edit-package-close" type="button" class="manual-pays-dialog__close" aria-label="Fermer">×</button>
+                </header>
+                <label class="manual-pays-edit-dialog__field" for="mp-edit-package-name">
+                  <span>Nom du package</span>
+                  <input id="mp-edit-package-name" type="text" maxlength="200" autocomplete="off" required />
+                </label>
+                <p id="mp-edit-package-status" class="status" aria-live="polite"></p>
+                <div class="manual-pays-edit-dialog__actions">
+                  <button id="mp-edit-package-cancel" type="button">Annuler</button>
+                  <button id="mp-edit-package-save" type="submit" class="primary">Enregistrer</button>
+                </div>
+              </form>
             </dialog>
             <dialog id="mp-content-dialog" class="manual-pays-dialog manual-pays-content-dialog">
               <div class="manual-pays-dialog__panel">

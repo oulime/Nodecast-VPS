@@ -194,7 +194,7 @@
   .main--velora #packages-view .vel-package-card {
     contain: layout style paint !important;
     content-visibility: auto !important;
-    contain-intrinsic-size: auto 220px !important;
+    contain-intrinsic-size: auto 64px !important;
   }
 }
 

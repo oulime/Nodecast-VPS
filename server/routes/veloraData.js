@@ -317,6 +317,93 @@ function effectiveCurations(packageIds = null) {
     return effective;
 }
 
+function liveChannelsForCurations(curations, packageById) {
+    const findItem = getDb().prepare(`
+        SELECT item_id, name, stream_icon, provider_order
+        FROM playlist_items
+        WHERE source_id = ? AND type = 'live' AND item_id = ? AND is_hidden = 0
+    `);
+    const seen = new Set();
+    const channels = [];
+    for (const curation of curations) {
+        if (curation.kind !== 'live') continue;
+        const sourceId = Number.parseInt(curation.source_id, 10);
+        const streamId = String(curation.stream_id || '').trim();
+        const packageId = String(curation.target_package_id || '').trim();
+        const key = `${packageId}:${sourceId}:${streamId}`;
+        if (!Number.isInteger(sourceId) || !streamId || seen.has(key)) continue;
+        const item = findItem.get(sourceId, streamId);
+        if (!item) continue;
+        seen.add(key);
+        channels.push({
+            stream_id: streamId,
+            source_id: sourceId,
+            kind: 'live',
+            name: item.name,
+            stream_icon: item.stream_icon || '',
+            provider_order: item.provider_order,
+            package_id: packageId,
+            package_name: packageById.get(packageId)?.name || packageId
+        });
+    }
+    return channels.sort((left, right) => {
+        const packageOrder = String(left.package_name).localeCompare(String(right.package_name), 'fr');
+        if (packageOrder) return packageOrder;
+        const a = Number.isFinite(left.provider_order) ? left.provider_order : Number.MAX_SAFE_INTEGER;
+        const b = Number.isFinite(right.provider_order) ? right.provider_order : Number.MAX_SAFE_INTEGER;
+        return a - b || String(left.name).localeCompare(String(right.name), 'fr');
+    });
+}
+
+function isEditableLivePackage(packageRow, countryId) {
+    return packageRow
+        && String(packageRow.country_id || '') === String(countryId || '')
+        && packageRow.kind === 'live'
+        && packageRow.is_parent !== true
+        && packageRow.is_parent !== 'true';
+}
+
+function saveChannelCuration({ countryId, sourceId, streamId, targetPackageId }, packages, rawCurations) {
+    const packageById = new Map(packages.map(row => [String(row.id), row]));
+    const matching = rawCurations.filter(row => {
+        if (String(row.country_id || '') !== countryId || String(row.stream_id || '') !== streamId) return false;
+        const currentPackage = packageById.get(String(row.target_package_id || '')) || {};
+        const rowSourceId = Number.parseInt(row.source_id ?? currentPackage.source_id, 10);
+        const rowKind = String(row.kind || currentPackage.kind || '');
+        return rowSourceId === sourceId && rowKind === 'live';
+    });
+    const existing = matching.find(row => Number.parseInt(row.source_id, 10) === sourceId && row.kind === 'live')
+        || matching[0];
+    const id = String(existing?.id || crypto.randomUUID());
+    const numericStreamId = /^\d+$/.test(streamId) ? Number(streamId) : streamId;
+    const row = {
+        ...(existing || {}),
+        id,
+        stream_id: numericStreamId,
+        country_id: countryId,
+        target_package_id: targetPackageId,
+        source_id: sourceId,
+        kind: 'live'
+    };
+    const db = getDb();
+    db.transaction(() => {
+        const remove = db.prepare(`
+            DELETE FROM velora_admin_rows WHERE table_name = 'admin_stream_curations' AND row_id = ?
+        `);
+        for (const duplicate of matching) {
+            if (String(duplicate.id) !== id) remove.run(String(duplicate.id));
+        }
+        db.prepare(`
+            INSERT INTO velora_admin_rows (table_name, row_id, data, updated_at)
+            VALUES ('admin_stream_curations', ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(table_name, row_id) DO UPDATE SET
+                data = excluded.data,
+                updated_at = CURRENT_TIMESTAMP
+        `).run(id, JSON.stringify(row));
+    })();
+    return row;
+}
+
 function sortRows(rows, order) {
     if (!order) return rows;
     const clauses = String(order).split(',').map(value => {
@@ -389,6 +476,113 @@ router.get('/admin/resolved-packages', (req, res) => {
         return res.json(rows);
     } catch (error) {
         console.error('[Velora data] Resolved packages failed:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+router.get('/admin/package-live-channels', (req, res) => {
+    try {
+        const countryId = String(req.query.countryId || '').trim();
+        const packageId = String(req.query.packageId || '').trim();
+        const packages = resolvedAdminPackages(
+            allRows('admin_packages'),
+            allRows('admin_stream_curations')
+        );
+        const packageById = new Map(packages.map(row => [String(row.id), row]));
+        const packageRow = packageById.get(packageId);
+        if (!countryId || !packageId) return res.status(400).json({ error: 'countryId and packageId are required' });
+        if (!isEditableLivePackage(packageRow, countryId)) {
+            return res.status(400).json({ error: 'This package is not an editable live package in this country' });
+        }
+        const channels = liveChannelsForCurations(
+            effectiveCurations(new Set([packageId])).filter(row =>
+                String(row.country_id || '') === countryId
+                && String(row.target_package_id || '') === packageId
+            ),
+            packageById
+        );
+        res.set('Cache-Control', 'no-store');
+        return res.json({ package: packageRow, channels });
+    } catch (error) {
+        console.error('[Velora data] Package live channels failed:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+router.get('/admin/country-live-channel-pool', (req, res) => {
+    try {
+        const countryId = String(req.query.countryId || '').trim();
+        const excludePackageId = String(req.query.excludePackageId || '').trim();
+        if (!countryId) return res.status(400).json({ error: 'countryId is required' });
+        const packages = resolvedAdminPackages(
+            allRows('admin_packages'),
+            allRows('admin_stream_curations')
+        );
+        const packageById = new Map(packages.map(row => [String(row.id), row]));
+        const packageIds = new Set(packages
+            .filter(row => isEditableLivePackage(row, countryId) && String(row.id) !== excludePackageId)
+            .map(row => String(row.id)));
+        const channels = liveChannelsForCurations(
+            effectiveCurations(packageIds).filter(row =>
+                String(row.country_id || '') === countryId
+                && packageIds.has(String(row.target_package_id || ''))
+            ),
+            packageById
+        );
+        res.set('Cache-Control', 'no-store');
+        return res.json({ channels });
+    } catch (error) {
+        console.error('[Velora data] Country live channel pool failed:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/admin/channel-membership', (req, res) => {
+    try {
+        const countryId = String(req.body?.countryId || '').trim();
+        const sourceId = Number.parseInt(req.body?.sourceId, 10);
+        const streamId = String(req.body?.streamId || '').trim();
+        const fromPackageId = String(req.body?.fromPackageId || '').trim();
+        const requestedTargetId = String(req.body?.targetPackageId || '').trim();
+        if (!countryId || !Number.isInteger(sourceId) || !streamId || !fromPackageId) {
+            return res.status(400).json({ error: 'Invalid channel membership request' });
+        }
+        const rawCurations = allRows('admin_stream_curations');
+        const packages = resolvedAdminPackages(allRows('admin_packages'), rawCurations);
+        const packageById = new Map(packages.map(row => [String(row.id), row]));
+        const fromPackage = packageById.get(fromPackageId);
+        if (!isEditableLivePackage(fromPackage, countryId)) {
+            return res.status(400).json({ error: 'Invalid source package' });
+        }
+        const targetPackageId = requestedTargetId || 'hidden';
+        if (targetPackageId !== 'hidden'
+            && !isEditableLivePackage(packageById.get(targetPackageId), countryId)) {
+            return res.status(400).json({ error: 'The destination package must belong to the same country' });
+        }
+        const currentMembership = effectiveCurations(new Set([fromPackageId])).some(row =>
+            String(row.country_id || '') === countryId
+            && String(row.target_package_id || '') === fromPackageId
+            && Number.parseInt(row.source_id, 10) === sourceId
+            && String(row.stream_id || '') === streamId
+            && row.kind === 'live'
+        );
+        if (!currentMembership) {
+            return res.status(409).json({ error: 'This channel is no longer in the source package' });
+        }
+        const item = getDb().prepare(`
+            SELECT 1 FROM playlist_items
+            WHERE source_id = ? AND type = 'live' AND item_id = ? AND is_hidden = 0
+        `).get(sourceId, streamId);
+        if (!item) return res.status(404).json({ error: 'Channel not found in the catalogue' });
+        const row = saveChannelCuration(
+            { countryId, sourceId, streamId, targetPackageId },
+            packages,
+            rawCurations
+        );
+        res.set('Cache-Control', 'no-store');
+        return res.json({ ok: true, curation: row });
+    } catch (error) {
+        console.error('[Velora data] Channel membership update failed:', error);
         return res.status(500).json({ error: error.message });
     }
 });

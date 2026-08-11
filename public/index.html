@@ -1515,19 +1515,19 @@
     <script src="/assets/local-velora-data.js?v=20260809-admin-sync-v2"></script>
     <script defer src="/assets/velora-home-sections.js?v=home-demand-loading-v2-20260810"></script>
     <script defer src="/assets/velora-home-cache-fallback.js?v=home-country-cache-v2-20260810"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=renamed-package-content-20260811"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=package-visibility-20260811"></script>
     <script defer src="/assets/subscription-access-guard.js?v=subscription-whatsapp-number-v2-20260810"></script>
     <script defer src="/assets/subscription-welcome.js?v=first-login-test-message-v1-20260810"></script>
     <script defer src="/assets/profile-account.js?v=profile-account-menu-v2-20260810"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=package-poster-refresh-secure-v4-20260809"></script>
-    <script defer src="/assets/manual-pays.js?v=legacy-package-preview-20260811"></script>
+    <script defer src="/assets/manual-pays-visible-memberships.js?v=visible-package-channel-highlight-20260811"></script>
     <script defer src="/assets/country-logos-admin.js?v=shared-app-country-flags-20260809"></script>
     <script defer src="/assets/direct-media-packages.js?v=20260811-parent-package-view-v1"></script>
     <script defer src="/assets/country-switch-loader.js?v=country-switch-fast-v2-20260810"></script>
     <script defer src="/assets/paid-users-admin.js?v=settings-admin-autocopy-test-v2-20260810"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
-    <link rel="stylesheet" href="/assets/manual-pays.css?v=country-package-preview-20260811">
+    <link rel="stylesheet" href="/assets/manual-pays.css?v=visible-package-channel-highlight-20260811">
     <link rel="stylesheet" href="/assets/parent-packages.css?v=parent-package-back-icon-20260811">
     <link rel="stylesheet" href="/assets/direct-media-packages.css?v=20260810-latest-navigation-wins-v2">
     <style>
@@ -4275,9 +4275,30 @@
                   <label for="mp-dialog-package-select">Ajouter depuis le stream sélectionné</label>
                   <div><select id="mp-dialog-package-select"></select><button id="mp-dialog-add" type="button" class="primary">Ajouter</button></div>
                 </div>
-                <button id="mp-parent-create" type="button" class="manual-pays-dialog__parent-create">Créer un package parent</button>
+                <div class="manual-pays-dialog__create-actions">
+                  <button id="mp-normal-create" type="button" class="manual-pays-dialog__normal-create">Créer un package normal</button>
+                  <button id="mp-parent-create" type="button" class="manual-pays-dialog__parent-create">Créer un package parent</button>
+                </div>
                 <div id="mp-dialog-package-list" class="manual-pays-dialog__list"></div>
               </div>
+            </dialog>
+            <dialog id="mp-normal-dialog" class="manual-pays-dialog manual-pays-edit-dialog">
+              <form id="mp-normal-form" class="manual-pays-dialog__panel">
+                <header class="manual-pays-dialog__header">
+                  <div><span class="manual-pays__eyebrow">NOUVEAU PACKAGE</span><h2>Créer un package normal</h2></div>
+                  <button id="mp-normal-close" type="button" class="manual-pays-dialog__close" aria-label="Fermer">×</button>
+                </header>
+                <label class="manual-pays-edit-dialog__field" for="mp-normal-name">
+                  <span>Nom du package</span>
+                  <input id="mp-normal-name" type="text" maxlength="200" autocomplete="off" required />
+                </label>
+                <p class="manual-pays-normal-dialog__help">Le package sera créé vide dans l’onglet actuel. Vous pourrez ensuite y déplacer du contenu avec le bouton œil.</p>
+                <p id="mp-normal-status" class="status" aria-live="polite"></p>
+                <div class="manual-pays-edit-dialog__actions">
+                  <button id="mp-normal-cancel" type="button">Annuler</button>
+                  <button id="mp-normal-save" type="submit" class="primary">Créer</button>
+                </div>
+              </form>
             </dialog>
             <dialog id="mp-edit-package-dialog" class="manual-pays-dialog manual-pays-edit-dialog">
               <form id="mp-edit-package-form" class="manual-pays-dialog__panel">
@@ -4322,9 +4343,34 @@
               <div class="manual-pays-dialog__panel">
                 <header class="manual-pays-dialog__header">
                   <div><span class="manual-pays__eyebrow">CONTENU DU PACKAGE</span><h2 id="mp-content-title">Package</h2></div>
-                  <button id="mp-content-close" type="button" class="manual-pays-dialog__close" aria-label="Fermer">×</button>
+                  <div class="manual-pays-content-dialog__header-actions">
+                    <button id="mp-content-rename" type="button" class="manual-pays-content-dialog__rename" hidden>Renommer</button>
+                    <button id="mp-content-close" type="button" class="manual-pays-dialog__close" aria-label="Fermer">×</button>
+                  </div>
                 </header>
                 <p id="mp-content-status" class="status" aria-live="polite"></p>
+                <div id="mp-content-editor-toolbar" class="manual-pays-content-dialog__toolbar" hidden>
+                  <button id="mp-content-add-open" type="button" class="primary">Ajouter des chaînes</button>
+                </div>
+                <section id="mp-channel-picker" class="manual-pays-channel-picker" hidden>
+                  <div class="manual-pays-channel-picker__heading">
+                    <div>
+                      <strong>Chaînes des autres packages de ce pays</strong>
+                      <small>Les chaînes sélectionnées seront déplacées dans le package ouvert.</small>
+                    </div>
+                    <button id="mp-channel-picker-close" type="button" aria-label="Fermer la sélection">×</button>
+                  </div>
+                  <label class="manual-pays-channel-picker__search" for="mp-channel-picker-search">
+                    <span>Rechercher une chaîne ou un package</span>
+                    <input id="mp-channel-picker-search" type="search" autocomplete="off" placeholder="Rechercher…" />
+                  </label>
+                  <p id="mp-channel-picker-status" class="status" aria-live="polite"></p>
+                  <div id="mp-channel-picker-list" class="manual-pays-channel-picker__list"></div>
+                  <div class="manual-pays-channel-picker__actions">
+                    <button id="mp-channel-picker-cancel" type="button">Annuler</button>
+                    <button id="mp-channel-picker-move" type="button" class="primary" disabled>Déplacer la sélection</button>
+                  </div>
+                </section>
                 <div id="mp-content-list" class="manual-pays-content-dialog__list"></div>
               </div>
             </dialog>

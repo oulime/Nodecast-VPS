@@ -139,6 +139,7 @@ function resolvedAdminPackages(packages, curations) {
     `);
 
     return packages.map(packageRow => {
+        if (packageRow.is_parent === true || packageRow.is_parent === 'true') return packageRow;
         if (String(packageRow.source_id ?? '').trim()
             && String(packageRow.category_id ?? '').trim()
             && String(packageRow.kind ?? '').trim()) return packageRow;
@@ -147,9 +148,10 @@ function resolvedAdminPackages(packages, curations) {
         const expectedKinds = kindsByPackage.get(packageId);
         const legacyIds = new Set((curationsByPackage.get(packageId) || [])
             .map(row => String(row.stream_id || '')).filter(Boolean));
+        const providerPackageName = String(packageRow.original_name || packageRow.name || '');
         const candidates = categories.filter(category => {
             const kind = category.type === 'movie' ? 'vod' : category.type;
-            return normalizedPackageName(category.name) === normalizedPackageName(packageRow.name)
+            return normalizedPackageName(category.name) === normalizedPackageName(providerPackageName)
                 && (!expectedKinds?.size || expectedKinds.has(kind));
         }).map(category => {
             const items = categoryItems.all(category.source_id, category.type, String(category.category_id));
@@ -376,6 +378,20 @@ function saveRow(table, input, req) {
 }
 
 router.use(express.json({ limit: '10mb' }));
+
+router.get('/admin/resolved-packages', (req, res) => {
+    try {
+        const rows = resolvedAdminPackages(
+            allRows('admin_packages'),
+            allRows('admin_stream_curations')
+        );
+        res.set('Cache-Control', 'no-store');
+        return res.json(rows);
+    } catch (error) {
+        console.error('[Velora data] Resolved packages failed:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
 
 router.get('/admin/stream-curation-map', (req, res) => {
     try {

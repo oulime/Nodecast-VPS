@@ -30,6 +30,10 @@
     return renderKey.startsWith(`${tab}|`);
   }
 
+  function isParentPackageView() {
+    return Boolean(packagesView.dataset.parentPackageId);
+  }
+
   function packageName(card) {
     const title = card.querySelector(".vel-package-card__title, h2, h3, strong");
     return String(title?.textContent || card.getAttribute("aria-label") || card.textContent || "Package")
@@ -112,6 +116,7 @@
   function openSelectedPackage(tab, cards) {
     if (
       !MEDIA_TABS.has(tab) ||
+      isParentPackageView() ||
       packagesView.classList.contains("hidden") ||
       !contentView.classList.contains("hidden") ||
       !gridBelongsTo(tab) ||
@@ -163,7 +168,7 @@
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ["class", "data-vel-active-tab", "data-rendered-grid-key"]
+    attributeFilter: ["class", "data-vel-active-tab", "data-rendered-grid-key", "data-parent-package-id"]
   });
 
   countrySelect?.addEventListener("change", () => {
@@ -181,7 +186,7 @@
     const tab = activeTab();
     const isDetail = contentView.classList.contains("content-view--vod-film-detail") ||
       Boolean(contentView.querySelector(".vel-vod-detail, .vel-series-detail, .vel-vod-series-detail"));
-    if (!back || !MEDIA_TABS.has(tab) || contentView.classList.contains("hidden") || isDetail) return;
+    if (!back || !MEDIA_TABS.has(tab) || isParentPackageView() || contentView.classList.contains("hidden") || isDetail) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     document.querySelector('[data-bottom-nav="home"]')?.click();

@@ -1515,19 +1515,20 @@
     <script src="/assets/local-velora-data.js?v=20260809-admin-sync-v2"></script>
     <script defer src="/assets/velora-home-sections.js?v=home-demand-loading-v2-20260810"></script>
     <script defer src="/assets/velora-home-cache-fallback.js?v=home-country-cache-v2-20260810"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=text-only-live-packages-v1-20260811"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-.js?v=parent-child-live-fix-20260811"></script>
     <script defer src="/assets/subscription-access-guard.js?v=subscription-whatsapp-number-v2-20260810"></script>
     <script defer src="/assets/subscription-welcome.js?v=first-login-test-message-v1-20260810"></script>
     <script defer src="/assets/profile-account.js?v=profile-account-menu-v2-20260810"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=package-poster-refresh-secure-v4-20260809"></script>
-    <script defer src="/assets/manual-pays.js?v=stable-package-order-20260811"></script>
+    <script defer src="/assets/manual-pays.js?v=legacy-package-preview-20260811"></script>
     <script defer src="/assets/country-logos-admin.js?v=shared-app-country-flags-20260809"></script>
-    <script defer src="/assets/direct-media-packages.js?v=20260811-package-grid-owner-v4"></script>
+    <script defer src="/assets/direct-media-packages.js?v=20260811-parent-package-view-v1"></script>
     <script defer src="/assets/country-switch-loader.js?v=country-switch-fast-v2-20260810"></script>
     <script defer src="/assets/paid-users-admin.js?v=settings-admin-autocopy-test-v2-20260810"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
-    <link rel="stylesheet" href="/assets/manual-pays.css?v=original-package-name-20260811">
+    <link rel="stylesheet" href="/assets/manual-pays.css?v=country-package-preview-20260811">
+    <link rel="stylesheet" href="/assets/parent-packages.css?v=parent-package-back-icon-20260811">
     <link rel="stylesheet" href="/assets/direct-media-packages.css?v=20260810-latest-navigation-wins-v2">
     <style>
       .manual-pays__pagination{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding:.7rem;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:rgba(14,11,20,.96);color:#aaa4b5;font-size:.75rem}
@@ -4274,6 +4275,7 @@
                   <label for="mp-dialog-package-select">Ajouter depuis le stream sélectionné</label>
                   <div><select id="mp-dialog-package-select"></select><button id="mp-dialog-add" type="button" class="primary">Ajouter</button></div>
                 </div>
+                <button id="mp-parent-create" type="button" class="manual-pays-dialog__parent-create">Créer un package parent</button>
                 <div id="mp-dialog-package-list" class="manual-pays-dialog__list"></div>
               </div>
             </dialog>
@@ -4291,6 +4293,28 @@
                 <div class="manual-pays-edit-dialog__actions">
                   <button id="mp-edit-package-cancel" type="button">Annuler</button>
                   <button id="mp-edit-package-save" type="submit" class="primary">Enregistrer</button>
+                </div>
+              </form>
+            </dialog>
+            <dialog id="mp-parent-dialog" class="manual-pays-dialog manual-pays-parent-dialog">
+              <form id="mp-parent-form" class="manual-pays-dialog__panel">
+                <header class="manual-pays-dialog__header">
+                  <div><span class="manual-pays__eyebrow">PACKAGE PARENT</span><h2 id="mp-parent-title">Créer un parent</h2></div>
+                  <button id="mp-parent-close" type="button" class="manual-pays-dialog__close" aria-label="Fermer">×</button>
+                </header>
+                <label class="manual-pays-edit-dialog__field" for="mp-parent-name">
+                  <span>Nom du package parent</span>
+                  <input id="mp-parent-name" type="text" maxlength="200" autocomplete="off" required />
+                </label>
+                <fieldset class="manual-pays-parent-dialog__packages">
+                  <legend>Packages contenus</legend>
+                  <p>Sélectionnez au moins deux packages.</p>
+                  <div id="mp-parent-package-list" class="manual-pays-parent-dialog__list"></div>
+                </fieldset>
+                <p id="mp-parent-status" class="status" aria-live="polite"></p>
+                <div class="manual-pays-edit-dialog__actions">
+                  <button id="mp-parent-cancel" type="button">Annuler</button>
+                  <button id="mp-parent-save" type="submit" class="primary">Enregistrer</button>
                 </div>
               </form>
             </dialog>

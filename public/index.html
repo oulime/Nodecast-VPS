@@ -1522,13 +1522,13 @@
     <script defer src="/assets/velora-cache-inventory.js?v=package-poster-refresh-secure-v4-20260809"></script>
     <script defer src="/assets/manual-pays-visible-memberships.js?v=channel-return-only-20260811"></script>
     <script defer src="/assets/country-logos-admin.js?v=shared-app-country-flags-20260809"></script>
-    <script defer src="/assets/direct-media-packages.js?v=20260811-parent-package-view-v1"></script>
+    <script defer src="/assets/direct-media-packages.js?v=20260811-inline-live-parent-v3"></script>
     <script defer src="/assets/country-switch-loader.js?v=country-switch-fast-v2-20260810"></script>
     <script defer src="/assets/paid-users-admin.js?v=settings-admin-autocopy-test-v2-20260810"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
     <link rel="stylesheet" href="/assets/manual-pays.css?v=channel-return-only-20260811">
-    <link rel="stylesheet" href="/assets/parent-packages.css?v=parent-package-back-icon-20260811">
+    <link rel="stylesheet" href="/assets/parent-packages.css?v=inline-live-parent-v3-20260811">
     <link rel="stylesheet" href="/assets/direct-media-packages.css?v=20260810-latest-navigation-wins-v2">
     <style>
       .manual-pays__pagination{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding:.7rem;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:rgba(14,11,20,.96);color:#aaa4b5;font-size:.75rem}
@@ -9919,6 +9919,12 @@ if (target.closest(".trial-offer-button")) {
         margin-top: 0 !important;
       }
 
+      /* Keep the first live channel from touching the player. */
+      .main--velora.main--velora-live-package:has(#player-container:not(.hidden))
+        #dynamic-list.item-list:not(.item-list--vod-vertical):not(.item-list--vod-film-detail) {
+        padding-top: clamp(0.85rem, 2vw, 1.2rem);
+      }
+
       .main--velora.main--velora-in-package #now-playing,
       .main--velora.main--velora-in-package #now-playing-vod,
       .main--velora:has(#player-container:not(.hidden)) #now-playing,
@@ -10045,7 +10051,7 @@ if (target.closest(".trial-offer-button")) {
         pointer-events: auto !important;
       }
 
-      /* Top-level TV / Movies / Series pages have no parent page to return to. */
+      /* Hide Back on top-level media pages by default. TV overrides this below. */
       body[data-vel-top-level] .main--velora #btn-header-back,
       body[data-vel-top-level] .main--velora .vel-header__left,
       body.vel-home-choice-picked:not(.vel-home-empty-active)
@@ -10057,6 +10063,19 @@ if (target.closest(".trial-offer-button")) {
         display: none !important;
         visibility: hidden !important;
         pointer-events: none !important;
+      }
+
+      /* TV always keeps a direct route back to the home page. */
+      body[data-vel-active-tab="live"].vel-home-choice-picked:not(.vel-home-empty-active)
+        .main--velora:has(#packages-view:not(.hidden)):not(:has(#content-view:not(.hidden))):not(:has(#player-container:not(.hidden))):not(:has(#vod-player-container:not(.hidden)))
+        .vel-header__left,
+      body[data-vel-active-tab="live"].vel-home-choice-picked:not(.vel-home-empty-active)
+        .main--velora:has(#packages-view:not(.hidden)):not(:has(#content-view:not(.hidden))):not(:has(#player-container:not(.hidden))):not(:has(#vod-player-container:not(.hidden)))
+        #btn-header-back {
+        display: inline-flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
       }
 
       /* Top-level media pages use the same title treatment as ACCUEIL. */

@@ -1,14 +1,5 @@
 .vel-parent-package-view {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  min-width: 0;
-  margin-bottom: 0.25rem;
-  padding: 0.7rem 0.8rem;
-  border: 1px solid rgba(167, 139, 250, 0.3);
-  border-radius: 12px;
-  background: rgba(20, 14, 31, 0.82);
+  display: none !important;
 }
 
 .vel-parent-package-view__back {
@@ -63,4 +54,72 @@
     width: 2.25rem;
     height: 2.25rem;
   }
+}
+
+body.vel-parent-package-open.vel-home-choice-picked:not(.vel-home-empty-active)
+  .main--velora:has(#packages-view[data-parent-package-id]:not(.hidden)):not(:has(#content-view:not(.hidden))):not(:has(#player-container:not(.hidden))):not(:has(#vod-player-container:not(.hidden)))
+  .vel-header__left,
+body.vel-parent-package-open.vel-home-choice-picked:not(.vel-home-empty-active)
+  .main--velora:has(#packages-view[data-parent-package-id]:not(.hidden)):not(:has(#content-view:not(.hidden))):not(:has(#player-container:not(.hidden))):not(:has(#vod-player-container:not(.hidden)))
+  #btn-header-back {
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+body[data-vel-active-tab="live"]
+  .main--velora:not(.main--velora-admin)
+  #packages-view
+  > .vel-parent-package-children {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(135px, 100%), 1fr));
+  gap: clamp(0.4rem, 1vw, 0.65rem);
+  margin: 0.1rem 0 0.45rem;
+  padding: clamp(0.55rem, 1.4vw, 0.85rem);
+  border: 1px solid rgba(167, 139, 250, 0.2);
+  border-radius: 16px;
+  background: rgba(12, 9, 24, 0.38);
+  transform-origin: top center;
+  animation: vel-parent-package-children-in 180ms ease-out both;
+}
+
+@keyframes vel-parent-package-children-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scaleY(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+body[data-vel-active-tab="live"]
+  .main--velora:not(.main--velora-admin)
+  #packages-view
+  > .vel-parent-package-children
+  .vel-package-card--parent-child {
+  min-height: 48px !important;
+  padding: 9px 12px !important;
+  border-radius: 13px !important;
+}
+
+body[data-vel-active-tab="live"]
+  .main--velora:not(.main--velora-admin)
+  #packages-view
+  > .vel-parent-package-children
+  .vel-package-card--parent-child
+  .vel-package-card__title {
+  font-size: clamp(0.78rem, 1.2vw, 0.9rem) !important;
+  line-height: 1.15 !important;
+}
+
+body[data-vel-active-tab="live"]
+  .main--velora:not(.main--velora-admin)
+  #packages-view
+  > .vel-package-card--parent-expanded {
+  border-color: rgba(196, 181, 253, 0.72) !important;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.18), 0 10px 26px rgba(0, 0, 0, 0.3) !important;
 }

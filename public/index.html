@@ -1522,7 +1522,7 @@
     <script defer src="/assets/velora-cache-inventory.js?v=package-poster-refresh-secure-v4-20260809"></script>
     <script defer src="/assets/manual-pays-visible-memberships.js?v=channel-return-only-20260811"></script>
     <script defer src="/assets/country-logos-admin.js?v=shared-app-country-flags-20260809"></script>
-    <script defer src="/assets/direct-media-packages.js?v=20260811-media-back-home-v4"></script>
+    <script defer src="/assets/direct-media-packages.js?v=20260811-live-back-simple-v6"></script>
     <script defer src="/assets/country-switch-loader.js?v=country-switch-fast-v2-20260810"></script>
     <script defer src="/assets/paid-users-admin.js?v=settings-admin-autocopy-test-v2-20260810"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
@@ -6249,7 +6249,26 @@
                 )
               ));
 
+              if (
+                activeCatalogTab === "live" &&
+                contentView &&
+                !contentView.classList.contains("hidden") &&
+                !isDetailView
+              ) {
+                document.dispatchEvent(new CustomEvent("velora-home-tab", {
+                  detail: { tab: "live" }
+                }));
+                packageContextTitle = "";
+                mediaContextTitle = "";
+                window.setTimeout(refreshHeaderContextTitle, 0);
+                return;
+              }
+
               if (isCatalogTab && packagesView && packagesView.dataset.parentPackageId) {
+                if (activeCatalogTab === "live") {
+                  document.dispatchEvent(new CustomEvent("velora-show-home"));
+                  return;
+                }
                 var parentPackageBack = packagesView.querySelector(".vel-parent-package-view__back");
                 if (parentPackageBack) {
                   parentPackageBack.click();

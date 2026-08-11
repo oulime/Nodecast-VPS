@@ -107,12 +107,8 @@
     return true;
   }
 
-  function closeInlineLiveParent(event) {
+  function collapseInlineLiveParent() {
     if (!inlineLiveParentId || !inlineLiveParentClose) return false;
-    const card = event.target.closest?.(".vel-package-card[data-package-id]");
-    if (!card || String(card.dataset.packageId || "") !== inlineLiveParentId) return false;
-    event.preventDefault();
-    event.stopImmediatePropagation();
     const closeButton = inlineLiveParentClose;
     inlineLiveParentId = "";
     inlineLiveParentClose = null;
@@ -121,6 +117,15 @@
     document.dispatchEvent(new CustomEvent("velora-top-level-tab", { detail: { tab: "live" } }));
     scheduleUpdate();
     return true;
+  }
+
+  function closeInlineLiveParent(event) {
+    if (!inlineLiveParentId || !inlineLiveParentClose) return false;
+    const card = event.target.closest?.(".vel-package-card[data-package-id]");
+    if (!card || String(card.dataset.packageId || "") !== inlineLiveParentId) return false;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return collapseInlineLiveParent();
   }
 
   function packageName(card) {
@@ -281,7 +286,7 @@
     const isDetail = contentView.classList.contains("content-view--vod-film-detail") ||
       Boolean(contentView.querySelector(".vel-vod-detail, .vel-series-detail, .vel-vod-series-detail"));
     if (!back) return;
-    if (isParentPackageView()) {
+    if (tab !== "live" && isParentPackageView()) {
       const parentBack = packagesView.querySelector(".vel-parent-package-view__back");
       if (!parentBack) return;
       event.preventDefault();
@@ -304,7 +309,7 @@
       ["Enter", "NumpadEnter", " ", "Spacebar"].includes(event.key) &&
       closeInlineLiveParent(event)
     ) return;
-    if (!isParentPackageView() || !event.target.closest?.("#btn-header-back")) return;
+    if (activeTab() === "live" || !isParentPackageView() || !event.target.closest?.("#btn-header-back")) return;
     if (!["Enter", "NumpadEnter", " ", "Spacebar"].includes(event.key)) return;
     const parentBack = packagesView.querySelector(".vel-parent-package-view__back");
     if (!parentBack) return;

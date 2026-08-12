@@ -10,6 +10,7 @@
   let liveTopLevelNodes = [];
   let inlineLiveParentId = "";
   let inlineLiveParentClose = null;
+  let liveParentScrollState = null;
 
   const packagesView = document.getElementById("packages-view");
   const contentView = document.getElementById("content-view");
@@ -108,8 +109,50 @@
     parentCard.insertAdjacentElement("afterend", children);
     inlineLiveParentId = parentId;
     inlineLiveParentClose = closeButton;
+    restoreLiveParentScroll();
     document.body.dataset.velTopLevel = "live";
     document.dispatchEvent(new CustomEvent("velora-top-level-tab", { detail: { tab: "live" } }));
+    return true;
+  }
+
+  function rememberLiveParentScroll(event) {
+    if (isAdultMode() || activeTab() !== "live" || isParentPackageView()) return;
+    const card = event.target.closest?.(".vel-package-card[data-package-id]");
+    if (!card || !packagesView.contains(card) || packagesView.classList.contains("hidden")) return;
+    const main = document.querySelector(".main--velora");
+    liveParentScrollState = {
+      windowX: window.scrollX,
+      windowY: window.scrollY,
+      main,
+      mainLeft: main?.scrollLeft || 0,
+      mainTop: main?.scrollTop || 0
+    };
+  }
+
+  function restoreLiveParentScroll() {
+    const state = liveParentScrollState;
+    liveParentScrollState = null;
+    if (!state) return;
+    const restore = () => {
+      if (state.main?.isConnected) {
+        state.main.scrollLeft = state.mainLeft;
+        state.main.scrollTop = state.mainTop;
+      }
+      window.scrollTo(state.windowX, state.windowY);
+    };
+    restore();
+    window.requestAnimationFrame(() => window.requestAnimationFrame(restore));
+  }
+
+  function clearLiveParentContextForAdult() {
+    if (!isParentPackageView()) return false;
+    const parentBack = packagesView.querySelector(".vel-parent-package-view__back");
+    inlineLiveParentId = "";
+    inlineLiveParentClose = null;
+    liveTopLevelNodes = [];
+    liveParentScrollState = null;
+    if (!parentBack) return false;
+    parentBack.click();
     return true;
   }
 
@@ -365,6 +408,7 @@
     updateQueued = false;
     syncAdultPackageExclusions();
     if (isAdultMode()) {
+      if (clearLiveParentContextForAdult()) return;
       if (activeTab() === "movies") {
         const cards = rememberPackages("movies");
         syncPicker("movies");
@@ -428,6 +472,8 @@
 
   document.addEventListener("pointerdown", prepareAdultMoviesOpen, true);
   document.addEventListener("click", prepareAdultMoviesOpen, true);
+  document.addEventListener("pointerdown", rememberLiveParentScroll, true);
+  document.addEventListener("click", rememberLiveParentScroll, true);
 
   document.addEventListener("velora-adult-packages-back", event => {
     if (event.detail?.tab !== "movies") return;

@@ -1120,3 +1120,5 @@ module.exports = router;
 module.exports.buildHomeCache = buildHomeCache;
 module.exports.buildCountryPackageCache = buildCountryPackageCache;
 module.exports.invalidateCountryPackageCache = invalidateCountryPackageCache;
+module.exports.getCountryPackageCache = getCountryPackageCache;
+module.exports.expandMemberships = expandMemberships;

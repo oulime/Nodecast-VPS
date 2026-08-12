@@ -4,6 +4,7 @@
   const MEDIA_TABS = new Set(["movies", "series"]);
   const packageCache = new Map();
   const selectedPackages = new Map();
+  const adultLiveArtworkCache = new Map();
   let updateQueued = false;
   let pendingOpen = "";
   let adultMoviesAutoOpenBlocked = false;
@@ -194,6 +195,103 @@
         card.hidden = false;
         card.removeAttribute("data-vel-adult-excluded");
       }
+    });
+  }
+
+  function decodeAdultLivePackageId(packageId) {
+    const raw = String(packageId || "").trim();
+    const delimiter = raw.indexOf("::");
+    let sourceId = delimiter > 0 ? raw.slice(0, delimiter) : "";
+    let categoryId = delimiter > 0 ? raw.slice(delimiter + 2) : raw;
+    try {
+      const encoded = categoryId.replace(/-/g, "+").replace(/_/g, "/");
+      const decoded = window.atob(encoded + "=".repeat((4 - encoded.length % 4) % 4));
+      const separator = decoded.indexOf(":");
+      if (separator > 0) {
+        sourceId = decoded.slice(0, separator);
+        categoryId = decoded.slice(separator + 1);
+      }
+    } catch (_) {}
+    return sourceId && categoryId ? { sourceId, categoryId } : null;
+  }
+
+  function firstStreamArtwork(payload) {
+    const lists = [
+      payload,
+      payload?.data,
+      payload?.items,
+      payload?.streams,
+      payload?.channels,
+      payload?.results
+    ];
+    for (const list of lists) {
+      if (!Array.isArray(list)) continue;
+      for (const stream of list) {
+        const artwork = String(
+          stream?.stream_icon || stream?.streamIcon || stream?.icon || stream?.logo || stream?.thumbnail || ""
+        ).trim();
+        if (artwork) return artwork;
+      }
+    }
+    return "";
+  }
+
+  function proxiedArtwork(url) {
+    if (!/^https?:\/\//i.test(url)) return url;
+    const encoded = encodeURIComponent(url);
+    return `/proxy?target=${encoded}&from=${encoded}`;
+  }
+
+  async function loadAdultLiveArtwork(packageId) {
+    if (adultLiveArtworkCache.has(packageId)) return adultLiveArtworkCache.get(packageId);
+    const request = (async () => {
+      const decoded = decodeAdultLivePackageId(packageId);
+      if (!decoded) return "";
+      const base = `/api/proxy/xtream/${encodeURIComponent(decoded.sourceId)}`;
+      const category = encodeURIComponent(decoded.categoryId);
+      const endpoints = [
+        `${base}/live_streams?category_id=${category}`,
+        `${base}/player_api?action=get_live_streams&category_id=${category}`
+      ];
+      const token = window.localStorage.getItem("authToken");
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(endpoint, {
+            cache: "force-cache",
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined
+          });
+          if (!response.ok) continue;
+          const artwork = firstStreamArtwork(await response.json());
+          if (artwork) return proxiedArtwork(artwork);
+        } catch (_) {}
+      }
+      return "";
+    })();
+    adultLiveArtworkCache.set(packageId, request);
+    return request;
+  }
+
+  function syncAdultLivePackageCards() {
+    if (!isAdultMode() || activeTab() !== "live") return;
+    packagesView.querySelectorAll(".vel-package-card[data-package-id]").forEach(card => {
+      const packageId = String(card.dataset.packageId || "");
+      if (!packageId) return;
+      card.classList.remove("vel-package-card--live-default-art");
+      card.classList.add("vel-package-card--adult-live-art");
+      card.querySelector(".vel-package-card__title")?.classList.remove("vel-package-card__title--live-default-art");
+      if (card.querySelector(":scope > img")) return;
+      loadAdultLiveArtwork(packageId).then(artwork => {
+        if (!artwork || !card.isConnected || card.querySelector(":scope > img")) return;
+        const image = document.createElement("img");
+        image.alt = "";
+        image.setAttribute("role", "presentation");
+        image.className = "vel-package-card__art vel-package-card__art--contain";
+        image.loading = "lazy";
+        image.decoding = "async";
+        image.src = artwork;
+        image.addEventListener("error", () => image.remove(), { once: true });
+        card.prepend(image);
+      });
     });
   }
 
@@ -409,6 +507,7 @@
     syncAdultPackageExclusions();
     if (isAdultMode()) {
       if (clearLiveParentContextForAdult()) return;
+      syncAdultLivePackageCards();
       if (activeTab() === "movies") {
         const cards = rememberPackages("movies");
         syncPicker("movies");

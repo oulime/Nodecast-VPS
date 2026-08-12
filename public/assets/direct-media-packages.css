@@ -5,6 +5,72 @@ body[data-vel-active-tab="series"] .main--velora:not(.main--velora-adult) #vel-p
   display: none !important;
 }
 
+body[data-vel-active-tab="live"]
+  .main--velora.main--velora-adult:not(.main--velora-admin)
+  #packages-view.grid.vel-packages {
+  grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)) !important;
+  gap: clamp(0.65rem, 1.5vw, 1rem) !important;
+}
+
+body[data-vel-active-tab="live"]
+  .main--velora.main--velora-adult:not(.main--velora-admin)
+  #packages-view
+  .vel-package-card--adult-live-art {
+  position: relative !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: center !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  height: auto !important;
+  aspect-ratio: 1 / 1 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border-radius: 18px !important;
+  background: rgba(10, 8, 22, 0.82) !important;
+}
+
+body[data-vel-active-tab="live"]
+  .main--velora.main--velora-adult:not(.main--velora-admin)
+  #packages-view
+  .vel-package-card--adult-live-art > img {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 1 !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  padding: 11% !important;
+  object-fit: contain !important;
+  background: radial-gradient(circle at 50% 42%, rgba(119, 76, 210, 0.2), transparent 70%) !important;
+}
+
+body[data-vel-active-tab="live"]
+  .main--velora.main--velora-adult:not(.main--velora-admin)
+  #packages-view
+  .vel-package-card--adult-live-art::before {
+  z-index: 2 !important;
+  background: linear-gradient(180deg, transparent 48%, rgba(5, 3, 14, 0.88) 100%) !important;
+}
+
+body[data-vel-active-tab="live"]
+  .main--velora.main--velora-adult:not(.main--velora-admin)
+  #packages-view
+  .vel-package-card--adult-live-art .vel-package-card__title {
+  position: relative !important;
+  z-index: 3 !important;
+  display: block !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0.7rem 0.65rem !important;
+  color: #fff !important;
+  font-size: 0.82rem !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  text-align: center !important;
+  background: linear-gradient(180deg, transparent, rgba(4, 3, 12, 0.9)) !important;
+}
+
 .vel-media-package-picker {
   position: relative;
   display: block;

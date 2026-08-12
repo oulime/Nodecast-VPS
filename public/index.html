@@ -9280,6 +9280,7 @@ if (target.closest(".trial-offer-button")) {
               button.type = "button";
               button.className = "vel-global-search__result";
               button.dataset.searchResultId = item.id || "";
+              button.dataset.searchResultType = item.type || "";
               button.setAttribute("role", "option");
 
               var thumb = document.createElement("span");
@@ -9490,6 +9491,40 @@ if (target.closest(".trial-offer-button")) {
               if (!id) return;
               prioritizeResultInteraction(button);
               closeSearch();
+              var directType = button.dataset.searchResultType;
+              var directMatch = id.match(/^(?:cache|api):(movie|series):([^:]+)$/);
+              if (
+                directMatch &&
+                (directType === "movie" || directType === "series") &&
+                typeof window.veloraOpenCachedHomeItem === "function"
+              ) {
+                try {
+                  var encodedStream = directMatch[2].replace(/-/g, "+").replace(/_/g, "/");
+                  encodedStream += "=".repeat((4 - encodedStream.length % 4) % 4);
+                  var decodedStream = window.atob(encodedStream);
+                  var streamSeparator = decodedStream.indexOf(":");
+                  if (streamSeparator > 0) {
+                    var sourceId = decodedStream.slice(0, streamSeparator);
+                    var streamId = decodedStream.slice(streamSeparator + 1);
+                    var contentType = directType === "movie" ? "movies" : "series";
+                    var resultImage = button.querySelector(".vel-global-search__thumb img");
+                    window.veloraOpenCachedHomeItem({
+                      id: "search:" + id,
+                      content_type: contentType,
+                      package_id: "search:" + id
+                    }, {
+                      id: id,
+                      streamId: streamId,
+                      sourceId: sourceId,
+                      globalStreamId: directMatch[2],
+                      name: button.querySelector(".vel-global-search__title")?.textContent || "",
+                      thumbUrl: resultImage ? resultImage.src : "",
+                      contentType: contentType
+                    });
+                    return;
+                  }
+                } catch (error) {}
+              }
               window.veloraOpenSearchResult(id).catch(function () {});
               return;
             }

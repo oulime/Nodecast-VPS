@@ -192,6 +192,20 @@
     if (!target) return;
     selectedPackages.set(cacheKey(tab), id);
     pendingOpen = `${cacheKey(tab)}::${id}`;
+    if (isAdultMode() && tab === "movies") {
+      if (typeof PointerEvent === "function") {
+        target.card.dispatchEvent(new PointerEvent("pointerup", {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          pointerId: 77,
+          pointerType: "mouse"
+        }));
+      } else {
+        target.card.click();
+      }
+      return;
+    }
     target.card.click();
   }
 

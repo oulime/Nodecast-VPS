@@ -435,6 +435,11 @@
     pendingOpen = "";
   });
 
+  document.addEventListener("pointerup", event => {
+    if (isAdultMode() || activeTab() !== "live") return;
+    closeInlineLiveParent(event);
+  }, true);
+
   document.addEventListener("click", event => {
     if (isAdultMode()) {
       const card = event.target.closest?.(".vel-package-card[data-package-id]");

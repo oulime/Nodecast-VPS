@@ -45,12 +45,8 @@ async function run() {
 
     const franceScope = getCountrySearchScope('country_france', 'movie');
     assert.ok(franceScope);
-    assert.ok(franceScope.byRawItem.size > 0);
-    const firstCountryItem = franceScope.byRawItem.entries().next().value;
-    assert.equal(
-        getCountryItemAssignment(franceScope, 7, firstCountryItem[0]),
-        firstCountryItem[1]
-    );
+    assert.equal(franceScope.byRawItem.size, 0);
+    assert.equal(getCountryItemAssignment(franceScope, 7, 'legacy-id-without-source'), null);
 
     const snapshotResult = await searchSnapshot(wildcard, 'movie', 'film', 10);
     assert.deepEqual(snapshotResult, { available: false, results: [] });

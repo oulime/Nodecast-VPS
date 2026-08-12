@@ -23,7 +23,7 @@ async function main() {
         response = await fetch(`${base.replace('/rest/v1', '')}/country-package-cache`);
         assert.equal(response.status, 200);
         let countryPackageCache = await response.json();
-        assert.equal(countryPackageCache.version, 1);
+        assert.equal(countryPackageCache.version, 3);
         assert.ok(Array.isArray(countryPackageCache.packages));
         assert.ok(Array.isArray(countryPackageCache.memberships.rows));
 

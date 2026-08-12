@@ -98,27 +98,42 @@ function getCountrySearchScope(countryId, type) {
         return existing;
     }
 
+    const orderedPackageIds = new Set((cache.packageOrders || [])
+        .filter(order =>
+            String(order.country_id || '') === normalizedCountryId
+            && membershipMatchesType(order.ui_tab, type)
+        )
+        .flatMap(order => Array.isArray(order.package_order) ? order.package_order : [])
+        .map(String));
     const packages = new Map((cache.packages || [])
         .filter(pkg => String(pkg.country_id || '') === normalizedCountryId)
+        .filter(pkg => !orderedPackageIds.size || orderedPackageIds.has(String(pkg.id)))
         .map(pkg => [String(pkg.id), {
             packageId: String(pkg.id),
             packageName: cleanText(pkg.name, 240),
-            priority: true
+            priority: true,
+            sourceId: cleanText(pkg.source_id, 80),
+            kind: cleanText(pkg.kind, 24) || type
         }]));
     const byRawItem = new Map();
     const bySourceItem = new Map();
     for (const membership of veloraData.expandMemberships(cache.memberships)) {
         if (String(membership.country_id || '') !== normalizedCountryId) continue;
-        if (!membershipMatchesType(membership.kind, type)) continue;
         const assignment = packages.get(String(membership.target_package_id || ''));
         const itemId = cleanText(membership.stream_id, 500);
         if (!assignment || !itemId) continue;
-        if (!byRawItem.has(itemId)) byRawItem.set(itemId, assignment);
-        const sourceId = cleanText(membership.source_id, 80);
+        const membershipKind = membership.kind || assignment.kind;
+        if (!membershipKind || !membershipMatchesType(membershipKind, type)) continue;
+        const sourceId = cleanText(membership.source_id ?? assignment.sourceId, 80);
         if (sourceId) bySourceItem.set(`${sourceId}\u001f${itemId}`, assignment);
     }
 
-    const scope = { countryId: normalizedCountryId, byRawItem, bySourceItem };
+    const scope = {
+        countryId: normalizedCountryId,
+        cacheVersion,
+        byRawItem,
+        bySourceItem
+    };
     countryScopeIndex.set(indexKey, scope);
     while (countryScopeIndex.size > 128) {
         countryScopeIndex.delete(countryScopeIndex.keys().next().value);
@@ -129,9 +144,14 @@ function getCountrySearchScope(countryId, type) {
 function getCountryItemAssignment(scope, sourceId, itemId) {
     if (!scope) return null;
     const rawItemId = String(itemId);
-    return scope.bySourceItem.get(`${sourceId}\u001f${rawItemId}`)
-        || scope.byRawItem.get(rawItemId)
-        || null;
+    const rawSourceId = String(sourceId ?? '').trim();
+    if (rawSourceId) {
+        // Provider item IDs are only unique inside their source. Falling back
+        // to a source-less ID can attach an item to an unrelated package from
+        // another provider that happens to reuse the same numeric ID.
+        return scope.bySourceItem.get(`${rawSourceId}\u001f${rawItemId}`) || null;
+    }
+    return null;
 }
 
 function isAllowedWildcardItem(allowedItems, sourceId, itemId, type) {
@@ -233,7 +253,7 @@ async function getIndexedSnapshot(action, snapshotVersion, type) {
 }
 
 async function getIndexedCountrySnapshot(action, snapshotVersion, type, countryScope) {
-    const key = `${snapshotVersion}\u001f${action}\u001fcountry:${countryScope.countryId}`;
+    const key = `${snapshotVersion}\u001f${action}\u001fcountry:${countryScope.countryId}\u001f${countryScope.cacheVersion}`;
     const existing = categorySearchIndex.get(key);
     if (existing) {
         categorySearchIndex.delete(key);
@@ -299,7 +319,9 @@ async function searchSnapshot(categories, type, normalizedQuery, limit, allowedI
                 : null;
             if (category.categoryId === '*' && (
                 item.sourceId !== category.sourceId ||
-                !(countryAssignment || isAllowedWildcardItem(allowedItems, item.sourceId, item.itemId, type))
+                !(countryScope
+                    ? countryAssignment
+                    : isAllowedWildcardItem(allowedItems, item.sourceId, item.itemId, type))
             )) continue;
             if (!item.normalizedName.includes(normalizedQuery)) continue;
             const itemKey = `${item.sourceId}\u001f${item.itemId}`;

@@ -166,10 +166,49 @@ function resolvedAdminPackages(packages, curations) {
         if (!curationsByPackage.has(packageId)) curationsByPackage.set(packageId, []);
         curationsByPackage.get(packageId).push(row);
     }
-    const categoryItems = db.prepare(`
-        SELECT item_id FROM playlist_items
-        WHERE source_id = ? AND type = ? AND category_id = ? AND is_hidden = 0
-    `);
+    const categoryByKey = new Map(categories.map(category => [
+        `${category.source_id}\u001f${category.type}\u001f${category.category_id}`,
+        category
+    ]));
+
+    function scoredCandidates(legacyIds, expectedKinds, providerPackageName) {
+        if (!legacyIds.size) return [];
+        const itemTypes = [...(expectedKinds || [])]
+            .map(catalogueItemType)
+            .filter(Boolean);
+        const scores = new Map();
+        const ids = [...legacyIds];
+        for (let offset = 0; offset < ids.length; offset += 800) {
+            const chunk = ids.slice(offset, offset + 800);
+            const itemPlaceholders = chunk.map(() => '?').join(',');
+            const typeClause = itemTypes.length
+                ? ` AND type IN (${itemTypes.map(() => '?').join(',')})`
+                : '';
+            const rows = db.prepare(`
+                SELECT source_id, type, category_id, COUNT(DISTINCT item_id) AS score
+                FROM playlist_items
+                WHERE is_hidden = 0 AND item_id IN (${itemPlaceholders})${typeClause}
+                GROUP BY source_id, type, category_id
+            `).all(...chunk, ...itemTypes);
+            for (const row of rows) {
+                const key = `${row.source_id}\u001f${row.type}\u001f${row.category_id}`;
+                scores.set(key, (scores.get(key) || 0) + Number(row.score || 0));
+            }
+        }
+        const wantedName = normalizedPackageName(providerPackageName);
+        return [...scores.entries()].map(([key, score]) => {
+            const category = categoryByKey.get(key);
+            if (!category) return null;
+            return {
+                category,
+                score,
+                nameMatch: normalizedPackageName(category.name) === wantedName
+            };
+        }).filter(Boolean).sort((left, right) =>
+            right.score - left.score ||
+            Number(right.nameMatch) - Number(left.nameMatch)
+        );
+    }
 
     return packages.map(packageRow => {
         if (packageRow.is_parent === true || packageRow.is_parent === 'true') return packageRow;
@@ -182,25 +221,15 @@ function resolvedAdminPackages(packages, curations) {
         const legacyIds = new Set((curationsByPackage.get(packageId) || [])
             .map(row => String(row.stream_id || '')).filter(Boolean));
         const providerPackageName = String(packageRow.original_name || packageRow.name || '');
-        const candidates = categories.filter(category => {
-            const kind = category.type === 'movie' ? 'vod' : category.type;
-            return normalizedPackageName(category.name) === normalizedPackageName(providerPackageName)
-                && (!expectedKinds?.size || expectedKinds.has(kind));
-        }).map(category => {
-            const items = categoryItems.all(category.source_id, category.type, String(category.category_id));
-            return {
-                category,
-                score: items.reduce(
-                    (total, item) => total + (legacyIds.has(String(item.item_id)) ? 1 : 0), 0
-                ),
-                itemCount: items.length
-            };
-        }).sort((left, right) => right.score - left.score || right.itemCount - left.itemCount);
+        const candidates = scoredCandidates(legacyIds, expectedKinds, providerPackageName);
 
         const best = candidates[0];
         const runnerUp = candidates[1];
-        if (!best || (candidates.length > 1 && best.score <= (runnerUp?.score || 0))) {
-            return packageRow;
+        if (!best || best.score < 1 || (
+            runnerUp && best.score === runnerUp.score && best.nameMatch === runnerUp.nameMatch
+        )) {
+            const onlyKind = expectedKinds?.size === 1 ? [...expectedKinds][0] : null;
+            return onlyKind && !packageRow.kind ? { ...packageRow, kind: onlyKind } : packageRow;
         }
         return {
             ...packageRow,
@@ -293,24 +322,35 @@ function effectiveCurations(packageIds = null) {
     const rawCurations = allRows('admin_stream_curations');
     const packages = resolvedAdminPackages(allRows('admin_packages'), rawCurations);
     const packageById = new Map(packages.map(row => [String(row.id), row]));
+    const matchingItems = db.prepare(`
+        SELECT DISTINCT source_id, type
+        FROM playlist_items
+        WHERE item_id = ? AND type = ? AND is_hidden = 0
+    `);
     const explicit = rawCurations.map(row => {
         const packageRow = packageById.get(String(row.target_package_id || '')) || {};
+        const kind = String(row.kind || packageRow.kind || '').trim();
+        const itemType = catalogueItemType(kind);
+        const streamId = String(row.stream_id || '').trim();
+        if (!itemType || !streamId) return null;
+        const matches = matchingItems.all(streamId, itemType);
+        const preferredSource = String(row.source_id ?? packageRow.source_id ?? '').trim();
+        const selected = preferredSource
+            ? matches.find(item => String(item.source_id) === preferredSource)
+            : matches.length === 1 ? matches[0] : null;
+        if (!selected) return null;
         return {
             ...row,
-            source_id: row.source_id ?? packageRow.source_id ?? null,
-            kind: row.kind || packageRow.kind || null
+            source_id: selected.source_id,
+            kind: selected.type === 'movie' ? 'vod' : selected.type
         };
-    });
+    }).filter(Boolean);
     const explicitKeys = new Set();
     for (const row of explicit) {
         const countryId = String(row.country_id || '');
         const streamId = String(row.stream_id || '');
         if (!countryId || !streamId) continue;
-        if (row.source_id != null && row.kind) {
-            explicitKeys.add(`${countryId}:${row.kind}:${row.source_id}:${streamId}`);
-        } else {
-            explicitKeys.add(`${countryId}:legacy:${streamId}`);
-        }
+        explicitKeys.add(`${countryId}:${row.kind}:${row.source_id}:${streamId}`);
     }
 
     const wanted = packageIds ? new Set([...packageIds].map(String)) : null;
@@ -406,7 +446,7 @@ function buildCountryPackageCache() {
     const memberships = compactMemberships(effectiveCurations());
     const countries = allRows('admin_countries');
     const payload = {
-        version: 2,
+        version: 3,
         generatedAt: new Date().toISOString(),
         catalogSnapshotVersion: veloraCatalogCache.getStatus().snapshotVersion || null,
         countries,
@@ -436,7 +476,7 @@ function getCountryPackageCache() {
     try {
         if (fs.existsSync(countryPackageCachePath)) {
             const payload = JSON.parse(fs.readFileSync(countryPackageCachePath, 'utf8'));
-            if (payload?.version === 2 && payload.catalogSnapshotVersion === snapshotVersion) {
+            if (payload?.version === 3 && payload.catalogSnapshotVersion === snapshotVersion) {
                 currentCountryPackageCache = payload;
                 return payload;
             }

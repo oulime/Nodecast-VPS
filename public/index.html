@@ -2657,6 +2657,22 @@
         transform: none;
       }
 
+      .vel-vod-skip-btn svg {
+        width: 1.18rem;
+        height: 1.18rem;
+        overflow: visible;
+      }
+
+      .vel-vod-skip-btn svg path {
+        fill: currentColor;
+      }
+
+      .vel-vod-skip-btn svg text {
+        fill: currentColor;
+        font: 800 7px/1 sans-serif;
+        text-anchor: middle;
+      }
+
       #vod-player-container.player-container--series-episode .vod-controls-row {
         gap: clamp(0.28rem, 1.25vw, 0.5rem);
       }
@@ -2666,6 +2682,29 @@
       }
 
       @media (max-width: 600px) {
+        #vod-player-container .vod-controls-overlay {
+          padding-right: calc(0.48rem + env(safe-area-inset-right, 0px)) !important;
+          padding-left: calc(0.48rem + env(safe-area-inset-left, 0px)) !important;
+        }
+
+        #vod-player-container .vod-controls-row {
+          gap: 0.3rem;
+        }
+
+        #vod-player-container .vod-ctl-btn {
+          width: 1.82rem;
+          height: 1.82rem;
+        }
+
+        #vod-player-container .vod-ctl-seek-track {
+          min-width: 1.8rem;
+        }
+
+        #vod-player-container .vod-ctl-time {
+          min-width: 2.9rem;
+          font-size: 0.66rem;
+        }
+
         #vod-player-container.player-container--series-episode .vod-controls-overlay {
           padding-right: calc(0.48rem + env(safe-area-inset-right, 0px)) !important;
           padding-left: calc(0.48rem + env(safe-area-inset-left, 0px)) !important;
@@ -2683,7 +2722,7 @@
       }
 
       @media (max-width: 420px) {
-        #vod-player-container.player-container--series-episode #vod-ctl-current {
+        #vod-player-container #vod-ctl-current {
           display: none;
         }
       }
@@ -4947,7 +4986,13 @@
                   <button id="vod-ctl-prev-episode" type="button" class="vod-ctl-btn vel-episode-nav-btn" aria-label="Épisode précédent" title="Épisode précédent" tabindex="0" data-tv-focusable="true" hidden>
                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 5h2v14H6V5Zm12.2 1.2v11.6L9.5 12l8.7-5.8Z"></path></svg>
                   </button>
+                  <button id="vod-ctl-back-5" type="button" class="vod-ctl-btn vel-vod-skip-btn" aria-label="Reculer de 5 secondes" title="−5 secondes" tabindex="0" data-tv-focusable="true">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 7H5.8l2-2L6.4 3.6 2 8l4.4 4.4L7.8 11l-2-2H9a7 7 0 1 1-6.4 9.8l1.85-.76A5 5 0 1 0 9 7Z"></path><text x="10" y="15.5">5</text></svg>
+                  </button>
                   <button id="vod-ctl-play" type="button" class="vod-ctl-btn" aria-label="Play" tabindex="0" data-tv-focusable="true"></button>
+                  <button id="vod-ctl-forward-5" type="button" class="vod-ctl-btn vel-vod-skip-btn" aria-label="Avancer de 5 secondes" title="+5 secondes" tabindex="0" data-tv-focusable="true">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 7h3.2l-2-2 1.4-1.4L22 8l-4.4 4.4-1.4-1.4 2-2H15a7 7 0 1 0 6.4 9.8l-1.85-.76A5 5 0 1 1 15 7Z"></path><text x="7" y="15.5">5</text></svg>
+                  </button>
                   <button id="vod-ctl-next-episode" type="button" class="vod-ctl-btn vel-episode-nav-btn" aria-label="Épisode suivant" title="Épisode suivant" tabindex="0" data-tv-focusable="true" hidden>
                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M16 5h2v14h-2V5ZM5.8 6.2 14.5 12l-8.7 5.8V6.2Z"></path></svg>
                   </button>
@@ -10072,6 +10117,57 @@ if (target.closest(".trial-offer-button")) {
           syncEpisodeButtons();
         }
 
+        function initModernVodControls() {
+          var video = document.getElementById("video-vod");
+          var player = document.getElementById("vod-player-container");
+          var overlay = document.getElementById("vod-controls-overlay");
+          var backButton = document.getElementById("vod-ctl-back-5");
+          var forwardButton = document.getElementById("vod-ctl-forward-5");
+          if (!video || !player || !overlay || !backButton || !forwardButton) return;
+
+          var hideTimer = 0;
+          function showControls() {
+            if (hideTimer) window.clearTimeout(hideTimer);
+            overlay.classList.remove("hidden", "vod-controls-overlay--idle");
+            overlay.setAttribute("aria-hidden", "false");
+            if (!video.paused && !video.ended) {
+              hideTimer = window.setTimeout(function () {
+                if (!video.paused && !video.ended) overlay.classList.add("vod-controls-overlay--idle");
+              }, 2800);
+            }
+          }
+
+          function seekBy(seconds) {
+            var duration = Number.isFinite(video.duration) ? video.duration : Infinity;
+            var nextTime = Math.max(0, Math.min(duration, (video.currentTime || 0) + seconds));
+            try { video.currentTime = nextTime; } catch (error) {}
+            showControls();
+          }
+
+          backButton.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            seekBy(-5);
+          });
+          forwardButton.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            seekBy(5);
+          });
+
+          var wrapper = video.closest(".video-wrapper") || player;
+          wrapper.addEventListener("click", function (event) {
+            if (event.target.closest("button, [role='slider']")) return;
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            showControls();
+          }, true);
+
+          video.addEventListener("pause", showControls);
+          video.addEventListener("ended", showControls);
+        }
+
         function initPageControls() {
           if (document.body.dataset.pageControlsReady === "true") return;
           document.body.dataset.pageControlsReady = "true";
@@ -10080,6 +10176,7 @@ if (target.closest(".trial-offer-button")) {
           initReliableMobileNavigation();
           initVideoFormatControls();
           initSeriesEpisodeControls();
+          initModernVodControls();
           suppressAllNativePlayerControls();
           ["video", "video-vod"].forEach(function (id) {
             var video = document.getElementById(id);

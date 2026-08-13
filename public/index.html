@@ -1946,6 +1946,53 @@
         outline: none;
       }
 
+      .vel-global-search__input-wrap {
+        position: relative;
+        min-width: 0;
+      }
+
+      .vel-global-search__input-wrap .vel-global-search__input {
+        padding-right: 3.25rem;
+      }
+
+      .vel-global-search__input::-webkit-search-cancel-button,
+      .vel-global-search__input::-webkit-search-decoration {
+        display: none;
+        -webkit-appearance: none;
+        appearance: none;
+      }
+
+      .vel-global-search__submit {
+        position: absolute;
+        top: 50%;
+        right: 0.42rem;
+        width: 2.2rem;
+        height: 2.2rem;
+        padding: 0;
+        display: inline-grid;
+        place-items: center;
+        transform: translateY(-50%);
+        border: 1px solid color-mix(in srgb, var(--vel-primary, #8a2be2) 58%, rgba(255, 255, 255, 0.2));
+        border-radius: 10px;
+        color: #fff;
+        background: color-mix(in srgb, var(--vel-primary, #8a2be2) 25%, rgba(13, 11, 28, 0.9));
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+
+      .vel-global-search__submit svg {
+        width: 1.12rem;
+        height: 1.12rem;
+        fill: currentColor;
+      }
+
+      .vel-global-search__submit:hover,
+      .vel-global-search__submit:focus-visible {
+        outline: none;
+        border-color: color-mix(in srgb, var(--vel-primary, #8a2be2) 82%, #fff);
+        background: color-mix(in srgb, var(--vel-primary, #8a2be2) 46%, rgba(13, 11, 28, 0.9));
+      }
+
       .vel-global-search__input:focus {
         border-color: color-mix(in srgb, var(--vel-primary, #8a2be2) 78%, #fff);
         box-shadow: 0 0 0 3px color-mix(in srgb, var(--vel-primary, #8a2be2) 22%, transparent);
@@ -2539,6 +2586,56 @@
         width: 100dvw !important;
         height: 100vh !important;
         height: 100dvh !important;
+        object-fit: fill !important;
+        object-position: center center !important;
+      }
+
+      .vel-format-btn svg {
+        width: 1.15rem;
+        height: 1.15rem;
+        overflow: visible;
+      }
+
+      .vel-format-btn svg rect {
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.7;
+      }
+
+      .vel-format-btn svg path {
+        fill: currentColor;
+        opacity: 0.92;
+      }
+
+      .vel-format-btn .vel-format-btn__stretch,
+      .vel-format-btn.is-stretched .vel-format-btn__original {
+        display: none;
+      }
+
+      .vel-format-btn.is-stretched .vel-format-btn__stretch {
+        display: block;
+      }
+
+      .vel-format-btn.is-stretched {
+        border-color: rgba(167, 139, 250, 0.88);
+        background: rgba(91, 55, 170, 0.72);
+        box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.18), 0 0 16px rgba(139, 92, 246, 0.38);
+      }
+
+      #btn-header-search {
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      html body #player-container #video.vel-video-format-original,
+      html body #vod-player-container #video-vod.vel-video-format-original {
+        object-fit: contain !important;
+        object-position: center center !important;
+        background: #000 !important;
+      }
+
+      html body #player-container #video.vel-video-format-stretched,
+      html body #vod-player-container #video-vod.vel-video-format-stretched {
         object-fit: fill !important;
         object-position: center center !important;
       }
@@ -4705,6 +4802,22 @@
                     LIVE
                   </span>
                   <button
+                    id="live-ctl-format"
+                    type="button"
+                    class="live-ctl-btn vel-format-btn is-original"
+                    aria-label="Format vidéo : original"
+                    aria-pressed="false"
+                    title="Format original"
+                    tabindex="0"
+                    data-tv-focusable="true"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <rect x="3.5" y="5" width="17" height="14" rx="2"></rect>
+                      <path class="vel-format-btn__original" d="M8 7.5h8v9H8z"></path>
+                      <path class="vel-format-btn__stretch" d="M5.5 7.5h13v9h-13z"></path>
+                    </svg>
+                  </button>
+                  <button
                     id="live-ctl-fullscreen"
                     type="button"
                     class="live-ctl-btn"
@@ -4783,6 +4896,22 @@
                     <div id="vod-ctl-seek-handle" class="vod-ctl-seek-handle"></div>
                   </div>
                   <span id="vod-ctl-duration" class="vod-ctl-time">00:00:00</span>
+                  <button
+                    id="vod-ctl-format"
+                    type="button"
+                    class="vod-ctl-btn vel-format-btn is-original"
+                    aria-label="Format vidéo : original"
+                    aria-pressed="false"
+                    title="Format original"
+                    tabindex="0"
+                    data-tv-focusable="true"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <rect x="3.5" y="5" width="17" height="14" rx="2"></rect>
+                      <path class="vel-format-btn__original" d="M8 7.5h8v9H8z"></path>
+                      <path class="vel-format-btn__stretch" d="M5.5 7.5h13v9h-13z"></path>
+                    </svg>
+                  </button>
                   <button id="vod-ctl-fullscreen" type="button" class="vod-ctl-btn" aria-label="Fullscreen" tabindex="0" data-tv-focusable="true"></button>
                 </div>
               </div>
@@ -4872,7 +5001,14 @@
       <div id="vel-global-search" class="vel-global-search hidden" role="dialog" aria-modal="true" aria-label="Recherche" aria-hidden="true">
         <div class="vel-global-search__panel">
           <form id="vel-global-search-form" class="vel-global-search__bar" role="search">
-            <input id="vel-global-search-input" class="vel-global-search__input" type="search" autocomplete="off" spellcheck="false" enterkeyhint="search" placeholder="Chercher une chaine" />
+            <div class="vel-global-search__input-wrap">
+              <input id="vel-global-search-input" class="vel-global-search__input" type="text" inputmode="search" autocomplete="off" spellcheck="false" enterkeyhint="search" placeholder="Chercher une chaine" />
+              <button type="submit" class="vel-global-search__submit" aria-label="Lancer la recherche" title="Rechercher">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M10.7 3.5a7.2 7.2 0 1 0 4.47 12.84l4.24 4.25a1 1 0 0 0 1.42-1.42l-4.25-4.24A7.2 7.2 0 0 0 10.7 3.5Zm0 2a5.2 5.2 0 1 1 0 10.4 5.2 5.2 0 0 1 0-10.4Z"></path>
+                </svg>
+              </button>
+            </div>
             <button type="button" id="vel-global-search-close" class="vel-global-search__close" aria-label="Fermer">
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path d="M6.7 5.3 12 10.6l5.3-5.3a1 1 0 1 1 1.4 1.4L13.4 12l5.3 5.3a1 1 0 0 1-1.4 1.4L12 13.4l-5.3 5.3a1 1 0 0 1-1.4-1.4l5.3-5.3-5.3-5.3a1 1 0 0 1 1.4-1.4Z"></path>
@@ -9467,6 +9603,17 @@ if (target.closest(".trial-offer-button")) {
             }, 40);
           }
 
+          var lastTouchSearchOpen = 0;
+          function openSearchOnFirstTouch(event) {
+            if (event.type === "pointerdown" && event.pointerType === "mouse") return;
+            var now = Date.now();
+            if (now - lastTouchSearchOpen < 500) return;
+            lastTouchSearchOpen = now;
+            event.preventDefault();
+            event.stopPropagation();
+            openSearch();
+          }
+
           function closeSearch() {
             runId += 1;
             deferredSearchUpdate = null;
@@ -9477,6 +9624,11 @@ if (target.closest(".trial-offer-button")) {
           }
 
           updateSearchPlaceholder();
+          if (window.PointerEvent) {
+            trigger.addEventListener("pointerdown", openSearchOnFirstTouch, { passive: false });
+          } else {
+            trigger.addEventListener("touchstart", openSearchOnFirstTouch, { passive: false });
+          }
           trigger.addEventListener("click", openSearch);
           document.addEventListener("velora-open-search", openSearch);
           document.addEventListener("velora-home-tab", function (event) {
@@ -9708,12 +9860,54 @@ if (target.closest(".trial-offer-button")) {
           window.setTimeout(suppressAllNativePlayerControls, 900);
         }
 
+        function initVideoFormatControls() {
+          [
+            { videoId: "video", buttonId: "live-ctl-format", storageKey: "velora_live_video_format_v1" },
+            { videoId: "video-vod", buttonId: "vod-ctl-format", storageKey: "velora_vod_video_format_v1" }
+          ].forEach(function (config) {
+            var video = document.getElementById(config.videoId);
+            var button = document.getElementById(config.buttonId);
+            if (!video || !button || button.dataset.velFormatReady === "true") return;
+            button.dataset.velFormatReady = "true";
+
+            var mode = "original";
+            try {
+              if (window.localStorage.getItem(config.storageKey) === "stretched") mode = "stretched";
+            } catch (error) {}
+
+            function applyMode(nextMode) {
+              mode = nextMode === "stretched" ? "stretched" : "original";
+              var stretched = mode === "stretched";
+              video.classList.toggle("vel-video-format-original", !stretched);
+              video.classList.toggle("vel-video-format-stretched", stretched);
+              button.classList.toggle("is-original", !stretched);
+              button.classList.toggle("is-stretched", stretched);
+              button.setAttribute("aria-pressed", stretched ? "true" : "false");
+              button.setAttribute(
+                "aria-label",
+                stretched ? "Format vidéo : étiré. Revenir au format original" : "Format vidéo : original. Étendre l’image"
+              );
+              button.title = stretched ? "Format étiré" : "Format original";
+            }
+
+            button.addEventListener("click", function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              applyMode(mode === "original" ? "stretched" : "original");
+              try { window.localStorage.setItem(config.storageKey, mode); } catch (error) {}
+            });
+
+            applyMode(mode);
+          });
+        }
+
         function initPageControls() {
           if (document.body.dataset.pageControlsReady === "true") return;
           document.body.dataset.pageControlsReady = "true";
           initMobileScrollTopButton();
           initGlobalSearch();
           initReliableMobileNavigation();
+          initVideoFormatControls();
           suppressAllNativePlayerControls();
           ["video", "video-vod"].forEach(function (id) {
             var video = document.getElementById(id);

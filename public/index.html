@@ -9195,6 +9195,30 @@ if (target.closest(".trial-offer-button")) {
           var deferredSearchUpdate = null;
           var deferredSearchTimer = null;
           var searchContentType = document.body.getAttribute("data-vel-active-tab") || "";
+          var searchMediaById = window.__veloraSearchMediaById || new Map();
+          window.__veloraSearchMediaById = searchMediaById;
+
+          if (!window.__veloraSearchResponseCaptureInstalled) {
+            window.__veloraSearchResponseCaptureInstalled = true;
+            var nativeFetch = window.fetch.bind(window);
+            window.fetch = async function (input, init) {
+              var response = await nativeFetch(input, init);
+              try {
+                var requestUrl = new URL(
+                  typeof input === "string" ? input : input.url,
+                  window.location.origin
+                );
+                if (requestUrl.pathname === "/api/search" && response.ok) {
+                  var searchPayload = await response.clone().json();
+                  searchMediaById.clear();
+                  (Array.isArray(searchPayload.results) ? searchPayload.results : []).forEach(function (item) {
+                    if (item && item.id) searchMediaById.set(String(item.id), item);
+                  });
+                }
+              } catch (error) {}
+              return response;
+            };
+          }
 
           function flushDeferredSearchUpdate() {
             if (deferredSearchTimer) window.clearTimeout(deferredSearchTimer);
@@ -9491,6 +9515,16 @@ if (target.closest(".trial-offer-button")) {
               if (!id) return;
               prioritizeResultInteraction(button);
               closeSearch();
+              var activeVodPlayer = document.getElementById("vod-player-container");
+              if (activeVodPlayer && !activeVodPlayer.classList.contains("hidden")) {
+                var closeVodPlayer = document.getElementById("btn-close-vod-player");
+                if (closeVodPlayer) closeVodPlayer.click();
+              }
+              var activeLivePlayer = document.getElementById("player-container");
+              if (activeLivePlayer && !activeLivePlayer.classList.contains("hidden")) {
+                var closeLivePlayer = document.getElementById("btn-close-player");
+                if (closeLivePlayer) closeLivePlayer.click();
+              }
               var directType = button.dataset.searchResultType;
               var directMatch = id.match(/^(?:cache|api):(movie|series):([^:]+)$/);
               if (
@@ -9498,16 +9532,21 @@ if (target.closest(".trial-offer-button")) {
                 (directType === "movie" || directType === "series") &&
                 typeof window.veloraOpenCachedHomeItem === "function"
               ) {
-                try {
-                  var encodedStream = directMatch[2].replace(/-/g, "+").replace(/_/g, "/");
-                  encodedStream += "=".repeat((4 - encodedStream.length % 4) % 4);
-                  var decodedStream = window.atob(encodedStream);
-                  var streamSeparator = decodedStream.indexOf(":");
-                  if (streamSeparator > 0) {
-                    var sourceId = decodedStream.slice(0, streamSeparator);
-                    var streamId = decodedStream.slice(streamSeparator + 1);
+                (function () {
+                  try {
+                    var encodedStream = directMatch[2].replace(/-/g, "+").replace(/_/g, "/");
+                    encodedStream += "=".repeat((4 - encodedStream.length % 4) % 4);
+                    var decodedStream = window.atob(encodedStream);
+                    var streamSeparator = decodedStream.indexOf(":");
+                    if (streamSeparator <= 0) throw new Error("Invalid search stream identity");
+                    var searchMedia = searchMediaById.get(String(id));
+                    var sourceId = String(searchMedia?.sourceId ?? decodedStream.slice(0, streamSeparator));
+                    var streamId = String(searchMedia?.itemId ?? decodedStream.slice(streamSeparator + 1));
                     var contentType = directType === "movie" ? "movies" : "series";
                     var resultImage = button.querySelector(".vel-global-search__thumb img");
+                    var containerExtension = searchMedia?.containerExtension || "";
+                    var globalStreamId = searchMedia?.globalStreamId || directMatch[2];
+
                     window.veloraOpenCachedHomeItem({
                       id: "search:" + id,
                       content_type: contentType,
@@ -9516,14 +9555,17 @@ if (target.closest(".trial-offer-button")) {
                       id: id,
                       streamId: streamId,
                       sourceId: sourceId,
-                      globalStreamId: directMatch[2],
+                      globalStreamId: globalStreamId,
                       name: button.querySelector(".vel-global-search__title")?.textContent || "",
                       thumbUrl: resultImage ? resultImage.src : "",
+                      containerExtension: containerExtension,
                       contentType: contentType
                     });
-                    return;
+                  } catch (error) {
+                    window.veloraOpenSearchResult(id).catch(function () {});
                   }
-                } catch (error) {}
+                })();
+                return;
               }
               window.veloraOpenSearchResult(id).catch(function () {});
               return;

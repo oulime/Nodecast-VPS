@@ -2628,6 +2628,10 @@
         fill: currentColor;
       }
 
+      .vel-episode-nav-btn[hidden] {
+        display: none !important;
+      }
+
       .vel-episode-nav-btn:disabled {
         opacity: 0.3;
         color: rgba(203, 213, 225, 0.72);
@@ -2636,6 +2640,37 @@
         box-shadow: none;
         cursor: default;
         transform: none;
+      }
+
+      #vod-player-container.player-container--series-episode .vod-controls-row {
+        gap: clamp(0.28rem, 1.25vw, 0.5rem);
+      }
+
+      #vod-player-container.player-container--series-episode .vod-ctl-seek-track {
+        min-width: 1.8rem;
+      }
+
+      @media (max-width: 600px) {
+        #vod-player-container.player-container--series-episode .vod-controls-overlay {
+          padding-right: calc(0.48rem + env(safe-area-inset-right, 0px)) !important;
+          padding-left: calc(0.48rem + env(safe-area-inset-left, 0px)) !important;
+        }
+
+        #vod-player-container.player-container--series-episode .vod-ctl-btn {
+          width: 1.82rem;
+          height: 1.82rem;
+        }
+
+        #vod-player-container.player-container--series-episode .vod-ctl-time {
+          min-width: 2.9rem;
+          font-size: 0.66rem;
+        }
+      }
+
+      @media (max-width: 420px) {
+        #vod-player-container.player-container--series-episode #vod-ctl-current {
+          display: none;
+        }
       }
 
       #btn-header-search {
@@ -9947,7 +9982,9 @@ if (target.closest(".trial-offer-button")) {
             var state = episodeState();
             var playerVisible = !player.classList.contains("hidden") &&
               player.getAttribute("aria-hidden") !== "true";
-            var seriesPlaying = !!state.detail && playerVisible && state.currentIndex >= 0;
+            var seriesPlaying = document.body.dataset.velActiveTab === "series" &&
+              !!state.detail && playerVisible && state.currentIndex >= 0;
+            player.classList.toggle("player-container--series-episode", seriesPlaying);
             previousButton.hidden = !seriesPlaying;
             nextButton.hidden = !seriesPlaying;
             if (!seriesPlaying) {
@@ -10007,6 +10044,10 @@ if (target.closest(".trial-offer-button")) {
           new MutationObserver(syncEpisodeButtons).observe(player, {
             attributes: true,
             attributeFilter: ["class", "aria-hidden"]
+          });
+          new MutationObserver(syncEpisodeButtons).observe(document.body, {
+            attributes: true,
+            attributeFilter: ["data-vel-active-tab"]
           });
           document.addEventListener("change", function (event) {
             if (event.target && event.target.classList.contains("vel-vod-detail__season-select")) {

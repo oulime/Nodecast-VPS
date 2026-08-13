@@ -6582,6 +6582,15 @@
             var goBack = function (event) {
               event.preventDefault();
               event.stopImmediatePropagation();
+
+              // Touch navigation dispatches a canonical back event on pointerup.
+              // Some mobile browsers still emit the follow-up synthetic click;
+              // ignoring only that duplicate prevents content -> packages -> home.
+              if (event.type === "click") {
+                var mobileBackActivatedAt = Number(headerBack.dataset.veloraMobileBackActivatedAt || 0);
+                if (mobileBackActivatedAt && Date.now() - mobileBackActivatedAt < 700) return;
+              }
+
               if (!document.body.classList.contains("vel-home-choice-picked")) return;
 
               var livePlayer = document.getElementById("player-container");
@@ -10016,6 +10025,7 @@ if (target.closest(".trial-offer-button")) {
               return;
             }
             if (control.id === "btn-header-back") {
+              control.dataset.veloraMobileBackActivatedAt = String(Date.now());
               document.dispatchEvent(new CustomEvent("velora-header-back"));
               return;
             }

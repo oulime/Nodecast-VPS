@@ -6276,6 +6276,16 @@
               if (vodPlayer && !vodPlayer.classList.contains("hidden")) {
                 var closeVodPlayer = document.getElementById("btn-close-vod-player");
                 if (closeVodPlayer) closeVodPlayer.click();
+                var searchReturnTab = document.body.dataset.veloraSearchMediaOpen;
+                if (searchReturnTab === "movies" || searchReturnTab === "series") {
+                  delete document.body.dataset.veloraSearchMediaOpen;
+                  document.dispatchEvent(new CustomEvent("velora-home-tab", {
+                    detail: { tab: searchReturnTab }
+                  }));
+                  packageContextTitle = "";
+                  mediaContextTitle = "";
+                  window.setTimeout(refreshHeaderContextTitle, 0);
+                }
                 return;
               }
 
@@ -9546,6 +9556,7 @@ if (target.closest(".trial-offer-button")) {
                     var resultImage = button.querySelector(".vel-global-search__thumb img");
                     var containerExtension = searchMedia?.containerExtension || "";
                     var globalStreamId = searchMedia?.globalStreamId || directMatch[2];
+                    document.body.dataset.veloraSearchMediaOpen = contentType;
 
                     window.veloraOpenCachedHomeItem({
                       id: "search:" + id,

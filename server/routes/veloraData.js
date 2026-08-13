@@ -317,23 +317,49 @@ function catalogueItemType(kind) {
  * packages. An explicit curation for the same country/item wins, so moving an
  * item to another package (or the hidden package) is still respected.
  */
-function effectiveCurations(packageIds = null) {
+function effectiveCurations(packageIds = null, prepared = null) {
     const db = getDb();
-    const rawCurations = allRows('admin_stream_curations');
-    const packages = resolvedAdminPackages(allRows('admin_packages'), rawCurations);
+    const rawCurations = prepared?.rawCurations || allRows('admin_stream_curations');
+    const packages = prepared?.packages
+        || resolvedAdminPackages(allRows('admin_packages'), rawCurations);
     const packageById = new Map(packages.map(row => [String(row.id), row]));
-    const matchingItems = db.prepare(`
-        SELECT DISTINCT source_id, type
-        FROM playlist_items
-        WHERE item_id = ? AND type = ? AND is_hidden = 0
-    `);
-    const explicit = rawCurations.map(row => {
+
+    // Resolve each distinct item/type pair in batches. Performing one synchronous
+    // SQLite query per curation can block the event loop for minutes on large data.
+    const candidates = [];
+    const itemIdsByType = new Map();
+    for (const row of rawCurations) {
         const packageRow = packageById.get(String(row.target_package_id || '')) || {};
         const kind = String(row.kind || packageRow.kind || '').trim();
         const itemType = catalogueItemType(kind);
         const streamId = String(row.stream_id || '').trim();
-        if (!itemType || !streamId) return null;
-        const matches = matchingItems.all(streamId, itemType);
+        if (!itemType || !streamId) continue;
+        candidates.push({ row, kind, itemType, streamId, packageRow });
+        if (!itemIdsByType.has(itemType)) itemIdsByType.set(itemType, new Set());
+        itemIdsByType.get(itemType).add(streamId);
+    }
+
+    const matchesByItem = new Map();
+    for (const [itemType, itemIds] of itemIdsByType) {
+        const ids = [...itemIds];
+        for (let offset = 0; offset < ids.length; offset += 800) {
+            const chunk = ids.slice(offset, offset + 800);
+            const placeholders = chunk.map(() => '?').join(',');
+            const rows = db.prepare(`
+                SELECT DISTINCT source_id, item_id, type
+                FROM playlist_items
+                WHERE type = ? AND item_id IN (${placeholders}) AND is_hidden = 0
+            `).all(itemType, ...chunk);
+            for (const item of rows) {
+                const key = `${item.type}\u001f${item.item_id}`;
+                if (!matchesByItem.has(key)) matchesByItem.set(key, []);
+                matchesByItem.get(key).push(item);
+            }
+        }
+    }
+
+    const explicit = candidates.map(({ row, kind, itemType, streamId, packageRow }) => {
+        const matches = matchesByItem.get(`${itemType}\u001f${streamId}`) || [];
         const preferredSource = String(row.source_id ?? packageRow.source_id ?? '').trim();
         const selected = preferredSource
             ? matches.find(item => String(item.source_id) === preferredSource)
@@ -443,7 +469,7 @@ function writeJsonAtomic(filePath, payload) {
 function buildCountryPackageCache() {
     const rawCurations = allRows('admin_stream_curations');
     const packages = resolvedAdminPackages(allRows('admin_packages'), rawCurations);
-    const memberships = compactMemberships(effectiveCurations());
+    const memberships = compactMemberships(effectiveCurations(null, { rawCurations, packages }));
     const countries = allRows('admin_countries');
     const payload = {
         version: 3,

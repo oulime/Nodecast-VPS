@@ -74,6 +74,13 @@ function initSchema() {
         );
         CREATE INDEX IF NOT EXISTS idx_items_source_type ON playlist_items(source_id, type);
         CREATE INDEX IF NOT EXISTS idx_items_category ON playlist_items(source_id, category_id);
+        -- Package resolution looks up large batches of provider item IDs. Without
+        -- this covering index every curation causes a full playlist scan and blocks
+        -- the Node event loop because better-sqlite3 is synchronous.
+        CREATE INDEX IF NOT EXISTS idx_items_item_type_visible
+            ON playlist_items(item_id, type, is_hidden, source_id, category_id);
+        CREATE INDEX IF NOT EXISTS idx_items_source_type_category_visible
+            ON playlist_items(source_id, type, category_id, is_hidden, item_id);
     `);
 
     const playlistItemColumns = db.prepare(`PRAGMA table_info(playlist_items)`).all();

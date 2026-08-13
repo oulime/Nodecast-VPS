@@ -2622,6 +2622,22 @@
         box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.18), 0 0 16px rgba(139, 92, 246, 0.38);
       }
 
+      .vel-episode-nav-btn svg {
+        width: 1.08rem;
+        height: 1.08rem;
+        fill: currentColor;
+      }
+
+      .vel-episode-nav-btn:disabled {
+        opacity: 0.3;
+        color: rgba(203, 213, 225, 0.72);
+        border-color: rgba(148, 163, 184, 0.2);
+        background: rgba(14, 20, 39, 0.48);
+        box-shadow: none;
+        cursor: default;
+        transform: none;
+      }
+
       #btn-header-search {
         touch-action: manipulation;
         -webkit-tap-highlight-color: transparent;
@@ -4878,7 +4894,13 @@
               </div>
               <div id="vod-controls-overlay" class="vod-controls-overlay hidden" aria-hidden="true">
                 <div class="vod-controls-row">
+                  <button id="vod-ctl-prev-episode" type="button" class="vod-ctl-btn vel-episode-nav-btn" aria-label="Épisode précédent" title="Épisode précédent" tabindex="0" data-tv-focusable="true" hidden>
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 5h2v14H6V5Zm12.2 1.2v11.6L9.5 12l8.7-5.8Z"></path></svg>
+                  </button>
                   <button id="vod-ctl-play" type="button" class="vod-ctl-btn" aria-label="Play" tabindex="0" data-tv-focusable="true"></button>
+                  <button id="vod-ctl-next-episode" type="button" class="vod-ctl-btn vel-episode-nav-btn" aria-label="Épisode suivant" title="Épisode suivant" tabindex="0" data-tv-focusable="true" hidden>
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M16 5h2v14h-2V5ZM5.8 6.2 14.5 12l-8.7 5.8V6.2Z"></path></svg>
+                  </button>
                   <button id="vod-ctl-mute" type="button" class="vod-ctl-btn" aria-label="Mute" tabindex="0" data-tv-focusable="true"></button>
                   <span id="vod-ctl-current" class="vod-ctl-time">00:00:00</span>
                   <div
@@ -9901,6 +9923,99 @@ if (target.closest(".trial-offer-button")) {
           });
         }
 
+        function initSeriesEpisodeControls() {
+          var previousButton = document.getElementById("vod-ctl-prev-episode");
+          var nextButton = document.getElementById("vod-ctl-next-episode");
+          var player = document.getElementById("vod-player-container");
+          var content = document.getElementById("content-view");
+          if (!previousButton || !nextButton || !player || !content) return;
+
+          function episodeState() {
+            var detail = content.querySelector(".vel-vod-detail--series");
+            var episodes = detail ? Array.from(detail.querySelectorAll(
+              ".vel-vod-detail__episode[data-episode-stream-id]"
+            )) : [];
+            var currentIndex = episodes.findIndex(function (episode) {
+              return episode.classList.contains("vel-vod-detail__episode--playing") ||
+                episode.getAttribute("aria-current") === "true";
+            });
+            var season = detail && detail.querySelector(".vel-vod-detail__season-select");
+            return { detail: detail, episodes: episodes, currentIndex: currentIndex, season: season };
+          }
+
+          function syncEpisodeButtons() {
+            var state = episodeState();
+            var playerVisible = !player.classList.contains("hidden") &&
+              player.getAttribute("aria-hidden") !== "true";
+            var seriesPlaying = !!state.detail && playerVisible && state.currentIndex >= 0;
+            previousButton.hidden = !seriesPlaying;
+            nextButton.hidden = !seriesPlaying;
+            if (!seriesPlaying) {
+              previousButton.disabled = true;
+              nextButton.disabled = true;
+              return;
+            }
+
+            var firstSeason = !state.season || state.season.selectedIndex <= 0;
+            var lastSeason = !state.season || state.season.selectedIndex >= state.season.options.length - 1;
+            previousButton.disabled = state.currentIndex === 0 && firstSeason;
+            nextButton.disabled = state.currentIndex === state.episodes.length - 1 && lastSeason;
+          }
+
+          function playAdjacent(direction) {
+            var state = episodeState();
+            if (state.currentIndex < 0) return;
+            var targetIndex = state.currentIndex + direction;
+            if (state.episodes[targetIndex]) {
+              state.episodes[targetIndex].click();
+              window.setTimeout(syncEpisodeButtons, 0);
+              return;
+            }
+
+            if (!state.season) return;
+            var seasonIndex = state.season.selectedIndex + direction;
+            if (seasonIndex < 0 || seasonIndex >= state.season.options.length) return;
+            state.season.selectedIndex = seasonIndex;
+            state.season.dispatchEvent(new Event("change", { bubbles: true }));
+            window.requestAnimationFrame(function () {
+              var adjacentEpisodes = Array.from(content.querySelectorAll(
+                ".vel-vod-detail--series .vel-vod-detail__episode[data-episode-stream-id]"
+              ));
+              var target = direction > 0 ? adjacentEpisodes[0] : adjacentEpisodes[adjacentEpisodes.length - 1];
+              if (target) target.click();
+              window.setTimeout(syncEpisodeButtons, 0);
+            });
+          }
+
+          previousButton.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!previousButton.disabled) playAdjacent(-1);
+          });
+          nextButton.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!nextButton.disabled) playAdjacent(1);
+          });
+
+          new MutationObserver(syncEpisodeButtons).observe(content, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ["class", "aria-current"]
+          });
+          new MutationObserver(syncEpisodeButtons).observe(player, {
+            attributes: true,
+            attributeFilter: ["class", "aria-hidden"]
+          });
+          document.addEventListener("change", function (event) {
+            if (event.target && event.target.classList.contains("vel-vod-detail__season-select")) {
+              window.setTimeout(syncEpisodeButtons, 0);
+            }
+          }, true);
+          syncEpisodeButtons();
+        }
+
         function initPageControls() {
           if (document.body.dataset.pageControlsReady === "true") return;
           document.body.dataset.pageControlsReady = "true";
@@ -9908,6 +10023,7 @@ if (target.closest(".trial-offer-button")) {
           initGlobalSearch();
           initReliableMobileNavigation();
           initVideoFormatControls();
+          initSeriesEpisodeControls();
           suppressAllNativePlayerControls();
           ["video", "video-vod"].forEach(function (id) {
             var video = document.getElementById(id);

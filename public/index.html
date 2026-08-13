@@ -2673,6 +2673,106 @@
         text-anchor: middle;
       }
 
+      .vel-vod-center-controls {
+        position: absolute;
+        inset: 0;
+        z-index: 7;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: clamp(2.2rem, 12vw, 7rem);
+        background: rgba(0, 0, 0, 0.2);
+        pointer-events: none;
+        opacity: 1;
+        transition: opacity 0.2s ease;
+      }
+
+      .vel-vod-center-controls.hidden,
+      .vel-vod-center-controls.vel-vod-center-controls--idle {
+        display: flex !important;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .vel-vod-center-btn {
+        width: clamp(3.3rem, 11vw, 5rem);
+        height: clamp(3.3rem, 11vw, 5rem);
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        border: 0;
+        border-radius: 999px;
+        color: #fff;
+        background: transparent;
+        box-shadow: none;
+        cursor: pointer;
+        pointer-events: auto;
+        opacity: 0.76;
+        transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+      }
+
+      .vel-vod-center-btn:hover,
+      .vel-vod-center-btn:focus-visible {
+        outline: none;
+        background: rgba(255, 255, 255, 0.14);
+        opacity: 1;
+        transform: scale(1.06);
+      }
+
+      .vel-vod-center-btn:active {
+        transform: scale(0.94);
+      }
+
+      .vel-vod-center-btn--play {
+        width: clamp(4rem, 13vw, 6rem);
+        height: clamp(4rem, 13vw, 6rem);
+        background: transparent;
+      }
+
+      .vel-vod-center-btn--play > svg {
+        width: 58% !important;
+        height: 58% !important;
+        display: block;
+        fill: currentColor;
+      }
+
+      .vel-vod-center-controls .vel-vod-skip-btn svg {
+        width: 76%;
+        height: 76%;
+        overflow: visible;
+      }
+
+      .vel-vod-center-controls .vel-vod-skip-btn svg .vel-vod-skip-btn__arc {
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 3;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .vel-vod-center-controls .vel-vod-skip-btn svg .vel-vod-skip-btn__head {
+        fill: currentColor;
+        stroke: none;
+      }
+
+      .vel-vod-center-controls .vel-vod-skip-btn svg text {
+        fill: currentColor;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        font-size: 15px;
+        font-weight: 800;
+        text-anchor: middle;
+        dominant-baseline: middle;
+      }
+
+      @media (max-width: 480px) {
+        .vel-vod-center-controls {
+          gap: clamp(1.6rem, 9vw, 2.8rem);
+        }
+      }
+
       #vod-player-container.player-container--series-episode .vod-controls-row {
         gap: clamp(0.28rem, 1.25vw, 0.5rem);
       }
@@ -4981,18 +5081,29 @@
                 <div class="player-buffering__spinner" aria-hidden="true"></div>
                 <span class="player-buffering__label">Chargement…</span>
               </div>
+              <div id="vod-center-controls" class="vel-vod-center-controls hidden" aria-hidden="true">
+                <button id="vod-ctl-back-5" type="button" class="vel-vod-center-btn vel-vod-skip-btn" aria-label="Reculer de 5 secondes" title="−5 secondes" tabindex="0" data-tv-focusable="true">
+                  <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+                    <path class="vel-vod-skip-btn__arc" d="M10 13.5A17 17 0 1 1 7.5 30"></path>
+                    <path class="vel-vod-skip-btn__head" d="M14 5.5 4 12l10 6.5Z"></path>
+                    <text x="24" y="25">5</text>
+                  </svg>
+                </button>
+                <button id="vod-center-play" type="button" class="vel-vod-center-btn vel-vod-center-btn--play" aria-label="Play" tabindex="0" data-tv-focusable="true"></button>
+                <button id="vod-ctl-forward-5" type="button" class="vel-vod-center-btn vel-vod-skip-btn" aria-label="Avancer de 5 secondes" title="+5 secondes" tabindex="0" data-tv-focusable="true">
+                  <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+                    <path class="vel-vod-skip-btn__arc" d="M38 13.5A17 17 0 1 0 40.5 30"></path>
+                    <path class="vel-vod-skip-btn__head" d="M34 5.5 44 12l-10 6.5Z"></path>
+                    <text x="24" y="25">5</text>
+                  </svg>
+                </button>
+              </div>
               <div id="vod-controls-overlay" class="vod-controls-overlay hidden" aria-hidden="true">
                 <div class="vod-controls-row">
                   <button id="vod-ctl-prev-episode" type="button" class="vod-ctl-btn vel-episode-nav-btn" aria-label="Épisode précédent" title="Épisode précédent" tabindex="0" data-tv-focusable="true" hidden>
                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 5h2v14H6V5Zm12.2 1.2v11.6L9.5 12l8.7-5.8Z"></path></svg>
                   </button>
-                  <button id="vod-ctl-back-5" type="button" class="vod-ctl-btn vel-vod-skip-btn" aria-label="Reculer de 5 secondes" title="−5 secondes" tabindex="0" data-tv-focusable="true">
-                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 7H5.8l2-2L6.4 3.6 2 8l4.4 4.4L7.8 11l-2-2H9a7 7 0 1 1-6.4 9.8l1.85-.76A5 5 0 1 0 9 7Z"></path><text x="10" y="15.5">5</text></svg>
-                  </button>
                   <button id="vod-ctl-play" type="button" class="vod-ctl-btn" aria-label="Play" tabindex="0" data-tv-focusable="true"></button>
-                  <button id="vod-ctl-forward-5" type="button" class="vod-ctl-btn vel-vod-skip-btn" aria-label="Avancer de 5 secondes" title="+5 secondes" tabindex="0" data-tv-focusable="true">
-                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 7h3.2l-2-2 1.4-1.4L22 8l-4.4 4.4-1.4-1.4 2-2H15a7 7 0 1 0 6.4 9.8l-1.85-.76A5 5 0 1 1 15 7Z"></path><text x="7" y="15.5">5</text></svg>
-                  </button>
                   <button id="vod-ctl-next-episode" type="button" class="vod-ctl-btn vel-episode-nav-btn" aria-label="Épisode suivant" title="Épisode suivant" tabindex="0" data-tv-focusable="true" hidden>
                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M16 5h2v14h-2V5ZM5.8 6.2 14.5 12l-8.7 5.8V6.2Z"></path></svg>
                   </button>
@@ -10121,19 +10232,71 @@ if (target.closest(".trial-offer-button")) {
           var video = document.getElementById("video-vod");
           var player = document.getElementById("vod-player-container");
           var overlay = document.getElementById("vod-controls-overlay");
+          var centerControls = document.getElementById("vod-center-controls");
+          var buffering = document.getElementById("vod-player-buffering");
           var backButton = document.getElementById("vod-ctl-back-5");
+          var centerPlayButton = document.getElementById("vod-center-play");
+          var toolbarPlayButton = document.getElementById("vod-ctl-play");
           var forwardButton = document.getElementById("vod-ctl-forward-5");
-          if (!video || !player || !overlay || !backButton || !forwardButton) return;
+          var wrapper = video.closest(".video-wrapper") || player;
+          var hoverControlsQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
+          if (!video || !player || !overlay || !centerControls || !buffering || !backButton ||
+              !centerPlayButton || !toolbarPlayButton || !forwardButton) return;
+
+          function usesHoverControls() {
+            return hoverControlsQuery.matches;
+          }
 
           var hideTimer = 0;
-          function showControls() {
+          var lastHoverActivity = 0;
+          function controlsAreVisible() {
+            return !centerControls.classList.contains("hidden") &&
+              !centerControls.classList.contains("vel-vod-center-controls--idle");
+          }
+
+          function syncCenterWithToolbar() {
+            var toolbarHidden = overlay.classList.contains("hidden") ||
+              overlay.getAttribute("aria-hidden") === "true";
+            var toolbarIdle = overlay.classList.contains("vod-controls-overlay--idle");
+            if (!toolbarHidden && toolbarIdle && usesHoverControls() && wrapper.matches(":hover") &&
+                Date.now() - lastHoverActivity < 3000) {
+              overlay.classList.remove("vod-controls-overlay--idle");
+              return;
+            }
+            centerControls.classList.toggle("hidden", toolbarHidden);
+            centerControls.classList.toggle("vel-vod-center-controls--idle", !toolbarHidden && toolbarIdle);
+            centerControls.setAttribute("aria-hidden", toolbarHidden || toolbarIdle ? "true" : "false");
+          }
+
+          function hideControls() {
             if (hideTimer) window.clearTimeout(hideTimer);
+            hideTimer = 0;
+            overlay.classList.add("vod-controls-overlay--idle");
+            centerControls.classList.add("vel-vod-center-controls--idle");
+            centerControls.setAttribute("aria-hidden", "true");
+          }
+
+          function showControls() {
+            if (!buffering.classList.contains("hidden") &&
+                buffering.getAttribute("aria-hidden") !== "true") {
+              hideControls();
+              return;
+            }
+            if (hideTimer) window.clearTimeout(hideTimer);
+            if (usesHoverControls()) lastHoverActivity = Date.now();
             overlay.classList.remove("hidden", "vod-controls-overlay--idle");
             overlay.setAttribute("aria-hidden", "false");
-            if (!video.paused && !video.ended) {
+            centerControls.classList.remove("hidden", "vel-vod-center-controls--idle");
+            centerControls.setAttribute("aria-hidden", "false");
+            if (usesHoverControls() || (!video.paused && !video.ended)) {
+              var hideDelay = usesHoverControls() ? 3000 : 2800;
               hideTimer = window.setTimeout(function () {
-                if (!video.paused && !video.ended) overlay.classList.add("vod-controls-overlay--idle");
-              }, 2800);
+                if (usesHoverControls() || (!video.paused && !video.ended)) {
+                  overlay.classList.add("vod-controls-overlay--idle");
+                  centerControls.classList.add("vel-vod-center-controls--idle");
+                  centerControls.setAttribute("aria-hidden", "true");
+                }
+              }, hideDelay);
             }
           }
 
@@ -10154,18 +10317,84 @@ if (target.closest(".trial-offer-button")) {
             event.stopPropagation();
             seekBy(5);
           });
+          centerPlayButton.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            toolbarPlayButton.click();
+            showControls();
+          });
 
-          var wrapper = video.closest(".video-wrapper") || player;
+          function syncCenterPlayButton() {
+            centerPlayButton.innerHTML = video.paused
+              ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 4.8v14.4L19 12 7.5 4.8Z"/></svg>'
+              : '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="4.5" width="4.2" height="15" rx="1"/><rect x="13.3" y="4.5" width="4.2" height="15" rx="1"/></svg>';
+            centerPlayButton.setAttribute("aria-label", video.paused ? "Play" : "Pause");
+            centerPlayButton.title = video.paused ? "Lecture" : "Pause";
+          }
+
+          var controlsVisibleAtTapStart = null;
+          function rememberControlsAtTapStart(event) {
+            if (usesHoverControls() || event.target.closest("button, [role='slider']")) return;
+            controlsVisibleAtTapStart = controlsAreVisible();
+          }
+          wrapper.addEventListener("pointerdown", rememberControlsAtTapStart, true);
+          wrapper.addEventListener("touchstart", rememberControlsAtTapStart, { capture: true, passive: true });
+
           wrapper.addEventListener("click", function (event) {
             if (event.target.closest("button, [role='slider']")) return;
             event.preventDefault();
             event.stopPropagation();
             event.stopImmediatePropagation();
-            showControls();
+            if (usesHoverControls()) {
+              showControls();
+              return;
+            }
+            var shouldHide = controlsVisibleAtTapStart === true;
+            controlsVisibleAtTapStart = null;
+            if (shouldHide) hideControls(); else showControls();
           }, true);
+          wrapper.addEventListener("mouseenter", function () {
+            if (usesHoverControls()) showControls();
+          });
+          wrapper.addEventListener("mousemove", function () {
+            if (usesHoverControls()) showControls();
+          });
+          wrapper.addEventListener("mouseleave", function () {
+            if (usesHoverControls()) hideControls();
+          });
 
-          video.addEventListener("pause", showControls);
-          video.addEventListener("ended", showControls);
+          video.addEventListener("pause", function () {
+            syncCenterPlayButton();
+            showControls();
+          });
+          video.addEventListener("play", function () {
+            syncCenterPlayButton();
+            window.requestAnimationFrame(function () {
+              if (!video.paused) hideControls();
+            });
+          });
+          video.addEventListener("ended", function () {
+            syncCenterPlayButton();
+            showControls();
+          });
+          video.addEventListener("waiting", hideControls);
+          video.addEventListener("seeking", hideControls);
+          video.addEventListener("stalled", hideControls);
+          new MutationObserver(function () {
+            if (!buffering.classList.contains("hidden") &&
+                buffering.getAttribute("aria-hidden") !== "true") {
+              hideControls();
+            }
+          }).observe(buffering, {
+            attributes: true,
+            attributeFilter: ["class", "aria-hidden"]
+          });
+          new MutationObserver(syncCenterWithToolbar).observe(overlay, {
+            attributes: true,
+            attributeFilter: ["class", "aria-hidden"]
+          });
+          syncCenterPlayButton();
+          syncCenterWithToolbar();
         }
 
         function initPageControls() {

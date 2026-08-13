@@ -2596,6 +2596,21 @@
         overflow: visible;
       }
 
+      .vel-format-btn {
+        display: none !important;
+      }
+
+      #player-container:fullscreen #live-ctl-format,
+      #player-container:-webkit-full-screen #live-ctl-format,
+      #player-container.player-container--live-fullscreen #live-ctl-format,
+      body.vel-live-fullscreen-active #live-ctl-format,
+      #vod-player-container:fullscreen #vod-ctl-format,
+      #vod-player-container:-webkit-full-screen #vod-ctl-format,
+      #vod-player-container.player-container--fullscreen #vod-ctl-format,
+      body.vel-vod-fullscreen-active #vod-ctl-format {
+        display: inline-flex !important;
+      }
+
       .vel-format-btn svg rect {
         fill: none;
         stroke: currentColor;

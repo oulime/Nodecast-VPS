@@ -162,9 +162,17 @@
     if(editor.isParent){const childOrder=new Map((editor.childPackageIds||[]).map((id,index)=>[String(id),index]));editor.channels.sort((left,right)=>(childOrder.get(left.package_id)??Number.MAX_SAFE_INTEGER)-(childOrder.get(right.package_id)??Number.MAX_SAFE_INTEGER)||left.provider_order-right.provider_order||left.name.localeCompare(right.name,"fr"))}
   }
   async function loadExactCountryMembership(editor){
-    const headers={apikey:KEY,Authorization:`Bearer ${KEY}`},countryId=encodeURIComponent(editor.countryId),packageId=encodeURIComponent(editor.packageId);
-    const selected=await req(`${SURL}/admin/package-live-channels?countryId=${countryId}&packageId=${packageId}`,{headers});
-    editor.channels=Array.isArray(selected?.channels)?selected.channels:[];
+    const headers={apikey:KEY,Authorization:`Bearer ${KEY}`},countryId=encodeURIComponent(editor.countryId);
+    let channels=[];
+    if(editor.isParent){
+      const childResults=await Promise.all((editor.childPackageIds||[]).map(childId=>req(`${SURL}/admin/package-live-channels?countryId=${countryId}&packageId=${encodeURIComponent(childId)}`,{headers})));
+      const seen=new Set;
+      for(const result of childResults)for(const channel of Array.isArray(result?.channels)?result.channels:[]){const key=`${channel.source_id}:${channel.stream_id}`;if(seen.has(key))continue;seen.add(key);channels.push(channel)}
+    }else{
+      const selected=await req(`${SURL}/admin/package-live-channels?countryId=${countryId}&packageId=${encodeURIComponent(editor.packageId)}`,{headers});
+      channels=Array.isArray(selected?.channels)?selected.channels:[]
+    }
+    editor.channels=channels;
     editor.pool=editor.isParent?[]:null;
     editor.catalogueItems=null;editor.catalogueMemberships=[]
   }

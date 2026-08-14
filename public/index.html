@@ -1520,7 +1520,7 @@
     <script defer src="/assets/subscription-welcome.js?v=first-login-test-message-v1-20260810"></script>
     <script defer src="/assets/profile-account.js?v=profile-account-menu-v2-20260810"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=package-poster-refresh-secure-v4-20260809"></script>
-    <script defer src="/assets/manual-pays-visible-memberships.js?v=tv-package-exact-membership-v1-20260814"></script>
+    <script defer src="/assets/manual-pays-visible-memberships.js?v=tv-parent-exact-children-v1-20260814"></script>
     <script defer src="/assets/country-logos-admin.js?v=shared-app-country-flags-20260809"></script>
     <script defer src="/assets/direct-media-packages.js?v=20260812-adult-live-art-v18"></script>
     <script defer src="/assets/country-switch-loader.js?v=country-switch-fast-v2-20260810"></script>
@@ -10345,14 +10345,44 @@ if (target.closest(".trial-offer-button")) {
           }
 
           var controlsVisibleAtTapStart = null;
-          function rememberControlsAtTapStart(event) {
-            if (usesHoverControls() || event.target.closest("button, [role='slider']")) return;
-            controlsVisibleAtTapStart = controlsAreVisible();
-          }
-          wrapper.addEventListener("pointerdown", rememberControlsAtTapStart, true);
-          wrapper.addEventListener("touchstart", rememberControlsAtTapStart, { capture: true, passive: true });
+          var revealOnlyTap = false;
+          var lastTapStart = 0;
 
-          wrapper.addEventListener("click", function (event) {
+          function consumeTapEvent(event) {
+            if (event.cancelable) event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+          }
+
+          function rememberControlsAtTapStart(event) {
+            var touchLike = event.type === "touchstart" || event.pointerType === "touch" ||
+              event.pointerType === "pen" || (!event.pointerType && !usesHoverControls());
+            if (!touchLike) return;
+            if (!(event.target instanceof Element) || !event.target.closest("#vod-player-container .video-wrapper")) return;
+            var now = Date.now();
+            if (now - lastTapStart < 80) {
+              if (revealOnlyTap) consumeTapEvent(event);
+              return;
+            }
+            lastTapStart = now;
+            controlsVisibleAtTapStart = controlsAreVisible();
+            revealOnlyTap = controlsVisibleAtTapStart !== true;
+            if (revealOnlyTap) {
+              showControls();
+              consumeTapEvent(event);
+            }
+          }
+          window.addEventListener("pointerdown", rememberControlsAtTapStart, true);
+          window.addEventListener("touchstart", rememberControlsAtTapStart, { capture: true, passive: false });
+
+          window.addEventListener("click", function (event) {
+            if (!(event.target instanceof Element) || !event.target.closest("#vod-player-container .video-wrapper")) return;
+            if (revealOnlyTap) {
+              revealOnlyTap = false;
+              controlsVisibleAtTapStart = null;
+              consumeTapEvent(event);
+              return;
+            }
             if (event.target.closest("button, [role='slider']")) return;
             event.preventDefault();
             event.stopPropagation();

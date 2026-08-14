@@ -1515,14 +1515,14 @@
     <script src="/assets/local-velora-data.js?v=20260814-media-package-session-cache-v1"></script>
     <script defer src="/assets/velora-home-sections.js?v=home-demand-loading-v2-20260810"></script>
     <script defer src="/assets/velora-home-cache-fallback.js?v=home-country-cache-v2-20260810"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=tv-package-parent-logo-v1-20260814"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=search-channel-select-scroll-v2-20260814"></script>
     <script defer src="/assets/subscription-access-guard.js?v=subscription-whatsapp-number-v2-20260810"></script>
     <script defer src="/assets/subscription-welcome.js?v=first-login-test-message-v1-20260810"></script>
     <script defer src="/assets/profile-account.js?v=profile-account-menu-v2-20260810"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=package-poster-refresh-secure-v4-20260809"></script>
     <script defer src="/assets/manual-pays-visible-memberships.js?v=media-package-content-move-v1-20260814"></script>
     <script defer src="/assets/country-logos-admin.js?v=shared-app-country-flags-20260809"></script>
-    <script defer src="/assets/direct-media-packages.js?v=20260812-adult-live-art-v18"></script>
+    <script defer src="/assets/direct-media-packages.js?v=20260814-live-parent-memory-v2"></script>
     <script defer src="/assets/country-switch-loader.js?v=country-switch-fast-v2-20260810"></script>
     <script defer src="/assets/paid-users-admin.js?v=settings-admin-autocopy-test-v2-20260810"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
@@ -9836,7 +9836,12 @@ if (target.closest(".trial-offer-button")) {
             }
           }
 
-          function openSearch() {
+          var suppressTouchSearchCloseUntil = 0;
+
+          function openSearch(event) {
+            if (event && event.type === "velora-open-search" && event.detail && event.detail.touch === true) {
+              suppressTouchSearchCloseUntil = Date.now() + 550;
+            }
             updateSearchPlaceholder();
             dialog.classList.remove("hidden");
             dialog.setAttribute("aria-hidden", "false");
@@ -9852,6 +9857,7 @@ if (target.closest(".trial-offer-button")) {
             var now = Date.now();
             if (now - lastTouchSearchOpen < 500) return;
             lastTouchSearchOpen = now;
+            suppressTouchSearchCloseUntil = now + 550;
             event.preventDefault();
             event.stopPropagation();
             openSearch();
@@ -9868,9 +9874,9 @@ if (target.closest(".trial-offer-button")) {
 
           updateSearchPlaceholder();
           if (window.PointerEvent) {
-            trigger.addEventListener("pointerdown", openSearchOnFirstTouch, { passive: false });
+            trigger.addEventListener("pointerup", openSearchOnFirstTouch, { passive: false });
           } else {
-            trigger.addEventListener("touchstart", openSearchOnFirstTouch, { passive: false });
+            trigger.addEventListener("touchend", openSearchOnFirstTouch, { passive: false });
           }
           trigger.addEventListener("click", openSearch);
           document.addEventListener("velora-open-search", openSearch);
@@ -9890,7 +9896,15 @@ if (target.closest(".trial-offer-button")) {
             var nextType = document.body.getAttribute("data-vel-active-tab");
             if (nextType) resetSearchForContentType(nextType);
           }).observe(document.body, { attributes: true, attributeFilter: ["data-vel-active-tab"] });
-          close.addEventListener("click", closeSearch);
+          close.addEventListener("click", function (event) {
+            if (Date.now() < suppressTouchSearchCloseUntil) {
+              event.preventDefault();
+              event.stopPropagation();
+              event.stopImmediatePropagation();
+              return;
+            }
+            closeSearch();
+          });
           input.addEventListener("input", resetSearchForTyping);
           input.addEventListener("keydown", function (event) {
             if (event.key !== "Enter") return;
@@ -10027,7 +10041,9 @@ if (target.closest(".trial-offer-button")) {
             event.stopImmediatePropagation();
 
             if (control.id === "btn-header-search") {
-              document.dispatchEvent(new CustomEvent("velora-open-search"));
+              document.dispatchEvent(new CustomEvent("velora-open-search", {
+                detail: { touch: true }
+              }));
               return;
             }
             if (control.id === "btn-header-back") {

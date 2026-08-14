@@ -5,6 +5,8 @@
   const packageCache = new Map();
   const selectedPackages = new Map();
   const adultLiveArtworkCache = new Map();
+  const liveParentChildrenCache = new Map();
+  const LIVE_PARENT_CACHE_LIMIT = 12;
   let updateQueued = false;
   let pendingOpen = "";
   let adultMoviesAutoOpenBlocked = false;
@@ -45,6 +47,48 @@
 
   function isParentPackageView() {
     return Boolean(packagesView.dataset.parentPackageId);
+  }
+
+  function liveParentCacheKey(parentId) {
+    return `${countryKey()}::${String(parentId || "")}`;
+  }
+
+  function liveParentCardsSignature(cards) {
+    return cards.map(card => {
+      const id = String(card.dataset.packageId || "");
+      const image = card.querySelector(":scope > img");
+      const imageSrc = String(image?.getAttribute("src") || "");
+      return `${id}\u0000${packageName(card)}\u0000${imageSrc}`;
+    }).join("\u0001");
+  }
+
+  function rememberLiveParentChildren(parentId, children) {
+    if (!parentId || !children) return;
+    const cards = [...children.querySelectorAll(":scope > .vel-package-card[data-package-id]")];
+    if (!cards.length) return;
+    const key = liveParentCacheKey(parentId);
+    liveParentChildrenCache.delete(key);
+    liveParentChildrenCache.set(key, {
+      children,
+      signature: liveParentCardsSignature(cards)
+    });
+    while (liveParentChildrenCache.size > LIVE_PARENT_CACHE_LIMIT) {
+      liveParentChildrenCache.delete(liveParentChildrenCache.keys().next().value);
+    }
+  }
+
+  function reuseLiveParentChildren(parentId, freshCards) {
+    const key = liveParentCacheKey(parentId);
+    const cached = liveParentChildrenCache.get(key);
+    if (!cached) return null;
+    if (cached.signature !== liveParentCardsSignature(freshCards)) {
+      liveParentChildrenCache.delete(key);
+      return null;
+    }
+    liveParentChildrenCache.delete(key);
+    liveParentChildrenCache.set(key, cached);
+    cached.children.dataset.memoryCache = "reused";
+    return cached.children;
   }
 
   function syncParentPackageHeader() {
@@ -94,14 +138,18 @@
       node.removeAttribute("aria-expanded");
     }
 
-    const children = document.createElement("div");
-    children.className = "vel-parent-package-children";
-    children.dataset.parentPackageId = parentId;
-    children.setAttribute("role", "group");
-    children.setAttribute("aria-label", `Sous-packages de ${parentTitle}`);
-    for (const card of childCards) {
-      card.classList.add("vel-package-card--parent-child");
-      children.appendChild(card);
+    let children = reuseLiveParentChildren(parentId, childCards);
+    if (!children) {
+      children = document.createElement("div");
+      children.className = "vel-parent-package-children";
+      children.dataset.parentPackageId = parentId;
+      children.dataset.memoryCache = "fresh";
+      children.setAttribute("role", "group");
+      children.setAttribute("aria-label", `Sous-packages de ${parentTitle}`);
+      for (const card of childCards) {
+        card.classList.add("vel-package-card--parent-child");
+        children.appendChild(card);
+      }
     }
 
     packagesView.replaceChildren(...liveTopLevelNodes);
@@ -160,6 +208,11 @@
   function collapseInlineLiveParent() {
     if (!inlineLiveParentId || !inlineLiveParentClose) return false;
     const closeButton = inlineLiveParentClose;
+    const children = packagesView.querySelector(".vel-parent-package-children");
+    if (children) {
+      children.remove();
+      rememberLiveParentChildren(inlineLiveParentId, children);
+    }
     inlineLiveParentId = "";
     inlineLiveParentClose = null;
     closeButton.click();

@@ -12,6 +12,9 @@ async function main() {
     });
     const base = `http://127.0.0.1:${server.address().port}/api/velora-db/rest/v1`;
     const testId = `test_${Date.now()}`;
+    const testSourceId = 999999;
+    const testStreamId = `${Date.now()}`;
+    const testItemId = `${testSourceId}:movie:${testStreamId}`;
 
     try {
         let response = await fetch(`${base.replace('/rest/v1', '')}/admin/stream-curation-map`);
@@ -108,6 +111,54 @@ async function main() {
         });
         assert.equal(response.status, 204);
 
+        const sourcePackageId = `${testId}_source`;
+        const targetPackageId = `${testId}_target`;
+        getDb().prepare(`
+            INSERT INTO playlist_items (
+                id, source_id, item_id, type, name, category_id,
+                stream_icon, provider_order, is_hidden
+            ) VALUES (?, ?, ?, 'movie', 'Test movie', 'test_category', '', 1, 0)
+        `).run(testItemId, testSourceId, testStreamId);
+        response = await fetch(`${base}/admin_packages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify([
+                { id: sourcePackageId, country_id: testId, name: 'Source movies', source_id: testSourceId,
+                    category_id: 'test_category', kind: 'vod', is_parent: false },
+                { id: targetPackageId, country_id: testId, name: 'Target movies', kind: 'vod', is_parent: false }
+            ])
+        });
+        assert.equal(response.status, 201);
+
+        const mediaBase = base.replace('/rest/v1', '');
+        response = await fetch(`${mediaBase}/admin/package-media-items?countryId=${testId}&packageId=${sourcePackageId}&kind=vod`);
+        assert.equal(response.status, 200);
+        let mediaPayload = await response.json();
+        assert.equal(mediaPayload.items.length, 1);
+        assert.equal(String(mediaPayload.items[0].stream_id), testStreamId);
+
+        response = await fetch(`${mediaBase}/admin/media-membership`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                countryId: testId,
+                sourceId: testSourceId,
+                streamId: testStreamId,
+                fromPackageId: sourcePackageId,
+                targetPackageId,
+                kind: 'vod'
+            })
+        });
+        assert.equal(response.status, 200);
+
+        response = await fetch(`${mediaBase}/admin/package-media-items?countryId=${testId}&packageId=${sourcePackageId}&kind=vod`);
+        mediaPayload = await response.json();
+        assert.equal(mediaPayload.items.length, 0);
+        response = await fetch(`${mediaBase}/admin/package-media-items?countryId=${testId}&packageId=${targetPackageId}&kind=vod`);
+        mediaPayload = await response.json();
+        assert.equal(mediaPayload.items.length, 1);
+        assert.equal(mediaPayload.items[0].origin_package_id, sourcePackageId);
+
         response = await fetch(`${base.replace('/rest/v1', '')}/country-package-cache`);
         assert.equal(response.status, 200);
         countryPackageCache = await response.json();
@@ -118,6 +169,8 @@ async function main() {
         getDb().prepare(
             `DELETE FROM velora_admin_rows WHERE json_extract(data, '$.id') = ? OR json_extract(data, '$.country_id') = ?`
         ).run(testId, testId);
+        getDb().prepare(`DELETE FROM playlist_items WHERE id = ?`).run(testItemId);
+        veloraData.invalidateCountryPackageCache();
         await new Promise(resolve => server.close(resolve));
     }
 }

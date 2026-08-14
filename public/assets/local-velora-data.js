@@ -18,17 +18,19 @@
     // A package backed by a provider category only needs this small payload.
     // Keep it for the session: admin writes invalidate the cache below.
     if (
-      /^\/api\/proxy\/xtream\/[^/]+\/live_streams$/.test(parsed.pathname) &&
+      /^\/api\/proxy\/xtream\/[^/]+\/(live_streams|vod_streams|series)$/.test(parsed.pathname) &&
       parsed.searchParams.has("category_id")
     ) return sessionDataTtl;
     // This map is already loaded while the catalogue starts. Keep that same
     // response for the session instead of downloading ~3 MB again whenever a
     // Live package opens. Every successful admin write clears this cache.
     if (parsed.pathname === "/api/velora-db/rest/v1/admin_stream_curations") return sessionDataTtl;
+    if (parsed.pathname === "/api/velora-db/admin/stream-curation-map") return sessionDataTtl;
     if (parsed.pathname === "/api/velora-db/admin/resolved-packages") return sessionDataTtl;
     // This response is small but expensive to compose on the current VPS.
     // Cache each package response so the full curation fallback is paid once.
     if (parsed.pathname === "/api/velora-db/admin/package-live-channels") return sessionDataTtl;
+    if (parsed.pathname === "/api/velora-db/admin/package-media-items") return sessionDataTtl;
     if (parsed.pathname === "/api/velora-db/home-cache") return 5 * 60 * 1000;
     if (parsed.pathname.startsWith("/api/velora-db/rest/v1/admin_")) return 30 * 1000;
     return 0;

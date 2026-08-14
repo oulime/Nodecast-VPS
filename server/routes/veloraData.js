@@ -588,6 +588,48 @@ function liveChannelsForCurations(curations, packageById) {
     });
 }
 
+function mediaItemsForCurations(curations, packageById, kind) {
+    const itemType = catalogueItemType(kind);
+    if (kind !== 'vod' && kind !== 'series') return [];
+    const findItem = getDb().prepare(`
+        SELECT item_id, name, stream_icon, container_extension, provider_order
+        FROM playlist_items
+        WHERE source_id = ? AND type = ? AND item_id = ? AND is_hidden = 0
+    `);
+    const seen = new Set();
+    const items = [];
+    for (const curation of curations) {
+        if (curation.kind !== kind) continue;
+        const sourceId = Number.parseInt(curation.source_id, 10);
+        const streamId = String(curation.stream_id || '').trim();
+        const packageId = String(curation.target_package_id || '').trim();
+        const key = `${packageId}:${sourceId}:${streamId}`;
+        if (!Number.isInteger(sourceId) || !streamId || seen.has(key)) continue;
+        const item = findItem.get(sourceId, itemType, streamId);
+        if (!item) continue;
+        seen.add(key);
+        items.push({
+            stream_id: streamId,
+            source_id: sourceId,
+            kind,
+            origin_package_id: String(curation.origin_package_id || ''),
+            name: item.name,
+            stream_icon: item.stream_icon || '',
+            container_extension: item.container_extension || '',
+            provider_order: item.provider_order,
+            package_id: packageId,
+            package_name: packageById.get(packageId)?.name || packageId
+        });
+    }
+    return items.sort((left, right) => {
+        const packageOrder = String(left.package_name).localeCompare(String(right.package_name), 'fr');
+        if (packageOrder) return packageOrder;
+        const a = Number.isFinite(left.provider_order) ? left.provider_order : Number.MAX_SAFE_INTEGER;
+        const b = Number.isFinite(right.provider_order) ? right.provider_order : Number.MAX_SAFE_INTEGER;
+        return a - b || String(left.name).localeCompare(String(right.name), 'fr');
+    });
+}
+
 function isEditableLivePackage(packageRow, countryId) {
     return packageRow
         && String(packageRow.country_id || '') === String(countryId || '')
@@ -596,16 +638,25 @@ function isEditableLivePackage(packageRow, countryId) {
         && packageRow.is_parent !== 'true';
 }
 
-function saveChannelCuration({ countryId, sourceId, streamId, targetPackageId, originPackageId }, packages, rawCurations) {
+function isEditableMediaPackage(packageRow, countryId, kind) {
+    return packageRow
+        && String(packageRow.country_id || '') === String(countryId || '')
+        && (kind === 'vod' || kind === 'series')
+        && packageRow.kind === kind
+        && packageRow.is_parent !== true
+        && packageRow.is_parent !== 'true';
+}
+
+function saveMediaCuration({ countryId, sourceId, streamId, targetPackageId, originPackageId, kind }, packages, rawCurations) {
     const packageById = new Map(packages.map(row => [String(row.id), row]));
     const matching = rawCurations.filter(row => {
         if (String(row.country_id || '') !== countryId || String(row.stream_id || '') !== streamId) return false;
         const currentPackage = packageById.get(String(row.target_package_id || '')) || {};
         const rowSourceId = Number.parseInt(row.source_id ?? currentPackage.source_id, 10);
         const rowKind = String(row.kind || currentPackage.kind || '');
-        return rowSourceId === sourceId && rowKind === 'live';
+        return rowSourceId === sourceId && rowKind === kind;
     });
-    const existing = matching.find(row => Number.parseInt(row.source_id, 10) === sourceId && row.kind === 'live')
+    const existing = matching.find(row => Number.parseInt(row.source_id, 10) === sourceId && row.kind === kind)
         || matching[0];
     const id = String(existing?.id || crypto.randomUUID());
     const numericStreamId = /^\d+$/.test(streamId) ? Number(streamId) : streamId;
@@ -616,7 +667,7 @@ function saveChannelCuration({ countryId, sourceId, streamId, targetPackageId, o
         country_id: countryId,
         target_package_id: targetPackageId,
         source_id: sourceId,
-        kind: 'live',
+        kind,
         origin_package_id: originPackageId || null
     };
     const db = getDb();
@@ -636,6 +687,10 @@ function saveChannelCuration({ countryId, sourceId, streamId, targetPackageId, o
         `).run(id, JSON.stringify(row));
     })();
     return row;
+}
+
+function saveChannelCuration(args, packages, rawCurations) {
+    return saveMediaCuration({ ...args, kind: 'live' }, packages, rawCurations);
 }
 
 function sortRows(rows, order) {
@@ -796,6 +851,66 @@ router.get('/admin/country-live-channel-pool', (req, res) => {
     }
 });
 
+router.get('/admin/package-media-items', (req, res) => {
+    try {
+        const countryId = String(req.query.countryId || '').trim();
+        const packageId = String(req.query.packageId || '').trim();
+        const requestedKind = String(req.query.kind || '').trim();
+        const kind = requestedKind === 'movies' ? 'vod' : requestedKind;
+        if (!countryId || !packageId || !['vod', 'series'].includes(kind)) {
+            return res.status(400).json({ error: 'countryId, packageId and a valid media kind are required' });
+        }
+        const cached = getCountryPackageCache();
+        const packages = cached.packages;
+        const packageById = new Map(packages.map(row => [String(row.id), row]));
+        const packageRow = packageById.get(packageId);
+        const isParent = packageRow
+            && String(packageRow.country_id || '') === countryId
+            && packageRow.kind === kind
+            && (packageRow.is_parent === true || packageRow.is_parent === 'true');
+        if (!isParent && !isEditableMediaPackage(packageRow, countryId, kind)) {
+            return res.status(400).json({ error: 'This package is not an editable media package in this country' });
+        }
+        const childIds = isParent
+            ? (Array.isArray(packageRow.child_package_ids) ? packageRow.child_package_ids : []).map(String)
+            : [packageId];
+        const allowedPackageIds = new Set(childIds.filter(childId =>
+            isEditableMediaPackage(packageById.get(childId), countryId, kind)
+        ));
+        let items = mediaItemsForCurations(
+            expandMemberships(cached.memberships).filter(row =>
+                String(row.country_id || '') === countryId
+                && allowedPackageIds.has(String(row.target_package_id || ''))
+            ),
+            packageById,
+            kind
+        );
+        if (isParent) {
+            const childPosition = new Map(childIds.map((childId, index) => [childId, index]));
+            const seen = new Set();
+            items = items.filter(item => {
+                const key = `${item.source_id}:${item.stream_id}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            }).sort((left, right) => {
+                const packageOrder = (childPosition.get(String(left.package_id)) ?? Number.MAX_SAFE_INTEGER)
+                    - (childPosition.get(String(right.package_id)) ?? Number.MAX_SAFE_INTEGER);
+                if (packageOrder) return packageOrder;
+                const a = Number.isFinite(left.provider_order) ? left.provider_order : Number.MAX_SAFE_INTEGER;
+                const b = Number.isFinite(right.provider_order) ? right.provider_order : Number.MAX_SAFE_INTEGER;
+                return a - b || String(left.name).localeCompare(String(right.name), 'fr');
+            });
+        }
+        res.set('Cache-Control', 'no-store');
+        res.set('X-Velora-Country-Package-Cache', 'vps-local-derived');
+        return res.json({ package: packageRow, items });
+    } catch (error) {
+        console.error('[Velora data] Package media items failed:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
 router.post('/admin/channel-membership', (req, res) => {
     try {
         const countryId = String(req.body?.countryId || '').trim();
@@ -850,6 +965,69 @@ router.post('/admin/channel-membership', (req, res) => {
         return res.json({ ok: true, curation: row });
     } catch (error) {
         console.error('[Velora data] Channel membership update failed:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/admin/media-membership', (req, res) => {
+    try {
+        const countryId = String(req.body?.countryId || '').trim();
+        const sourceId = Number.parseInt(req.body?.sourceId, 10);
+        const streamId = String(req.body?.streamId || '').trim();
+        const fromPackageId = String(req.body?.fromPackageId || '').trim();
+        const requestedTargetId = String(req.body?.targetPackageId || '').trim();
+        const requestedKind = String(req.body?.kind || '').trim();
+        const kind = requestedKind === 'movies' ? 'vod' : requestedKind;
+        if (!countryId || !Number.isInteger(sourceId) || !streamId || !fromPackageId
+            || !['vod', 'series'].includes(kind)) {
+            return res.status(400).json({ error: 'Invalid media membership request' });
+        }
+        const rawCurations = allRows('admin_stream_curations');
+        const packages = resolvedAdminPackages(allRows('admin_packages'), rawCurations);
+        const packageById = new Map(packages.map(row => [String(row.id), row]));
+        const fromPackage = packageById.get(fromPackageId);
+        if (!isEditableMediaPackage(fromPackage, countryId, kind)) {
+            return res.status(400).json({ error: 'Invalid source package' });
+        }
+        const targetPackageId = requestedTargetId || 'hidden';
+        if (targetPackageId !== 'hidden'
+            && !isEditableMediaPackage(packageById.get(targetPackageId), countryId, kind)) {
+            return res.status(400).json({ error: 'The destination package must belong to the same country and media type' });
+        }
+        const currentMembership = effectiveCurations(new Set([fromPackageId])).find(row =>
+            String(row.country_id || '') === countryId
+            && String(row.target_package_id || '') === fromPackageId
+            && Number.parseInt(row.source_id, 10) === sourceId
+            && String(row.stream_id || '') === streamId
+            && row.kind === kind
+        );
+        if (!currentMembership) {
+            return res.status(409).json({ error: 'This item is no longer in the source package' });
+        }
+        const itemType = catalogueItemType(kind);
+        const item = getDb().prepare(`
+            SELECT 1 FROM playlist_items
+            WHERE source_id = ? AND type = ? AND item_id = ? AND is_hidden = 0
+        `).get(sourceId, itemType, streamId);
+        if (!item) return res.status(404).json({ error: 'Media item not found in the catalogue' });
+        invalidateCountryPackageCache();
+        const originalPackageId = String(currentMembership.origin_package_id || fromPackageId);
+        const row = saveMediaCuration(
+            {
+                countryId,
+                sourceId,
+                streamId,
+                targetPackageId,
+                originPackageId: targetPackageId === originalPackageId ? '' : originalPackageId,
+                kind
+            },
+            packages,
+            rawCurations
+        );
+        res.set('Cache-Control', 'no-store');
+        return res.json({ ok: true, curation: row });
+    } catch (error) {
+        console.error('[Velora data] Media membership update failed:', error);
         return res.status(500).json({ error: error.message });
     }
 });
@@ -927,13 +1105,19 @@ function buildHomeCache() {
         const entries = snapshots[type].filter(item => {
             const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
             const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
+            // Effective memberships include both provider defaults and explicit
+            // moves. Prefer them whenever available so Home follows media moved
+            // into or out of provider-backed Movie and Series packages.
+            if (membership.keys.size) {
+                return membership.sourceAware
+                    ? membership.keys.has(`${sourceId}:${String(rawId)}`)
+                    : membership.keys.has(String(rawId));
+            }
             if (providerBacked) {
                 return sourceId === providerSourceId
                     && String(item.raw_category_id ?? '') === providerCategoryId;
             }
-            return membership.sourceAware
-                ? membership.keys.has(`${sourceId}:${String(rawId)}`)
-                : membership.keys.has(String(rawId));
+            return false;
         }).slice(0, 500).map(item => {
             const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
             return {

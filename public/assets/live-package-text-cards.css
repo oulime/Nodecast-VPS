@@ -1,4 +1,4 @@
-/* Compact text-only package cards for the public live-TV catalogue. */
+/* Compact package cards for the public live-TV catalogue. */
 body[data-vel-active-tab="live"]
   .main--velora:not(.main--velora-admin)
   #packages-view.grid.vel-packages {
@@ -13,6 +13,7 @@ body[data-vel-active-tab="live"]
   .vel-package-card--live {
   position: relative !important;
   display: flex !important;
+  flex-direction: row !important;
   align-items: center !important;
   justify-content: center !important;
   width: 100% !important;
@@ -75,7 +76,7 @@ body[data-vel-active-tab="live"]
 body[data-vel-active-tab="live"]
   .main--velora:not(.main--velora-admin)
   #packages-view
-  .vel-package-card--live > img,
+  .vel-package-card--live > img:not(.vel-package-card__live-logo),
 body[data-vel-active-tab="live"]
   .main--velora:not(.main--velora-admin)
   #packages-view
@@ -86,12 +87,52 @@ body[data-vel-active-tab="live"]
 body[data-vel-active-tab="live"]
   .main--velora:not(.main--velora-admin)
   #packages-view
+  .vel-package-card--live.vel-package-card--has-live-logo {
+  justify-content: flex-start !important;
+  gap: 12px !important;
+  padding-left: 12px !important;
+}
+
+body[data-vel-active-tab="live"]
+  .main--velora:not(.main--velora-admin)
+  #packages-view
+  .vel-package-card--live
+  > .vel-package-card__live-logo {
+  position: relative !important;
+  inset: auto !important;
+  z-index: 2 !important;
+  order: -1 !important;
+  display: block !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  height: auto !important;
+  min-width: 0 !important;
+  max-width: 44px !important;
+  min-height: 0 !important;
+  max-height: 44px !important;
+  align-self: center !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  object-fit: contain !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body[data-vel-active-tab="live"]
+  .main--velora:not(.main--velora-admin)
+  #packages-view
   .vel-package-card--live
   .vel-package-card__title {
   position: static !important;
   inset: auto !important;
   z-index: 2 !important;
+  order: 0 !important;
   display: block !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
   width: 100% !important;
   min-height: 0 !important;
   max-height: none !important;
@@ -120,6 +161,16 @@ body[data-vel-active-tab="live"]
   letter-spacing: 0.006em !important;
   text-align: center !important;
   text-shadow: none !important;
+}
+
+body[data-vel-active-tab="live"]
+  .main--velora:not(.main--velora-admin)
+  #packages-view
+  .vel-package-card--live.vel-package-card--has-live-logo
+  .vel-package-card__title {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  text-align: left !important;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -185,6 +236,28 @@ body[data-vel-active-tab="live"]
     .vel-package-card--live {
     min-height: 60px !important;
     padding: 12px 16px !important;
+  }
+
+  body[data-vel-active-tab="live"]
+    .main--velora:not(.main--velora-admin)
+    #packages-view
+    .vel-package-card--live.vel-package-card--has-live-logo {
+    gap: 10px !important;
+    padding-left: 10px !important;
+  }
+
+  body[data-vel-active-tab="live"]
+    .main--velora:not(.main--velora-admin)
+    #packages-view
+    .vel-package-card--live
+    > .vel-package-card__live-logo {
+    flex-basis: auto !important;
+    width: auto !important;
+    height: auto !important;
+    min-width: 0 !important;
+    max-width: 38px !important;
+    min-height: 0 !important;
+    max-height: 38px !important;
   }
 }
 

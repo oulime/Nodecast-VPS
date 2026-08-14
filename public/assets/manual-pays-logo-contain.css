@@ -1,0 +1,4 @@
+/* Preserve the existing 16:10 preview card while showing the complete logo. */
+.manual-pays-content-dialog__item img {
+  object-fit: contain;
+}

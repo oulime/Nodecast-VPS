@@ -51,9 +51,12 @@ body[data-vel-active-tab="live"]
   inset: 0 !important;
   display: block !important;
   border-radius: inherit !important;
+  padding: 0 !important;
   background:
     linear-gradient(115deg, rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0.055) 18%, transparent 39%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.085), transparent 46%) !important;
+  -webkit-mask: none !important;
+  mask: none !important;
   opacity: 0.72 !important;
   pointer-events: none !important;
 }

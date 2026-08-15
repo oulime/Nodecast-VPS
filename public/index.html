@@ -1520,17 +1520,17 @@
     <script defer src="/assets/subscription-welcome.js?v=first-login-test-message-v1-20260810"></script>
     <script defer src="/assets/profile-account.js?v=profile-account-menu-v2-20260810"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=package-poster-refresh-secure-v4-20260809"></script>
-    <script defer src="/assets/manual-pays-visible-memberships.js?v=package-content-groups-v1-20260815"></script>
+    <script defer src="/assets/manual-pays-visible-memberships.js?v=package-source-search-v1-20260815"></script>
     <script defer src="/assets/country-logos-admin.js?v=shared-app-country-flags-20260809"></script>
-    <script defer src="/assets/direct-media-packages.js?v=20260815-media-package-counts-v1"></script>
+    <script defer src="/assets/direct-media-packages.js?v=20260815-admin-only-counts-v1"></script>
     <script defer src="/assets/country-switch-loader.js?v=country-switch-fast-v2-20260810"></script>
     <script defer src="/assets/paid-users-admin.js?v=settings-admin-autocopy-test-v2-20260810"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
-    <link rel="stylesheet" href="/assets/manual-pays.css?v=package-content-groups-v1-20260815">
+    <link rel="stylesheet" href="/assets/manual-pays.css?v=package-source-search-v1-20260815">
     <link rel="stylesheet" href="/assets/manual-pays-logo-contain.css?v=tv-package-logo-contain-v1-20260814">
     <link rel="stylesheet" href="/assets/parent-packages.css?v=inline-live-parent-v3-20260811">
-    <link rel="stylesheet" href="/assets/direct-media-packages.css?v=20260815-media-package-counts-v1">
+    <link rel="stylesheet" href="/assets/direct-media-packages.css?v=20260815-admin-only-counts-v1">
     <style>
       .manual-pays__pagination{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding:.7rem;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:rgba(14,11,20,.96);color:#aaa4b5;font-size:.75rem}
       .manual-pays__pagination button{border:1px solid rgba(167,139,250,.45);border-radius:8px;background:rgba(124,58,237,.2);color:#fff;padding:.45rem .7rem;cursor:pointer}
@@ -4668,7 +4668,9 @@
                   </div>
                   <label id="mp-channel-picker-source-field" class="manual-pays-channel-picker__source" for="mp-channel-picker-source" hidden>
                     <span>Package source</span>
-                    <select id="mp-channel-picker-source"></select>
+                    <input id="mp-channel-picker-source-search" type="search" autocomplete="off" placeholder="Rechercher un package…" />
+                    <select id="mp-channel-picker-source" size="6" aria-label="Packages trouvés"></select>
+                    <small id="mp-channel-picker-source-summary" aria-live="polite"></small>
                   </label>
                   <label class="manual-pays-channel-picker__search" for="mp-channel-picker-search">
                     <span id="mp-channel-picker-search-label">Rechercher une chaîne ou un package</span>
@@ -5173,6 +5175,7 @@
                 <span class="vel-home-brand__name">Velora<span>VIP</span></span>
               </div>
               <div id="vel-home-sections" class="vel-home-sections" aria-live="polite"></div>
+              <div class="vel-home-empty-page__canvas" hidden aria-hidden="true"></div>
             </section>
             <div id="adult-view" class="vel-adult-portal hidden" aria-label="Contenu adulte">
               <div class="vel-adult-portal__inner">
@@ -11170,6 +11173,10 @@ if (target.closest(".trial-offer-button")) {
         width: 100% !important;
         max-width: none !important;
         min-width: 0 !important;
+      }
+
+      .vel-home-empty-page__canvas {
+        display: none !important;
       }
 
       /* Accueil owns the full page; never leak a previous media header into it. */

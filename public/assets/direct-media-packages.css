@@ -191,16 +191,16 @@ body[data-vel-active-tab="live"]
   z-index: 2510;
   top: calc(100% + 0.65rem);
   left: 50%;
-  width: min(34rem, calc(100vw - 1.5rem));
+  width: min(40rem, calc(100vw - 1.5rem));
   max-height: min(55vh, 430px);
   overflow: auto;
-  padding: 8px;
-  border: 1px solid rgba(151, 135, 255, 0.3);
-  border-radius: 18px;
-  background: linear-gradient(145deg, rgba(27, 23, 55, 0.98), rgba(7, 11, 27, 0.98));
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.58), 0 0 30px rgba(109, 77, 255, 0.16);
-  -webkit-backdrop-filter: blur(24px) saturate(145%);
-  backdrop-filter: blur(24px) saturate(145%);
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 17px;
+  background: linear-gradient(145deg, rgba(22, 17, 43, 0.72), rgba(6, 8, 20, 0.68));
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.62), 0 0 0 1px rgba(139, 92, 246, 0.06), 0 10px 36px rgba(69, 38, 130, 0.2);
+  -webkit-backdrop-filter: blur(34px) saturate(155%);
+  backdrop-filter: blur(34px) saturate(155%);
   transform: translateX(-50%);
   scrollbar-color: rgba(139, 92, 246, 0.75) rgba(9, 8, 22, 0.72);
   scrollbar-width: thin;
@@ -224,50 +224,60 @@ body.vel-media-package-menu-open .main--velora :is(#content-view, #dynamic-list,
 }
 
 .vel-media-package-picker__menu-title {
-  display: block;
-  padding: 8px 10px 10px;
-  color: rgba(238, 237, 255, 0.72);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  display: none;
 }
 
 .vel-media-package-picker__option {
   width: 100%;
-  min-height: 42px;
+  min-height: 58px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 8px 11px;
+  gap: 12px;
+  padding: 12px 16px;
   border: 0;
-  border-radius: 11px;
+  border-radius: 10px;
   color: rgba(238, 237, 255, 0.78);
   background: transparent;
   font: inherit;
-  font-size: 13px;
-  font-weight: 650;
+  font-size: 17px;
+  font-weight: 720;
+  letter-spacing: 0.01em;
   text-align: left;
   cursor: pointer;
+}
+
+.vel-media-package-picker__option > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .vel-media-package-picker__option:hover,
 .vel-media-package-picker__option:focus-visible {
   color: #fff;
-  background: rgba(125, 92, 255, 0.14);
+  background: rgba(255, 255, 255, 0.07);
   outline: none;
 }
 
 .vel-media-package-picker__option.is-selected {
-  color: #fff;
-  background: linear-gradient(135deg, rgba(126, 87, 255, 0.28), rgba(52, 197, 255, 0.1));
+  color: #f0abfc;
+  background: transparent;
+  font-weight: 760;
+}
+
+.vel-media-package-picker__option.is-selected:hover,
+.vel-media-package-picker__option.is-selected:focus-visible {
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .vel-media-package-picker__check {
   flex: 0 0 auto;
-  color: #6dd5ff;
+  margin-left: auto;
+  color: #f0abfc;
   font-size: 17px;
+  font-weight: 900;
   line-height: 1;
   opacity: 0;
 }

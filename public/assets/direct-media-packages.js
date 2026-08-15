@@ -40,6 +40,13 @@
     return `${countryKey()}::${tab}`;
   }
 
+  function packageDisplayName(value) {
+    const text = String(value || "").trim();
+    const letters = text.replace(/[^\p{L}]/gu, "");
+    if (!letters || letters !== letters.toLocaleUpperCase("fr")) return text;
+    return text.toLocaleLowerCase("fr").replace(/(^|[\s\-–—/|([{])\p{L}/gu, match => match.toLocaleUpperCase("fr"));
+  }
+
   function gridBelongsTo(tab) {
     const renderKey = String(packagesView.dataset.renderedGridKey || "");
     return renderKey.startsWith(`${tab}|`);
@@ -500,7 +507,7 @@
         option.dataset.packageId = item.id;
         option.setAttribute("role", "option");
         const name = document.createElement("span");
-        name.textContent = item.name;
+        name.textContent = packageDisplayName(item.name);
         const check = document.createElement("span");
         check.className = "vel-media-package-picker__check";
         check.textContent = "✓";
@@ -514,8 +521,9 @@
     const selected = selectedPackages.get(cacheKey(tab));
     const selectedPackage = packages.find(item => item.id === selected) || packages[0];
     if (!selectedPackage) return;
-    label.textContent = selectedPackage.name;
-    trigger.setAttribute("aria-label", `Package : ${selectedPackage.name}`);
+    const selectedName = packageDisplayName(selectedPackage.name);
+    label.textContent = selectedName;
+    trigger.setAttribute("aria-label", `Package : ${selectedName}`);
     menu.querySelectorAll("[data-package-id]").forEach(option => {
       const active = option.dataset.packageId === selectedPackage.id;
       option.classList.toggle("is-selected", active);

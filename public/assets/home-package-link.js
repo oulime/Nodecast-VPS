@@ -23,14 +23,12 @@
 
       const icon = document.createElement("span");
       icon.className = "vel-home-section__package-link-icon";
-      icon.textContent = "→";
+      icon.innerHTML = '<svg viewBox="0 0 48 48" focusable="false"><circle cx="24" cy="24" r="19"></circle><path d="M15.5 24h16.2m-6.4-6.4 6.4 6.4-6.4 6.4"></path></svg>';
       icon.setAttribute("aria-hidden", "true");
       const label = document.createElement("span");
       label.className = "vel-home-section__package-link-label";
       label.textContent = "Voir tout le package";
-      const hint = document.createElement("small");
-      hint.textContent = "Afficher tous les contenus";
-      button.append(icon, label, hint);
+      button.append(icon, label);
       button.addEventListener("click", () => {
         window.veloraOpenHomePackage?.({ package_id: packageId, content_type: contentType }, button);
       });

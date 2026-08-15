@@ -212,16 +212,21 @@
       media.alt = "";
       media.loading = "lazy";
       media.decoding = "async";
-      media.src = entry.thumbUrl;
       media.addEventListener("load", function () {
         card.classList.remove("is-poster-loading");
         card.classList.add("is-poster-ready");
       }, { once: true });
-      media.addEventListener("error", function () {
+      var markImageFailed = function () {
         card.classList.remove("is-poster-loading");
         media.removeAttribute("src");
         media.classList.add("vel-home-section__fallback");
-      });
+      };
+      if (typeof window.veloraSetHomeImageSource === "function") {
+        window.veloraSetHomeImageSource(media, entry.thumbUrl, markImageFailed);
+      } else {
+        media.addEventListener("error", markImageFailed, { once: true });
+        media.src = entry.thumbUrl;
+      }
     } else {
       media = document.createElement("span");
       media.classList.add("vel-home-section__fallback");

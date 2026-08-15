@@ -73,7 +73,9 @@
       heading.textContent = section.title || "";
       var rail = document.createElement("div");
       rail.className = "vel-home-section__rail";
-      (Array.isArray(section.entries) ? section.entries : []).forEach(function (entry) {
+      var entries = Array.isArray(section.entries) ? section.entries : [];
+      if (typeof window.veloraApplyHomeChannelRules === "function") entries = window.veloraApplyHomeChannelRules(section, entries);
+      entries.forEach(function (entry) {
         rail.appendChild(card(section, entry));
       });
       block.append(heading, rail);

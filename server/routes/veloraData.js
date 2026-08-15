@@ -23,6 +23,11 @@ const COUNTRY_PACKAGE_TABLES = new Set([
     'admin_packages',
     'admin_stream_curations'
 ]);
+const HOME_CHANNEL_RULE_TABLES = new Set([
+    'admin_channel_name_prefixes',
+    'admin_hidden_filters'
+]);
+const DEFAULT_CHANNEL_HIDDEN_FILTERS = ['HEVC', 'H265', 'H.265', 'H 265', 'x265'];
 
 let currentCountryPackageCache = null;
 
@@ -43,6 +48,50 @@ function invalidateCountryPackageCache() {
 
 function invalidateHomeCache() {
     removeCacheFile(homeCachePath);
+}
+
+function invalidateDerivedCachesForTable(table) {
+    if (COUNTRY_PACKAGE_TABLES.has(table)) invalidateCountryPackageCache();
+    else if (table === 'admin_home_sections' || HOME_CHANNEL_RULE_TABLES.has(table)) invalidateHomeCache();
+}
+
+function homeChannelNameRules() {
+    const prefixes = [...new Set(allRows('admin_channel_name_prefixes')
+        .map(row => String(row.prefix || '').trim()).filter(Boolean))]
+        .sort((left, right) => right.length - left.length);
+    const hiddenFilters = [...new Set([
+        ...DEFAULT_CHANNEL_HIDDEN_FILTERS,
+        ...allRows('admin_hidden_filters').map(row => String(row.needle || '').trim()).filter(Boolean)
+    ])].sort((left, right) => right.length - left.length);
+    return { prefixes, hiddenFilters };
+}
+
+function normalizeChannelRuleValue(value) {
+    return String(value || '').normalize('NFKC').trim().toLowerCase();
+}
+
+function isHomeChannelHidden(rawName, hiddenFilters) {
+    const name = normalizeChannelRuleValue(rawName);
+    return hiddenFilters.some(filter => {
+        const normalized = normalizeChannelRuleValue(filter);
+        return normalized.startsWith('suffix:')
+            ? name.endsWith(normalized.slice(7).trim())
+            : name.includes(normalized);
+    });
+}
+
+function stripHomeChannelPrefixes(rawName, prefixes) {
+    const original = String(rawName || '').trim();
+    let name = original;
+    for (let pass = 0; pass < 64; pass += 1) {
+        const prefix = prefixes.find(candidate =>
+            candidate.length <= name.length
+            && name.slice(0, candidate.length).toLowerCase() === candidate.toLowerCase()
+        );
+        if (!prefix) break;
+        name = name.slice(prefix.length).trim();
+    }
+    return name || original;
 }
 
 function normalizedPosterTitle(value) {
@@ -1212,6 +1261,7 @@ router.get('/country-package-cache', (req, res) => {
 
 function buildHomeCache() {
     const sections = sortRows(allRows('admin_home_sections'), 'section_order.asc');
+    const channelRules = homeChannelNameRules();
     const sectionPackageIds = new Set(sections.map(section => String(section.package_id || '')));
     const countryPackageCache = getCountryPackageCache();
     const curations = expandMemberships(countryPackageCache.memberships)
@@ -1268,11 +1318,13 @@ function buildHomeCache() {
                     && String(item.raw_category_id ?? '') === providerCategoryId;
             }
             return false;
-        }).slice(0, HOME_CACHE_ENTRIES_PER_PACKAGE).map(item => {
+        }).map(item => {
             const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
+            const rawName = String(item.name || item.title || item.series_name || '').trim();
+            if (type === 'live' && isHomeChannelHidden(rawName, channelRules.hiddenFilters)) return null;
             return {
                 id: `home-cache:${section.id}:${rawId}`,
-                name: String(item.name || item.title || item.series_name || '').trim(),
+                name: type === 'live' ? stripHomeChannelPrefixes(rawName, channelRules.prefixes) : rawName,
                 thumbUrl: String(item.stream_icon || item.cover || ''),
                 streamId: rawId,
                 sourceId: item.source_id,
@@ -1281,7 +1333,7 @@ function buildHomeCache() {
                 contentType: type,
                 packageId: section.package_id
             };
-        }).filter(item => item.name);
+        }).filter(item => item?.name).slice(0, HOME_CACHE_ENTRIES_PER_PACKAGE);
         return { ...section, content_type: type, entries };
     });
     const payload = { generatedAt: new Date().toISOString(), sections: output };
@@ -1534,8 +1586,7 @@ router.all('/rest/v1/:table', (req, res) => {
         }
 
         if (req.method === 'POST') {
-            if (COUNTRY_PACKAGE_TABLES.has(table)) invalidateCountryPackageCache();
-            else if (table === 'admin_home_sections') invalidateHomeCache();
+            invalidateDerivedCachesForTable(table);
             const values = Array.isArray(req.body) ? req.body : [req.body];
             const saved = getDb().transaction(() => values.map(value => saveRow(table, value, req)))();
             const representation = String(req.get('Prefer') || '').includes('return=representation');
@@ -1544,8 +1595,7 @@ router.all('/rest/v1/:table', (req, res) => {
 
         const rows = allRows(table).filter(row => matches(row, req.query));
         if (req.method === 'PATCH') {
-            if (COUNTRY_PACKAGE_TABLES.has(table) && rows.length) invalidateCountryPackageCache();
-            else if (table === 'admin_home_sections' && rows.length) invalidateHomeCache();
+            if (rows.length) invalidateDerivedCachesForTable(table);
             const saved = getDb().transaction(() =>
                 rows.map(row => saveRow(table, { ...row, ...req.body }, req))
             )();
@@ -1554,8 +1604,7 @@ router.all('/rest/v1/:table', (req, res) => {
         }
 
         if (req.method === 'DELETE') {
-            if (COUNTRY_PACKAGE_TABLES.has(table) && rows.length) invalidateCountryPackageCache();
-            else if (table === 'admin_home_sections' && rows.length) invalidateHomeCache();
+            if (rows.length) invalidateDerivedCachesForTable(table);
             const remove = getDb().prepare(
                 `DELETE FROM velora_admin_rows WHERE table_name = ? AND row_id = ?`
             );

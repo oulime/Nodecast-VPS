@@ -2,7 +2,7 @@
   "use strict";
 
   var PAGE_SIZE = 12;
-  var state = { items: new Map(), limits: { movie: PAGE_SIZE, series: PAGE_SIZE, channel: PAGE_SIZE }, page: null, open: false, decorateTimer: 0 };
+  var state = { items: new Map(), limits: { movie: PAGE_SIZE, series: PAGE_SIZE, channel: PAGE_SIZE }, page: null, open: false, decorateTimer: 0, currentDetailDescriptor: null };
   var heartSvg = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8.5-4.8-8.5-11.2A4.8 4.8 0 0 1 12 6.7a4.8 4.8 0 0 1 8.5 3.1C20.5 16.2 12 21 12 21Z"/></svg>';
 
   function token() {
@@ -30,6 +30,20 @@
 
   function fromDescriptor(item) {
     return normalize(item);
+  }
+
+  function favoriteItemDescriptor(item) {
+    var normalized = normalize(item);
+    return {
+      sourceId: normalized.source_id,
+      itemId: normalized.item_id,
+      itemType: normalized.item_type,
+      name: normalized.name,
+      thumbUrl: normalized.thumb_url,
+      packageId: normalized.package_id,
+      globalStreamId: normalized.global_stream_id,
+      containerExtension: normalized.container_extension
+    };
   }
 
   async function request(options) {
@@ -73,10 +87,12 @@
     heart.setAttribute("aria-pressed", active ? "true" : "false");
     heart.setAttribute("aria-label", active ? "Retirer des favoris" : "Ajouter aux favoris");
     heart.title = active ? "Retirer des favoris" : "Ajouter aux favoris";
+    var label = heart.querySelector(".vel-favorite-detail-button__label");
+    if (label) label.textContent = active ? "Retirer des favoris" : "Ajouter aux favoris";
   }
 
   function syncHearts() {
-    document.querySelectorAll(".vel-favorite-heart[data-favorite-key]").forEach(function (heart) {
+    document.querySelectorAll(".vel-favorite-heart[data-favorite-key], .vel-favorite-detail-button[data-favorite-key]").forEach(function (heart) {
       setHeartState(heart, state.items.has(heart.dataset.favoriteKey));
     });
   }
@@ -155,7 +171,9 @@
 
   function captureHeartInteraction(event) {
     var target = event.target;
-    var heart = target && typeof target.closest === "function" ? target.closest(".vel-favorite-heart") : null;
+    var heart = target && typeof target.closest === "function"
+      ? target.closest(".vel-favorite-heart, .vel-favorite-detail-button")
+      : null;
     if (!heart) return;
     if (
       event.type === "touchend" ||
@@ -200,22 +218,115 @@
     return heart;
   }
 
-  function decorateCards() {
-    if (typeof window.veloraDescribeFavoriteCard !== "function") return;
-    document.querySelectorAll(".vel-vod-movie-card, .vel-media-item-row").forEach(function (card) {
-      if (card.closest("#vel-favorites-page")) return;
-      var descriptor = window.veloraDescribeFavoriteCard(card);
+  function detailDescriptor(detail) {
+    var sourceId = String(detail.dataset.favoriteSourceId || "");
+    var itemId = String(detail.dataset.favoriteItemId || "");
+    var itemType = String(detail.dataset.favoriteItemType || "");
+    var descriptor = sourceId && itemId && (itemType === "movie" || itemType === "series") ? {
+      sourceId: sourceId,
+      itemId: itemId,
+      itemType: itemType,
+      name: String(detail.dataset.favoriteName || detail.getAttribute("aria-label") || ""),
+      thumbUrl: String(detail.dataset.favoriteThumbUrl || ""),
+      packageId: String(detail.dataset.favoritePackageId || ""),
+      globalStreamId: String(detail.dataset.favoriteGlobalStreamId || ""),
+      containerExtension: String(detail.dataset.favoriteContainerExtension || "")
+    } : state.currentDetailDescriptor;
+    if (!descriptor) return null;
+    var expectedType = detail.classList.contains("vel-vod-detail--series") ? "series" : "movie";
+    if (descriptor.itemType !== expectedType) return null;
+    var detailName = String(detail.getAttribute("aria-label") || "").replace(/\s+/g, " ").trim().toLocaleLowerCase();
+    var descriptorName = String(descriptor.name || "").replace(/\s+/g, " ").trim().toLocaleLowerCase();
+    if (detailName && descriptorName && detailName !== descriptorName) return null;
+    return descriptor;
+  }
+
+  function rememberCardDetail(event) {
+    var target = event.target;
+    if (!target || typeof target.closest !== "function" || target.closest(".vel-favorite-heart, .vel-favorite-detail-button")) return;
+    var card = target.closest(".vel-vod-movie-card");
+    if (!card) return;
+    var heart = card.querySelector(":scope > .vel-favorite-heart");
+    var descriptor = heart && heart._veloraFavorite;
+    if (!descriptor && typeof window.veloraDescribeFavoriteCard === "function") descriptor = window.veloraDescribeFavoriteCard(card);
+    if (descriptor && (descriptor.itemType === "movie" || descriptor.itemType === "series")) state.currentDetailDescriptor = descriptor;
+  }
+
+  function installCachedHomeBridge() {
+    var original = window.veloraOpenCachedHomeItem;
+    if (typeof original !== "function" || original._veloraFavoriteWrapped) return;
+    function wrapped(section, item) {
+      var contentType = String((section && section.content_type) || "");
+      var itemType = contentType === "series" ? "series" : contentType === "movies" ? "movie" : "";
+      if (itemType && item) {
+        state.currentDetailDescriptor = {
+          sourceId: String(item.sourceId || ""),
+          itemId: String(item.streamId || item.itemId || ""),
+          itemType: itemType,
+          name: String(item.name || ""),
+          thumbUrl: String(item.thumbUrl || ""),
+          packageId: String((section && section.package_id) || item.packageId || ""),
+          globalStreamId: String(item.globalStreamId || ""),
+          containerExtension: String(item.containerExtension || "")
+        };
+      }
+      return original.apply(this, arguments);
+    }
+    wrapped._veloraFavoriteWrapped = true;
+    window.veloraOpenCachedHomeItem = wrapped;
+  }
+
+  function createDetailFavoriteButton(descriptor) {
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "vel-favorite-detail-button";
+    button.innerHTML = heartSvg + '<span class="vel-favorite-detail-button__label"></span>';
+    button.dataset.favoriteKey = favoriteKey({ sourceId: descriptor.sourceId, itemId: descriptor.itemId, itemType: descriptor.itemType });
+    button._veloraFavorite = descriptor;
+    setHeartState(button, state.items.has(button.dataset.favoriteKey));
+    bindHeartActivation(button);
+    return button;
+  }
+
+  function decorateDetails() {
+    document.querySelectorAll(".vel-vod-detail").forEach(function (detail) {
+      var descriptor = detailDescriptor(detail);
       if (!descriptor) return;
-      var existing = card.querySelector(":scope > .vel-favorite-heart");
+      var existing = detail.querySelector(":scope .vel-favorite-detail-button");
       if (existing) {
         existing._veloraFavorite = descriptor;
         existing.dataset.favoriteKey = favoriteKey({ sourceId: descriptor.sourceId, itemId: descriptor.itemId, itemType: descriptor.itemType });
         setHeartState(existing, state.items.has(existing.dataset.favoriteKey));
         return;
       }
-      card.dataset.favoriteDecorated = "true";
-      card.appendChild(createHeart(descriptor, card.classList.contains("vel-vod-movie-card")));
+      var plot = detail.querySelector(".vel-vod-detail__plot");
+      var target = detail.querySelector(".vel-vod-detail__details-panel") || detail.querySelector(".vel-vod-detail__inner");
+      if (!target) return;
+      var button = createDetailFavoriteButton(descriptor);
+      if (plot && plot.parentElement === target) plot.insertAdjacentElement("afterend", button);
+      else target.appendChild(button);
     });
+  }
+
+  function decorateCards() {
+    installCachedHomeBridge();
+    if (typeof window.veloraDescribeFavoriteCard === "function") {
+      document.querySelectorAll(".vel-vod-movie-card, .vel-media-item-row").forEach(function (card) {
+        if (card.closest("#vel-favorites-page")) return;
+        var descriptor = window.veloraDescribeFavoriteCard(card);
+        if (!descriptor) return;
+        var existing = card.querySelector(":scope > .vel-favorite-heart");
+        if (existing) {
+          existing._veloraFavorite = descriptor;
+          existing.dataset.favoriteKey = favoriteKey({ sourceId: descriptor.sourceId, itemId: descriptor.itemId, itemType: descriptor.itemType });
+          setHeartState(existing, state.items.has(existing.dataset.favoriteKey));
+          return;
+        }
+        card.dataset.favoriteDecorated = "true";
+        card.appendChild(createHeart(descriptor, card.classList.contains("vel-vod-movie-card")));
+      });
+    }
+    decorateDetails();
   }
 
   function scheduleDecorate() {
@@ -274,6 +385,7 @@
       if (!await ensureCatalog()) throw new Error("Le catalogue n’est pas encore disponible.");
       closePage();
       if (typeof window.veloraOpenFavoriteItem !== "function") throw new Error("Le lecteur de favoris est indisponible.");
+      if (item.item_type === "movie" || item.item_type === "series") state.currentDetailDescriptor = favoriteItemDescriptor(item);
       await window.veloraOpenFavoriteItem(item, Array.from(state.items.values()));
     } catch (error) {
       toast(error.message, true);
@@ -347,7 +459,7 @@
     page.id = "vel-favorites-page";
     page.className = "vel-favorites-page";
     page.hidden = true;
-    page.innerHTML = '<header class="vel-favorites-page__header"><div><p>MA LISTE</p><h1>Mes favoris</h1></div><button type="button" class="vel-favorites-page__close" aria-label="Fermer les favoris">×</button></header><main class="vel-favorites-page__content" aria-live="polite"></main>';
+    page.innerHTML = '<header class="vel-favorites-page__header"><div><p>MA LISTE</p><h1>Mes favoris</h1></div><button type="button" class="vel-favorites-page__close" aria-label="Fermer les favoris"><span aria-hidden="true">×</span></button></header><main class="vel-favorites-page__content" aria-live="polite"></main>';
     page.querySelector(".vel-favorites-page__close").addEventListener("click", closePage);
     document.body.appendChild(page);
     state.page = page;
@@ -389,6 +501,8 @@
     });
     document.addEventListener("touchstart", captureHeartInteraction, { capture: true, passive: false });
     document.addEventListener("touchend", captureHeartInteraction, { capture: true, passive: false });
+    document.addEventListener("pointerdown", rememberCardDetail, true);
+    document.addEventListener("click", rememberCardDetail, true);
     var profileFavorite = document.getElementById("vel-profile-favorites");
     if (profileFavorite) {
       profileFavorite.addEventListener("click", function (event) {

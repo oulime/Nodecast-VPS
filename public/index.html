@@ -1566,7 +1566,7 @@
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css">
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=large-package-virtualization-v1-20260810">
     <link rel="stylesheet" href="/assets/live-package-text-cards.css?v=tv-package-flat-inner-v1-20260814">
-    <link rel="stylesheet" href="/assets/velora-home-sections.css?v=home-package-link-svg-icon-v3-20260815">
+    <link rel="stylesheet" href="/assets/velora-home-sections.css?v=home-square-channel-logos-v4-20260816">
     <style>
       #settings-tab-btn-ip,
       #settings-tab-ip,
@@ -10607,6 +10607,11 @@ if (target.closest(".trial-offer-button")) {
         filter: drop-shadow(0 0 7px rgba(117, 99, 255, 0.25));
       }
 
+      .vel-bottom-nav__button[data-bottom-nav="live"] .vel-bottom-nav__icon {
+        width: 26px;
+        height: 26px;
+      }
+
       .vel-floating-search {
         position: fixed;
         z-index: 2395;
@@ -11307,6 +11312,11 @@ if (target.closest(".trial-offer-button")) {
         .vel-bottom-nav__icon {
           width: 21px;
           height: 21px;
+        }
+
+        .vel-bottom-nav__button[data-bottom-nav="live"] .vel-bottom-nav__icon {
+          width: 24px;
+          height: 24px;
         }
 
         .vel-bottom-nav__label {

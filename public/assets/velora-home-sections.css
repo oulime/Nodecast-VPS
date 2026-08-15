@@ -43,3 +43,8 @@
   .vel-home-section__scroll-btn:hover,.vel-home-section__scroll-btn:focus-visible{background:color-mix(in srgb,var(--vel-primary,#8b5cf6) 76%,#111);transform:translateY(-50%) scale(1.08);outline:2px solid #fff;outline-offset:2px}
   .vel-home-section__scroll-btn:disabled{visibility:hidden;opacity:0;pointer-events:none}
 }
+
+/* Live channels use square, uncropped logo frames on Accueil. */
+.vel-home-section__card--live .vel-home-section__media{aspect-ratio:1/1}
+.vel-home-section__card--live img.vel-home-section__media{box-sizing:border-box;padding:6%;object-fit:contain}
+.vel-home-section__skeleton--live{aspect-ratio:1/1}

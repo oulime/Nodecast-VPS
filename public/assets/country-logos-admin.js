@@ -31,10 +31,31 @@
       image.src = selectedLogo;
       image.hidden = false;
     });
-    document.querySelectorAll(".vel-home-country-picker__option, .vel-bottom-country-menu__option, #vel-bottom-country-options [role='option']").forEach(option => {
-      const logo = resolvedLogo("", option.textContent);
-      const image = option.querySelector("img");
-      if (logo && image) { image.src = logo; image.hidden = false; }
+    document.querySelectorAll(".vel-home-country-picker__option, #vel-bottom-country-options [role='option']").forEach(option => {
+      let name = option.querySelector(":scope > .vel-app-country-option__name");
+      if (!name) {
+        name = option.querySelector(":scope > span:not(.vel-bottom-country-menu__check)");
+        if (name) name.classList.add("vel-app-country-option__name");
+      }
+      if (!name) {
+        const text = [...option.childNodes].filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.textContent).join(" ").trim();
+        if (!text) return;
+        [...option.childNodes].filter(node => node.nodeType === Node.TEXT_NODE).forEach(node => node.remove());
+        name = document.createElement("span");
+        name.className = "vel-app-country-option__name";
+        name.textContent = text;
+        option.prepend(name);
+      }
+      let image = option.querySelector(":scope > .vel-app-country-option__logo");
+      if (!image) {
+        image = document.createElement("img");
+        image.className = "vel-app-country-option__logo";
+        image.alt = "";
+        image.decoding = "async";
+        option.insertBefore(image, name);
+      }
+      const countryId = option.dataset.countryId || option.dataset.value || "";
+      setImageSource(image, resolvedLogo(countryId, name.textContent));
     });
   }
 

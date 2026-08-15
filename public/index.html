@@ -1521,7 +1521,7 @@
     <script defer src="/assets/profile-account.js?v=profile-account-menu-v2-20260810"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=package-poster-refresh-secure-v4-20260809"></script>
     <script defer src="/assets/manual-pays-visible-memberships.js?v=package-source-search-v1-20260815"></script>
-    <script defer src="/assets/country-logos-admin.js?v=shared-app-country-flags-20260809"></script>
+    <script defer src="/assets/country-logos-admin.js?v=app-country-list-logos-v2-20260815"></script>
     <script defer src="/assets/direct-media-packages.js?v=20260815-premium-picker-v2"></script>
     <script defer src="/assets/home-package-link.js?v=20260815-svg-icon-v3"></script>
     <script defer src="/assets/country-switch-loader.js?v=country-switch-fast-v2-20260810"></script>
@@ -10744,6 +10744,29 @@ if (target.closest(".trial-offer-button")) {
         background: linear-gradient(135deg, rgba(126, 87, 255, 0.28), rgba(52, 197, 255, 0.1));
       }
 
+      .vel-app-country-option__logo {
+        width: 30px;
+        height: 21px;
+        flex: 0 0 30px;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 5px;
+        background: rgba(255, 255, 255, 0.06);
+        object-fit: cover;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.32);
+      }
+
+      .vel-app-country-option__logo[hidden] {
+        display: none !important;
+      }
+
+      .vel-app-country-option__name {
+        min-width: 0;
+        flex: 1 1 auto;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
       #vel-profile-favorites[hidden] {
         display: none !important;
       }
@@ -11487,10 +11510,12 @@ if (target.closest(".trial-offer-button")) {
             var item = document.createElement("button");
             item.type = "button";
             item.className = "vel-bottom-country-menu__option";
+            item.dataset.countryId = option.value;
             item.setAttribute("role", "option");
             item.setAttribute("aria-selected", option.selected ? "true" : "false");
             item.classList.toggle("is-selected", option.selected);
             var name = document.createElement("span");
+            name.className = "vel-app-country-option__name";
             name.textContent = option.textContent;
             item.appendChild(name);
             if (option.selected) {

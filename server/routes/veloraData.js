@@ -647,8 +647,11 @@ function isEditableMediaPackage(packageRow, countryId, kind) {
         && packageRow.is_parent !== 'true';
 }
 
-function saveMediaCuration({ countryId, sourceId, streamId, targetPackageId, originPackageId, kind }, packages, rawCurations) {
-    const packageById = new Map(packages.map(row => [String(row.id), row]));
+function prepareMediaCuration(
+    { countryId, sourceId, streamId, targetPackageId, originPackageId, kind },
+    packageById,
+    rawCurations
+) {
     const matching = rawCurations.filter(row => {
         if (String(row.country_id || '') !== countryId || String(row.stream_id || '') !== streamId) return false;
         const currentPackage = packageById.get(String(row.target_package_id || '')) || {};
@@ -670,23 +673,34 @@ function saveMediaCuration({ countryId, sourceId, streamId, targetPackageId, ori
         kind,
         origin_package_id: originPackageId || null
     };
+    return { row, duplicateIds: matching.filter(duplicate => String(duplicate.id) !== id).map(duplicate => String(duplicate.id)) };
+}
+
+function saveMediaCurations(updates, packages, rawCurations) {
+    const packageById = new Map(packages.map(row => [String(row.id), row]));
+    const prepared = updates.map(update => prepareMediaCuration(update, packageById, rawCurations));
     const db = getDb();
     db.transaction(() => {
         const remove = db.prepare(`
             DELETE FROM velora_admin_rows WHERE table_name = 'admin_stream_curations' AND row_id = ?
         `);
-        for (const duplicate of matching) {
-            if (String(duplicate.id) !== id) remove.run(String(duplicate.id));
-        }
-        db.prepare(`
+        const upsert = db.prepare(`
             INSERT INTO velora_admin_rows (table_name, row_id, data, updated_at)
             VALUES ('admin_stream_curations', ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(table_name, row_id) DO UPDATE SET
                 data = excluded.data,
                 updated_at = CURRENT_TIMESTAMP
-        `).run(id, JSON.stringify(row));
+        `);
+        for (const { row, duplicateIds } of prepared) {
+            for (const duplicateId of duplicateIds) remove.run(duplicateId);
+            upsert.run(String(row.id), JSON.stringify(row));
+        }
     })();
-    return row;
+    return prepared.map(entry => entry.row);
+}
+
+function saveMediaCuration(args, packages, rawCurations) {
+    return saveMediaCurations([args], packages, rawCurations)[0];
 }
 
 function saveChannelCuration(args, packages, rawCurations) {
@@ -907,6 +921,92 @@ router.get('/admin/package-media-items', (req, res) => {
         return res.json({ package: packageRow, items });
     } catch (error) {
         console.error('[Velora data] Package media items failed:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/admin/memberships/bulk', (req, res) => {
+    try {
+        const countryId = String(req.body?.countryId || '').trim();
+        const requestedKind = String(req.body?.kind || '').trim();
+        const kind = requestedKind === 'movies' ? 'vod' : requestedKind;
+        const targetPackageId = String(req.body?.targetPackageId || '').trim() || 'hidden';
+        const requestedItems = Array.isArray(req.body?.items) ? req.body.items : [];
+        if (!countryId || !['live', 'vod', 'series'].includes(kind) || !requestedItems.length) {
+            return res.status(400).json({ error: 'Invalid bulk membership request' });
+        }
+        if (requestedItems.length > 5000) {
+            return res.status(413).json({ error: 'A bulk transfer is limited to 5000 items' });
+        }
+
+        const rawCurations = allRows('admin_stream_curations');
+        const packages = resolvedAdminPackages(allRows('admin_packages'), rawCurations);
+        const packageById = new Map(packages.map(row => [String(row.id), row]));
+        const isEditablePackage = packageRow => kind === 'live'
+            ? isEditableLivePackage(packageRow, countryId)
+            : isEditableMediaPackage(packageRow, countryId, kind);
+        if (targetPackageId !== 'hidden' && !isEditablePackage(packageById.get(targetPackageId))) {
+            return res.status(400).json({ error: 'The destination package must belong to the same country and media type' });
+        }
+
+        const items = [];
+        const seenItems = new Set();
+        for (let index = 0; index < requestedItems.length; index += 1) {
+            const input = requestedItems[index] || {};
+            const sourceId = Number.parseInt(input.sourceId, 10);
+            const streamId = String(input.streamId || '').trim();
+            const fromPackageId = String(input.fromPackageId || '').trim();
+            if (!Number.isInteger(sourceId) || !streamId || !fromPackageId) {
+                return res.status(400).json({ error: `Invalid membership item at index ${index}` });
+            }
+            if (!isEditablePackage(packageById.get(fromPackageId))) {
+                return res.status(400).json({ error: `Invalid source package at index ${index}` });
+            }
+            const identity = `${sourceId}\u001f${streamId}`;
+            if (seenItems.has(identity)) continue;
+            seenItems.add(identity);
+            items.push({ sourceId, streamId, fromPackageId });
+        }
+
+        const sourcePackageIds = new Set(items.map(item => item.fromPackageId));
+        const currentMemberships = new Map(effectiveCurations(sourcePackageIds)
+            .filter(row => String(row.country_id || '') === countryId && row.kind === kind)
+            .map(row => [
+                `${String(row.target_package_id || '')}\u001f${Number.parseInt(row.source_id, 10)}\u001f${String(row.stream_id || '')}`,
+                row
+            ]));
+        const itemType = catalogueItemType(kind);
+        const findCatalogueItem = getDb().prepare(`
+            SELECT 1 FROM playlist_items
+            WHERE source_id = ? AND type = ? AND item_id = ? AND is_hidden = 0
+        `);
+        const updates = [];
+        for (const item of items) {
+            const membershipKey = `${item.fromPackageId}\u001f${item.sourceId}\u001f${item.streamId}`;
+            const currentMembership = currentMemberships.get(membershipKey);
+            if (!currentMembership) {
+                return res.status(409).json({ error: `Item ${item.streamId} is no longer in its source package` });
+            }
+            if (!findCatalogueItem.get(item.sourceId, itemType, item.streamId)) {
+                return res.status(404).json({ error: `Item ${item.streamId} was not found in the catalogue` });
+            }
+            const originalPackageId = String(currentMembership.origin_package_id || item.fromPackageId);
+            updates.push({
+                countryId,
+                sourceId: item.sourceId,
+                streamId: item.streamId,
+                targetPackageId,
+                originPackageId: targetPackageId === originalPackageId ? '' : originalPackageId,
+                kind
+            });
+        }
+
+        const rows = saveMediaCurations(updates, packages, rawCurations);
+        invalidateCountryPackageCache();
+        res.set('Cache-Control', 'no-store');
+        return res.json({ ok: true, count: rows.length, requestedCount: requestedItems.length, curations: rows });
+    } catch (error) {
+        console.error('[Velora data] Bulk membership update failed:', error);
         return res.status(500).json({ error: error.message });
     }
 });

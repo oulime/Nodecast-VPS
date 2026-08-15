@@ -14,7 +14,13 @@ async function main() {
     const testId = `test_${Date.now()}`;
     const testSourceId = 999999;
     const testStreamId = `${Date.now()}`;
+    const testStreamId2 = `${Number(testStreamId) + 1}`;
     const testItemId = `${testSourceId}:movie:${testStreamId}`;
+    const testItemId2 = `${testSourceId}:movie:${testStreamId2}`;
+    const testLiveStreamId = `${Number(testStreamId) + 2}`;
+    const testLiveStreamId2 = `${Number(testStreamId) + 3}`;
+    const testLiveItemId = `${testSourceId}:live:${testLiveStreamId}`;
+    const testLiveItemId2 = `${testSourceId}:live:${testLiveStreamId2}`;
 
     try {
         let response = await fetch(`${base.replace('/rest/v1', '')}/admin/stream-curation-map`);
@@ -113,12 +119,14 @@ async function main() {
 
         const sourcePackageId = `${testId}_source`;
         const targetPackageId = `${testId}_target`;
-        getDb().prepare(`
+        const insertTestItem = getDb().prepare(`
             INSERT INTO playlist_items (
                 id, source_id, item_id, type, name, category_id,
                 stream_icon, provider_order, is_hidden
-            ) VALUES (?, ?, ?, 'movie', 'Test movie', 'test_category', '', 1, 0)
-        `).run(testItemId, testSourceId, testStreamId);
+            ) VALUES (?, ?, ?, 'movie', ?, 'test_category', '', ?, 0)
+        `);
+        insertTestItem.run(testItemId, testSourceId, testStreamId, 'Test movie 1', 1);
+        insertTestItem.run(testItemId2, testSourceId, testStreamId2, 'Test movie 2', 2);
         response = await fetch(`${base}/admin_packages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -134,8 +142,34 @@ async function main() {
         response = await fetch(`${mediaBase}/admin/package-media-items?countryId=${testId}&packageId=${sourcePackageId}&kind=vod`);
         assert.equal(response.status, 200);
         let mediaPayload = await response.json();
-        assert.equal(mediaPayload.items.length, 1);
+        assert.equal(mediaPayload.items.length, 2);
         assert.equal(String(mediaPayload.items[0].stream_id), testStreamId);
+
+        response = await fetch(`${mediaBase}/admin/memberships/bulk`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                countryId: testId,
+                targetPackageId,
+                kind: 'vod',
+                items: [testStreamId, testStreamId2].map(streamId => ({
+                    sourceId: testSourceId,
+                    streamId,
+                    fromPackageId: sourcePackageId
+                }))
+            })
+        });
+        assert.equal(response.status, 200);
+        const bulkPayload = await response.json();
+        assert.equal(bulkPayload.count, 2);
+
+        response = await fetch(`${mediaBase}/admin/package-media-items?countryId=${testId}&packageId=${sourcePackageId}&kind=vod`);
+        mediaPayload = await response.json();
+        assert.equal(mediaPayload.items.length, 0);
+        response = await fetch(`${mediaBase}/admin/package-media-items?countryId=${testId}&packageId=${targetPackageId}&kind=vod`);
+        mediaPayload = await response.json();
+        assert.equal(mediaPayload.items.length, 2);
+        assert.ok(mediaPayload.items.every(item => item.origin_package_id === sourcePackageId));
 
         response = await fetch(`${mediaBase}/admin/media-membership`, {
             method: 'POST',
@@ -144,20 +178,60 @@ async function main() {
                 countryId: testId,
                 sourceId: testSourceId,
                 streamId: testStreamId,
-                fromPackageId: sourcePackageId,
-                targetPackageId,
+                fromPackageId: targetPackageId,
+                targetPackageId: sourcePackageId,
                 kind: 'vod'
             })
         });
         assert.equal(response.status, 200);
-
         response = await fetch(`${mediaBase}/admin/package-media-items?countryId=${testId}&packageId=${sourcePackageId}&kind=vod`);
         mediaPayload = await response.json();
-        assert.equal(mediaPayload.items.length, 0);
-        response = await fetch(`${mediaBase}/admin/package-media-items?countryId=${testId}&packageId=${targetPackageId}&kind=vod`);
-        mediaPayload = await response.json();
         assert.equal(mediaPayload.items.length, 1);
-        assert.equal(mediaPayload.items[0].origin_package_id, sourcePackageId);
+
+        const sourceLivePackageId = `${testId}_live_source`;
+        const targetLivePackageId = `${testId}_live_target`;
+        const insertLiveItem = getDb().prepare(`
+            INSERT INTO playlist_items (
+                id, source_id, item_id, type, name, category_id,
+                stream_icon, provider_order, is_hidden
+            ) VALUES (?, ?, ?, 'live', ?, 'test_live_category', '', ?, 0)
+        `);
+        insertLiveItem.run(testLiveItemId, testSourceId, testLiveStreamId, 'Test channel 1', 1);
+        insertLiveItem.run(testLiveItemId2, testSourceId, testLiveStreamId2, 'Test channel 2', 2);
+        response = await fetch(`${base}/admin_packages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify([
+                { id: sourceLivePackageId, country_id: testId, name: 'Source live', source_id: testSourceId,
+                    category_id: 'test_live_category', kind: 'live', is_parent: false },
+                { id: targetLivePackageId, country_id: testId, name: 'Target live', kind: 'live', is_parent: false }
+            ])
+        });
+        assert.equal(response.status, 201);
+
+        response = await fetch(`${mediaBase}/admin/memberships/bulk`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                countryId: testId,
+                targetPackageId: targetLivePackageId,
+                kind: 'live',
+                items: [testLiveStreamId, testLiveStreamId2].map(streamId => ({
+                    sourceId: testSourceId,
+                    streamId,
+                    fromPackageId: sourceLivePackageId
+                }))
+            })
+        });
+        assert.equal(response.status, 200);
+        const liveBulkPayload = await response.json();
+        assert.equal(liveBulkPayload.count, 2);
+
+        response = await fetch(`${mediaBase}/admin/package-live-channels?countryId=${testId}&packageId=${targetLivePackageId}`);
+        assert.equal(response.status, 200);
+        const livePayload = await response.json();
+        assert.equal(livePayload.channels.length, 2);
+        assert.ok(livePayload.channels.every(channel => channel.origin_package_id === sourceLivePackageId));
 
         response = await fetch(`${base.replace('/rest/v1', '')}/country-package-cache`);
         assert.equal(response.status, 200);
@@ -169,7 +243,8 @@ async function main() {
         getDb().prepare(
             `DELETE FROM velora_admin_rows WHERE json_extract(data, '$.id') = ? OR json_extract(data, '$.country_id') = ?`
         ).run(testId, testId);
-        getDb().prepare(`DELETE FROM playlist_items WHERE id = ?`).run(testItemId);
+        getDb().prepare(`DELETE FROM playlist_items WHERE id IN (?, ?, ?, ?)`)
+            .run(testItemId, testItemId2, testLiveItemId, testLiveItemId2);
         veloraData.invalidateCountryPackageCache();
         await new Promise(resolve => server.close(resolve));
     }

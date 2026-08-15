@@ -140,9 +140,48 @@
   }
 
   function stopHeartEvent(event) {
-    event.preventDefault();
+    if (event.cancelable) event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
+  }
+
+  function activateHeart(event, heart) {
+    stopHeartEvent(event);
+    var now = Date.now();
+    if (now - Number(heart._veloraLastActivation || 0) < 650) return;
+    heart._veloraLastActivation = now;
+    void toggleFavorite(heart);
+  }
+
+  function captureHeartInteraction(event) {
+    var target = event.target;
+    var heart = target && typeof target.closest === "function" ? target.closest(".vel-favorite-heart") : null;
+    if (!heart) return;
+    if (
+      event.type === "touchend" ||
+      event.type === "click" ||
+      (event.type === "pointerup" && (event.pointerType === "touch" || event.pointerType === "pen"))
+    ) {
+      activateHeart(event, heart);
+      return;
+    }
+    stopHeartEvent(event);
+  }
+
+  function bindHeartActivation(heart) {
+    heart.addEventListener("pointerdown", stopHeartEvent);
+    heart.addEventListener("pointerup", function (event) {
+      if (event.pointerType === "touch" || event.pointerType === "pen") activateHeart(event, heart);
+      else stopHeartEvent(event);
+    });
+    heart.addEventListener("touchstart", stopHeartEvent, { passive: false });
+    heart.addEventListener("touchend", function (event) { activateHeart(event, heart); }, { passive: false });
+    heart.addEventListener("mousedown", stopHeartEvent);
+    heart.addEventListener("mouseup", stopHeartEvent);
+    heart.addEventListener("click", function (event) { activateHeart(event, heart); });
+    heart.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" || event.key === " ") activateHeart(event, heart);
+    });
   }
 
   function createHeart(descriptor, nested) {
@@ -157,18 +196,7 @@
       heart.tabIndex = 0;
     }
     setHeartState(heart, state.items.has(heart.dataset.favoriteKey));
-    ["pointerdown", "pointerup", "mousedown", "mouseup", "touchstart", "touchend"].forEach(function (type) {
-      heart.addEventListener(type, stopHeartEvent);
-    });
-    heart.addEventListener("click", function (event) {
-      stopHeartEvent(event);
-      void toggleFavorite(heart);
-    });
-    heart.addEventListener("keydown", function (event) {
-      if (event.key !== "Enter" && event.key !== " ") return;
-      stopHeartEvent(event);
-      void toggleFavorite(heart);
-    });
+    bindHeartActivation(heart);
     return heart;
   }
 
@@ -275,10 +303,7 @@
     remove.dataset.favoriteKey = favoriteKey(item);
     remove._veloraFavorite = item;
     setHeartState(remove, true);
-    remove.addEventListener("click", function (event) {
-      stopHeartEvent(event);
-      void toggleFavorite(remove);
-    });
+    bindHeartActivation(remove);
     card.append(open, remove);
     return card;
   }
@@ -359,6 +384,11 @@
   }
 
   function init() {
+    ["pointerdown", "pointerup", "mousedown", "mouseup", "click"].forEach(function (eventName) {
+      document.addEventListener(eventName, captureHeartInteraction, true);
+    });
+    document.addEventListener("touchstart", captureHeartInteraction, { capture: true, passive: false });
+    document.addEventListener("touchend", captureHeartInteraction, { capture: true, passive: false });
     var profileFavorite = document.getElementById("vel-profile-favorites");
     if (profileFavorite) {
       profileFavorite.addEventListener("click", function (event) {

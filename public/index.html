@@ -10563,8 +10563,8 @@ if (target.closest(".trial-offer-button")) {
         width: 24px;
         height: 2px;
         border-radius: 999px;
-        background: linear-gradient(90deg, #7d5cff, #36c9ff);
-        box-shadow: 0 0 12px rgba(86, 161, 255, 0.9);
+        background: linear-gradient(90deg, #f59e0b, #fde68a);
+        box-shadow: 0 0 12px rgba(245, 158, 11, 0.8);
         opacity: 0;
         transform: scaleX(0.4);
         transition: opacity 160ms ease, transform 160ms ease;
@@ -10582,13 +10582,19 @@ if (target.closest(".trial-offer-button")) {
       }
 
       .vel-bottom-nav__button.is-active {
-        color: #fff;
-        background: linear-gradient(145deg, rgba(126, 87, 255, 0.25), rgba(52, 197, 255, 0.09));
+        color: #fff7ed;
+        background: linear-gradient(145deg, rgba(245, 158, 11, 0.34), rgba(251, 191, 36, 0.16));
+        box-shadow: inset 0 0 0 1px rgba(253, 230, 138, 0.18), 0 5px 15px rgba(120, 53, 15, 0.2);
       }
 
       .vel-bottom-nav__button.is-active::before {
         opacity: 1;
         transform: scaleX(1);
+      }
+
+      .vel-bottom-nav__button.is-active .vel-bottom-nav__icon,
+      .vel-bottom-nav__button.is-active .vel-bottom-nav__icon-frame {
+        filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.58));
       }
 
       .vel-bottom-nav__icon {
@@ -10736,6 +10742,10 @@ if (target.closest(".trial-offer-button")) {
       .vel-bottom-country-menu__option.is-selected {
         color: #fff;
         background: linear-gradient(135deg, rgba(126, 87, 255, 0.28), rgba(52, 197, 255, 0.1));
+      }
+
+      #vel-profile-favorites[hidden] {
+        display: none !important;
       }
 
       .vel-bottom-country-menu__check {
@@ -11298,7 +11308,7 @@ if (target.closest(".trial-offer-button")) {
         <span class="vel-bottom-nav__label">Films</span>
       </button>
       <button type="button" class="vel-bottom-nav__button" data-bottom-nav="series" aria-label="Séries">
-        <svg class="vel-bottom-nav__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.3 2.8 12 6.5l3.7-3.7 1.4 1.4L13.3 8H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h5.7L6.9 4.2l1.4-1.4ZM6 11v7h10v-7H6Zm12 1.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm0 3a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/></svg>
+        <svg class="vel-bottom-nav__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h12a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3Zm3.2 4.5v7l6-3.5-6-3.5ZM2 6h1v10a4 4 0 0 0 4 4h11v2H7a6 6 0 0 1-6-6V7a1 1 0 0 1 1-1Z"/></svg>
         <span class="vel-bottom-nav__label">Séries</span>
       </button>
       <button type="button" class="vel-bottom-nav__button" data-bottom-nav="country" aria-label="Choisir un pays">
@@ -11324,7 +11334,7 @@ if (target.closest(".trial-offer-button")) {
         <span>Adulte +18</span>
         <img src="/logos/adult-18.svg" alt="" aria-hidden="true" width="26" height="26" />
       </button>
-      <button type="button" id="vel-profile-favorites" class="vel-bottom-country-menu__option">
+      <button type="button" id="vel-profile-favorites" class="vel-bottom-country-menu__option" hidden>
         <span>Favoris</span>
         <span class="vel-bottom-country-menu__check" aria-hidden="true">♥</span>
       </button>

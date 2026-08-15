@@ -145,6 +145,12 @@ async function main() {
         assert.equal(mediaPayload.items.length, 2);
         assert.equal(String(mediaPayload.items[0].stream_id), testStreamId);
 
+        response = await fetch(`${mediaBase}/admin/package-media-counts?countryId=${testId}&kind=movies`);
+        assert.equal(response.status, 200);
+        let mediaCounts = await response.json();
+        assert.equal(mediaCounts.counts.find(item => item.package_id === sourcePackageId)?.count, 2);
+        assert.equal(mediaCounts.counts.find(item => item.package_id === targetPackageId)?.count, 0);
+
         response = await fetch(`${mediaBase}/admin/memberships/bulk`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -170,6 +176,12 @@ async function main() {
         mediaPayload = await response.json();
         assert.equal(mediaPayload.items.length, 2);
         assert.ok(mediaPayload.items.every(item => item.origin_package_id === sourcePackageId));
+
+        response = await fetch(`${mediaBase}/admin/package-media-counts?countryId=${testId}&kind=vod`);
+        assert.equal(response.status, 200);
+        mediaCounts = await response.json();
+        assert.equal(mediaCounts.counts.find(item => item.package_id === sourcePackageId)?.count, 0);
+        assert.equal(mediaCounts.counts.find(item => item.package_id === targetPackageId)?.count, 2);
 
         response = await fetch(`${mediaBase}/admin/media-membership`, {
             method: 'POST',

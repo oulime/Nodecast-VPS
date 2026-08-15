@@ -252,6 +252,46 @@ body.vel-media-package-menu-open .main--velora :is(#content-view, #dynamic-list,
   cursor: pointer;
 }
 
+.vel-media-package-picker__name {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vel-media-package-picker__count,
+.vel-package-card__media-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.12);
+  color: #bae6fd;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.vel-media-package-picker__count {
+  flex: 0 0 auto;
+  min-width: 4.3rem;
+  padding: 0.32rem 0.48rem;
+}
+
+.vel-package-card__media-count {
+  position: absolute;
+  z-index: 8;
+  right: 0.55rem;
+  bottom: 0.55rem;
+  padding: 0.38rem 0.52rem;
+  background: rgba(4, 8, 20, 0.84);
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.38);
+  pointer-events: none;
+}
+
 .vel-media-package-picker__option:hover,
 .vel-media-package-picker__option:focus-visible {
   color: #fff;

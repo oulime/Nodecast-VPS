@@ -3,6 +3,9 @@
 
   const MEDIA_TABS = new Set(["movies", "series"]);
   const packageCache = new Map();
+  const mediaCountCache = new Map();
+  const mediaCountLoads = new Map();
+  let countryPackagePayloadPromise = null;
   const selectedPackages = new Map();
   const adultLiveArtworkCache = new Map();
   const liveParentChildrenCache = new Map();
@@ -38,6 +41,134 @@
   function cacheKey(tab = activeTab()) {
     if (isAdultMode()) return `adult::${tab}`;
     return `${countryKey()}::${tab}`;
+  }
+
+  function countLabel(tab, count) {
+    const value = Number(count) || 0;
+    const noun = tab === "series"
+      ? value === 1 ? "série" : "séries"
+      : value === 1 ? "film" : "films";
+    return `${value} ${noun}`;
+  }
+
+  function syncPackageCardCounts(tab) {
+    const counts = mediaCountCache.get(cacheKey(tab));
+    if (!counts || !gridBelongsTo(tab)) return;
+    for (const { id, card } of currentPackageCards(tab)) {
+      const count = counts.get(id) ?? 0;
+      let badge = card.querySelector(":scope > .vel-package-card__media-count");
+      if (!badge) {
+        badge = document.createElement("span");
+        badge.className = "vel-package-card__media-count";
+        card.appendChild(badge);
+      }
+      const text = countLabel(tab, count);
+      if (badge.textContent !== text) badge.textContent = text;
+    }
+  }
+
+  function mediaCountsFromCountryPackageCache(payload, countryId, tab) {
+    const kind = tab === "movies" ? "vod" : "series";
+    const memberships = payload?.memberships || {};
+    const countries = Array.isArray(memberships.countries) ? memberships.countries : [];
+    const packageIds = Array.isArray(memberships.packages) ? memberships.packages : [];
+    const rows = Array.isArray(memberships.rows) ? memberships.rows : [];
+    const itemKeysByPackage = new Map();
+
+    for (const row of rows) {
+      if (!Array.isArray(row) || countries[row[0]] !== countryId || row[4] !== kind) continue;
+      const packageId = String(packageIds[row[2]] || "");
+      if (!packageId) continue;
+      if (!itemKeysByPackage.has(packageId)) itemKeysByPackage.set(packageId, new Set());
+      itemKeysByPackage.get(packageId).add(`${String(row[3] ?? "")}:${String(row[1] ?? "")}`);
+    }
+
+    const counts = new Map();
+    for (const packageRow of Array.isArray(payload?.packages) ? payload.packages : []) {
+      if (String(packageRow.country_id || "") !== countryId || packageRow.kind !== kind) continue;
+      const packageId = String(packageRow.id || "");
+      const isParent = packageRow.is_parent === true || packageRow.is_parent === "true";
+      if (!isParent) {
+        counts.set(packageId, itemKeysByPackage.get(packageId)?.size || 0);
+        continue;
+      }
+      const uniqueItems = new Set();
+      for (const childId of Array.isArray(packageRow.child_package_ids) ? packageRow.child_package_ids : []) {
+        for (const itemKey of itemKeysByPackage.get(String(childId)) || []) uniqueItems.add(itemKey);
+      }
+      counts.set(packageId, uniqueItems.size);
+    }
+    return counts;
+  }
+
+  async function loadCountsFromCountryPackageCache(countryId, tab) {
+    if (!countryPackagePayloadPromise) {
+      countryPackagePayloadPromise = fetch("/api/velora-db/country-package-cache", { cache: "no-store" })
+        .then(response => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return response.json();
+        })
+        .catch(error => {
+          countryPackagePayloadPromise = null;
+          throw error;
+        });
+    }
+    return mediaCountsFromCountryPackageCache(await countryPackagePayloadPromise, countryId, tab);
+  }
+
+  async function loadMediaPackageCounts(tab) {
+    if (!MEDIA_TABS.has(tab) || isAdultMode()) return null;
+    const countryId = countryKey();
+    if (!countryId || countryId === "all") return null;
+    const key = cacheKey(tab);
+    if (mediaCountCache.has(key)) return mediaCountCache.get(key);
+    if (mediaCountLoads.has(key)) return mediaCountLoads.get(key);
+
+    const request = (async () => {
+      try {
+        const token = window.localStorage.getItem("authToken");
+        const response = await fetch(
+          `/api/velora-db/admin/package-media-counts?countryId=${encodeURIComponent(countryId)}&kind=${encodeURIComponent(tab)}`,
+          {
+            cache: "no-store",
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined
+          }
+        );
+        const contentType = String(response.headers.get("content-type") || "");
+        if (!response.ok || !contentType.includes("application/json")) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const payload = await response.json();
+        if (!Array.isArray(payload?.counts)) throw new Error("Invalid media count response");
+        const counts = new Map(payload.counts.map(item => [
+          String(item.package_id || ""),
+          Math.max(0, Number(item.count) || 0)
+        ]));
+        mediaCountCache.set(key, counts);
+        if (cacheKey(tab) === key) {
+          syncPackageCardCounts(tab);
+          syncPicker(tab);
+        }
+        return counts;
+      } catch (error) {
+        try {
+          const counts = await loadCountsFromCountryPackageCache(countryId, tab);
+          mediaCountCache.set(key, counts);
+          if (cacheKey(tab) === key) {
+            syncPackageCardCounts(tab);
+            syncPicker(tab);
+          }
+          return counts;
+        } catch (fallbackError) {
+          console.warn("[Velora] Package media counts failed", { tab, countryId, error, fallbackError });
+          return null;
+        }
+      } finally {
+        mediaCountLoads.delete(key);
+      }
+    })();
+    mediaCountLoads.set(key, request);
+    return request;
   }
 
   function gridBelongsTo(tab) {
@@ -490,7 +621,10 @@
       return;
     }
 
-    const signature = packages.map(item => `${item.id}\u0000${item.name}`).join("\u0001");
+    const counts = mediaCountCache.get(cacheKey(tab));
+    const signature = packages.map(item =>
+      `${item.id}\u0000${item.name}\u0000${counts?.get(item.id) ?? ""}`
+    ).join("\u0001");
     if (menu.dataset.signature !== signature) {
       menu.querySelectorAll("[data-package-id]").forEach(option => option.remove());
       menu.append(...packages.map(item => {
@@ -500,12 +634,16 @@
         option.dataset.packageId = item.id;
         option.setAttribute("role", "option");
         const name = document.createElement("span");
+        name.className = "vel-media-package-picker__name";
         name.textContent = item.name;
+        const count = document.createElement("span");
+        count.className = "vel-media-package-picker__count";
+        count.textContent = counts ? countLabel(tab, counts.get(item.id) ?? 0) : "…";
         const check = document.createElement("span");
         check.className = "vel-media-package-picker__check";
         check.textContent = "✓";
         check.setAttribute("aria-hidden", "true");
-        option.append(name, check);
+        option.append(name, count, check);
         return option;
       }));
       menu.dataset.signature = signature;
@@ -514,8 +652,13 @@
     const selected = selectedPackages.get(cacheKey(tab));
     const selectedPackage = packages.find(item => item.id === selected) || packages[0];
     if (!selectedPackage) return;
-    label.textContent = selectedPackage.name;
-    trigger.setAttribute("aria-label", `Package : ${selectedPackage.name}`);
+    const selectedCount = counts?.get(selectedPackage.id);
+    label.textContent = selectedCount == null
+      ? selectedPackage.name
+      : `${selectedPackage.name} · ${countLabel(tab, selectedCount)}`;
+    trigger.setAttribute("aria-label", selectedCount == null
+      ? `Package : ${selectedPackage.name}`
+      : `Package : ${selectedPackage.name}, ${countLabel(tab, selectedCount)}`);
     menu.querySelectorAll("[data-package-id]").forEach(option => {
       const active = option.dataset.packageId === selectedPackage.id;
       option.classList.toggle("is-selected", active);
@@ -588,7 +731,9 @@
     }
 
     const cards = rememberPackages(tab);
+    syncPackageCardCounts(tab);
     syncPicker(tab);
+    void loadMediaPackageCounts(tab);
     openSelectedPackage(tab, cards);
   }
 
@@ -607,6 +752,13 @@
 
   countrySelect?.addEventListener("change", () => {
     pendingOpen = "";
+    scheduleUpdate();
+  });
+
+  window.addEventListener("velora-admin-curation-changed", () => {
+    mediaCountCache.clear();
+    mediaCountLoads.clear();
+    countryPackagePayloadPromise = null;
     scheduleUpdate();
   });
 

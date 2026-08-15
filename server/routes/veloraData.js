@@ -925,6 +925,55 @@ router.get('/admin/package-media-items', (req, res) => {
     }
 });
 
+router.get('/admin/package-media-counts', (req, res) => {
+    try {
+        const countryId = String(req.query.countryId || '').trim();
+        const requestedKind = String(req.query.kind || '').trim();
+        const kind = requestedKind === 'movies' ? 'vod' : requestedKind;
+        if (!countryId || !['vod', 'series'].includes(kind)) {
+            return res.status(400).json({ error: 'countryId and a valid media kind are required' });
+        }
+
+        const cached = getCountryPackageCache();
+        const packages = cached.packages.filter(packageRow =>
+            String(packageRow.country_id || '') === countryId
+            && packageRow.kind === kind
+        );
+        const itemKeysByPackage = new Map(packages
+            .filter(packageRow => packageRow.is_parent !== true && packageRow.is_parent !== 'true')
+            .map(packageRow => [String(packageRow.id), new Set()]));
+
+        for (const membership of expandMemberships(cached.memberships)) {
+            if (String(membership.country_id || '') !== countryId || membership.kind !== kind) continue;
+            const packageItems = itemKeysByPackage.get(String(membership.target_package_id || ''));
+            if (!packageItems) continue;
+            packageItems.add(`${String(membership.source_id ?? '')}:${String(membership.stream_id ?? '')}`);
+        }
+
+        const counts = packages.map(packageRow => {
+            const packageId = String(packageRow.id);
+            const isParent = packageRow.is_parent === true || packageRow.is_parent === 'true';
+            if (!isParent) {
+                return { package_id: packageId, count: itemKeysByPackage.get(packageId)?.size || 0 };
+            }
+            const uniqueItems = new Set();
+            for (const childId of Array.isArray(packageRow.child_package_ids)
+                ? packageRow.child_package_ids.map(String)
+                : []) {
+                for (const itemKey of itemKeysByPackage.get(childId) || []) uniqueItems.add(itemKey);
+            }
+            return { package_id: packageId, count: uniqueItems.size };
+        });
+
+        res.set('Cache-Control', 'no-store');
+        res.set('X-Velora-Country-Package-Cache', 'vps-local-derived');
+        return res.json({ country_id: countryId, kind, counts });
+    } catch (error) {
+        console.error('[Velora data] Package media counts failed:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
 router.post('/admin/memberships/bulk', (req, res) => {
     try {
         const countryId = String(req.body?.countryId || '').trim();

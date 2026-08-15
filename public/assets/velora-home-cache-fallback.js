@@ -14,7 +14,7 @@
   var lastDirectTouchAt = 0;
   var homeRootObserver = null;
   var renderVersion = 0;
-  var railPageSize = 36;
+  var railPageSize = 20;
 
   function activateDirectTouch(card, payload) {
     var now = Date.now();
@@ -94,7 +94,7 @@
       return Promise.resolve(countryPayload);
     }
     if (cacheRequests.has(countryId)) return cacheRequests.get(countryId);
-    var request = fetch("/api/velora-db/home-cache?country_id=" + encodeURIComponent(countryId) + "&limit=10", {
+    var request = fetch("/api/velora-db/home-cache?country_id=" + encodeURIComponent(countryId) + "&limit=20", {
       cache: force ? "reload" : "force-cache"
     }).then(function (response) {
       if (!response.ok) throw new Error("HTTP " + response.status);
@@ -129,7 +129,7 @@
   function loadSectionPage(section, offset) {
     var countryId = activeCountryId();
     return fetch("/api/velora-db/home-cache?country_id=" + encodeURIComponent(countryId) +
-      "&section_id=" + encodeURIComponent(section.id) + "&offset=" + offset + "&limit=10", {
+      "&section_id=" + encodeURIComponent(section.id) + "&offset=" + offset + "&limit=20", {
       cache: "force-cache"
     }).then(function (response) {
       if (!response.ok) throw new Error("HTTP " + response.status);
@@ -203,6 +203,8 @@
     card.type = "button";
     card.className = "vel-home-section__card vel-home-section__card--" + section.content_type;
     card.setAttribute("aria-label", entry.name || "");
+    card.dataset.packageId = String(section.package_id || entry.packageId || "");
+    card.dataset.contentType = String(section.content_type || entry.contentType || "");
     var media;
     if (entry.thumbUrl) {
       media = document.createElement("img");

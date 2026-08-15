@@ -598,6 +598,47 @@
     window.requestAnimationFrame(update);
   }
 
+  window.veloraOpenHomePackage = (section, button) => {
+    const packageId = String(section?.package_id || section?.packageId || "");
+    const tab = section?.content_type === "movies"
+      ? "movies"
+      : section?.content_type === "series" ? "series" : "live";
+    if (!packageId || button?.dataset.homePackagePending === "true") return;
+    if (button) {
+      button.dataset.homePackagePending = "true";
+      button.classList.add("is-opening");
+      button.setAttribute("aria-busy", "true");
+    }
+    document.dispatchEvent(new CustomEvent("velora-home-tab", { detail: { tab } }));
+    if (MEDIA_TABS.has(tab)) {
+      selectedPackages.set(`${countryKey()}::${tab}`, packageId);
+      pendingOpen = `${countryKey()}::${tab}::${packageId}`;
+    }
+    const started = Date.now();
+    const finish = () => {
+      if (!button) return;
+      delete button.dataset.homePackagePending;
+      button.classList.remove("is-opening");
+      button.removeAttribute("aria-busy");
+    };
+    const openWhenReady = () => {
+      const target = [...packagesView.querySelectorAll(".vel-package-card[data-package-id]")]
+        .find(card => String(card.dataset.packageId || "") === packageId && !card.hidden);
+      if (activeTab() === tab && target && packagesView.contains(target)) {
+        finish();
+        target.click();
+        return;
+      }
+      if (Date.now() - started >= 15000) {
+        finish();
+        return;
+      }
+      scheduleUpdate();
+      window.requestAnimationFrame(openWhenReady);
+    };
+    window.requestAnimationFrame(openWhenReady);
+  };
+
   new MutationObserver(scheduleUpdate).observe(document.body, {
     childList: true,
     subtree: true,

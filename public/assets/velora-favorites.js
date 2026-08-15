@@ -477,6 +477,7 @@
     document.getElementById("vel-bottom-profile-menu")?.setAttribute("hidden", "");
     state.limits = { movie: PAGE_SIZE, series: PAGE_SIZE, channel: PAGE_SIZE };
     state.open = true;
+    document.body.classList.add("vel-favorites-open");
     page.hidden = false;
     page.querySelector(".vel-favorites-page__content").innerHTML = '<p class="vel-favorites-page__loading">Chargement de vos favoris…</p>';
     try {
@@ -493,6 +494,7 @@
     if (!state.page) return;
     state.page.hidden = true;
     state.open = false;
+    document.body.classList.remove("vel-favorites-open");
   }
 
   function init() {

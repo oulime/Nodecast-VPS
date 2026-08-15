@@ -1519,8 +1519,8 @@
     <script defer src="/assets/subscription-access-guard.js?v=subscription-whatsapp-number-v2-20260810"></script>
     <script defer src="/assets/subscription-welcome.js?v=first-login-test-message-v1-20260810"></script>
     <script defer src="/assets/profile-account.js?v=profile-account-menu-v2-20260810"></script>
-    <link rel="stylesheet" href="/assets/velora-favorites.css?v=favorites-nav-square-channels-v7-20260816" />
-    <script defer src="/assets/velora-favorites.js?v=favorites-fullscreen-v6-20260816"></script>
+    <link rel="stylesheet" href="/assets/velora-favorites.css?v=favorites-cover-top-v8-20260816" />
+    <script defer src="/assets/velora-favorites.js?v=favorites-cover-top-v8-20260816"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=package-poster-refresh-secure-v4-20260809"></script>
     <script defer src="/assets/manual-pays-visible-memberships.js?v=package-source-search-v1-20260815"></script>
     <script defer src="/assets/country-logos-admin.js?v=app-country-list-logos-v2-20260815"></script>
@@ -1566,7 +1566,7 @@
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css">
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=large-package-virtualization-v1-20260810">
     <link rel="stylesheet" href="/assets/live-package-text-cards.css?v=tv-package-flat-inner-v1-20260814">
-    <link rel="stylesheet" href="/assets/velora-home-sections.css?v=home-square-channel-logos-v4-20260816">
+    <link rel="stylesheet" href="/assets/velora-home-sections.css?v=home-streaming-rail-titles-v5-20260816">
     <style>
       #settings-tab-btn-ip,
       #settings-tab-ip,
@@ -10786,6 +10786,33 @@ if (target.closest(".trial-offer-button")) {
         display: none !important;
       }
 
+      #btn-adult-portal img,
+      #vel-profile-favorites .vel-bottom-country-menu__check {
+        width: 26px;
+        height: 26px;
+        flex: 0 0 26px;
+        margin: 0;
+      }
+
+      #btn-adult-portal img {
+        display: block;
+        object-fit: contain;
+      }
+
+      #vel-profile-favorites .vel-bottom-country-menu__check {
+        display: grid;
+        place-items: center;
+        color: #fb4b62;
+        filter: drop-shadow(0 0 7px rgba(251, 75, 98, 0.4));
+      }
+
+      #vel-profile-favorites .vel-bottom-country-menu__check svg {
+        display: block;
+        width: 22px;
+        height: 22px;
+        fill: currentColor;
+      }
+
       .vel-bottom-country-menu__check {
         color: #6dd5ff;
         font-size: 17px;
@@ -11379,7 +11406,7 @@ if (target.closest(".trial-offer-button")) {
       </button>
       <button type="button" id="vel-profile-favorites" class="vel-bottom-country-menu__option" hidden>
         <span>Favoris</span>
-        <span class="vel-bottom-country-menu__check" aria-hidden="true">♥</span>
+        <span class="vel-bottom-country-menu__check" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 21s-8.5-4.8-8.5-11.2A4.8 4.8 0 0 1 12 6.7a4.8 4.8 0 0 1 8.5 3.1C20.5 16.2 12 21 12 21Z"/></svg></span>
       </button>
       <button type="button" id="vel-profile-session" class="vel-bottom-country-menu__option">
         <span id="vel-profile-session-label">Connexion</span>

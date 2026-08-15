@@ -9,6 +9,7 @@ const veloraCatalogCache = require('../services/veloraCatalogCache');
 
 const router = express.Router();
 const homeCachePath = path.join(__dirname, '..', '..', 'data', 'velora-cache', 'home-sections.json');
+const HOME_CACHE_ENTRIES_PER_PACKAGE = 20;
 const countryPackageCachePath = path.join(
     __dirname, '..', '..', 'data', 'velora-cache', 'country-packages.json'
 );
@@ -1267,7 +1268,7 @@ function buildHomeCache() {
                     && String(item.raw_category_id ?? '') === providerCategoryId;
             }
             return false;
-        }).slice(0, 500).map(item => {
+        }).slice(0, HOME_CACHE_ENTRIES_PER_PACKAGE).map(item => {
             const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
             return {
                 id: `home-cache:${section.id}:${rawId}`,
@@ -1330,7 +1331,9 @@ router.post('/home-cache/rebuild', async (req, res) => {
                 generatedAt: new Date().toISOString(),
                 sections: req.body.sections.slice(0, 100).map(section => ({
                     ...section,
-                    entries: Array.isArray(section.entries) ? section.entries.slice(0, 500) : []
+                    entries: Array.isArray(section.entries)
+                        ? section.entries.slice(0, HOME_CACHE_ENTRIES_PER_PACKAGE)
+                        : []
                 }))
             };
             await enrichHomeCacheMoviePosters(payload);

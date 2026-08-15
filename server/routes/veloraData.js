@@ -1325,22 +1325,12 @@ router.get('/home-cache', (req, res) => {
 
 router.post('/home-cache/rebuild', async (req, res) => {
     try {
-        let payload;
-        if (req.body && Array.isArray(req.body.sections)) {
-            payload = {
-                generatedAt: new Date().toISOString(),
-                sections: req.body.sections.slice(0, 100).map(section => ({
-                    ...section,
-                    entries: Array.isArray(section.entries)
-                        ? section.entries.slice(0, HOME_CACHE_ENTRIES_PER_PACKAGE)
-                        : []
-                }))
-            };
-            await enrichHomeCacheMoviePosters(payload);
-            writeJsonAtomic(homeCachePath, payload);
-        } else {
-            payload = buildHomeCache();
-        }
+        // Never trust browser-computed section entries here. Rebuild from the
+        // server-side effective memberships so each Home section contains only
+        // content that currently belongs to its configured country/package.
+        const payload = buildHomeCache();
+        await enrichHomeCacheMoviePosters(payload);
+        writeJsonAtomic(homeCachePath, payload);
         return res.json({ ok: true, generatedAt: payload.generatedAt, sections: payload.sections.length,
             entries: payload.sections.reduce((total, section) => total + section.entries.length, 0) });
     } catch (error) {

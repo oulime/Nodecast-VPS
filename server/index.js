@@ -192,13 +192,10 @@ if (USE_VPS_DATA_API) {
             delete headers['content-length'];
             delete headers['accept-encoding'];
 
-            if (req.method === 'POST' && req.path === '/api/velora-db/home-cache/rebuild'
-                && Array.isArray(req.body?.sections)) {
-                const movieEntries = req.body.sections
-                    .filter(section => section?.content_type === 'movies')
-                    .flatMap(section => Array.isArray(section.entries) ? section.entries : []);
-                await enrichVpsHomePosterMatches(movieEntries, headers);
-                await enrichVpsVodPosters(movieEntries, '', headers);
+            if (req.method === 'POST' && req.path === '/api/velora-db/home-cache/rebuild') {
+                // Force the VPS data service to derive Home entries from its
+                // authoritative package memberships instead of browser data.
+                req.body = {};
             }
 
             const hasBody = !['GET', 'HEAD'].includes(req.method) && req.body !== undefined;

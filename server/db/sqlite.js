@@ -242,6 +242,11 @@ function initSchema() {
             source_id INTEGER NOT NULL,
             item_id TEXT NOT NULL,
             item_type TEXT NOT NULL, -- 'channel', 'movie', 'series'
+            name TEXT,
+            thumb_url TEXT,
+            package_id TEXT,
+            global_stream_id TEXT,
+            container_extension TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(user_id, source_id, item_id, item_type)
         );
@@ -252,6 +257,17 @@ function initSchema() {
     const userColumns = db.prepare(`PRAGMA table_info(users)`).all();
     if (!userColumns.some(column => column.name === 'subscription_plan_minutes')) {
         db.exec(`ALTER TABLE users ADD COLUMN subscription_plan_minutes INTEGER`);
+    }
+
+    const favoriteColumns = new Set(db.prepare(`PRAGMA table_info(favorites)`).all().map(column => column.name));
+    for (const [column, definition] of Object.entries({
+        name: 'TEXT',
+        thumb_url: 'TEXT',
+        package_id: 'TEXT',
+        global_stream_id: 'TEXT',
+        container_extension: 'TEXT'
+    })) {
+        if (!favoriteColumns.has(column)) db.exec(`ALTER TABLE favorites ADD COLUMN ${column} ${definition}`);
     }
 
     // One-time compatibility import from the former JSON user store. Existing
@@ -346,13 +362,28 @@ const favorites = {
         return db.prepare(sql).all(...params);
     },
 
-    add(userId, sourceId, itemId, itemType = 'channel') {
+    add(userId, sourceId, itemId, itemType = 'channel', metadata = {}) {
         const db = getDb();
         const stmt = db.prepare(`
-            INSERT OR IGNORE INTO favorites (user_id, source_id, item_id, item_type)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO favorites (
+                user_id, source_id, item_id, item_type, name, thumb_url,
+                package_id, global_stream_id, container_extension
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, source_id, item_id, item_type) DO UPDATE SET
+                name = COALESCE(NULLIF(excluded.name, ''), favorites.name),
+                thumb_url = COALESCE(NULLIF(excluded.thumb_url, ''), favorites.thumb_url),
+                package_id = COALESCE(NULLIF(excluded.package_id, ''), favorites.package_id),
+                global_stream_id = COALESCE(NULLIF(excluded.global_stream_id, ''), favorites.global_stream_id),
+                container_extension = COALESCE(NULLIF(excluded.container_extension, ''), favorites.container_extension)
         `);
-        const result = stmt.run(userId, sourceId, itemId, itemType);
+        const result = stmt.run(
+            userId, sourceId, itemId, itemType,
+            metadata.name || null,
+            metadata.thumbUrl || null,
+            metadata.packageId || null,
+            metadata.globalStreamId || null,
+            metadata.containerExtension || null
+        );
         return result.changes > 0;
     },
 

@@ -2,7 +2,12 @@
   "use strict";
 
   var PAGE_SIZE = 12;
-  var state = { items: new Map(), limits: { movie: PAGE_SIZE, series: PAGE_SIZE, channel: PAGE_SIZE }, page: null, open: false, decorateTimer: 0, currentDetailDescriptor: null };
+  var FAVORITE_TABS = [
+    { type: "channel", label: "Chaînes" },
+    { type: "movie", label: "Films" },
+    { type: "series", label: "Séries" }
+  ];
+  var state = { items: new Map(), limits: { movie: PAGE_SIZE, series: PAGE_SIZE, channel: PAGE_SIZE }, page: null, open: false, activeType: "channel", decorateTimer: 0, currentDetailDescriptor: null };
   var heartSvg = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8.5-4.8-8.5-11.2A4.8 4.8 0 0 1 12 6.7a4.8 4.8 0 0 1 8.5 3.1C20.5 16.2 12 21 12 21Z"/></svg>';
 
   function token() {
@@ -420,15 +425,13 @@
     return card;
   }
 
-  function group(type, title) {
+  function group(type) {
     var all = Array.from(state.items.values()).filter(function (item) { return item.item_type === type; });
     var section = document.createElement("section");
     section.className = "vel-favorites-group vel-favorites-group--" + type;
-    var heading = document.createElement("div");
-    heading.className = "vel-favorites-group__heading";
-    heading.innerHTML = "<h2></h2><span></span>";
-    heading.querySelector("h2").textContent = title;
-    heading.querySelector("span").textContent = String(all.length);
+    section.id = "vel-favorites-panel-" + type;
+    section.setAttribute("role", "tabpanel");
+    section.setAttribute("aria-labelledby", "vel-favorites-tab-" + type);
     var grid = document.createElement("div");
     grid.className = "vel-favorites-grid";
     all.slice(0, state.limits[type]).forEach(function (item) { grid.appendChild(favoriteCard(item)); });
@@ -438,7 +441,7 @@
       empty.textContent = type === "channel" ? "Aucune chaîne favorite." : type === "series" ? "Aucune série favorite." : "Aucun film favori.";
       grid.appendChild(empty);
     }
-    section.append(heading, grid);
+    section.appendChild(grid);
     if (all.length > state.limits[type]) {
       var more = document.createElement("button");
       more.type = "button";
@@ -459,8 +462,24 @@
     page.id = "vel-favorites-page";
     page.className = "vel-favorites-page";
     page.hidden = true;
-    page.innerHTML = '<header class="vel-favorites-page__header"><h1>Mes favoris</h1><button type="button" class="vel-favorites-page__close" aria-label="Fermer les favoris"><span aria-hidden="true">×</span></button></header><main class="vel-favorites-page__content" aria-live="polite"></main>';
+    page.innerHTML = '<header class="vel-favorites-page__header"><h1>Mes favoris</h1><button type="button" class="vel-favorites-page__close" aria-label="Fermer les favoris"><span aria-hidden="true">×</span></button></header><nav class="vel-favorites-tabs" role="tablist" aria-label="Catégories de favoris"><button type="button" id="vel-favorites-tab-channel" class="vel-favorites-tab" role="tab" data-favorites-tab="channel" aria-controls="vel-favorites-panel-channel"><span>Chaînes</span><small>0</small></button><button type="button" id="vel-favorites-tab-movie" class="vel-favorites-tab" role="tab" data-favorites-tab="movie" aria-controls="vel-favorites-panel-movie"><span>Films</span><small>0</small></button><button type="button" id="vel-favorites-tab-series" class="vel-favorites-tab" role="tab" data-favorites-tab="series" aria-controls="vel-favorites-panel-series"><span>Séries</span><small>0</small></button></nav><main class="vel-favorites-page__content" aria-live="polite"></main>';
     page.querySelector(".vel-favorites-page__close").addEventListener("click", closePage);
+    page.querySelector(".vel-favorites-tabs").addEventListener("click", function (event) {
+      var tab = event.target.closest("[data-favorites-tab]");
+      if (!tab) return;
+      state.activeType = tab.dataset.favoritesTab;
+      renderPage();
+    });
+    page.querySelector(".vel-favorites-tabs").addEventListener("keydown", function (event) {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      var tabs = Array.from(page.querySelectorAll("[data-favorites-tab]"));
+      var current = tabs.indexOf(document.activeElement);
+      if (current < 0) return;
+      event.preventDefault();
+      var next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+      tabs[next].click();
+      tabs[next].focus();
+    });
     document.body.appendChild(page);
     state.page = page;
     return page;
@@ -469,13 +488,22 @@
   function renderPage() {
     var page = ensurePage();
     var content = page.querySelector(".vel-favorites-page__content");
-    content.replaceChildren(group("movie", "Films"), group("series", "Séries"), group("channel", "Chaînes"));
+    FAVORITE_TABS.forEach(function (definition) {
+      var tab = page.querySelector('[data-favorites-tab="' + definition.type + '"]');
+      var active = definition.type === state.activeType;
+      tab.classList.toggle("is-active", active);
+      tab.setAttribute("aria-selected", active ? "true" : "false");
+      tab.tabIndex = active ? 0 : -1;
+      tab.querySelector("small").textContent = String(Array.from(state.items.values()).filter(function (item) { return item.item_type === definition.type; }).length);
+    });
+    content.replaceChildren(group(state.activeType));
   }
 
   async function openPage() {
     var page = ensurePage();
     document.getElementById("vel-bottom-profile-menu")?.setAttribute("hidden", "");
     state.limits = { movie: PAGE_SIZE, series: PAGE_SIZE, channel: PAGE_SIZE };
+    state.activeType = "channel";
     state.open = true;
     document.body.classList.add("vel-favorites-open");
     page.hidden = false;

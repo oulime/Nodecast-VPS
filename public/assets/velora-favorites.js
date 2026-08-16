@@ -459,7 +459,7 @@
     page.id = "vel-favorites-page";
     page.className = "vel-favorites-page";
     page.hidden = true;
-    page.innerHTML = '<header class="vel-favorites-page__header"><div><p>MA LISTE</p><h1>Mes favoris</h1></div><button type="button" class="vel-favorites-page__close" aria-label="Fermer les favoris"><span aria-hidden="true">×</span></button></header><main class="vel-favorites-page__content" aria-live="polite"></main>';
+    page.innerHTML = '<header class="vel-favorites-page__header"><h1>Mes favoris</h1><button type="button" class="vel-favorites-page__close" aria-label="Fermer les favoris"><span aria-hidden="true">×</span></button></header><main class="vel-favorites-page__content" aria-live="polite"></main>';
     page.querySelector(".vel-favorites-page__close").addEventListener("click", closePage);
     document.body.appendChild(page);
     state.page = page;

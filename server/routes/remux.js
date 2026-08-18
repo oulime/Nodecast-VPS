@@ -3,6 +3,13 @@ const router = express.Router();
 const { spawn } = require('child_process');
 const db = require('../db');
 
+function setCastMediaHeaders(res) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Range, Origin, Accept, Content-Type, User-Agent');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
+}
+
 /**
  * Remux stream (container conversion only)
  * GET /api/remux?url=...
@@ -13,6 +20,11 @@ const db = require('../db');
  * 
  * Note: This does NOT fix Dolby/AC3 audio issues - use /api/transcode for that.
  */
+router.options('/', (req, res) => {
+    setCastMediaHeaders(res);
+    res.sendStatus(204);
+});
+
 router.get('/', async (req, res) => {
     const { url } = req.query;
     if (!url) {
@@ -84,8 +96,9 @@ router.get('/', async (req, res) => {
     }
 
     // Set headers for fragmented MP4
+    setCastMediaHeaders(res);
     res.setHeader('Content-Type', 'video/mp4');
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Accept-Ranges', 'none');
 
     // Pipe stdout to response
     ffmpeg.stdout.pipe(res);

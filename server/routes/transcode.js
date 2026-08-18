@@ -14,6 +14,13 @@ const ENCODER_FAILURE_COOLDOWN_MS = (() => {
 })();
 const encoderFailureUntil = new Map();
 
+function setCastMediaHeaders(res) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS, DELETE');
+    res.setHeader('Access-Control-Allow-Headers', 'Range, Origin, Accept, Content-Type, User-Agent');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
+}
+
 function resolveSelectedEncoder(settings, detectedEncoder) {
     const hardwareMode = settings.transcodeHardwareMode || 'auto';
     const configuredEncoder = settings.hwEncoder || 'auto';
@@ -216,6 +223,16 @@ function markEncoderFailure(encoder) {
 // Start session cleanup interval
 transcodeSession.startCleanupInterval();
 
+router.options('/:sessionId/stream.m3u8', (req, res) => {
+    setCastMediaHeaders(res);
+    res.sendStatus(204);
+});
+
+router.options('/:sessionId/:segment', (req, res) => {
+    setCastMediaHeaders(res);
+    res.sendStatus(204);
+});
+
 /**
  * Create a new transcode session
  * POST /api/transcode/session
@@ -403,7 +420,8 @@ router.get('/:sessionId/stream.m3u8', async (req, res) => {
         return res.status(404).json({ error: 'Playlist not ready' });
     }
 
-    res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+    setCastMediaHeaders(res);
+    res.setHeader('Content-Type', 'application/x-mpegURL');
     res.setHeader('Cache-Control', 'no-cache');
     res.send(playlist);
 });
@@ -430,7 +448,9 @@ router.get('/:sessionId/:segment', async (req, res) => {
         return res.status(404).json({ error: 'Segment not found' });
     }
 
+    setCastMediaHeaders(res);
     res.setHeader('Content-Type', 'video/MP2T');
+    res.setHeader('Accept-Ranges', 'bytes');
     res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache forever (immutable)
     res.sendFile(segmentPath);
 });

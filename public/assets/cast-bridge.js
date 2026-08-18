@@ -16,6 +16,8 @@
     lastLoadedKey: "",
     pendingCastClick: false,
     loadTimer: null,
+    blockedTimer: null,
+    phase: "DISCONNECTED",
     activeVideo: null
   };
 
@@ -38,6 +40,45 @@
 
   function isM3u8(url) {
     return /\.m3u8(?:[?#]|$)/i.test(String(url || "")) || /\/api\/transcode\/[^/]+\/stream\.m3u8/i.test(String(url || ""));
+  }
+
+  function isInternalTranscode(url) {
+    return /\/api\/transcode\/[^/]+\/stream\.m3u8/i.test(String(url || ""));
+  }
+
+  function isInternalRemux(url) {
+    try {
+      return /\/api\/remux$/i.test(new URL(url, window.location.href).pathname);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function extensionOf(url) {
+    try {
+      return new URL(url, window.location.href).pathname.split(".").pop().toLowerCase();
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function isDirectCastFriendly(url) {
+    if (isM3u8(url) || isInternalRemux(url)) return true;
+    return /^(mp4|m4v|mov|webm)$/i.test(extensionOf(url));
+  }
+
+  function canServerRemux(url) {
+    return /^(mkv|avi|ts|mpeg|mpg|mov|m4v)$/i.test(extensionOf(url));
+  }
+
+  function remuxUrlFor(url) {
+    var mediaUrl = absoluteUrl(url);
+    if (!mediaUrl) return "";
+    try {
+      return new URL("/api/remux?url=" + encodeURIComponent(mediaUrl), window.location.href).href;
+    } catch (_) {
+      return "";
+    }
   }
 
   function contentTypeFor(url) {
@@ -104,11 +145,29 @@
 
   function mediaKey(media) {
     return [
-      media && media.url,
+      media && media.castUrl || media && media.url,
       media && media.type,
       media && media.isLive ? "live" : "vod",
       media && media.title
     ].join("|");
+  }
+
+  function previousDirectFor(input, media) {
+    var previous = state.currentMedia;
+    if (!previous || !media) return "";
+    if (previous.type !== media.type || previous.title !== media.title) return "";
+    if (isInternalTranscode(media.url) && !isInternalTranscode(previous.url)) return previous.directUrl || previous.url;
+    return "";
+  }
+
+  function castUrlFor(media) {
+    var directUrl = absoluteUrl(media && media.directUrl || media && media.originalUrl);
+    var primaryUrl = absoluteUrl(media && media.url);
+    if (directUrl && isDirectCastFriendly(directUrl)) return directUrl;
+    if (primaryUrl && !isInternalTranscode(primaryUrl) && isDirectCastFriendly(primaryUrl)) return primaryUrl;
+    if (directUrl && canServerRemux(directUrl)) return remuxUrlFor(directUrl);
+    if (primaryUrl && !isInternalTranscode(primaryUrl) && canServerRemux(primaryUrl)) return remuxUrlFor(primaryUrl);
+    return primaryUrl || directUrl;
   }
 
   function normalizeMedia(input) {
@@ -120,7 +179,7 @@
 
     var type = input && input.type || (input && input.isLive ? "live" : isM3u8(url) ? "video" : "video");
     var isLive = Boolean(input && input.isLive) || type === "live";
-    return {
+    var media = {
       type: type,
       url: url,
       title: input && input.title || pageTitle(video),
@@ -130,6 +189,10 @@
       position: isLive ? 0 : logicalPosition(input, video),
       video: video || null
     };
+    media.directUrl = absoluteUrl(input && (input.directUrl || input.originalUrl || input.sourceUrl)) || previousDirectFor(input || {}, media);
+    media.castUrl = absoluteUrl(input && input.castUrl) || castUrlFor(media);
+    media.castContentType = input && input.castContentType || contentTypeFor(media.castUrl || media.url);
+    return media;
   }
 
   function setStatus(text) {
@@ -137,6 +200,31 @@
     if (!button) return;
     button.title = text || "Cast video to TV";
     button.setAttribute("aria-label", text || "Cast video to TV");
+  }
+
+  function setPhase(phase) {
+    state.phase = phase || state.phase;
+    syncButton();
+  }
+
+  function clearBlockedTimer() {
+    if (state.blockedTimer) {
+      window.clearTimeout(state.blockedTimer);
+      state.blockedTimer = null;
+    }
+  }
+
+  function showBlockedMessage() {
+    if (!state.pendingCastClick || state.sdkReady) return;
+    window.alert(
+      "Cast is blocked by your browser.\n\n" +
+      "Allow local network access and allow Google Cast / third-party scripts for this site, then click Cast again."
+    );
+  }
+
+  function armBlockedTimer() {
+    clearBlockedTimer();
+    state.blockedTimer = window.setTimeout(showBlockedMessage, 5500);
   }
 
   function rememberSessionActive(active) {
@@ -170,14 +258,16 @@
     button.disabled = !hasMedia;
     button.classList.toggle("velora-cast-button--connected", !!session());
     if (!hasMedia) setStatus("Start a video first, then cast it");
-    else if (!state.sdkReady) setStatus("Cast loading");
+    else if (!state.sdkReady) setStatus("Cast loading. If nothing opens, allow local network access for this site.");
+    else if (session() && state.phase === "LOADING_MEDIA") setStatus("Sending video to TV");
     else if (session()) setStatus("Casting to TV");
     else if (state.castState === "NO_DEVICES_AVAILABLE") setStatus("No Cast TV detected yet");
     else setStatus("Cast video to TV");
   }
 
   function buildMediaRequest(media) {
-    var mediaInfo = new window.chrome.cast.media.MediaInfo(media.url, media.contentType);
+    var castUrl = media.castUrl || media.url;
+    var mediaInfo = new window.chrome.cast.media.MediaInfo(castUrl, media.castContentType || contentTypeFor(castUrl));
     mediaInfo.streamType = media.isLive
       ? window.chrome.cast.media.StreamType.LIVE
       : window.chrome.cast.media.StreamType.BUFFERED;
@@ -200,12 +290,15 @@
       if (state.lastLoadedKey === key) return true;
     }
     try {
+      setPhase("LOADING_MEDIA");
       await castSession.loadMedia(buildMediaRequest(media));
       state.lastLoadedKey = key;
       rememberSessionActive(true);
+      setPhase("PLAYING");
       return true;
     } catch (error) {
       console.warn("[VeloraCast] loadMedia failed", error);
+      setPhase("CONNECTED");
       return false;
     }
   }
@@ -243,7 +336,9 @@
 
     if (!state.sdkReady) {
       state.pendingCastClick = true;
+      setPhase("CONNECTING");
       setStatus("Cast loading");
+      armBlockedTimer();
       loadGoogleCastSdk();
       return;
     }
@@ -254,7 +349,11 @@
 
     try {
       var context = window.cast.framework.CastContext.getInstance();
-      var castSession = context.getCurrentSession() || await context.requestSession();
+      var castSession = context.getCurrentSession();
+      if (!castSession) {
+        setPhase("CONNECTING");
+        castSession = await context.requestSession();
+      }
       if (!castSession) return;
       await loadMediaOnCast(state.currentMedia, { force: true });
     } catch (error) {
@@ -273,6 +372,7 @@
   }
 
   function onCastApiAvailable(available) {
+    clearBlockedTimer();
     state.sdkReady = Boolean(available && window.cast && window.cast.framework && window.chrome && window.chrome.cast);
     state.sdkLoading = false;
     if (!state.sdkReady) {
@@ -303,6 +403,7 @@
         event.sessionState === window.cast.framework.SessionState.SESSION_RESUMED
       ) {
         rememberSessionActive(true);
+        setPhase("CONNECTED");
         setupRemotePlayer();
         if (state.currentMedia) scheduleCastReload(true);
       }
@@ -312,6 +413,7 @@
       ) {
         state.lastLoadedKey = "";
         rememberSessionActive(false);
+        setPhase("DISCONNECTED");
       }
       syncButton();
     });
@@ -342,7 +444,9 @@
 
   function loadGoogleCastSdk() {
     window.__onGCastApiAvailable = onCastApiAvailable;
-    if (state.sdkReady || state.sdkLoading || byId("velora-google-cast-sdk")) return;
+    if (state.sdkReady || state.sdkLoading) return;
+    var oldScript = byId("velora-google-cast-sdk");
+    if (oldScript) oldScript.remove();
     state.sdkLoading = true;
     var script = document.createElement("script");
     script.id = "velora-google-cast-sdk";
@@ -350,6 +454,8 @@
     script.src = CAST_SDK_SRC;
     script.onerror = function () {
       state.sdkLoading = false;
+      clearBlockedTimer();
+      if (state.pendingCastClick) showBlockedMessage();
       syncButton();
     };
     document.head.appendChild(script);
@@ -435,6 +541,15 @@
       },
       isConnected: function () {
         return !!session();
+      },
+      getState: function () {
+        return {
+          phase: state.phase,
+          castState: state.castState,
+          sessionState: state.sessionState,
+          connected: !!session(),
+          media: state.currentMedia
+        };
       }
     };
 

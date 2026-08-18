@@ -15,10 +15,15 @@
     currentMedia: null,
     lastLoadedKey: "",
     pendingCastClick: false,
+    requestPending: false,
+    pendingInitialMedia: null,
+    pendingInitialToken: 0,
+    sdkInitialized: false,
     loadTimer: null,
     blockedTimer: null,
     phase: "DISCONNECTED",
-    activeVideo: null
+    activeVideo: null,
+    remoteUiTimer: null
   };
 
   function byId(id) {
@@ -134,6 +139,15 @@
       contentType: input && input.contentType || contentTypeFor(url),
       isLive: isLive,
       position: isLive ? 0 : logicalPosition(input, video),
+      offset: input && Number.isFinite(Number(input.offset)) ? Math.max(0, Number(input.offset)) : 0,
+      duration: input && Number.isFinite(Number(input.duration)) ? Math.max(0, Number(input.duration)) : 0,
+      sourceUrl: absoluteUrl(input && input.sourceUrl),
+      baseUrl: absoluteUrl(input && input.baseUrl),
+      authHeaders: input && input.authHeaders || null,
+      videoMode: input && input.videoMode,
+      videoCodec: input && input.videoCodec,
+      audioCodec: input && input.audioCodec,
+      audioChannels: input && input.audioChannels,
       video: video || null
     };
     media.playbackMode = input && input.playbackMode || (isInternalTranscode(url) ? "transcode" : "final");
@@ -223,9 +237,10 @@
     var button = byId("velora-cast-button");
     if (!button) return;
     var hasMedia = !!state.currentMedia || !!normalizeMedia({});
-    button.disabled = !hasMedia;
+    button.disabled = !hasMedia || state.requestPending;
     button.classList.toggle("velora-cast-button--connected", !!session());
     if (!hasMedia) setStatus("Start a video first, then cast it");
+    else if (state.requestPending) setStatus("Opening Cast picker");
     else if (!state.sdkReady) setStatus("Cast loading. If nothing opens, allow local network access for this site.");
     else if (session() && state.phase === "LOADING_MEDIA") setStatus("Sending video to TV");
     else if (session()) setStatus("Casting to TV");
@@ -245,7 +260,8 @@
 
     var request = new window.chrome.cast.media.LoadRequest(mediaInfo);
     request.autoplay = true;
-    if (!media.isLive) request.currentTime = Math.max(0, Number(media.position) || 0);
+    if (!media.isLive && media.duration) mediaInfo.duration = media.duration;
+    if (!media.isLive) request.currentTime = Math.max(0, (Number(media.position) || 0) - (Number(media.offset) || 0));
     return request;
   }
 
@@ -265,8 +281,10 @@
       setPhase("LOADING_MEDIA");
       await castSession.loadMedia(buildMediaRequest(media));
       state.lastLoadedKey = key;
+      state.currentMedia = media;
       rememberSessionActive(true);
       setPhase("PLAYING");
+      updateRemoteUi();
       return true;
     } catch (error) {
       console.warn("[VeloraCast] loadMedia failed", error);
@@ -310,7 +328,24 @@
     return setMedia(Object.assign({}, meta || {}, { video: video || activeVideo(), url: url }), { implicit: true });
   }
 
+  function clearLocalCastSessionState() {
+    window.clearTimeout(state.loadTimer);
+    state.loadTimer = null;
+    state.requestPending = false;
+    state.pendingInitialMedia = null;
+    state.pendingInitialToken += 1;
+    state.lastLoadedKey = "";
+    state.castState = "NO_DEVICES_AVAILABLE";
+    state.sessionState = "NO_SESSION";
+    state.remotePlayer = null;
+    state.remoteController = null;
+    rememberSessionActive(false);
+    setPhase("DISCONNECTED");
+    updateRemoteUi();
+  }
+
   async function requestGoogleCast() {
+    if (state.requestPending) return;
     if (!state.sdkReady) {
       state.pendingCastClick = true;
       setPhase("CONNECTING");
@@ -325,23 +360,55 @@
       return;
     }
 
+    var selectedMedia = state.currentMedia || normalizeMedia({});
+    if (!selectedMedia) {
+      window.alert("Start a video first, then cast it.");
+      return;
+    }
+
     try {
       var context = window.cast.framework.CastContext.getInstance();
       var castSession = context.getCurrentSession();
       if (!castSession) {
+        state.requestPending = true;
+        state.pendingInitialMedia = selectedMedia;
+        var token = ++state.pendingInitialToken;
+        syncButton();
         setPhase("CONNECTING");
-        castSession = await context.requestSession();
-      }
-      if (!castSession) return;
-      if (!state.currentMedia) setMedia({});
-      if (!state.currentMedia) {
-        window.alert("Start a video first, then cast it.");
+        try {
+          await context.requestSession();
+        } catch (error) {
+          clearLocalCastSessionState();
+          syncButton();
+          console.warn("[VeloraCast] requestSession failed", error);
+          window.alert(castErrorMessage(error));
+          return;
+        }
+        castSession = context.getCurrentSession();
+        state.requestPending = false;
+        syncButton();
+        if (!castSession || token !== state.pendingInitialToken) {
+          clearLocalCastSessionState();
+          syncButton();
+          return;
+        }
+        var mediaToLoad = state.pendingInitialMedia;
+        state.pendingInitialMedia = null;
+        if (!(await loadMediaOnCast(mediaToLoad, { force: true }))) {
+          window.alert("Cast session started, but the video could not be loaded on the TV.");
+        }
         return;
       }
-      await loadMediaOnCast(state.currentMedia, { force: true });
+
+      if (!(await loadMediaOnCast(selectedMedia, { force: true }))) {
+        window.alert("Cast session started, but the video could not be loaded on the TV.");
+      }
     } catch (error) {
-      console.warn("[VeloraCast] requestSession failed", error);
-      window.alert("Cast could not start: " + castErrorMessage(error));
+      console.warn("[VeloraCast] loadMedia failed", error);
+      window.alert("Cast session started, but the video could not be loaded on the TV.");
+    } finally {
+      state.requestPending = false;
+      syncButton();
     }
   }
 
@@ -349,6 +416,7 @@
     var message = error && (error.description || error.message || error.code || error);
     var text = String(message || "Unknown Cast error");
     if (/cancel/i.test(text)) return "TV selection was cancelled.";
+    if (/SESSION_ERROR/i.test(text)) return "Could not create a Cast session in this browser.";
     if (/timeout/i.test(text)) return "Cast timed out. Check that browser local network access is allowed for this site.";
     if (/receiver|session/i.test(text)) return text;
     return text + ". If the browser asks for local network access, allow it and click Cast again.";
@@ -364,37 +432,38 @@
     }
 
     var context = window.cast.framework.CastContext.getInstance();
-    context.setOptions({
-      receiverApplicationId: RECEIVER_APP_ID,
-      autoJoinPolicy: window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
-      resumeSavedSession: true
-    });
+    if (!state.sdkInitialized) {
+      state.sdkInitialized = true;
+      context.setOptions({
+        receiverApplicationId: RECEIVER_APP_ID,
+        autoJoinPolicy: window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
+        resumeSavedSession: true
+      });
 
-    context.addEventListener(window.cast.framework.CastContextEventType.CAST_STATE_CHANGED, function (event) {
-      state.castState = event.castState;
-      syncButton();
-    });
+      context.addEventListener(window.cast.framework.CastContextEventType.CAST_STATE_CHANGED, function (event) {
+        state.castState = event.castState;
+        syncButton();
+      });
 
-    context.addEventListener(window.cast.framework.CastContextEventType.SESSION_STATE_CHANGED, function (event) {
-      state.sessionState = event.sessionState;
-      if (
-        event.sessionState === window.cast.framework.SessionState.SESSION_STARTED ||
-        event.sessionState === window.cast.framework.SessionState.SESSION_RESUMED
-      ) {
-        rememberSessionActive(true);
-        setPhase("CONNECTED");
-        setupRemotePlayer();
-      }
-      if (
-        event.sessionState === window.cast.framework.SessionState.SESSION_ENDED ||
-        event.sessionState === window.cast.framework.SessionState.SESSION_START_FAILED
-      ) {
-        state.lastLoadedKey = "";
-        rememberSessionActive(false);
-        setPhase("DISCONNECTED");
-      }
-      syncButton();
-    });
+      context.addEventListener(window.cast.framework.CastContextEventType.SESSION_STATE_CHANGED, function (event) {
+        state.sessionState = event.sessionState;
+        if (
+          event.sessionState === window.cast.framework.SessionState.SESSION_STARTED ||
+          event.sessionState === window.cast.framework.SessionState.SESSION_RESUMED
+        ) {
+          rememberSessionActive(true);
+          setPhase("CONNECTED");
+          setupRemotePlayer();
+        }
+        if (
+          event.sessionState === window.cast.framework.SessionState.SESSION_ENDED ||
+          event.sessionState === window.cast.framework.SessionState.SESSION_START_FAILED
+        ) {
+          clearLocalCastSessionState();
+        }
+        syncButton();
+      });
+    }
 
     setupRemotePlayer();
     syncButton();
@@ -405,14 +474,22 @@
     if (!state.sdkReady || !window.cast || !window.cast.framework || state.remoteController) return;
     state.remotePlayer = new window.cast.framework.RemotePlayer();
     state.remoteController = new window.cast.framework.RemotePlayerController(state.remotePlayer);
-    state.remoteController.addEventListener(
-      window.cast.framework.RemotePlayerEventType.IS_CONNECTED_CHANGED,
-      syncButton
-    );
-    state.remoteController.addEventListener(
-      window.cast.framework.RemotePlayerEventType.MEDIA_INFO_CHANGED,
-      syncButton
-    );
+    addRemoteEvent("IS_CONNECTED_CHANGED", function () {
+      syncButton();
+      updateRemoteUi();
+    });
+    addRemoteEvent("MEDIA_INFO_CHANGED", updateRemoteUi);
+    addRemoteEvent("IS_PAUSED_CHANGED", updateRemoteUi);
+    addRemoteEvent("CURRENT_TIME_CHANGED", updateRemoteUi);
+    addRemoteEvent("DURATION_CHANGED", updateRemoteUi);
+    addRemoteEvent("CAN_SEEK_CHANGED", updateRemoteUi);
+  }
+
+  function addRemoteEvent(name, handler) {
+    try {
+      var type = window.cast.framework.RemotePlayerEventType[name];
+      if (type) state.remoteController.addEventListener(type, handler);
+    } catch (_) {}
   }
 
   function loadGoogleCastSdk() {
@@ -486,6 +563,12 @@
       ".velora-cast-button[disabled]{opacity:.42;cursor:not-allowed}",
       ".velora-cast-button--connected{background:rgba(34,197,94,.9)}",
       ".velora-cast-button svg{width:26px;height:26px;fill:currentColor}",
+      ".velora-cast-remote{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:2147482999;display:none;align-items:center;gap:8px;padding:10px;border:1px solid rgba(255,255,255,.18);border-radius:12px;background:rgba(12,14,24,.9);color:#fff;box-shadow:0 12px 30px rgba(0,0,0,.38);backdrop-filter:blur(14px)}",
+      ".velora-cast-remote--visible{display:flex}",
+      ".velora-cast-remote button{width:38px;height:34px;border:1px solid rgba(255,255,255,.18);border-radius:9px;background:rgba(255,255,255,.08);color:#fff;font-weight:800;cursor:pointer}",
+      ".velora-cast-remote button:disabled{opacity:.35;cursor:not-allowed}",
+      ".velora-cast-remote input{flex:1;min-width:80px}",
+      ".velora-cast-remote time{font-size:12px;min-width:96px;text-align:center;color:rgba(255,255,255,.82)}",
       "@media(max-width:768px){.velora-cast-button{right:12px;bottom:calc(86px + env(safe-area-inset-bottom,0px));width:52px;height:52px}}"
     ].join("");
     document.head.appendChild(style);
@@ -501,7 +584,183 @@
       requestGoogleCast();
     });
     document.body.appendChild(button);
+    installRemoteUi();
     syncButton();
+  }
+
+  function installRemoteUi() {
+    if (byId("velora-cast-remote")) return;
+    var remote = document.createElement("div");
+    remote.id = "velora-cast-remote";
+    remote.className = "velora-cast-remote";
+    remote.innerHTML =
+      '<button type="button" data-cast-remote="back">-30</button>' +
+      '<button type="button" data-cast-remote="play">Play</button>' +
+      '<button type="button" data-cast-remote="fwd">+30</button>' +
+      '<input type="range" min="0" max="1000" value="0" step="1" data-cast-remote="seek" />' +
+      '<time data-cast-remote="time">00:00 / 00:00</time>';
+    remote.addEventListener("click", function (event) {
+      var action = event.target && event.target.getAttribute("data-cast-remote");
+      if (!action || action === "seek") return;
+      event.preventDefault();
+      if (action === "play") return remotePlayPause();
+      if (action === "back") return remoteSeekBy(-30);
+      if (action === "fwd") return remoteSeekBy(30);
+    });
+    remote.querySelector('[data-cast-remote="seek"]').addEventListener("change", function (event) {
+      var duration = castDuration();
+      if (!duration) return;
+      var value = Number(event.target.value) || 0;
+      remoteSeekTo(duration * value / 1000);
+    });
+    document.body.appendChild(remote);
+  }
+
+  function castDuration() {
+    var media = state.currentMedia || {};
+    var remoteDuration = state.remotePlayer && Number(state.remotePlayer.duration);
+    return media.duration || (Number.isFinite(remoteDuration) ? Math.max(0, remoteDuration + (media.offset || 0)) : 0);
+  }
+
+  function castPosition() {
+    var remoteTime = state.remotePlayer && Number(state.remotePlayer.currentTime);
+    return Math.max(0, (state.currentMedia && state.currentMedia.offset || 0) + (Number.isFinite(remoteTime) ? remoteTime : 0));
+  }
+
+  function isLiveMedia(media) {
+    return !!(media && (media.isLive || media.type === "live"));
+  }
+
+  function canServerSeek(media) {
+    return !!(
+      media &&
+      !isLiveMedia(media) &&
+      media.playbackMode === "transcode" &&
+      media.sourceUrl &&
+      Number(media.duration) > 0
+    );
+  }
+
+  function canNativeCastSeek(media) {
+    var remoteDuration = state.remotePlayer && Number(state.remotePlayer.duration);
+    return !!(
+      media &&
+      !isLiveMedia(media) &&
+      state.remotePlayer &&
+      state.remotePlayer.canSeek &&
+      (Number(media.duration) > 0 || Number.isFinite(remoteDuration) && remoteDuration > 0)
+    );
+  }
+
+  function canSeekMedia(media) {
+    return canServerSeek(media) || canNativeCastSeek(media);
+  }
+
+  function fmt(seconds) {
+    seconds = Math.max(0, Math.floor(Number(seconds) || 0));
+    var h = Math.floor(seconds / 3600);
+    var m = Math.floor((seconds % 3600) / 60);
+    var s = seconds % 60;
+    return (h ? h + ":" + String(m).padStart(2, "0") : String(m)) + ":" + String(s).padStart(2, "0");
+  }
+
+  function updateRemoteUi() {
+    var remote = byId("velora-cast-remote");
+    if (!remote) return;
+    var media = state.currentMedia;
+    var visible = !!session() && !!media && !media.isLive;
+    remote.classList.toggle("velora-cast-remote--visible", visible);
+    if (!visible || !state.remotePlayer) {
+      if (state.remoteUiTimer) {
+        window.clearInterval(state.remoteUiTimer);
+        state.remoteUiTimer = null;
+      }
+      return;
+    }
+    var duration = castDuration();
+    var position = castPosition();
+    var canSeek = canSeekMedia(media);
+    var seek = remote.querySelector('[data-cast-remote="seek"]');
+    var play = remote.querySelector('[data-cast-remote="play"]');
+    var back = remote.querySelector('[data-cast-remote="back"]');
+    var fwd = remote.querySelector('[data-cast-remote="fwd"]');
+    var time = remote.querySelector('[data-cast-remote="time"]');
+    if (seek) {
+      seek.disabled = !canSeek;
+      seek.value = duration ? String(Math.max(0, Math.min(1000, Math.round(position / duration * 1000)))) : "0";
+    }
+    if (play) play.textContent = state.remotePlayer.isPaused ? "Play" : "Pause";
+    if (back) back.disabled = !canSeek;
+    if (fwd) fwd.disabled = !canSeek;
+    if (time) time.textContent = fmt(position) + " / " + fmt(duration);
+    if (visible && !state.remoteUiTimer) {
+      state.remoteUiTimer = window.setInterval(updateRemoteUi, 1000);
+    }
+  }
+
+  function remotePlayPause() {
+    if (!state.remoteController) return;
+    try {
+      state.remoteController.playOrPause();
+    } catch (_) {}
+  }
+
+  function remoteSeekBy(delta) {
+    remoteSeekTo(castPosition() + delta);
+  }
+
+  async function remoteSeekTo(targetSeconds) {
+    var media = state.currentMedia;
+    if (!media || isLiveMedia(media) || !state.remoteController || !state.remotePlayer) return;
+    var duration = castDuration();
+    var target = Math.max(0, duration ? Math.min(duration, targetSeconds) : targetSeconds);
+    if (canServerSeek(media) && media.baseUrl) {
+      await restartCastTranscodeAt(target);
+      return;
+    }
+    if (!canNativeCastSeek(media)) return;
+    state.remotePlayer.currentTime = Math.max(0, target - (media.offset || 0));
+    try {
+      state.remoteController.seek();
+    } catch (_) {}
+    updateRemoteUi();
+  }
+
+  async function restartCastTranscodeAt(targetSeconds) {
+    var media = state.currentMedia;
+    if (!media || !media.sourceUrl || !media.baseUrl) return;
+    try {
+      var response = await fetch(new URL("/api/transcode/session", media.baseUrl).href, {
+        method: "POST",
+        headers: Object.assign({ "Content-Type": "application/json" }, media.authHeaders || {}),
+        body: JSON.stringify({
+          url: media.sourceUrl,
+          mode: "vod",
+          startAt: targetSeconds,
+          seekOffset: targetSeconds,
+          videoMode: media.videoMode,
+          videoCodec: media.videoCodec,
+          audioCodec: media.audioCodec,
+          audioChannels: media.audioChannels
+        })
+      });
+      if (!response.ok) throw new Error(await response.text());
+      var payload = await response.json();
+      if (!payload || !payload.playlistUrl) throw new Error("No Cast transcode playlist returned");
+      var nextMedia = Object.assign({}, media, {
+        url: new URL(payload.playlistUrl, media.baseUrl).href,
+        castUrl: new URL(payload.playlistUrl, media.baseUrl).href,
+        position: targetSeconds,
+        offset: targetSeconds,
+        duration: Number(payload.durationSeconds) || media.duration || 0,
+        playbackMode: "transcode"
+      });
+      state.currentMedia = nextMedia;
+      await loadMediaOnCast(nextMedia, { force: true });
+    } catch (error) {
+      console.warn("[VeloraCast] Cast transcode seek failed", error);
+      window.alert("Could not seek this Cast movie yet. Please try again.");
+    }
   }
 
   function boot() {

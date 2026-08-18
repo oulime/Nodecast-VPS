@@ -46,41 +46,6 @@
     return /\/api\/transcode\/[^/]+\/stream\.m3u8/i.test(String(url || ""));
   }
 
-  function isInternalRemux(url) {
-    try {
-      return /\/api\/remux$/i.test(new URL(url, window.location.href).pathname);
-    } catch (_) {
-      return false;
-    }
-  }
-
-  function extensionOf(url) {
-    try {
-      return new URL(url, window.location.href).pathname.split(".").pop().toLowerCase();
-    } catch (_) {
-      return "";
-    }
-  }
-
-  function isDirectCastFriendly(url) {
-    if (isM3u8(url) || isInternalRemux(url)) return true;
-    return /^(mp4|m4v|mov|webm)$/i.test(extensionOf(url));
-  }
-
-  function canServerRemux(url) {
-    return /^(mkv|avi|ts|mpeg|mpg|mov|m4v)$/i.test(extensionOf(url));
-  }
-
-  function remuxUrlFor(url) {
-    var mediaUrl = absoluteUrl(url);
-    if (!mediaUrl) return "";
-    try {
-      return new URL("/api/remux?url=" + encodeURIComponent(mediaUrl), window.location.href).href;
-    } catch (_) {
-      return "";
-    }
-  }
-
   function contentTypeFor(url) {
     if (isM3u8(url)) return "application/x-mpegURL";
     if (/\.mpd(?:[?#]|$)/i.test(url)) return "application/dash+xml";
@@ -152,24 +117,6 @@
     ].join("|");
   }
 
-  function previousDirectFor(input, media) {
-    var previous = state.currentMedia;
-    if (!previous || !media) return "";
-    if (previous.type !== media.type || previous.title !== media.title) return "";
-    if (isInternalTranscode(media.url) && !isInternalTranscode(previous.url)) return previous.directUrl || previous.url;
-    return "";
-  }
-
-  function castUrlFor(media) {
-    var directUrl = absoluteUrl(media && media.directUrl || media && media.originalUrl);
-    var primaryUrl = absoluteUrl(media && media.url);
-    if (directUrl && isDirectCastFriendly(directUrl)) return directUrl;
-    if (primaryUrl && !isInternalTranscode(primaryUrl) && isDirectCastFriendly(primaryUrl)) return primaryUrl;
-    if (directUrl && canServerRemux(directUrl)) return remuxUrlFor(directUrl);
-    if (primaryUrl && !isInternalTranscode(primaryUrl) && canServerRemux(primaryUrl)) return remuxUrlFor(primaryUrl);
-    return primaryUrl || directUrl;
-  }
-
   function normalizeMedia(input) {
     var video = input && input.video || activeVideo();
     var app = window.app || {};
@@ -189,8 +136,8 @@
       position: isLive ? 0 : logicalPosition(input, video),
       video: video || null
     };
-    media.directUrl = absoluteUrl(input && (input.directUrl || input.originalUrl || input.sourceUrl)) || previousDirectFor(input || {}, media);
-    media.castUrl = absoluteUrl(input && input.castUrl) || castUrlFor(media);
+    media.playbackMode = input && input.playbackMode || (isInternalTranscode(url) ? "transcode" : "final");
+    media.castUrl = absoluteUrl(input && input.castUrl) || url;
     media.castContentType = input && input.castContentType || contentTypeFor(media.castUrl || media.url);
     return media;
   }
@@ -216,6 +163,9 @@
 
   function showBlockedMessage() {
     if (!state.pendingCastClick || state.sdkReady) return;
+    state.sdkLoading = false;
+    var oldScript = byId("velora-google-cast-sdk");
+    if (oldScript) oldScript.remove();
     window.alert(
       "Cast is blocked by your browser.\n\n" +
       "Allow local network access and allow Google Cast / third-party scripts for this site, then click Cast again."
@@ -251,6 +201,24 @@
     return state.sdkReady && !!window.cast && !!window.cast.framework && !!window.chrome && !!window.chrome.cast;
   }
 
+  function castUnavailableMessage() {
+    if (state.sdkLoading) return "Cast is still loading. If your browser asks for local network access, allow it and click Cast again.";
+    if (!state.sdkReady) return "Google Cast is not ready. Your browser may have blocked the Cast SDK or local network access for this site.";
+    if (!window.chrome || !window.chrome.cast) return "Google Cast is not supported or not enabled in this browser.";
+    return "Google Cast is not available right now. Allow local network access for this site, then click Cast again.";
+  }
+
+  function isTvReachableCastUrl(url) {
+    if (!url || /^(blob:|data:|about:|mediastream:)/i.test(String(url))) return false;
+    try {
+      var parsed = new URL(url, window.location.href);
+      if (parsed.protocol !== "https:") return false;
+      return !/^(localhost|127(?:\.\d+){3}|\[::1\])$/i.test(parsed.hostname);
+    } catch (_) {
+      return false;
+    }
+  }
+
   function syncButton() {
     var button = byId("velora-cast-button");
     if (!button) return;
@@ -261,7 +229,7 @@
     else if (!state.sdkReady) setStatus("Cast loading. If nothing opens, allow local network access for this site.");
     else if (session() && state.phase === "LOADING_MEDIA") setStatus("Sending video to TV");
     else if (session()) setStatus("Casting to TV");
-    else if (state.castState === "NO_DEVICES_AVAILABLE") setStatus("No Cast TV detected yet");
+    else if (state.castState === "NO_DEVICES_AVAILABLE") setStatus("Cast ready. Click to search for TVs.");
     else setStatus("Cast video to TV");
   }
 
@@ -285,6 +253,10 @@
     if (!canUseGoogleCast()) return false;
     var castSession = session();
     if (!castSession) return false;
+    if (!isTvReachableCastUrl(media.castUrl || media.url)) {
+      window.alert("This video URL cannot be reached by the TV. Cast needs a public HTTPS playback URL, not localhost, blob, or browser-only media.");
+      return false;
+    }
     var key = mediaKey(media);
     if (!options || !options.force) {
       if (state.lastLoadedKey === key) return true;
@@ -310,9 +282,10 @@
     }, 120);
   }
 
-  function setMedia(input) {
+  function setMedia(input, options) {
     var media = normalizeMedia(input || {});
     if (!media) return null;
+    media.explicit = !(options && options.implicit);
     state.currentMedia = media;
     if (media.video) {
       media.video.__veloraCastUrl = media.url;
@@ -324,16 +297,20 @@
   }
 
   function rememberMedia(video, url, meta) {
-    return setMedia(Object.assign({}, meta || {}, { video: video || activeVideo(), url: url }));
+    var mediaUrl = absoluteUrl(url);
+    if (
+      state.currentMedia &&
+      state.currentMedia.explicit &&
+      state.currentMedia.video === (video || state.activeVideo) &&
+      mediaUrl &&
+      mediaUrl === state.currentMedia.url
+    ) {
+      return state.currentMedia;
+    }
+    return setMedia(Object.assign({}, meta || {}, { video: video || activeVideo(), url: url }), { implicit: true });
   }
 
   async function requestGoogleCast() {
-    if (!state.currentMedia) setMedia({});
-    if (!state.currentMedia) {
-      window.alert("Start a video first, then cast it.");
-      return;
-    }
-
     if (!state.sdkReady) {
       state.pendingCastClick = true;
       setPhase("CONNECTING");
@@ -344,7 +321,8 @@
     }
 
     if (!canUseGoogleCast()) {
-      return requestAirPlayOrExplain();
+      window.alert(castUnavailableMessage());
+      return;
     }
 
     try {
@@ -355,20 +333,25 @@
         castSession = await context.requestSession();
       }
       if (!castSession) return;
+      if (!state.currentMedia) setMedia({});
+      if (!state.currentMedia) {
+        window.alert("Start a video first, then cast it.");
+        return;
+      }
       await loadMediaOnCast(state.currentMedia, { force: true });
     } catch (error) {
       console.warn("[VeloraCast] requestSession failed", error);
-      requestAirPlayOrExplain();
+      window.alert("Cast could not start: " + castErrorMessage(error));
     }
   }
 
-  function requestAirPlayOrExplain() {
-    var media = state.currentMedia || normalizeMedia({});
-    if (media && media.video && typeof media.video.webkitShowPlaybackTargetPicker === "function") {
-      media.video.webkitShowPlaybackTargetPicker();
-      return;
-    }
-    window.alert("No Cast TV detected. Use Chrome/Android with Chromecast, Google TV, or Android TV on the same Wi-Fi.");
+  function castErrorMessage(error) {
+    var message = error && (error.description || error.message || error.code || error);
+    var text = String(message || "Unknown Cast error");
+    if (/cancel/i.test(text)) return "TV selection was cancelled.";
+    if (/timeout/i.test(text)) return "Cast timed out. Check that browser local network access is allowed for this site.";
+    if (/receiver|session/i.test(text)) return text;
+    return text + ". If the browser asks for local network access, allow it and click Cast again.";
   }
 
   function onCastApiAvailable(available) {
@@ -390,10 +373,6 @@
     context.addEventListener(window.cast.framework.CastContextEventType.CAST_STATE_CHANGED, function (event) {
       state.castState = event.castState;
       syncButton();
-      if (state.pendingCastClick && state.castState !== "NO_DEVICES_AVAILABLE") {
-        state.pendingCastClick = false;
-        requestGoogleCast();
-      }
     });
 
     context.addEventListener(window.cast.framework.CastContextEventType.SESSION_STATE_CHANGED, function (event) {
@@ -405,7 +384,6 @@
         rememberSessionActive(true);
         setPhase("CONNECTED");
         setupRemotePlayer();
-        if (state.currentMedia) scheduleCastReload(true);
       }
       if (
         event.sessionState === window.cast.framework.SessionState.SESSION_ENDED ||
@@ -420,12 +398,7 @@
 
     setupRemotePlayer();
     syncButton();
-    if (state.pendingCastClick) {
-      state.pendingCastClick = false;
-      requestGoogleCast();
-    } else if (hadSessionActive() && session() && state.currentMedia) {
-      scheduleCastReload(true);
-    }
+    if (state.pendingCastClick) state.pendingCastClick = false;
   }
 
   function setupRemotePlayer() {

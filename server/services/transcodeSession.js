@@ -290,9 +290,10 @@ class TranscodeSession extends EventEmitter {
             );
         }
 
-        // HLS output options
+        // HLS output options. VOD sessions are generated progressively, so expose
+        // them as EVENT playlists until FFmpeg finishes and writes ENDLIST.
         const hlsFlags = isVodMode ? 'independent_segments' : 'independent_segments+append_list';
-        const livePlaylistTypeArgs = isVodMode ? [] : ['-hls_playlist_type', 'event'];
+        const livePlaylistTypeArgs = ['-hls_playlist_type', 'event'];
         args.push(
             '-f', 'hls',
             '-hls_time', String(SEGMENT_DURATION),

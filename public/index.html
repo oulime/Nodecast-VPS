@@ -2580,6 +2580,52 @@
         padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
       }
 
+      body.vel-vod-fullscreen-active {
+        padding: 0 !important;
+        overflow: hidden !important;
+        background: #000 !important;
+      }
+
+      #vod-player-container:fullscreen,
+      #vod-player-container:-webkit-full-screen,
+      #vod-player-container.player-container--fullscreen,
+      #vod-player-container:fullscreen .video-wrapper,
+      #vod-player-container:-webkit-full-screen .video-wrapper,
+      #vod-player-container.player-container--fullscreen .video-wrapper,
+      #vod-player-container:fullscreen #video-vod,
+      #vod-player-container:-webkit-full-screen #video-vod,
+      #vod-player-container.player-container--fullscreen #video-vod {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        width: 100dvw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        min-width: 100vw !important;
+        min-width: 100dvw !important;
+        min-height: 100vh !important;
+        min-height: 100dvh !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        max-width: none !important;
+        max-height: none !important;
+        transform: none !important;
+      }
+
+      #vod-player-container:fullscreen .vod-controls-overlay,
+      #vod-player-container:-webkit-full-screen .vod-controls-overlay,
+      #vod-player-container.player-container--fullscreen .vod-controls-overlay {
+        inset: 0 !important;
+        width: 100vw !important;
+        width: 100dvw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
       body.vel-live-fullscreen-active #video,
       body.vel-vod-fullscreen-active #video-vod,
       #player-container:fullscreen #video,
@@ -5119,7 +5165,6 @@
                   <button id="vod-ctl-next-episode" type="button" class="vod-ctl-btn vel-episode-nav-btn" aria-label="Épisode suivant" title="Épisode suivant" tabindex="0" data-tv-focusable="true" hidden>
                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M16 5h2v14h-2V5ZM5.8 6.2 14.5 12l-8.7 5.8V6.2Z"></path></svg>
                   </button>
-                  <button id="vod-ctl-mute" type="button" class="vod-ctl-btn" aria-label="Mute" tabindex="0" data-tv-focusable="true"></button>
                   <span id="vod-ctl-current" class="vod-ctl-time">00:00:00</span>
                   <div
                     id="vod-ctl-seek-track"
@@ -10338,7 +10383,54 @@ if (target.closest(".trial-offer-button")) {
             }
           }
 
+          function parseVodClock(value) {
+            var parts = String(value || "").trim().split(":").map(Number);
+            if (parts.some(function (part) { return !Number.isFinite(part); })) return NaN;
+            if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+            if (parts.length === 2) return parts[0] * 60 + parts[1];
+            return NaN;
+          }
+
+          function seekViaVodTimeline(seconds) {
+            var track = document.getElementById("vod-ctl-seek-track");
+            var current = parseVodClock(document.getElementById("vod-ctl-current")?.textContent);
+            var duration = parseVodClock(document.getElementById("vod-ctl-duration")?.textContent);
+            if (!track || !Number.isFinite(current) || !Number.isFinite(duration) || duration <= 0) return false;
+            var target = Math.max(0, Math.min(duration, current + seconds));
+            var rect = track.getBoundingClientRect();
+            if (!rect.width) return false;
+            var x = rect.left + rect.width * (target / duration);
+            var y = rect.top + rect.height / 2;
+            track.dispatchEvent(new MouseEvent("click", {
+              bubbles: true,
+              cancelable: true,
+              clientX: x,
+              clientY: y,
+              detail: 1
+            }));
+            return true;
+          }
+
           function seekBy(seconds) {
+            var current = parseVodClock(document.getElementById("vod-ctl-current")?.textContent);
+            var duration = parseVodClock(document.getElementById("vod-ctl-duration")?.textContent);
+            if (Number.isFinite(current) && Number.isFinite(duration) && duration > 0) {
+              var target = Math.max(0, Math.min(duration, current + seconds));
+              var localOffset = current - (video.currentTime || 0);
+              var localTarget = target - localOffset;
+              var localDuration = Number.isFinite(video.duration) ? video.duration : Infinity;
+              if (localTarget >= 0 && localTarget <= localDuration) {
+                try {
+                  video.currentTime = localTarget;
+                  showControls();
+                  return;
+                } catch (error) {}
+              }
+            }
+            if (seekViaVodTimeline(seconds)) {
+              showControls();
+              return;
+            }
             var duration = Number.isFinite(video.duration) ? video.duration : Infinity;
             var nextTime = Math.max(0, Math.min(duration, (video.currentTime || 0) + seconds));
             try { video.currentTime = nextTime; } catch (error) {}

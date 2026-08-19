@@ -385,13 +385,13 @@
 
   async function openItem(item, button) {
     button.disabled = true;
-    toast("Ouverture…");
     try {
       if (!await ensureCatalog()) throw new Error("Le catalogue n’est pas encore disponible.");
-      closePage();
       if (typeof window.veloraOpenFavoriteItem !== "function") throw new Error("Le lecteur de favoris est indisponible.");
       if (item.item_type === "movie" || item.item_type === "series") state.currentDetailDescriptor = favoriteItemDescriptor(item);
-      await window.veloraOpenFavoriteItem(item, Array.from(state.items.values()));
+      var opened = await window.veloraOpenFavoriteItem(item, Array.from(state.items.values()));
+      if (opened === false) throw new Error("Impossible d’ouvrir ce favori.");
+      closePage();
     } catch (error) {
       toast(error.message, true);
       state.page.hidden = false;
@@ -499,7 +499,20 @@
     content.replaceChildren(group(state.activeType));
   }
 
+  function closeActivePlayers() {
+    [
+      { container: "player-container", button: "btn-close-player" },
+      { container: "vod-player-container", button: "btn-close-vod-player" }
+    ].forEach(function (target) {
+      var container = document.getElementById(target.container);
+      if (!container || container.classList.contains("hidden")) return;
+      var button = document.getElementById(target.button);
+      if (button) button.click();
+    });
+  }
+
   async function openPage() {
+    closeActivePlayers();
     var page = ensurePage();
     document.getElementById("vel-bottom-profile-menu")?.setAttribute("hidden", "");
     state.limits = { movie: PAGE_SIZE, series: PAGE_SIZE, channel: PAGE_SIZE };

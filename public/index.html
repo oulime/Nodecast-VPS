@@ -1512,29 +1512,29 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
       rel="stylesheet"
     />
-    <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-8"></script>
-    <script defer src="/assets/velora-home-sections.js?v=instant-nav-v20260821-8"></script>
-    <script defer src="/assets/velora-home-cache-fallback.js?v=instant-nav-v20260821-8"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=instant-nav-v20260821-8"></script>
-    <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-8"></script>
-    <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-8"></script>
-    <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-8"></script>
-    <link rel="stylesheet" href="/assets/velora-favorites.css?v=instant-nav-v20260821-8" />
-    <script defer src="/assets/velora-favorites.js?v=instant-nav-v20260821-8"></script>
-    <script defer src="/assets/velora-catalog-scroll-memory.js?v=instant-nav-v20260821-8"></script>
-    <script defer src="/assets/velora-cache-inventory.js?v=instant-nav-v20260821-8"></script>
-    <script defer src="/assets/manual-pays-visible-memberships.js?v=instant-nav-v20260821-8"></script>
-    <script defer src="/assets/country-logos-admin.js?v=instant-nav-v20260821-8"></script>
-    <script defer src="/assets/direct-media-packages.js?v=instant-nav-v20260821-8"></script>
-    <script defer src="/assets/home-package-link.js?v=instant-nav-v20260821-8"></script>
-    <script defer src="/assets/country-switch-loader.js?v=instant-nav-v20260821-8"></script>
-    <script defer src="/assets/paid-users-admin.js?v=instant-nav-v20260821-8"></script>
-    <script defer src="/assets/ios-native-fullscreen.js?v=instant-nav-v20260821-8"></script>
-    <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=instant-nav-v20260821-8">
-    <link rel="stylesheet" href="/assets/manual-pays.css?v=instant-nav-v20260821-8">
-    <link rel="stylesheet" href="/assets/manual-pays-logo-contain.css?v=instant-nav-v20260821-8">
-    <link rel="stylesheet" href="/assets/parent-packages.css?v=instant-nav-v20260821-8">
-    <link rel="stylesheet" href="/assets/direct-media-packages.css?v=instant-nav-v20260821-8">
+    <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-12"></script>
+    <script defer src="/assets/velora-home-sections.js?v=instant-nav-v20260821-12"></script>
+    <script defer src="/assets/velora-home-cache-fallback.js?v=instant-nav-v20260821-12"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=instant-nav-v20260821-12"></script>
+    <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-12"></script>
+    <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-12"></script>
+    <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-12"></script>
+    <link rel="stylesheet" href="/assets/velora-favorites.css?v=instant-nav-v20260821-12" />
+    <script defer src="/assets/velora-favorites.js?v=instant-nav-v20260821-12"></script>
+    <script defer src="/assets/velora-catalog-scroll-memory.js?v=instant-nav-v20260821-12"></script>
+    <script defer src="/assets/velora-cache-inventory.js?v=instant-nav-v20260821-12"></script>
+    <script defer src="/assets/manual-pays-visible-memberships.js?v=instant-nav-v20260821-12"></script>
+    <script defer src="/assets/country-logos-admin.js?v=instant-nav-v20260821-12"></script>
+    <script defer src="/assets/direct-media-packages.js?v=instant-nav-v20260821-12"></script>
+    <script defer src="/assets/home-package-link.js?v=instant-nav-v20260821-12"></script>
+    <script defer src="/assets/country-switch-loader.js?v=instant-nav-v20260821-12"></script>
+    <script defer src="/assets/paid-users-admin.js?v=instant-nav-v20260821-12"></script>
+    <script defer src="/assets/ios-native-fullscreen.js?v=instant-nav-v20260821-12"></script>
+    <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=instant-nav-v20260821-12">
+    <link rel="stylesheet" href="/assets/manual-pays.css?v=instant-nav-v20260821-12">
+    <link rel="stylesheet" href="/assets/manual-pays-logo-contain.css?v=instant-nav-v20260821-12">
+    <link rel="stylesheet" href="/assets/parent-packages.css?v=instant-nav-v20260821-12">
+    <link rel="stylesheet" href="/assets/direct-media-packages.css?v=instant-nav-v20260821-12">
     <style>
       .manual-pays__pagination{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding:.7rem;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:rgba(14,11,20,.96);color:#aaa4b5;font-size:.75rem}
       .manual-pays__pagination button{border:1px solid rgba(167,139,250,.45);border-radius:8px;background:rgba(124,58,237,.2);color:#fff;padding:.45rem .7rem;cursor:pointer}
@@ -6909,20 +6909,47 @@
             };
 
             var showHomeChoice = function (event) {
-              event.preventDefault();
-              event.stopImmediatePropagation();
+              if (event) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+              }
               if (typeof window.veloraBlockCountryPickerAfterPageChange === "function") {
                 window.veloraBlockCountryPickerAfterPageChange();
               }
               stopHomeMediaPlayback();
               homeChoiceRunId += 1;
+              delete document.body.dataset.velTopLevel;
+              delete document.body.dataset.velActiveTab;
+              var homePage = document.getElementById("vel-home-empty-page");
+              if (homePage) {
+                homePage.classList.remove("hidden");
+                homePage.setAttribute("aria-hidden", "false");
+              }
+              ["content-view", "packages-view", "adult-view"].forEach(function (id) {
+                var view = document.getElementById(id);
+                if (view) {
+                  view.classList.add("hidden");
+                  view.setAttribute("aria-hidden", "true");
+                }
+              });
               document.body.classList.remove("vel-home-choice-loading");
               document.body.classList.remove("vel-home-choice-catalog-pending");
-              document.body.classList.remove("vel-home-choice-picked");
+              document.body.classList.add("vel-home-choice-picked");
+              document.body.classList.add("vel-home-empty-active");
               window.scrollTo(0, 0);
               var main = document.querySelector(".main--velora");
-              if (main) main.scrollTop = 0;
+              if (main) {
+                main.classList.remove("main--velora-in-package", "main--velora-live-package");
+                main.scrollTop = 0;
+              }
+              document.querySelectorAll("[data-bottom-nav]").forEach(function (button) {
+                var active = button.getAttribute("data-bottom-nav") === "home";
+                button.classList.toggle("is-active", active);
+                if (active) button.setAttribute("aria-current", "page");
+                else button.removeAttribute("aria-current");
+              });
             };
+            window.veloraShowHome = showHomeChoice;
 
             logoHome.addEventListener("pointerdown", showHomeChoice, true);
             logoHome.addEventListener("touchend", showHomeChoice, true);
@@ -7244,6 +7271,7 @@
                   if (closeVodPlayer) closeVodPlayer.click();
                 }
                 document.dispatchEvent(new CustomEvent("velora-return-home"));
+                return;
               }
             }, true);
 
@@ -12094,6 +12122,12 @@ if (target.closest(".trial-offer-button")) {
             packagesView.classList.remove("hidden");
             packagesView.setAttribute("aria-hidden", "false");
           }
+          try {
+            var state = window.history.state && typeof window.history.state === "object" ? window.history.state : {};
+            if (!state.veloraNav || state.veloraNav !== ("tab:" + tab)) {
+              window.history.pushState(Object.assign({}, state, { veloraNav: "tab:" + tab }), "", window.location.href);
+            }
+          } catch (_) {}
           document.dispatchEvent(new CustomEvent("velora-top-level-tab", { detail: { tab: tab } }));
           if (typeof window.veloraBlockCountryPickerAfterPageChange === "function") {
             window.veloraBlockCountryPickerAfterPageChange();

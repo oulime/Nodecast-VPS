@@ -1773,14 +1773,12 @@
         display: none !important;
       }
 
-      .main--velora .vel-vod-detail__plot.vel-vod-detail__text--collapsible,
-      .main--velora .vel-vod-detail__cast.vel-vod-detail__text--collapsible {
+      .main--velora .vel-vod-detail__plot.vel-vod-detail__text--collapsible {
         position: relative;
         overflow: hidden;
       }
 
-      .main--velora .vel-vod-detail__plot.vel-vod-detail__text--collapsible:not(.vel-vod-detail__text--expanded),
-      .main--velora .vel-vod-detail__cast.vel-vod-detail__text--collapsible:not(.vel-vod-detail__text--expanded) {
+      .main--velora .vel-vod-detail__plot.vel-vod-detail__text--collapsible:not(.vel-vod-detail__text--expanded) {
         display: -webkit-box;
         -webkit-box-orient: vertical;
         -webkit-line-clamp: 3;
@@ -1789,25 +1787,24 @@
 
       .main--velora .vel-vod-detail__show-more {
         width: fit-content;
-        min-height: 2.35rem;
+        min-height: 2rem;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        margin: 0.3rem 0 0.72rem;
-        padding: 0 0.82rem;
-        border: 1px solid color-mix(in srgb, var(--vel-primary, #8a2be2) 54%, rgba(255, 255, 255, 0.22));
-        border-radius: 8px;
-        color: #fff;
-        background:
-          linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.05)),
-          rgba(12, 8, 26, 0.82);
-        box-shadow:
-          inset 0 1px rgba(255, 255, 255, 0.16),
-          0 8px 18px rgba(0, 0, 0, 0.32),
-          0 0 18px color-mix(in srgb, var(--vel-accent-glow, rgba(138, 43, 226, 0.3)) 42%, transparent);
-        font-size: 0.82rem;
-        font-weight: 900;
-        letter-spacing: 0;
+        margin: 0.35rem 0 0.6rem;
+        padding: 0.35rem 0.88rem;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 999px;
+        color: rgba(255, 255, 255, 0.88);
+        background: rgba(255, 255, 255, 0.08);
+        -webkit-backdrop-filter: blur(14px);
+        backdrop-filter: blur(14px);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+        font-size: 0.78rem;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
       }
 
       .main--velora .vel-vod-detail--episode-playing .vel-vod-detail__show-more {
@@ -1816,8 +1813,17 @@
 
       .main--velora .vel-vod-detail__show-more:hover,
       .main--velora .vel-vod-detail__show-more:focus-visible {
-        border-color: color-mix(in srgb, var(--vel-primary, #8a2be2) 76%, rgba(255, 255, 255, 0.34));
+        color: #ffffff;
+        background: rgba(255, 255, 255, 0.16);
+        border-color: rgba(255, 255, 255, 0.36);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.32), 0 0 14px rgba(255, 255, 255, 0.1);
+        transform: translateY(-1px);
         outline: none;
+      }
+
+      .main--velora .vel-vod-detail__show-more:active {
+        transform: translateY(0);
+        background: rgba(255, 255, 255, 0.12);
       }
 
       .main--velora .vel-header__country,
@@ -5739,11 +5745,13 @@
           }
 
           function scan() {
-            root.querySelectorAll(".vel-vod-detail__inner").forEach(function (detail) {
-              if (!detail.querySelector(".vel-vod-detail__episodes-section")) return;
-              detail
-                .querySelectorAll(".vel-vod-detail__plot, .vel-vod-detail__cast")
-                .forEach(enhanceTextBlock);
+            root.querySelectorAll(".vel-vod-detail__inner, .vel-vod-detail__details-panel").forEach(function (detail) {
+              // Only enhance the description plot, never cast/distribution
+              detail.querySelectorAll(".vel-vod-detail__plot").forEach(enhanceTextBlock);
+              // Remove any stray show-more buttons on cast or distribution
+              detail.querySelectorAll(".vel-vod-detail__cast + .vel-vod-detail__show-more, .vel-vod-detail__director + .vel-vod-detail__show-more").forEach(function (btn) {
+                btn.remove();
+              });
             });
           }
 

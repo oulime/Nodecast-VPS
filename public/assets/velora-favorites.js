@@ -308,7 +308,9 @@
       var target = detail.querySelector(".vel-vod-detail__details-panel") || detail.querySelector(".vel-vod-detail__inner");
       if (!target) return;
       var button = createDetailFavoriteButton(descriptor);
-      if (plot && plot.parentElement === target) plot.insertAdjacentElement("afterend", button);
+      var showMore = plot && plot.nextElementSibling && plot.nextElementSibling.classList.contains("vel-vod-detail__show-more") ? plot.nextElementSibling : null;
+      if (showMore && showMore.parentElement === target) showMore.insertAdjacentElement("afterend", button);
+      else if (plot && plot.parentElement === target) plot.insertAdjacentElement("afterend", button);
       else target.appendChild(button);
     });
   }

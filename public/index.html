@@ -1512,29 +1512,29 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
       rel="stylesheet"
     />
-    <script src="/assets/local-velora-data.js?v=20260814-media-package-session-cache-v1"></script>
-    <script defer src="/assets/velora-home-sections.js?v=home-prefix-suffix-rules-v2-20260816"></script>
-    <script defer src="/assets/velora-home-cache-fallback.js?v=home-image-proxy-retry-v1-20260815"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=favorites-return-fix-v20260821-2"></script>
-    <script defer src="/assets/subscription-access-guard.js?v=subscription-whatsapp-number-v2-20260810"></script>
-    <script defer src="/assets/subscription-welcome.js?v=first-login-test-message-v1-20260810"></script>
-    <script defer src="/assets/profile-account.js?v=profile-account-menu-v2-20260810"></script>
-    <link rel="stylesheet" href="/assets/velora-favorites.css?v=favorites-return-fix-v20260821-2" />
-    <script defer src="/assets/velora-favorites.js?v=favorites-return-fix-v20260821-2"></script>
-    <script defer src="/assets/velora-catalog-scroll-memory.js?v=catalog-scroll-memory-v1-20260816"></script>
-    <script defer src="/assets/velora-cache-inventory.js?v=package-poster-refresh-secure-v4-20260809"></script>
-    <script defer src="/assets/manual-pays-visible-memberships.js?v=package-source-search-v1-20260815"></script>
-    <script defer src="/assets/country-logos-admin.js?v=app-country-list-logos-v2-20260815"></script>
-    <script defer src="/assets/direct-media-packages.js?v=20260815-premium-picker-v2"></script>
-    <script defer src="/assets/home-package-link.js?v=20260815-svg-icon-v3"></script>
-    <script defer src="/assets/country-switch-loader.js?v=country-switch-fast-v2-20260810"></script>
-    <script defer src="/assets/paid-users-admin.js?v=settings-admin-autocopy-test-v2-20260810"></script>
-    <script defer src="/assets/ios-native-fullscreen.js?v=ios-landscape-20260705"></script>
-    <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=package-title-full-20260610">
-    <link rel="stylesheet" href="/assets/manual-pays.css?v=package-source-search-v1-20260815">
-    <link rel="stylesheet" href="/assets/manual-pays-logo-contain.css?v=tv-package-logo-contain-v1-20260814">
-    <link rel="stylesheet" href="/assets/parent-packages.css?v=inline-live-parent-v3-20260811">
-    <link rel="stylesheet" href="/assets/direct-media-packages.css?v=20260815-premium-picker-brands-v5">
+    <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-8"></script>
+    <script defer src="/assets/velora-home-sections.js?v=instant-nav-v20260821-8"></script>
+    <script defer src="/assets/velora-home-cache-fallback.js?v=instant-nav-v20260821-8"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=instant-nav-v20260821-8"></script>
+    <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-8"></script>
+    <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-8"></script>
+    <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-8"></script>
+    <link rel="stylesheet" href="/assets/velora-favorites.css?v=instant-nav-v20260821-8" />
+    <script defer src="/assets/velora-favorites.js?v=instant-nav-v20260821-8"></script>
+    <script defer src="/assets/velora-catalog-scroll-memory.js?v=instant-nav-v20260821-8"></script>
+    <script defer src="/assets/velora-cache-inventory.js?v=instant-nav-v20260821-8"></script>
+    <script defer src="/assets/manual-pays-visible-memberships.js?v=instant-nav-v20260821-8"></script>
+    <script defer src="/assets/country-logos-admin.js?v=instant-nav-v20260821-8"></script>
+    <script defer src="/assets/direct-media-packages.js?v=instant-nav-v20260821-8"></script>
+    <script defer src="/assets/home-package-link.js?v=instant-nav-v20260821-8"></script>
+    <script defer src="/assets/country-switch-loader.js?v=instant-nav-v20260821-8"></script>
+    <script defer src="/assets/paid-users-admin.js?v=instant-nav-v20260821-8"></script>
+    <script defer src="/assets/ios-native-fullscreen.js?v=instant-nav-v20260821-8"></script>
+    <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=instant-nav-v20260821-8">
+    <link rel="stylesheet" href="/assets/manual-pays.css?v=instant-nav-v20260821-8">
+    <link rel="stylesheet" href="/assets/manual-pays-logo-contain.css?v=instant-nav-v20260821-8">
+    <link rel="stylesheet" href="/assets/parent-packages.css?v=instant-nav-v20260821-8">
+    <link rel="stylesheet" href="/assets/direct-media-packages.css?v=instant-nav-v20260821-8">
     <style>
       .manual-pays__pagination{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding:.7rem;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:rgba(14,11,20,.96);color:#aaa4b5;font-size:.75rem}
       .manual-pays__pagination button{border:1px solid rgba(167,139,250,.45);border-radius:8px;background:rgba(124,58,237,.2);color:#fff;padding:.45rem .7rem;cursor:pointer}
@@ -1578,14 +1578,32 @@
         display: none !important;
       }
 
-      body:not(.vel-home-choice-picked) .main--velora .vel-futuristic-bg {
-        display: block !important;
-        opacity: 0.92 !important;
-        visibility: visible !important;
+      .vel-futuristic-bg {
+        display: none !important;
       }
 
-      body:not(.vel-home-choice-picked) .main--velora {
-        background-color: var(--vel-bg, #06050a) !important;
+      /* Static TV Live background with identical purple/cyan nebula grid - 0% CPU/GPU overhead */
+      body[data-vel-active-tab="live"] .main--velora,
+      body[data-vel-top-level="live"] .main--velora,
+      .main--velora.main--velora-live-package,
+      body:not(.vel-home-empty-active):not([data-vel-active-tab="movies"]):not([data-vel-active-tab="series"]) .main--velora {
+        background-color: #060511 !important;
+        background-image:
+          radial-gradient(ellipse 90% 50% at 50% -10%, rgba(56, 189, 248, 0.18), transparent 70%),
+          radial-gradient(circle 550px at 100% 50%, rgba(168, 85, 247, 0.16), transparent 70%),
+          radial-gradient(circle 500px at 0% 75%, rgba(37, 99, 235, 0.14), transparent 70%),
+          linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px) !important;
+        background-size: auto, auto, auto, 44px 44px, 44px 44px !important;
+        background-repeat: no-repeat, no-repeat, no-repeat, repeat, repeat !important;
+      }
+
+      body[data-vel-active-tab="movies"] .main--velora,
+      body[data-vel-active-tab="series"] .main--velora,
+      body[data-vel-top-level="movies"] .main--velora,
+      body[data-vel-top-level="series"] .main--velora {
+        background-color: #06050a !important;
+        background-image: none !important;
       }
 
       .main--velora .vel-header {
@@ -6234,20 +6252,22 @@
             window.veloraBlockCountryPickerAfterPageChange();
           }
           syncHomeCountriesFallback();
+          document.body.dataset.velActiveTab = tabName;
+          document.body.classList.remove("vel-home-choice-loading", "vel-home-empty-active");
+          document.body.classList.add("vel-home-choice-picked");
+          var homePage = document.getElementById("vel-home-empty-page");
+          if (homePage) {
+            homePage.classList.add("hidden");
+            homePage.setAttribute("aria-hidden", "true");
+          }
+          var packagesView = document.getElementById("packages-view");
+          if (packagesView) {
+            packagesView.classList.remove("hidden");
+            packagesView.setAttribute("aria-hidden", "false");
+          }
           document.dispatchEvent(new CustomEvent("velora-home-tab", {
             detail: { tab: tabName }
           }));
-          var started = Date.now();
-          var timer = window.setInterval(function () {
-            var active = document.body.dataset.velActiveTab;
-            if (active === tabName || Date.now() - started > 12000) {
-              window.clearInterval(timer);
-              if (active === tabName) {
-                document.body.classList.remove("vel-home-choice-loading");
-                document.body.classList.add("vel-home-choice-picked");
-              }
-            }
-          }, 120);
         }
 
         function bindHomeFallback() {
@@ -6839,40 +6859,27 @@
           });
 
           function activateHomeTab(tabName) {
-            var runId = ++homeChoiceRunId;
-            var started = Date.now();
-            var maxWait = 30000;
-            var didOpen = false;
-
-            function tryActivate() {
-              if (runId !== homeChoiceRunId) return;
-              syncHomeCountryOptions();
-              document.dispatchEvent(
-                new CustomEvent("velora-home-tab", {
-                  detail: { tab: tabName }
-                })
-              );
-
-              window.setTimeout(function () {
-                if (runId !== homeChoiceRunId) return;
-                var isActive = document.body.dataset.velActiveTab === tabName;
-
-                if (isActive) {
-                  document.body.classList.remove("vel-home-choice-loading");
-                  document.body.classList.add("vel-home-choice-picked");
-                  didOpen = true;
-                  return;
-                }
-
-                if (Date.now() - started < maxWait) {
-                  window.setTimeout(function () {
-                    if (runId === homeChoiceRunId) tryActivate();
-                  }, 250);
-                }
-              }, 60);
+            homeChoiceRunId += 1;
+            document.body.dataset.velActiveTab = tabName;
+            document.body.classList.remove("vel-home-choice-loading", "vel-home-empty-active");
+            document.body.classList.add("vel-home-choice-picked");
+            syncHomeCountryOptions();
+            syncPackagesSectionTitle(tabName);
+            var packagesView = document.getElementById("packages-view");
+            if (packagesView) {
+              packagesView.classList.remove("hidden");
+              packagesView.setAttribute("aria-hidden", "false");
             }
-
-            tryActivate();
+            var homePage = document.getElementById("vel-home-empty-page");
+            if (homePage) {
+              homePage.classList.add("hidden");
+              homePage.setAttribute("aria-hidden", "true");
+            }
+            document.dispatchEvent(
+              new CustomEvent("velora-home-tab", {
+                detail: { tab: tabName }
+              })
+            );
           }
 
           var logoHome = document.getElementById("btn-logo-home");
@@ -12069,22 +12076,33 @@ if (target.closest(".trial-offer-button")) {
         }
 
         function openTab(tab) {
+          setActive(tab);
           closeBottomCountryMenu();
           closeProfileMenu();
           delete document.body.dataset.veloraReturnHome;
           document.body.dataset.velTopLevel = tab;
-          document.body.classList.remove("vel-home-empty-active");
+          document.body.dataset.velActiveTab = tab;
+          document.body.classList.remove("vel-home-empty-active", "vel-home-choice-loading");
+          document.body.classList.add("vel-home-choice-picked");
+          var homePage = document.getElementById("vel-home-empty-page");
+          if (homePage) {
+            homePage.classList.add("hidden");
+            homePage.setAttribute("aria-hidden", "true");
+          }
+          var packagesView = document.getElementById("packages-view");
+          if (packagesView) {
+            packagesView.classList.remove("hidden");
+            packagesView.setAttribute("aria-hidden", "false");
+          }
           document.dispatchEvent(new CustomEvent("velora-top-level-tab", { detail: { tab: tab } }));
           if (typeof window.veloraBlockCountryPickerAfterPageChange === "function") {
             window.veloraBlockCountryPickerAfterPageChange();
           }
+          document.dispatchEvent(new CustomEvent("velora-home-tab", { detail: { tab: tab } }));
           var homeControl = document.querySelector('#vel-home-choice [data-home-tab="' + tab + '"]');
           if (homeControl) {
             homeControl.click();
-          } else {
-            document.dispatchEvent(new CustomEvent("velora-home-tab", { detail: { tab: tab } }));
           }
-          setActive(tab);
         }
 
         function stopHomeMedia() {
@@ -12284,16 +12302,39 @@ if (target.closest(".trial-offer-button")) {
 
         if (floatingSearchButton) floatingSearchButton.addEventListener("click", openSearch);
 
-        nav.addEventListener("click", function (event) {
-          var button = event.target.closest("[data-bottom-nav]");
+        var lastNavTriggerAt = 0;
+        var lastNavTriggerAction = "";
+
+        function handleNavAction(button, event) {
           if (!button) return;
           var action = button.getAttribute("data-bottom-nav");
+          if (!action) return;
+          var now = Date.now();
+          if (lastNavTriggerAction === action && now - lastNavTriggerAt < 300) return;
+          lastNavTriggerAt = now;
+          lastNavTriggerAction = action;
+
+          setActive(action);
+
           if (action === "home") showHome();
           else if (action === "live" || action === "movies" || action === "series") openTab(action);
           else if (action === "country") openCountryPicker();
           else if (action === "search") openSearch();
           else if (action === "profile") openProfile();
-        });
+        }
+
+        nav.addEventListener("pointerdown", function (event) {
+          if (event.pointerType === "mouse" && event.button !== 0) return;
+          var button = event.target.closest("[data-bottom-nav]");
+          if (!button) return;
+          handleNavAction(button, event);
+        }, true);
+
+        nav.addEventListener("click", function (event) {
+          var button = event.target.closest("[data-bottom-nav]");
+          if (!button) return;
+          handleNavAction(button, event);
+        }, true);
 
         if (profileFavoritesButton) {
           profileFavoritesButton.addEventListener("click", function () {

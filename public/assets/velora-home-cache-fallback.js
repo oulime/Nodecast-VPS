@@ -156,8 +156,9 @@
     document.dispatchEvent(new CustomEvent("velora-home-media-open", {
       detail: { title: entry.name || "", contentType: section.content_type }
     }));
+    var targetTab = section.content_type === "movies" ? "movies" : section.content_type === "series" ? "series" : section.content_type === "live" ? "live" : "home";
     document.querySelectorAll("[data-bottom-nav]").forEach(function (button) {
-      var active = button.getAttribute("data-bottom-nav") === "home";
+      var active = button.getAttribute("data-bottom-nav") === targetTab;
       button.classList.toggle("is-active", active);
       if (active) button.setAttribute("aria-current", "page");
       else button.removeAttribute("aria-current");

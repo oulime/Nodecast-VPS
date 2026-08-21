@@ -73,14 +73,18 @@ body[data-vel-active-tab="live"]
 
 .vel-media-package-picker {
   position: relative;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   align-self: center;
   width: 100%;
-  height: 2.75rem;
-  min-height: 2.75rem;
+  height: 2.5rem !important;
+  min-height: 2.5rem !important;
+  max-height: 2.5rem !important;
   max-width: 34rem;
-  margin: 0;
-  padding: 0;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
   line-height: normal;
 }
 
@@ -101,16 +105,19 @@ body[data-vel-active-tab="live"]
   position: relative;
   isolation: isolate;
   width: 100%;
-  height: 2.75rem;
-  min-height: 2.75rem;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 1.35rem;
+  height: 2.5rem !important;
+  min-height: 2.5rem !important;
+  max-height: 2.5rem !important;
+  box-sizing: border-box !important;
+  display: flex;
   align-items: center;
-  gap: 0.65rem;
-  padding: 0 0.8rem 0 1rem;
+  justify-content: space-between;
+  gap: 0.55rem;
+  padding: 0 0.55rem 0 0.75rem;
+  margin: 0 !important;
   overflow: hidden;
   border: 1px solid rgba(211, 196, 255, 0.34);
-  border-radius: 14px;
+  border-radius: 12px;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.025) 34%, rgba(117, 77, 205, 0.08) 70%, rgba(6, 4, 20, 0.18)),
     rgba(16, 13, 34, 0.42);
@@ -124,7 +131,7 @@ body[data-vel-active-tab="live"]
     0 9px 22px rgba(2, 0, 14, 0.27),
     0 0 14px rgba(125, 70, 255, 0.07);
   font-family: inherit;
-  font-size: clamp(0.82rem, 1.5vw, 0.95rem);
+  font-size: 0.85rem;
   font-weight: 750;
   letter-spacing: 0.015em;
   text-align: left;
@@ -146,23 +153,65 @@ body[data-vel-active-tab="live"]
   pointer-events: none;
 }
 
-.vel-media-package-picker__label,
-.vel-media-package-picker__chevron {
+.vel-media-package-picker__label {
   position: relative;
   z-index: 1;
-}
-
-.vel-media-package-picker__label {
   min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  line-height: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.vel-media-package-picker__icon {
+  font-size: 1rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.vel-media-package-picker__kicker {
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #c4b5fd;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.vel-media-package-picker__name {
+  font-size: 0.86rem;
+  font-weight: 850;
+  color: #ffffff;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vel-media-package-picker__chevron-wrap {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 999px;
+  background: rgba(167, 139, 250, 0.18);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  flex-shrink: 0;
+}
+
 .vel-media-package-picker__chevron {
-  width: 1.2rem;
-  height: 1.2rem;
-  color: rgba(218, 200, 255, 0.92);
+  width: 0.95rem;
+  height: 0.95rem;
+  color: #f3e8ff;
   transition: transform 180ms ease;
 }
 
@@ -288,55 +337,85 @@ body.vel-media-package-menu-open .main--velora :is(#content-view, #dynamic-list,
 
 body[data-vel-active-tab="movies"] .main--velora .vel-header,
 body[data-vel-active-tab="series"] .main--velora .vel-header {
-  grid-template-columns: 2.75rem minmax(12rem, 34rem) 2.75rem !important;
+  grid-template-columns: 2.5rem minmax(12rem, 34rem) 2.5rem !important;
   justify-content: space-between;
-  min-height: 3.75rem;
-  padding-block: 0.5rem;
+  min-height: 3.25rem;
+  padding-block: 0.45rem;
+  margin-bottom: 0.75rem !important;
+}
+
+body[data-vel-active-tab="movies"] .main--velora #content-view:not(.content-view--vod-film-detail),
+body[data-vel-active-tab="series"] .main--velora #content-view:not(.content-view--vod-film-detail) {
+  padding-top: 0.45rem !important;
+}
+
+body[data-vel-active-tab="movies"] .main--velora #dynamic-list.item-list--vod-vertical,
+body[data-vel-active-tab="series"] .main--velora #dynamic-list.item-list--vod-vertical {
+  padding-top: 0.35rem !important;
 }
 
 body[data-vel-active-tab="movies"] .main--velora .vel-header__left,
 body[data-vel-active-tab="movies"] .main--velora .vel-header__right,
 body[data-vel-active-tab="series"] .main--velora .vel-header__left,
 body[data-vel-active-tab="series"] .main--velora .vel-header__right {
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.5rem !important;
+  height: 2.5rem !important;
   align-items: center;
   justify-content: center;
 }
 
-body[data-vel-active-tab="movies"] .main--velora .vel-header-context-title--package-picker,
-body[data-vel-active-tab="series"] .main--velora .vel-header-context-title--package-picker {
+#vel-header-context-title.vel-header-context-title--package-picker,
+.main--velora .vel-header-context-title--package-picker,
+body[data-vel-active-tab="movies"] .main--velora .vel-header-context-title,
+body[data-vel-active-tab="series"] .main--velora .vel-header-context-title {
   display: flex !important;
-  align-items: center;
-  justify-content: center;
-  align-self: center;
-  width: 100%;
-  min-height: 2.75rem;
+  align-items: center !important;
+  justify-content: center !important;
+  align-self: center !important;
+  width: 100% !important;
+  min-height: 2.5rem !important;
+  height: 2.5rem !important;
+  max-height: 2.5rem !important;
+  margin: 0 !important;
   padding: 0 !important;
-  overflow: visible;
+  border: 0 !important;
+  overflow: visible !important;
+}
+
+#vel-header-context-title.vel-header-context-title--package-picker > *:not(#vel-media-package-picker),
+.vel-header-context-title--package-picker > #vel-header-context-title-text,
+.vel-header-context-title--package-picker > .vel-category-heading__accent-line,
+.vel-header-context-title--package-picker > h2,
+.vel-header-context-title--package-picker > span:not(.vel-media-package-picker) {
+  display: none !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 @media (max-width: 640px) {
   body[data-vel-active-tab="movies"] .main--velora .vel-header,
   body[data-vel-active-tab="series"] .main--velora .vel-header {
-    grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem !important;
+    grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem !important;
     gap: 0.55rem;
     padding-inline: max(0.65rem, env(safe-area-inset-left)) max(0.65rem, env(safe-area-inset-right));
   }
 
   .vel-media-package-picker {
     width: 100%;
-    height: 2.75rem;
-    min-height: 2.75rem;
+    height: 2.5rem !important;
+    min-height: 2.5rem !important;
     max-width: none;
   }
 
   .vel-media-package-picker__trigger {
-    height: 2.75rem;
-    min-height: 2.75rem;
-    padding-inline: 0.9rem 0.75rem;
-    border-radius: 14px;
-    font-size: 16px;
+    height: 2.5rem !important;
+    min-height: 2.5rem !important;
+    padding-inline: 0.75rem 0.55rem;
+    border-radius: 12px !important;
+    font-size: 0.85rem;
     font-weight: 700;
   }
 

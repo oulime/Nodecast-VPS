@@ -419,11 +419,15 @@
     picker.className = "vel-media-package-picker";
     picker.innerHTML = [
       '<button id="vel-media-package-trigger" class="vel-media-package-picker__trigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="vel-media-package-menu">',
-      '<span class="vel-media-package-picker__label">Choisir un package</span>',
-      '<svg class="vel-media-package-picker__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 9 5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
+      '<span class="vel-media-package-picker__label">',
+      '<span class="vel-media-package-picker__icon" aria-hidden="true">🎬</span>',
+      '<span class="vel-media-package-picker__kicker">Genre :</span>',
+      '<span class="vel-media-package-picker__name">Choisir</span>',
+      '</span>',
+      '<span class="vel-media-package-picker__chevron-wrap"><svg class="vel-media-package-picker__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 9 5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>',
       '</button>',
-      '<div id="vel-media-package-menu" class="vel-media-package-picker__menu" role="listbox" aria-label="Choisir un package" hidden>',
-      '<span class="vel-media-package-picker__menu-title">Choisir un package</span>',
+      '<div id="vel-media-package-menu" class="vel-media-package-picker__menu" role="listbox" aria-label="Choisir une catégorie" hidden>',
+      '<span class="vel-media-package-picker__menu-title">Choisir une catégorie</span>',
       "</div>"
     ].join("");
     headerContext.appendChild(picker);
@@ -492,6 +496,9 @@
     const show = MEDIA_TABS.has(tab) && !contentView.classList.contains("hidden") && packages.length > 0;
     picker.hidden = !show;
     headerContext.classList.toggle("vel-header-context-title--package-picker", show);
+    if (show) {
+      if (headerContextText) headerContextText.textContent = "";
+    }
     if (!show) {
       closePackageMenu(picker);
       return;
@@ -522,8 +529,14 @@
     const selectedPackage = packages.find(item => item.id === selected) || packages[0];
     if (!selectedPackage) return;
     const selectedName = packageDisplayName(selectedPackage.name);
-    label.textContent = selectedName;
-    trigger.setAttribute("aria-label", `Package : ${selectedName}`);
+    const iconEl = picker.querySelector(".vel-media-package-picker__icon");
+    const kickerEl = picker.querySelector(".vel-media-package-picker__kicker");
+    const nameEl = picker.querySelector(".vel-media-package-picker__name");
+    const isSeries = tab === "series";
+    if (iconEl) iconEl.textContent = isSeries ? "🍿" : "🎬";
+    if (kickerEl) kickerEl.textContent = "Genre :";
+    if (nameEl) nameEl.textContent = selectedName;
+    trigger.setAttribute("aria-label", `Genre : ${selectedName}`);
     menu.querySelectorAll("[data-package-id]").forEach(option => {
       const active = option.dataset.packageId === selectedPackage.id;
       option.classList.toggle("is-selected", active);

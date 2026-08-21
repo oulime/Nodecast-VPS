@@ -90,10 +90,12 @@
   function setHeartState(heart, active) {
     heart.classList.toggle("is-active", active);
     heart.setAttribute("aria-pressed", active ? "true" : "false");
-    heart.setAttribute("aria-label", active ? "Retirer des favoris" : "Ajouter aux favoris");
-    heart.title = active ? "Retirer des favoris" : "Ajouter aux favoris";
+    heart.setAttribute("aria-label", active ? "Dans vos favoris (cliquer pour retirer)" : "Ajouter aux favoris");
+    heart.title = active ? "Dans vos favoris (cliquer pour retirer)" : "Ajouter aux favoris";
     var label = heart.querySelector(".vel-favorite-detail-button__label");
-    if (label) label.textContent = active ? "Retirer des favoris" : "Ajouter aux favoris";
+    if (label) {
+      label.textContent = active ? "Ajouté aux favoris" : "Ajouter aux favoris";
+    }
   }
 
   function syncHearts() {
@@ -293,6 +295,105 @@
     return button;
   }
 
+  var dominantColorCache = new Map();
+
+  function toProxiedImageUrl(url) {
+    if (!url) return "";
+    var clean = String(url).trim().replace(/^url\(["']?/, "").replace(/["']?\)$/, "");
+    if (!clean) return "";
+    if (clean.startsWith("/proxy") || clean.startsWith("data:")) return clean;
+    if (typeof window.An === "function") {
+      try { return window.An(clean); } catch (e) {}
+    }
+    if (/^https?:\/\//i.test(clean)) {
+      try {
+        var u = new URL(clean, window.location.origin);
+        if (u.origin === window.location.origin) return clean;
+      } catch (e) {}
+      return "/proxy?target=" + encodeURIComponent(clean);
+    }
+    return clean;
+  }
+
+  function sampleHeroDominantColor(imgUrl, targetEl) {
+    if (!imgUrl || !targetEl) return;
+    try {
+      var rawUrl = imgUrl.replace(/^url\(["']?/, "").replace(/["']?\)$/, "").trim();
+      if (!rawUrl) return;
+      if (dominantColorCache.has(rawUrl)) {
+        targetEl.style.setProperty("--vel-vod-dominant-color", dominantColorCache.get(rawUrl));
+        return;
+      }
+      var proxiedUrl = toProxiedImageUrl(rawUrl);
+      var img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = function () {
+        try {
+          var canvas = document.createElement("canvas");
+          canvas.width = 40;
+          canvas.height = 40;
+          var ctx = canvas.getContext("2d", { willReadFrequently: true });
+          if (!ctx) return;
+          ctx.drawImage(img, 0, 0, 40, 40);
+          var data = ctx.getImageData(0, 0, 40, 40).data;
+          var bins = {};
+          var totalPixels = 0;
+          for (var i = 0; i < data.length; i += 4) {
+            var r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
+            if (a < 160) continue;
+            totalPixels++;
+            var qr = (r >> 3) << 3;
+            var qg = (g >> 3) << 3;
+            var qb = (b >> 3) << 3;
+            var key = qr + "," + qg + "," + qb;
+            if (!bins[key]) {
+              bins[key] = { r: qr, g: qg, b: qb, count: 1 };
+            } else {
+              bins[key].count++;
+            }
+          }
+          if (totalPixels === 0) return;
+          var bestColor = null;
+          var bestScore = -1;
+          for (var k in bins) {
+            var bin = bins[k];
+            if (bin.count < totalPixels * 0.015) continue;
+            var br = bin.r, bg = bin.g, bb = bin.b;
+            var max = Math.max(br, bg, bb), min = Math.min(br, bg, bb);
+            var sat = max === 0 ? 0 : (max - min) / max;
+            var lum = (br * 0.299 + bg * 0.587 + bb * 0.114) / 255;
+            
+            // Skip pitch blacks or pure washed-out whites
+            if (lum < 0.12 || lum > 0.92) continue;
+            
+            var freqWeight = bin.count / totalPixels;
+            var lumWeight = 1 - Math.abs(lum - 0.50) * 0.7;
+            var satBonus = 1 + Math.min(sat, 0.85) * 1.8;
+            var score = freqWeight * satBonus * lumWeight;
+            if (score > bestScore) {
+              bestScore = score;
+              bestColor = bin;
+            }
+          }
+          if (bestColor) {
+            var fr = bestColor.r, fg = bestColor.g, fb = bestColor.b;
+            var maxC = Math.max(fr, fg, fb);
+            if (maxC > 0 && maxC < 165) {
+              var boost = 165 / maxC;
+              fr = Math.min(255, Math.round(fr * boost));
+              fg = Math.min(255, Math.round(fg * boost));
+              fb = Math.min(255, Math.round(fb * boost));
+            }
+            var colorStr = "rgb(" + fr + ", " + fg + ", " + fb + ")";
+            dominantColorCache.set(rawUrl, colorStr);
+            targetEl.style.setProperty("--vel-vod-dominant-color", colorStr);
+          }
+        } catch (e) {}
+      };
+      img.src = proxiedUrl;
+    } catch (e) {}
+  }
+
   function decorateDetails() {
     document.querySelectorAll(".vel-vod-detail").forEach(function (detail) {
       var descriptor = detailDescriptor(detail);
@@ -304,14 +405,57 @@
         setHeartState(existing, state.items.has(existing.dataset.favoriteKey));
         return;
       }
+      var meta = detail.querySelector(".vel-vod-detail__meta");
+      var watch = detail.querySelector(".vel-vod-detail__watch--film");
       var plot = detail.querySelector(".vel-vod-detail__plot");
+      var fullDesc = detail.querySelector(".vel-vod-detail__full-description");
+      if (fullDesc) fullDesc.remove();
       var target = detail.querySelector(".vel-vod-detail__details-panel") || detail.querySelector(".vel-vod-detail__inner");
-      if (!target) return;
+
+      if (watch && target && watch.parentElement === target) {
+        var watchIcon = watch.querySelector(".vel-vod-detail__watch-icon");
+        if (watchIcon && !watchIcon.querySelector("svg")) {
+          watchIcon.innerHTML = '<svg viewBox="0 0 24 24" width="1.25rem" height="1.25rem" fill="currentColor" aria-hidden="true"><path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11.04-6.86a1 1 0 0 0 0-1.72L9.5 4.28a1 1 0 0 0-1.5.86z"/></svg>';
+        }
+      }
+
+      function updateDetailThemeFromBackdrop() {
+        var bgEl = detail.querySelector(".vel-vod-detail__bg");
+        var bgUrl = "";
+        if (bgEl) {
+          var inlineBg = bgEl.style.backgroundImage || bgEl.style.getPropertyValue("--vel-vod-hero-url") || "";
+          var match = inlineBg.match(/url\(["']?([^"']+)["']?\)/);
+          if (match && match[1]) bgUrl = match[1];
+        }
+        var posterImg = detail.querySelector(".vel-vod-detail__poster-img");
+        var targetUrl = bgUrl || descriptor.backdropUrl || (posterImg && posterImg.src) || descriptor.posterUrl || descriptor.thumbUrl || "";
+        if (targetUrl) {
+          var rawTargetUrl = targetUrl.replace(/^url\(["']?/, "").replace(/["']?\)$/, "").trim();
+          if (dominantColorCache.has(rawTargetUrl)) {
+            detail.style.setProperty("--vel-vod-dominant-color", dominantColorCache.get(rawTargetUrl));
+          } else {
+            sampleHeroDominantColor(rawTargetUrl, detail);
+          }
+        }
+      }
+
+      // Initialize with neutral ice-cyan baseline
+      detail.style.setProperty("--vel-vod-dominant-color", "rgb(56, 189, 248)");
+      updateDetailThemeFromBackdrop();
+
+      // Observe background element for async backdrop load
+      var bgEl = detail.querySelector(".vel-vod-detail__bg");
+      if (bgEl && typeof MutationObserver !== "undefined") {
+        var bgObserver = new MutationObserver(function () {
+          updateDetailThemeFromBackdrop();
+        });
+        bgObserver.observe(bgEl, { attributes: true, attributeFilter: ["style", "class"] });
+      }
+
+      // Attach floating favorite heart button at the top-left of the detail hero card
       var button = createDetailFavoriteButton(descriptor);
-      var showMore = plot && plot.nextElementSibling && plot.nextElementSibling.classList.contains("vel-vod-detail__show-more") ? plot.nextElementSibling : null;
-      if (showMore && showMore.parentElement === target) showMore.insertAdjacentElement("afterend", button);
-      else if (plot && plot.parentElement === target) plot.insertAdjacentElement("afterend", button);
-      else target.appendChild(button);
+      detail.appendChild(button);
+      setHeartState(button, state.items.has(button.dataset.favoriteKey));
     });
   }
 
@@ -505,14 +649,43 @@
   }
 
   function closeActivePlayers() {
+    document.querySelectorAll("video, audio").forEach(function (v) {
+      try {
+        v.pause();
+        v.muted = true;
+        v.currentTime = 0;
+        if (v.hls && typeof v.hls.destroy === "function") {
+          try { v.hls.destroy(); } catch (_) {}
+        }
+        v.removeAttribute("src");
+        v.load();
+      } catch (_) {}
+    });
+
+    if (window.hls && typeof window.hls.destroy === "function") {
+      try { window.hls.destroy(); } catch (_) {}
+    }
+
+    try {
+      if (document.fullscreenElement && typeof document.exitFullscreen === "function") {
+        document.exitFullscreen().catch(function () {});
+      }
+    } catch (_) {}
+
     [
-      { container: "player-container", button: "btn-close-player" },
-      { container: "vod-player-container", button: "btn-close-vod-player" }
-    ].forEach(function (target) {
-      var container = document.getElementById(target.container);
-      if (!container || container.classList.contains("hidden")) return;
-      var button = document.getElementById(target.button);
-      if (button) button.click();
+      "player-container",
+      "vod-player-container",
+      "now-playing",
+      "now-playing-vod",
+      "content-view",
+      "packages-view",
+      "adult-view"
+    ].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.classList.add("hidden");
+        el.setAttribute("aria-hidden", "true");
+      }
     });
   }
 
@@ -559,28 +732,7 @@
     delete window._veloraFavoriteReturnTab;
     delete document.body.dataset.veloraReturnHome;
 
-    ["video", "video-vod"].forEach(function (id) {
-      var v = document.getElementById(id);
-      if (v) {
-        try { v.pause(); v.removeAttribute("src"); v.load(); } catch (_) {}
-      }
-    });
-
-    [
-      "player-container",
-      "vod-player-container",
-      "now-playing",
-      "now-playing-vod",
-      "content-view",
-      "packages-view",
-      "adult-view"
-    ].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (el) {
-        el.classList.add("hidden");
-        el.setAttribute("aria-hidden", "true");
-      }
-    });
+    closeActivePlayers();
 
     var contextTitle = document.getElementById("vel-header-context-title-text");
     if (contextTitle) contextTitle.textContent = "";

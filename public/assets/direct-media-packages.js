@@ -700,12 +700,12 @@
       }
       return;
     }
-    if (activeTab() === "live" && closeInlineLiveParent(event)) return;
     const back = event.target.closest?.("#btn-header-back, #btn-back-home");
+    if (!back) return;
+    if (document.body.dataset.veloraReturnFavorites || window._veloraFavoriteReturnTab || document.body.classList.contains("vel-favorites-open")) return;
     const tab = activeTab();
     const isDetail = contentView.classList.contains("content-view--vod-film-detail") ||
       Boolean(contentView.querySelector(".vel-vod-detail, .vel-series-detail, .vel-vod-series-detail"));
-    if (!back) return;
     if (tab !== "live" && isParentPackageView()) {
       const parentBack = packagesView.querySelector(".vel-parent-package-view__back");
       if (!parentBack) return;

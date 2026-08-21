@@ -534,30 +534,8 @@
   }
 
   function installButton() {
-    if (byId("velora-cast-button")) return;
-    var style = document.createElement("style");
-    style.textContent = [
-      ".velora-cast-button{position:fixed;right:16px;bottom:calc(78px + env(safe-area-inset-bottom,0px));z-index:2147483000;width:50px;height:50px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.22);border-radius:14px;background:rgba(12,14,24,.86);color:#fff;box-shadow:0 12px 30px rgba(0,0,0,.42);backdrop-filter:blur(14px);cursor:pointer}",
-      ".velora-cast-button:hover,.velora-cast-button:focus-visible{background:rgba(83,105,255,.95);outline:none}",
-      ".velora-cast-button[disabled]{opacity:.42;cursor:not-allowed}",
-      ".velora-cast-button--connected{background:rgba(34,197,94,.9)}",
-      ".velora-cast-button svg{width:26px;height:26px;fill:currentColor}",
-      "@media(max-width:768px){.velora-cast-button{right:12px;bottom:calc(86px + env(safe-area-inset-bottom,0px));width:52px;height:52px}}"
-    ].join("");
-    document.head.appendChild(style);
-
-    var button = document.createElement("button");
-    button.id = "velora-cast-button";
-    button.className = "velora-cast-button";
-    button.type = "button";
-    button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18v3h3a3 3 0 0 0-3-3Zm0-4v2a5 5 0 0 1 5 5h2a7 7 0 0 0-7-7Zm0-4v2a9 9 0 0 1 9 9h2A11 11 0 0 0 3 10Zm0-7v5h2V5h14v12h-3v2h5V3H3Z"/></svg>';
-    button.addEventListener("click", function (event) {
-      event.preventDefault();
-      event.stopPropagation();
-      requestGoogleCast();
-    });
-    document.body.appendChild(button);
-    syncButton();
+    var existing = byId("velora-cast-button");
+    if (existing) existing.remove();
   }
 
   function boot() {

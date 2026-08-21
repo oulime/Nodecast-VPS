@@ -1512,29 +1512,29 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
       rel="stylesheet"
     />
-    <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-12"></script>
-    <script defer src="/assets/velora-home-sections.js?v=instant-nav-v20260821-12"></script>
-    <script defer src="/assets/velora-home-cache-fallback.js?v=instant-nav-v20260821-12"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=instant-nav-v20260821-12"></script>
-    <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-12"></script>
-    <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-12"></script>
-    <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-12"></script>
-    <link rel="stylesheet" href="/assets/velora-favorites.css?v=instant-nav-v20260821-12" />
-    <script defer src="/assets/velora-favorites.js?v=instant-nav-v20260821-12"></script>
-    <script defer src="/assets/velora-catalog-scroll-memory.js?v=instant-nav-v20260821-12"></script>
-    <script defer src="/assets/velora-cache-inventory.js?v=instant-nav-v20260821-12"></script>
-    <script defer src="/assets/manual-pays-visible-memberships.js?v=instant-nav-v20260821-12"></script>
-    <script defer src="/assets/country-logos-admin.js?v=instant-nav-v20260821-12"></script>
-    <script defer src="/assets/direct-media-packages.js?v=instant-nav-v20260821-12"></script>
-    <script defer src="/assets/home-package-link.js?v=instant-nav-v20260821-12"></script>
-    <script defer src="/assets/country-switch-loader.js?v=instant-nav-v20260821-12"></script>
-    <script defer src="/assets/paid-users-admin.js?v=instant-nav-v20260821-12"></script>
-    <script defer src="/assets/ios-native-fullscreen.js?v=instant-nav-v20260821-12"></script>
-    <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=instant-nav-v20260821-12">
-    <link rel="stylesheet" href="/assets/manual-pays.css?v=instant-nav-v20260821-12">
-    <link rel="stylesheet" href="/assets/manual-pays-logo-contain.css?v=instant-nav-v20260821-12">
-    <link rel="stylesheet" href="/assets/parent-packages.css?v=instant-nav-v20260821-12">
-    <link rel="stylesheet" href="/assets/direct-media-packages.css?v=instant-nav-v20260821-12">
+    <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-14"></script>
+    <script defer src="/assets/velora-home-sections.js?v=instant-nav-v20260821-14"></script>
+    <script defer src="/assets/velora-home-cache-fallback.js?v=instant-nav-v20260821-14"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=instant-nav-v20260821-14"></script>
+    <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-14"></script>
+    <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-14"></script>
+    <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-14"></script>
+    <link rel="stylesheet" href="/assets/velora-favorites.css?v=instant-nav-v20260821-14" />
+    <script defer src="/assets/velora-favorites.js?v=instant-nav-v20260821-14"></script>
+    <script defer src="/assets/velora-catalog-scroll-memory.js?v=instant-nav-v20260821-14"></script>
+    <script defer src="/assets/velora-cache-inventory.js?v=instant-nav-v20260821-14"></script>
+    <script defer src="/assets/manual-pays-visible-memberships.js?v=instant-nav-v20260821-14"></script>
+    <script defer src="/assets/country-logos-admin.js?v=instant-nav-v20260821-14"></script>
+    <script defer src="/assets/direct-media-packages.js?v=instant-nav-v20260821-14"></script>
+    <script defer src="/assets/home-package-link.js?v=instant-nav-v20260821-14"></script>
+    <script defer src="/assets/country-switch-loader.js?v=instant-nav-v20260821-14"></script>
+    <script defer src="/assets/paid-users-admin.js?v=instant-nav-v20260821-14"></script>
+    <script defer src="/assets/ios-native-fullscreen.js?v=instant-nav-v20260821-14"></script>
+    <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=instant-nav-v20260821-14">
+    <link rel="stylesheet" href="/assets/manual-pays.css?v=instant-nav-v20260821-14">
+    <link rel="stylesheet" href="/assets/manual-pays-logo-contain.css?v=instant-nav-v20260821-14">
+    <link rel="stylesheet" href="/assets/parent-packages.css?v=instant-nav-v20260821-14">
+    <link rel="stylesheet" href="/assets/direct-media-packages.css?v=instant-nav-v20260821-14">
     <style>
       .manual-pays__pagination{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding:.7rem;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:rgba(14,11,20,.96);color:#aaa4b5;font-size:.75rem}
       .manual-pays__pagination button{border:1px solid rgba(167,139,250,.45);border-radius:8px;background:rgba(124,58,237,.2);color:#fff;padding:.45rem .7rem;cursor:pointer}
@@ -2540,7 +2540,8 @@
 
       .vel-scroll-top-btn {
         position: fixed;
-        right: max(14px, env(safe-area-inset-right));
+        left: 50%;
+        right: auto;
         bottom: calc(var(--vel-bottom-nav-height, 76px) + max(14px, env(safe-area-inset-bottom, 0px)));
         z-index: 2450;
         width: 3rem;
@@ -2563,7 +2564,7 @@
           inset 0 1px rgba(255, 255, 255, 0.22);
         opacity: 0;
         pointer-events: none;
-        transform: translateY(10px) scale(0.94);
+        transform: translateX(-50%) translateY(10px) scale(0.94);
         transition: opacity 160ms ease, transform 160ms ease, border-color 160ms ease;
       }
 
@@ -2576,14 +2577,14 @@
       .vel-scroll-top-btn.is-visible {
         opacity: 1;
         pointer-events: auto;
-        transform: translateY(0) scale(1);
+        transform: translateX(-50%) translateY(0) scale(1);
       }
 
       .vel-scroll-top-btn:hover,
       .vel-scroll-top-btn:focus-visible {
         border-color: color-mix(in srgb, var(--vel-primary, #8a2be2) 78%, #fff);
         outline: none;
-        transform: translateY(-1px) scale(1.02);
+        transform: translateX(-50%) translateY(-2px) scale(1.04);
       }
 
       @media (max-width: 760px) {
@@ -7258,6 +7259,10 @@
                 }));
                 return;
               }
+              if (window.__veloraInternalNavPop) {
+                window.__veloraInternalNavPop = false;
+                return;
+              }
               if (document.body.dataset.veloraReturnHome === "true") {
                 delete document.body.dataset.veloraReturnHome;
                 var livePlayer = document.getElementById("player-container");
@@ -7273,6 +7278,8 @@
                 document.dispatchEvent(new CustomEvent("velora-return-home"));
                 return;
               }
+
+              goBack(event);
             }, true);
 
             document.addEventListener("keydown", function (event) {
@@ -11162,8 +11169,40 @@ if (target.closest(".trial-offer-button")) {
 
       #velora-cast-button,
       .velora-cast-button {
-        display: none !important;
-        pointer-events: none !important;
+        position: fixed;
+        right: 18px;
+        bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+        z-index: 2390;
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        border: 1px solid rgba(167, 139, 250, 0.45);
+        background: rgba(22, 16, 40, 0.92);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+        cursor: pointer;
+        transition: transform 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+        -webkit-backdrop-filter: blur(12px);
+        backdrop-filter: blur(12px);
+      }
+      .velora-cast-button:hover {
+        transform: scale(1.08);
+        background: rgba(124, 58, 237, 0.9);
+      }
+      .velora-cast-button svg {
+        width: 22px;
+        height: 22px;
+      }
+      .velora-cast-button--connected {
+        border-color: #22c55e;
+        color: #22c55e;
+      }
+      .velora-cast-button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
       }
 
       .vel-bottom-nav {
@@ -12600,7 +12639,7 @@ if (target.closest(".trial-offer-button")) {
         load();
       })();
     </script>
-    <script defer src="/assets/cast-bridge.js?v=20260818-cast-button-only-fix"></script>
+    <script defer src="/assets/cast-bridge.js?v=20260821-cast-restored"></script>
   </body>
 </html>
 

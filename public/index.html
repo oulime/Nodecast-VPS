@@ -1512,7 +1512,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
       rel="stylesheet"
     />
-    <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-26"></script>
+    <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-27"></script>
     <script defer src="/assets/velora-home-sections.js?v=instant-nav-v20260821-26"></script>
     <script defer src="/assets/velora-home-cache-fallback.js?v=instant-nav-v20260821-26"></script>
     <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=instant-nav-v20260821-26"></script>
@@ -5459,9 +5459,8 @@
                 x5-video-player-type="h5-page"
                 x5-video-player-fullscreen="false"
                 x5-video-orientation="landscape"
-                controlslist="nofullscreen nodownload noplaybackrate noremoteplayback"
+                controlslist="nofullscreen nodownload noplaybackrate"
                 disablepictureinpicture
-                disableremoteplayback
                 preload="auto"
                 crossorigin="anonymous"
               ></video>
@@ -10860,14 +10859,14 @@ if (target.closest(".trial-offer-button")) {
           video.setAttribute("x5-playsinline", "true");
           video.setAttribute("x5-video-player-type", "h5-page");
           video.setAttribute("x5-video-player-fullscreen", "false");
-          video.setAttribute("controlslist", "nofullscreen nodownload noplaybackrate noremoteplayback");
+          video.setAttribute("controlslist", "nofullscreen nodownload noplaybackrate");
           video.setAttribute("disablepictureinpicture", "");
-          video.setAttribute("disableremoteplayback", "");
+          video.removeAttribute("disableremoteplayback");
           try {
             video.disablePictureInPicture = true;
           } catch (err) {}
           try {
-            video.disableRemotePlayback = true;
+            video.disableRemotePlayback = false;
           } catch (err) {}
         }
 
@@ -12860,7 +12859,7 @@ if (target.closest(".trial-offer-button")) {
         load();
       })();
     </script>
-    <script defer src="/assets/cast-bridge.js?v=20260821-cast-restored"></script>
+    <script defer src="/assets/cast-bridge.js?v=20260821-cast-airplay-v1"></script>
   </body>
 </html>
 

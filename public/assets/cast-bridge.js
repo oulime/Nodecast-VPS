@@ -20,8 +20,17 @@
     loadTimer: null,
     blockedTimer: null,
     phase: "DISCONNECTED",
-    activeVideo: null
+    activeVideo: null,
+    airPlayAvailable: false,
+    airPlayConnected: false
   };
+
+  function isIosOrSafari() {
+    var ua = navigator.userAgent || "";
+    var isAppleMobile = /iPad|iPhone|iPod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    var isSafari = /Safari/i.test(ua) && !/Chrome|CriOS|Edg|OPR|Android/i.test(ua);
+    return isAppleMobile || isSafari;
+  }
 
   function byId(id) {
     return document.getElementById(id);
@@ -62,7 +71,7 @@
       return video && !video.paused && !video.ended && video.readyState > 0;
     }) || state.activeVideo || videos.find(function (video) {
       return video && (video.__veloraCastUrl || video.currentSrc || video.src);
-    }) || null;
+    }) || document.getElementById("video-vod") || document.getElementById("video") || null;
   }
 
   function textFrom(selectors) {
@@ -175,7 +184,7 @@
   }
 
   function showBlockedMessage() {
-    if (!state.pendingCastClick || state.sdkReady) return;
+    if (!state.pendingCastClick || state.sdkReady || isIosOrSafari()) return;
     state.sdkLoading = false;
     var oldScript = byId("velora-google-cast-sdk");
     if (oldScript) oldScript.remove();
@@ -186,6 +195,7 @@
   }
 
   function armBlockedTimer() {
+    if (isIosOrSafari()) return;
     clearBlockedTimer();
     state.blockedTimer = window.setTimeout(showBlockedMessage, 5500);
   }
@@ -221,14 +231,6 @@
     );
   }
 
-  function castUnavailableMessage() {
-    if (state.sdkLoading) return "Cast is still loading. If your browser asks for local network access, allow it and click Cast again.";
-    if (!state.sdkReady) return "Google Cast is not ready. Your browser may have blocked the Cast SDK or local network access for this site.";
-    if (!window.chrome || !window.chrome.cast) return "Google Cast is not supported or not enabled in this browser.";
-    if (!window.cast || !window.cast.framework || !window.cast.framework.CastContext) return "Google Cast framework is not available in this browser.";
-    return "Google Cast is not available right now. Allow local network access for this site, then click Cast again.";
-  }
-
   function isTvReachableCastUrl(url) {
     if (!url || /^(blob:|data:|about:|mediastream:)/i.test(String(url))) return false;
     try {
@@ -243,11 +245,18 @@
   function syncButton() {
     var button = byId("velora-cast-button");
     if (!button) return;
-    var hasMedia = !!state.currentMedia || !!normalizeMedia({});
+    var video = activeVideo();
+    var hasMedia = !!state.currentMedia || !!normalizeMedia({}) || (video && !!(video.currentSrc || video.src));
+    var isIos = isIosOrSafari();
+    var isConnected = !!session() || !!state.airPlayConnected;
+
     button.disabled = !hasMedia || state.requestPending;
-    button.classList.toggle("velora-cast-button--connected", !!session());
-    if (!hasMedia) setStatus("Start a video first, then cast it");
+    button.classList.toggle("velora-cast-button--connected", isConnected);
+
+    if (!hasMedia) setStatus(isIos ? "Lancez une vidéo pour diffuser (AirPlay)" : "Start a video first, then cast it");
     else if (state.requestPending) setStatus("Opening Cast picker");
+    else if (isConnected) setStatus(isIos ? "AirPlay actif sur TV" : "Casting to TV");
+    else if (isIos) setStatus("Diffuser sur la TV (AirPlay)");
     else if (!state.sdkReady) setStatus("Cast loading. If nothing opens, allow local network access for this site.");
     else if (session() && state.phase === "LOADING_MEDIA") setStatus("Sending video to TV");
     else if (session()) setStatus("Casting to TV");
@@ -347,6 +356,35 @@
     setPhase("DISCONNECTED");
   }
 
+  async function requestUniversalCast() {
+    var video = activeVideo();
+
+    // 1. iPhone / iPad / Safari: Trigger native WebKit AirPlay Target Picker
+    if (isIosOrSafari() || (video && typeof video.webkitShowPlaybackTargetPicker === "function")) {
+      if (!video) {
+        window.alert("Lancez d'abord une vidéo, puis touchez le bouton pour diffuser sur votre TV.");
+        return;
+      }
+      if (typeof video.webkitShowPlaybackTargetPicker === "function") {
+        try {
+          video.webkitShowPlaybackTargetPicker();
+          return;
+        } catch (err) {
+          console.warn("[VeloraCast] webkitShowPlaybackTargetPicker failed", err);
+        }
+      }
+      window.alert(
+        "Pour diffuser sur votre TV avec AirPlay :\n\n" +
+        "1. Ouvrez le Centre de contrôle iOS (glissez depuis le coin supérieur droit)\n" +
+        "2. Touchez l'icône AirPlay dans le widget de lecture."
+      );
+      return;
+    }
+
+    // 2. Android / PC / Chrome: Use Google Cast SDK
+    return requestGoogleCast();
+  }
+
   async function requestGoogleCast() {
     if (state.requestPending) return;
     if (!state.sdkReady) {
@@ -359,7 +397,7 @@
     }
 
     if (!canUseGoogleCast()) {
-      window.alert(castUnavailableMessage());
+      window.alert("Google Cast is not available in this browser. Please use Chrome on Android or PC.");
       return;
     }
 
@@ -384,7 +422,6 @@
           clearLocalCastSessionState();
           syncButton();
           console.warn("[VeloraCast] requestSession failed", error);
-          window.alert(castErrorMessage(error));
           return;
         }
         castSession = context.getCurrentSession();
@@ -413,16 +450,6 @@
       state.requestPending = false;
       syncButton();
     }
-  }
-
-  function castErrorMessage(error) {
-    var message = error && (error.description || error.message || error.code || error);
-    var text = String(message || "Unknown Cast error");
-    if (/cancel/i.test(text)) return "TV selection was cancelled.";
-    if (/SESSION_ERROR/i.test(text)) return "Could not create a Cast session in this browser.";
-    if (/timeout/i.test(text)) return "Cast timed out. Check that browser local network access is allowed for this site.";
-    if (/receiver|session/i.test(text)) return text;
-    return text + ". If the browser asks for local network access, allow it and click Cast again.";
   }
 
   function onCastApiAvailable(available) {
@@ -472,6 +499,7 @@
   }
 
   function loadGoogleCastSdk() {
+    if (isIosOrSafari()) return; // Skip Google Cast SDK on iOS Safari
     window.__onGCastApiAvailable = onCastApiAvailable;
     if (state.sdkReady || state.sdkLoading) return;
     var oldScript = byId("velora-google-cast-sdk");
@@ -484,7 +512,6 @@
     script.onerror = function () {
       state.sdkLoading = false;
       clearBlockedTimer();
-      if (state.pendingCastClick) showBlockedMessage();
       syncButton();
     };
     document.head.appendChild(script);
@@ -524,6 +551,19 @@
     Array.prototype.forEach.call(document.querySelectorAll("video"), function (video) {
       if (video.__veloraCastBound) return;
       video.__veloraCastBound = true;
+
+      // AirPlay listener on iOS / WebKit
+      if (typeof video.addEventListener === "function") {
+        video.addEventListener("webkitplaybacktargetavailabilitychanged", function (event) {
+          state.airPlayAvailable = event.availability === "available";
+          syncButton();
+        });
+        video.addEventListener("webkitcurrentplaybacktargetiswirelesschanged", function (event) {
+          state.airPlayConnected = !!(video.webkitCurrentPlaybackTargetIsWireless);
+          syncButton();
+        });
+      }
+
       ["play", "loadedmetadata", "canplay"].forEach(function (eventName) {
         video.addEventListener(eventName, function () {
           state.activeVideo = video;
@@ -539,8 +579,8 @@
     button.id = "velora-cast-button";
     button.className = "velora-cast-button";
     button.type = "button";
-    button.title = "Cast video to TV";
-    button.setAttribute("aria-label", "Cast video to TV");
+    button.title = isIosOrSafari() ? "Diffuser sur TV (AirPlay)" : "Cast video to TV";
+    button.setAttribute("aria-label", button.title);
     button.innerHTML =
       '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
       '<path d="M1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm0-4v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11zm20-7H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>' +
@@ -548,7 +588,7 @@
     button.addEventListener("click", function (event) {
       event.preventDefault();
       event.stopPropagation();
-      requestGoogleCast();
+      requestUniversalCast();
     });
     document.body.appendChild(button);
     syncButton();
@@ -558,19 +598,20 @@
     window.VeloraCast = {
       setMedia: setMedia,
       rememberMedia: rememberMedia,
-      cast: requestGoogleCast,
+      cast: requestUniversalCast,
       getCurrentMedia: function () {
         return state.currentMedia || normalizeMedia({});
       },
       isConnected: function () {
-        return !!session();
+        return !!session() || !!state.airPlayConnected;
       },
       getState: function () {
         return {
           phase: state.phase,
           castState: state.castState,
           sessionState: state.sessionState,
-          connected: !!session(),
+          connected: !!session() || !!state.airPlayConnected,
+          airPlay: isIosOrSafari(),
           media: state.currentMedia
         };
       }
@@ -579,7 +620,9 @@
     patchVideoSources();
     installButton();
     bindVideos();
-    loadGoogleCastSdk();
+    if (!isIosOrSafari()) {
+      loadGoogleCastSdk();
+    }
     new MutationObserver(function () {
       bindVideos();
       syncButton();

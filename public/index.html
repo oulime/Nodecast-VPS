@@ -11861,6 +11861,7 @@ if (target.closest(".trial-offer-button")) {
           if (!bottomCountryMenu || bottomCountryMenu.hidden) return;
           bottomCountryMenu.hidden = true;
           if (bottomCountryButton) bottomCountryButton.setAttribute("aria-expanded", "false");
+          if (document.body.classList.contains("vel-favorites-open")) return;
           var activeTab = document.body.dataset.velActiveTab;
           setActive(
             document.body.classList.contains("vel-home-empty-active")
@@ -11870,6 +11871,7 @@ if (target.closest(".trial-offer-button")) {
         }
 
         function restoreBottomNavActive() {
+          if (document.body.classList.contains("vel-favorites-open")) return;
           var activeTab = document.body.dataset.velActiveTab;
           setActive(
             document.body.classList.contains("vel-home-empty-active")

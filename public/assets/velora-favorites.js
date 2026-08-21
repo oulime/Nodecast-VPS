@@ -605,7 +605,11 @@
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape" && state.open) closePage(true);
     });
-    document.getElementById("vel-bottom-nav")?.addEventListener("click", function () {
+    document.getElementById("vel-bottom-nav")?.addEventListener("click", function (event) {
+      var target = event.target.closest("[data-bottom-nav]");
+      if (!target) return;
+      var action = target.getAttribute("data-bottom-nav");
+      if (action === "country" || action === "profile") return;
       if (state.open) closePage(false);
     }, true);
     document.addEventListener("velora-return-favorites", function (event) {

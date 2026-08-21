@@ -388,10 +388,14 @@
     try {
       if (!await ensureCatalog()) throw new Error("Le catalogue n’est pas encore disponible.");
       if (typeof window.veloraOpenFavoriteItem !== "function") throw new Error("Le lecteur de favoris est indisponible.");
+      var favoriteType = state.activeType || item.item_type || "channel";
       if (item.item_type === "movie" || item.item_type === "series") state.currentDetailDescriptor = favoriteItemDescriptor(item);
       var opened = await window.veloraOpenFavoriteItem(item, Array.from(state.items.values()));
       if (opened === false) throw new Error("Impossible d’ouvrir ce favori.");
-      closePage();
+      delete document.body.dataset.veloraReturnHome;
+      document.body.dataset.veloraReturnFavorites = favoriteType;
+      window._veloraFavoriteReturnTab = favoriteType;
+      closePage(false);
     } catch (error) {
       toast(error.message, true);
       state.page.hidden = false;
@@ -462,8 +466,7 @@
     page.id = "vel-favorites-page";
     page.className = "vel-favorites-page";
     page.hidden = true;
-    page.innerHTML = '<header class="vel-favorites-page__header"><h1>Mes favoris</h1><button type="button" class="vel-favorites-page__close" aria-label="Fermer les favoris"><span aria-hidden="true">×</span></button></header><nav class="vel-favorites-tabs" role="tablist" aria-label="Catégories de favoris"><button type="button" id="vel-favorites-tab-channel" class="vel-favorites-tab" role="tab" data-favorites-tab="channel" aria-controls="vel-favorites-panel-channel"><span>Chaînes</span><small>0</small></button><button type="button" id="vel-favorites-tab-movie" class="vel-favorites-tab" role="tab" data-favorites-tab="movie" aria-controls="vel-favorites-panel-movie"><span>Films</span><small>0</small></button><button type="button" id="vel-favorites-tab-series" class="vel-favorites-tab" role="tab" data-favorites-tab="series" aria-controls="vel-favorites-panel-series"><span>Séries</span><small>0</small></button></nav><main class="vel-favorites-page__content" aria-live="polite"></main>';
-    page.querySelector(".vel-favorites-page__close").addEventListener("click", closePage);
+    page.innerHTML = '<header class="vel-favorites-page__header"><h1>Mes favoris</h1></header><nav class="vel-favorites-tabs" role="tablist" aria-label="Catégories de favoris"><button type="button" id="vel-favorites-tab-channel" class="vel-favorites-tab" role="tab" data-favorites-tab="channel" aria-controls="vel-favorites-panel-channel"><span>Chaînes</span><small>0</small></button><button type="button" id="vel-favorites-tab-movie" class="vel-favorites-tab" role="tab" data-favorites-tab="movie" aria-controls="vel-favorites-panel-movie"><span>Films</span><small>0</small></button><button type="button" id="vel-favorites-tab-series" class="vel-favorites-tab" role="tab" data-favorites-tab="series" aria-controls="vel-favorites-panel-series"><span>Séries</span><small>0</small></button></nav><main class="vel-favorites-page__content" aria-live="polite"></main>';
     page.querySelector(".vel-favorites-tabs").addEventListener("click", function (event) {
       var tab = event.target.closest("[data-favorites-tab]");
       if (!tab) return;
@@ -511,12 +514,14 @@
     });
   }
 
-  async function openPage() {
+  async function openPage(initialType) {
     closeActivePlayers();
     var page = ensurePage();
     document.getElementById("vel-bottom-profile-menu")?.setAttribute("hidden", "");
     state.limits = { movie: PAGE_SIZE, series: PAGE_SIZE, channel: PAGE_SIZE };
-    state.activeType = "channel";
+    if (initialType && (initialType === "channel" || initialType === "movie" || initialType === "series")) {
+      state.activeType = initialType;
+    }
     state.open = true;
     document.body.classList.add("vel-favorites-open");
     page.hidden = false;
@@ -528,14 +533,57 @@
       page.querySelector(".vel-favorites-page__content").innerHTML = '<p class="vel-favorites-page__loading is-error"></p>';
       page.querySelector(".is-error").textContent = error.message;
     }
-    page.querySelector(".vel-favorites-page__close").focus();
+    var activeTabBtn = page.querySelector('[data-favorites-tab="' + state.activeType + '"]');
+    if (activeTabBtn) activeTabBtn.focus();
   }
 
-  function closePage() {
+  function closePage(andReturnHome) {
     if (!state.page) return;
     state.page.hidden = true;
     state.open = false;
     document.body.classList.remove("vel-favorites-open");
+    delete document.body.dataset.veloraReturnFavorites;
+    if (andReturnHome !== false) {
+      document.dispatchEvent(new CustomEvent("velora-show-home"));
+    }
+  }
+
+  function stopAndReturnFavorites(tab) {
+    var targetTab = tab && (tab === "channel" || tab === "movie" || tab === "series")
+      ? tab
+      : state.activeType || "channel";
+
+    delete document.body.dataset.veloraReturnFavorites;
+    delete window._veloraFavoriteReturnTab;
+    delete document.body.dataset.veloraReturnHome;
+
+    ["video", "video-vod"].forEach(function (id) {
+      var v = document.getElementById(id);
+      if (v) {
+        try { v.pause(); v.removeAttribute("src"); v.load(); } catch (_) {}
+      }
+    });
+
+    [
+      "player-container",
+      "vod-player-container",
+      "now-playing",
+      "now-playing-vod",
+      "content-view",
+      "packages-view",
+      "adult-view"
+    ].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.classList.add("hidden");
+        el.setAttribute("aria-hidden", "true");
+      }
+    });
+
+    var contextTitle = document.getElementById("vel-header-context-title-text");
+    if (contextTitle) contextTitle.textContent = "";
+
+    void openPage(targetTab);
   }
 
   function init() {
@@ -555,11 +603,18 @@
       }, true);
     }
     document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape" && state.open) closePage();
+      if (event.key === "Escape" && state.open) closePage(true);
     });
     document.getElementById("vel-bottom-nav")?.addEventListener("click", function () {
-      if (state.open) closePage();
+      if (state.open) closePage(false);
     }, true);
+    document.addEventListener("velora-return-favorites", function (event) {
+      var tab = event.detail && event.detail.tab ? event.detail.tab : state.activeType || "channel";
+      stopAndReturnFavorites(tab);
+    });
+    window.veloraOpenFavoritesPage = openPage;
+    window.veloraCloseFavoritesPage = closePage;
+    window.veloraStopAndReturnFavorites = stopAndReturnFavorites;
     new MutationObserver(scheduleDecorate).observe(document.body, { childList: true, subtree: true });
     document.addEventListener("velora-app-ready", scheduleDecorate);
     document.addEventListener("velora-top-level-tab", scheduleDecorate);

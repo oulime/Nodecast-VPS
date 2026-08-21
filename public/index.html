@@ -1512,29 +1512,29 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
       rel="stylesheet"
     />
-    <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-24"></script>
-    <script defer src="/assets/velora-home-sections.js?v=instant-nav-v20260821-24"></script>
-    <script defer src="/assets/velora-home-cache-fallback.js?v=instant-nav-v20260821-24"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=instant-nav-v20260821-24"></script>
-    <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-24"></script>
-    <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-24"></script>
-    <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-24"></script>
-    <link rel="stylesheet" href="/assets/velora-favorites.css?v=instant-nav-v20260821-24" />
-    <script defer src="/assets/velora-favorites.js?v=instant-nav-v20260821-24"></script>
-    <script defer src="/assets/velora-catalog-scroll-memory.js?v=instant-nav-v20260821-24"></script>
-    <script defer src="/assets/velora-cache-inventory.js?v=instant-nav-v20260821-24"></script>
-    <script defer src="/assets/manual-pays-visible-memberships.js?v=instant-nav-v20260821-24"></script>
-    <script defer src="/assets/country-logos-admin.js?v=instant-nav-v20260821-24"></script>
-    <script defer src="/assets/direct-media-packages.js?v=instant-nav-v20260821-24"></script>
-    <script defer src="/assets/home-package-link.js?v=instant-nav-v20260821-24"></script>
-    <script defer src="/assets/country-switch-loader.js?v=instant-nav-v20260821-24"></script>
-    <script defer src="/assets/paid-users-admin.js?v=instant-nav-v20260821-24"></script>
-    <script defer src="/assets/ios-native-fullscreen.js?v=instant-nav-v20260821-24"></script>
-    <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=instant-nav-v20260821-24">
-    <link rel="stylesheet" href="/assets/manual-pays.css?v=instant-nav-v20260821-24">
-    <link rel="stylesheet" href="/assets/manual-pays-logo-contain.css?v=instant-nav-v20260821-24">
-    <link rel="stylesheet" href="/assets/parent-packages.css?v=instant-nav-v20260821-24">
-    <link rel="stylesheet" href="/assets/direct-media-packages.css?v=instant-nav-v20260821-24">
+    <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-26"></script>
+    <script defer src="/assets/velora-home-sections.js?v=instant-nav-v20260821-26"></script>
+    <script defer src="/assets/velora-home-cache-fallback.js?v=instant-nav-v20260821-26"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=instant-nav-v20260821-26"></script>
+    <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-26"></script>
+    <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-26"></script>
+    <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-26"></script>
+    <link rel="stylesheet" href="/assets/velora-favorites.css?v=instant-nav-v20260821-26" />
+    <script defer src="/assets/velora-favorites.js?v=instant-nav-v20260821-26"></script>
+    <script defer src="/assets/velora-catalog-scroll-memory.js?v=instant-nav-v20260821-26"></script>
+    <script defer src="/assets/velora-cache-inventory.js?v=instant-nav-v20260821-26"></script>
+    <script defer src="/assets/manual-pays-visible-memberships.js?v=instant-nav-v20260821-26"></script>
+    <script defer src="/assets/country-logos-admin.js?v=instant-nav-v20260821-26"></script>
+    <script defer src="/assets/direct-media-packages.js?v=instant-nav-v20260821-26"></script>
+    <script defer src="/assets/home-package-link.js?v=instant-nav-v20260821-26"></script>
+    <script defer src="/assets/country-switch-loader.js?v=instant-nav-v20260821-26"></script>
+    <script defer src="/assets/paid-users-admin.js?v=instant-nav-v20260821-26"></script>
+    <script defer src="/assets/ios-native-fullscreen.js?v=instant-nav-v20260821-26"></script>
+    <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=instant-nav-v20260821-26">
+    <link rel="stylesheet" href="/assets/manual-pays.css?v=instant-nav-v20260821-26">
+    <link rel="stylesheet" href="/assets/manual-pays-logo-contain.css?v=instant-nav-v20260821-26">
+    <link rel="stylesheet" href="/assets/parent-packages.css?v=instant-nav-v20260821-26">
+    <link rel="stylesheet" href="/assets/direct-media-packages.css?v=instant-nav-v20260821-26">
     <style>
       .manual-pays__pagination{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding:.7rem;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:rgba(14,11,20,.96);color:#aaa4b5;font-size:.75rem}
       .manual-pays__pagination button{border:1px solid rgba(167,139,250,.45);border-radius:8px;background:rgba(124,58,237,.2);color:#fff;padding:.45rem .7rem;cursor:pointer}
@@ -11243,23 +11243,57 @@ if (target.closest(".trial-offer-button")) {
             if (usesHoverControls()) hideControls();
           });
 
+          function dismissBufferingIfPlaying() {
+            if (!video.paused && !video.seeking && (video.currentTime > 0.05 || video.readyState >= 2)) {
+              if (buffering && !buffering.classList.contains("hidden")) {
+                buffering.classList.add("hidden");
+                buffering.setAttribute("aria-hidden", "true");
+              }
+            }
+          }
+
           video.addEventListener("pause", function () {
             syncCenterPlayButton();
             showControls();
           });
           video.addEventListener("play", function () {
             syncCenterPlayButton();
+            dismissBufferingIfPlaying();
             window.requestAnimationFrame(function () {
               if (!video.paused) hideControls();
             });
           });
+          video.addEventListener("playing", function () {
+            syncCenterPlayButton();
+            if (buffering) {
+              buffering.classList.add("hidden");
+              buffering.setAttribute("aria-hidden", "true");
+            }
+            dismissBufferingIfPlaying();
+          });
+          video.addEventListener("timeupdate", dismissBufferingIfPlaying);
+          video.addEventListener("progress", dismissBufferingIfPlaying);
+          video.addEventListener("canplay", dismissBufferingIfPlaying);
+          video.addEventListener("loadeddata", dismissBufferingIfPlaying);
           video.addEventListener("ended", function () {
             syncCenterPlayButton();
             showControls();
           });
-          video.addEventListener("waiting", hideControls);
+          video.addEventListener("waiting", function () {
+            if (video.paused || video.seeking || !(video.currentTime > 0.05 && video.readyState >= 3)) {
+              hideControls();
+            } else {
+              dismissBufferingIfPlaying();
+            }
+          });
           video.addEventListener("seeking", hideControls);
-          video.addEventListener("stalled", hideControls);
+          video.addEventListener("stalled", function () {
+            if (video.paused || video.seeking || !(video.currentTime > 0.05 && video.readyState >= 3)) {
+              hideControls();
+            } else {
+              dismissBufferingIfPlaying();
+            }
+          });
           new MutationObserver(function () {
             if (!buffering.classList.contains("hidden") &&
                 buffering.getAttribute("aria-hidden") !== "true") {
@@ -11290,10 +11324,36 @@ if (target.closest(".trial-offer-button")) {
           ["video", "video-vod"].forEach(function (id) {
             var video = document.getElementById(id);
             if (!video) return;
+            var dismissBuf = function () {
+              if (!video.paused && !video.seeking && (video.currentTime > 0.05 || video.readyState >= 2)) {
+                var bufId = id === "video-vod" ? "vod-player-buffering" : "player-buffering";
+                var buf = document.getElementById(bufId);
+                if (buf && !buf.classList.contains("hidden")) {
+                  buf.classList.add("hidden");
+                  buf.setAttribute("aria-hidden", "true");
+                }
+              }
+            };
+            ["timeupdate", "progress", "canplay", "loadeddata", "playing"].forEach(function (evt) {
+              video.addEventListener(evt, dismissBuf, { passive: true });
+            });
             ["loadedmetadata", "play", "playing", "pause", "webkitbeginfullscreen", "webkitendfullscreen"].forEach(function (eventName) {
               video.addEventListener(eventName, scheduleSuppressNativePlayerControls, true);
             });
           });
+          setInterval(function () {
+            ["video", "video-vod"].forEach(function (id) {
+              var vid = document.getElementById(id);
+              if (vid && !vid.paused && !vid.seeking && (vid.currentTime > 0.05 || vid.readyState >= 2)) {
+                var bufId = id === "video-vod" ? "vod-player-buffering" : "player-buffering";
+                var buf = document.getElementById(bufId);
+                if (buf && !buf.classList.contains("hidden")) {
+                  buf.classList.add("hidden");
+                  buf.setAttribute("aria-hidden", "true");
+                }
+              }
+            });
+          }, 150);
           ["live-ctl-fullscreen", "vod-ctl-fullscreen"].forEach(function (id) {
             var button = document.getElementById(id);
             if (!button) return;

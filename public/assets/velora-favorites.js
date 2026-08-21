@@ -225,6 +225,11 @@
     return heart;
   }
 
+  window.veloraCreateFavoriteHeart = function (descriptor) {
+    if (!descriptor || !descriptor.itemId) return null;
+    return createHeart(descriptor, true);
+  };
+
   function detailDescriptor(detail) {
     var sourceId = String(detail.dataset.favoriteSourceId || "");
     var itemId = String(detail.dataset.favoriteItemId || "");
@@ -241,12 +246,27 @@
     } : state.currentDetailDescriptor;
     if (!descriptor) return null;
     var expectedType = detail.classList.contains("vel-vod-detail--series") ? "series" : "movie";
-    if (descriptor.itemType !== expectedType) return null;
-    var detailName = String(detail.getAttribute("aria-label") || "").replace(/\s+/g, " ").trim().toLocaleLowerCase();
-    var descriptorName = String(descriptor.name || "").replace(/\s+/g, " ").trim().toLocaleLowerCase();
-    if (detailName && descriptorName && detailName !== descriptorName) return null;
+    descriptor.itemType = expectedType;
     return descriptor;
   }
+
+  window.veloraSetDetailDescriptor = function (desc) {
+    if (!desc) return;
+    var normalized = {
+      sourceId: String(desc.sourceId || desc.source_id || ""),
+      itemId: String(desc.itemId || desc.item_id || desc.streamId || desc.stream_id || ""),
+      itemType: String(desc.itemType || desc.item_type || (desc.contentType === "series" ? "series" : "movie")),
+      name: String(desc.name || desc.title || desc.series_name || ""),
+      thumbUrl: String(desc.thumbUrl || desc.thumb_url || desc.stream_icon || desc.cover || ""),
+      packageId: String(desc.packageId || desc.package_id || ""),
+      globalStreamId: String(desc.globalStreamId || desc.global_stream_id || ""),
+      containerExtension: String(desc.containerExtension || desc.container_extension || "")
+    };
+    if (normalized.itemId && (normalized.itemType === "movie" || normalized.itemType === "series")) {
+      state.currentDetailDescriptor = normalized;
+      scheduleDecorate();
+    }
+  };
 
   function rememberCardDetail(event) {
     var target = event.target;

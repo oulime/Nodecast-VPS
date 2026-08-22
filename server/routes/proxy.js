@@ -165,6 +165,9 @@ async function proxyRemoteCatalog(req, res) {
             if (value) headers[name] = value;
         }
         const upstream = await fetch(target, { headers, cache: 'no-store' });
+        if (!upstream.ok) {
+            return false;
+        }
         let body = Buffer.from(await upstream.arrayBuffer());
         const routeMatch = target.pathname.match(/\/api\/proxy\/xtream\/([^/]+)\/vod_streams$/i);
         const contentType = upstream.headers.get('content-type');

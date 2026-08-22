@@ -207,6 +207,11 @@ if (USE_VPS_DATA_API) {
                 signal: controller.signal
             });
 
+            if (!upstream.ok && req.path.startsWith('/api/proxy/')) {
+                clearRequest();
+                return next();
+            }
+
             res.status(upstream.status);
             upstream.headers.forEach((value, name) => {
                 if (!['content-encoding', 'content-length', 'transfer-encoding'].includes(name.toLowerCase())) {

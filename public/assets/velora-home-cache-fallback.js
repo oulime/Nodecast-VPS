@@ -348,6 +348,10 @@
     var version = ++renderVersion;
     var matching = matchingSections(payload);
     var fragment = document.createDocumentFragment();
+    if (typeof window.veloraRenderResumeSection === "function") {
+      var resumeBlock = window.veloraRenderResumeSection();
+      if (resumeBlock) fragment.appendChild(resumeBlock);
+    }
     matching.forEach(function (section) {
       var block = document.createElement("section");
       block.className = "vel-home-section";

@@ -84,7 +84,9 @@ function getDefaultSettings() {
     // Upscaling settings
     upscaleEnabled: false,
     upscaleMethod: 'hardware',    // hardware | software
-    upscaleTarget: '1080p'        // 1080p | 4k | 720p
+    upscaleTarget: '1080p',       // 1080p | 4k | 720p
+    // Upstream proxy (for routing external streams/FFmpeg through VPS)
+    upstreamProxy: ''             // e.g. http://127.0.0.1:1080 or http://user:pass@vps-ip:8888
   };
 }
 
@@ -100,6 +102,31 @@ function getUserAgent(settings) {
     return settings.userAgentCustom;
   }
   return USER_AGENT_PRESETS[settings.userAgentPreset] || USER_AGENT_PRESETS.chrome;
+}
+
+function getUpstreamProxy(settings = {}) {
+  if (settings.upstreamProxy && String(settings.upstreamProxy).trim()) {
+    return String(settings.upstreamProxy).trim();
+  }
+  return process.env.UPSTREAM_PROXY || process.env.HTTP_PROXY || process.env.http_proxy || null;
+}
+
+function resolveStreamUrl(url) {
+  if (!url || typeof url !== 'string') return url;
+
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  const vpsDisabled = /^(1|true|yes)$/i.test(String(process.env.VPS_DATA_API_DISABLED || '').trim());
+  const vpsBase = String(process.env.VPS_DATA_API_BASE || 'https://nodecast.veloravip.net').trim().replace(/\/+$/, '');
+
+  if (!isDevelopment || vpsDisabled || url.includes('/api/proxy/stream')) {
+    return url;
+  }
+
+  if (/^https?:\/\//i.test(url) && !url.startsWith(vpsBase)) {
+    return `${vpsBase}/api/proxy/stream?url=${encodeURIComponent(url)}`;
+  }
+
+  return url;
 }
 
 // Write lock to prevent concurrent writes from corrupting db.json
@@ -471,4 +498,4 @@ const users = {
   }
 };
 
-module.exports = { loadDb, saveDb, sources, hiddenItems, favorites, settings, users, getDefaultSettings, getUserAgent, USER_AGENT_PRESETS };
+module.exports = { loadDb, saveDb, sources, hiddenItems, favorites, settings, users, getDefaultSettings, getUserAgent, getUpstreamProxy, resolveStreamUrl, USER_AGENT_PRESETS };

@@ -101,7 +101,7 @@ async function checkRangeSeekable(url, userAgent) {
 /**
  * Probe stream with ffprobe
  */
-function probeStream(url, ffprobePath, userAgent = null, timeout = PROBE_TIMEOUT_MS) {
+function probeStream(url, ffprobePath, userAgent = null, timeout = PROBE_TIMEOUT_MS, upstreamProxy = null) {
     return new Promise((resolve, reject) => {
         const args = [
             '-v', 'error',
@@ -110,9 +110,14 @@ function probeStream(url, ffprobePath, userAgent = null, timeout = PROBE_TIMEOUT
             '-show_streams',
             '-show_format',
             '-probesize', PROBE_SIZE,
-            '-analyzeduration', PROBE_ANALYZE_DURATION,
-            url
+            '-analyzeduration', PROBE_ANALYZE_DURATION
         ];
+
+        if (upstreamProxy) {
+            args.push('-http_proxy', upstreamProxy);
+        }
+
+        args.push(url);
 
         const proc = spawn(ffprobePath, args);
         let stdout = '';
@@ -242,6 +247,7 @@ router.get('/', async (req, res) => {
         console.warn('[Probe] Failed to load settings, using defaults:', err.message);
     }
     const userAgent = resolveUserAgent(ua, settings);
+    const upstreamProxy = db.getUpstreamProxy(settings);
     const cacheTtlSeconds = Number(settings.probeCacheTTL);
     const cacheTtlMs = Number.isFinite(cacheTtlSeconds) && cacheTtlSeconds > 0
         ? cacheTtlSeconds * 1000
@@ -271,9 +277,10 @@ router.get('/', async (req, res) => {
     console.log(`[Probe] Probing: ${url.substring(0, 80)}... ${ua ? `(UA: ${ua})` : ''}`);
 
     try {
+        const streamUrl = db.resolveStreamUrl(url);
         const [probeResult, rangeInfo] = await Promise.all([
-            probeStream(url, ffprobePath, userAgent),
-            checkRangeSeekable(url, userAgent)
+            probeStream(streamUrl, ffprobePath, userAgent, PROBE_TIMEOUT_MS, upstreamProxy),
+            checkRangeSeekable(streamUrl, userAgent)
         ]);
         const analysis = analyzeProbeResult(probeResult, url, rangeInfo);
 

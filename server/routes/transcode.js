@@ -97,7 +97,7 @@ function tryExtractDurationFromMetadata(metadata = {}) {
     return null;
 }
 
-async function probeDurationSeconds(url, ffprobePath, userAgent) {
+async function probeDurationSeconds(url, ffprobePath, userAgent, upstreamProxy = null) {
     if (!ffprobePath) return null;
 
     return new Promise((resolve) => {
@@ -106,9 +106,12 @@ async function probeDurationSeconds(url, ffprobePath, userAgent) {
             '-user_agent', userAgent || 'Mozilla/5.0',
             '-print_format', 'json',
             '-show_format',
-            '-show_streams',
-            url
+            '-show_streams'
         ];
+        if (upstreamProxy) {
+            args.push('-http_proxy', upstreamProxy);
+        }
+        args.push(url);
         const proc = spawn(ffprobePath, args);
         let stdout = '';
 
@@ -143,7 +146,7 @@ async function probeDurationSeconds(url, ffprobePath, userAgent) {
     });
 }
 
-async function getDurationSeconds(url, ffprobePath, userAgent, metadata = {}) {
+async function getDurationSeconds(url, ffprobePath, userAgent, metadata = {}, upstreamProxy = null) {
     const metadataDuration = tryExtractDurationFromMetadata(metadata);
     if (metadataDuration !== null) return metadataDuration;
 
@@ -153,7 +156,7 @@ async function getDurationSeconds(url, ffprobePath, userAgent, metadata = {}) {
         return cached.value;
     }
 
-    const probed = await probeDurationSeconds(url, ffprobePath, userAgent);
+    const probed = await probeDurationSeconds(url, ffprobePath, userAgent, upstreamProxy);
     durationCache.set(url, { value: probed, timestamp: now });
     return probed;
 }
@@ -171,10 +174,10 @@ function getKnownDurationSeconds(url, metadata = {}) {
     return { value: null, pending: true };
 }
 
-function warmDurationCache(url, ffprobePath, userAgent) {
+function warmDurationCache(url, ffprobePath, userAgent, upstreamProxy = null) {
     if (!ffprobePath || durationProbePromises.has(url)) return;
 
-    const promise = probeDurationSeconds(url, ffprobePath, userAgent)
+    const promise = probeDurationSeconds(url, ffprobePath, userAgent, upstreamProxy)
         .then((value) => {
             durationCache.set(url, { value, timestamp: Date.now() });
             return value;
@@ -259,6 +262,7 @@ router.post('/session', async (req, res) => {
     const ffprobePath = req.app.locals.ffprobePath;
     const settings = await db.settings.get();
     const userAgent = db.getUserAgent(settings);
+    const upstreamProxy = db.getUpstreamProxy(settings);
     const hwDetect = require('../services/hwDetect');
     const hwCaps = hwDetect.getCapabilities() || await hwDetect.detect();
     const detectedEncoder = hwCaps?.recommended || 'software';
@@ -272,6 +276,7 @@ router.post('/session', async (req, res) => {
         ? requestedMode
         : (inferredVodMode ? 'vod' : requestedMode);
     const isVodMode = ['vod', 'movie', 'series', 'episode'].includes(normalizedMode);
+    const streamUrl = db.resolveStreamUrl(url);
 
     console.log('[Transcode] Session request:', {
         url: redactStreamUrlForLogs(url),
@@ -283,13 +288,16 @@ router.post('/session', async (req, res) => {
         videoMode,
         videoCodec,
         audioCodec,
-        audioChannels
+        audioChannels,
+        upstreamProxy: upstreamProxy ? 'configured' : 'none',
+        routedThroughVps: streamUrl !== url
     });
 
     try {
         const baseSessionOptions = {
             ffmpegPath,
             userAgent,
+            upstreamProxy,
             seekOffset: effectiveSeekOffset,
             maxResolution: settings.maxResolution || '1080p',
             quality: settings.quality || 'medium',
@@ -305,7 +313,7 @@ router.post('/session', async (req, res) => {
         };
 
         const startSessionWithEncoder = async (encoder) => {
-            const session = await transcodeSession.createSession(url, {
+            const session = await transcodeSession.createSession(streamUrl, {
                 ...baseSessionOptions,
                 hwEncoder: encoder
             });
@@ -356,11 +364,11 @@ router.post('/session', async (req, res) => {
         }
 
         const durationInfo = isVodMode
-            ? getKnownDurationSeconds(url, metadata || {})
+            ? getKnownDurationSeconds(streamUrl, metadata || {})
             : { value: null, pending: false };
 
         if (isVodMode && durationInfo.pending) {
-            warmDurationCache(url, ffprobePath, userAgent);
+            warmDurationCache(streamUrl, ffprobePath, userAgent, upstreamProxy);
         }
 
         const responsePayload = {

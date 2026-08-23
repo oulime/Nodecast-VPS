@@ -82,6 +82,7 @@ class TranscodeSession extends EventEmitter {
         this.options = {
             ffmpegPath: options.ffmpegPath || 'ffmpeg',
             userAgent: options.userAgent || 'Mozilla/5.0',
+            upstreamProxy: options.upstreamProxy || process.env.UPSTREAM_PROXY || process.env.HTTP_PROXY || process.env.http_proxy || null,
             seekOffset: options.seekOffset || 0,
             hwEncoder: options.hwEncoder || 'software',
             maxResolution: options.maxResolution || '1080p',
@@ -203,6 +204,10 @@ class TranscodeSession extends EventEmitter {
             '-user_agent', this.options.userAgent,
         ];
 
+        if (this.options.upstreamProxy) {
+            args.push('-http_proxy', this.options.upstreamProxy);
+        }
+
         // Add hardware acceleration input options based on encoder (only if encoding)
         if (videoMode === 'encode') {
             this.addHwAccelInputArgs(args, encoder);
@@ -254,7 +259,7 @@ class TranscodeSession extends EventEmitter {
 
         // Audio: Apply mix preset
         const audioCodec = this.options.audioCodec?.toLowerCase() || 'unknown';
-        const audioChannels = this.options.audioChannels || 0;
+        const audioChannels = Number(this.options.audioChannels) || 0;
         const audioMixPreset = this.options.audioMixPreset || 'auto';
         const isStereoAac = audioCodec.includes('aac') && audioChannels === 2;
 
@@ -279,15 +284,21 @@ class TranscodeSession extends EventEmitter {
         } else {
             // Transcode to AAC with selected mix preset (default to ITU for 'auto')
             const mixPreset = (audioMixPreset === 'auto') ? 'itu' : audioMixPreset;
-            const panFilter = AUDIO_MIX_FILTERS[mixPreset] || AUDIO_MIX_FILTERS.itu;
+            const use51Matrix = audioChannels >= 6;
+            const panFilter = use51Matrix ? (AUDIO_MIX_FILTERS[mixPreset] || AUDIO_MIX_FILTERS.itu) : null;
 
-            console.log(`[TranscodeSession ${this.id}] Audio: ${mixPreset.toUpperCase()} mix (${audioCodec} ${audioChannels}ch -> Stereo AAC)`);
+            console.log(`[TranscodeSession ${this.id}] Audio: ${mixPreset.toUpperCase()} mix (${audioCodec} ${audioChannels}ch -> Stereo AAC${use51Matrix ? ' via 5.1 matrix' : ''})`);
             args.push(
                 '-c:a', 'aac',
+                '-ac', '2',
                 '-ar', '48000',
-                '-b:a', '192k',
-                '-af', `${panFilter},aresample=async=1`
+                '-b:a', '192k'
             );
+            if (panFilter) {
+                args.push('-af', `${panFilter},aresample=async=1`);
+            } else {
+                args.push('-af', 'aresample=async=1');
+            }
         }
 
         // HLS output options. VOD sessions are generated progressively, so expose
@@ -691,11 +702,18 @@ class TranscodeSession extends EventEmitter {
      */
     async cleanup() {
         this.stop();
-        try {
-            await fs.rm(this.dir, { recursive: true, force: true });
-            console.log(`[TranscodeSession ${this.id}] Cleaned up session directory`);
-        } catch (err) {
-            console.error(`[TranscodeSession ${this.id}] Failed to cleanup:`, err.message);
+        for (let attempt = 0; attempt < 4; attempt++) {
+            try {
+                await fs.rm(this.dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+                console.log(`[TranscodeSession ${this.id}] Cleaned up session directory`);
+                return;
+            } catch (err) {
+                if (attempt < 3 && (err.code === 'EBUSY' || err.code === 'EPERM' || err.code === 'ENOTEMPTY')) {
+                    await new Promise(r => setTimeout(r, 300));
+                    continue;
+                }
+                console.warn(`[TranscodeSession ${this.id}] Failed to cleanup:`, err.message);
+            }
         }
     }
 }

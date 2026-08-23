@@ -36,6 +36,8 @@ router.get('/', async (req, res) => {
     // Get User-Agent from settings
     const settings = await db.settings.get();
     const userAgent = db.getUserAgent(settings);
+    const upstreamProxy = db.getUpstreamProxy(settings);
+    const streamUrl = db.resolveStreamUrl(url);
 
     console.log(`[Remux] Starting remux for: ${url}`);
     console.log(`[Remux] Using User-Agent: ${settings.userAgentPreset}`);
@@ -46,7 +48,13 @@ router.get('/', async (req, res) => {
         '-hide_banner',
         '-loglevel', 'warning',
         '-user_agent', userAgent,
-        '-user_agent', userAgent,
+    ];
+
+    if (upstreamProxy) {
+        args.push('-http_proxy', upstreamProxy);
+    }
+
+    args.push(
         // Standard probe size to handle complex containers (MKV) correctly
         '-probesize', '5000000',
         '-analyzeduration', '5000000',
@@ -62,7 +70,7 @@ router.get('/', async (req, res) => {
         '-reconnect_delay_max', '5',
         // Prevent Range/HEAD requests that some providers reject with 405
         '-seekable', '0',
-        '-i', url,
+        '-i', streamUrl,
         // STRICT MAPPING: Only map video and audio, ignore subtitles/data/attachments
         // This prevents remux failure when source container has incompatible subtitle tracks (e.g. MKV -> MP4)
         '-map', '0:v',
@@ -83,7 +91,7 @@ router.get('/', async (req, res) => {
         '-f', 'mp4',
         '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
         '-' // Output to stdout
-    ];
+    );
 
     console.log(`[Remux] Full command: ${ffmpegPath} ${args.join(' ')}`);
 

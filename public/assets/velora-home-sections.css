@@ -35,13 +35,14 @@
 
 /* Mouse-friendly paging controls; touch keeps native swipe scrolling. */
 .vel-home-section__scroll-btn{display:none}
-@media(hover:hover) and (pointer:fine){
-  .vel-home-section.has-scroll-controls .vel-home-section__scroll-btn{position:absolute;z-index:8;top:calc(50% + .9rem);display:grid;place-items:center;width:3rem;height:3rem;padding:0;transform:translateY(-50%);border:1px solid rgba(255,255,255,.3);border-radius:50%;background:rgba(10,9,18,.88);box-shadow:0 8px 24px rgba(0,0,0,.55);color:#fff;cursor:pointer;backdrop-filter:blur(10px);transition:opacity .15s ease,transform .15s ease,background .15s ease}
-  .vel-home-section__scroll-btn--prev{left:.45rem}
-  .vel-home-section__scroll-btn--next{right:.45rem}
-  .vel-home-section__scroll-btn svg{width:1.65rem;height:1.65rem;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
-  .vel-home-section__scroll-btn:hover,.vel-home-section__scroll-btn:focus-visible{background:color-mix(in srgb,var(--vel-primary,#8b5cf6) 76%,#111);transform:translateY(-50%) scale(1.08);outline:2px solid #fff;outline-offset:2px}
-  .vel-home-section__scroll-btn:disabled{visibility:hidden;opacity:0;pointer-events:none}
+.vel-home-section.has-scroll-controls .vel-home-section__scroll-btn{position:absolute;z-index:8;top:calc(50% + .9rem);display:grid;place-items:center;width:3rem;height:3rem;padding:0;transform:translateY(-50%);border:1px solid rgba(255,255,255,.3);border-radius:50%;background:rgba(10,9,18,.88);box-shadow:0 8px 24px rgba(0,0,0,.55);color:#fff;cursor:pointer;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:opacity .18s ease,transform .18s ease,background .18s ease,border-color .18s ease}
+.vel-home-section__scroll-btn--prev{left:.45rem}
+.vel-home-section__scroll-btn--next{right:.45rem}
+.vel-home-section__scroll-btn svg{width:1.65rem;height:1.65rem;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.vel-home-section__scroll-btn:hover,.vel-home-section__scroll-btn:focus-visible{background:color-mix(in srgb,var(--vel-primary,#8b5cf6) 76%,#111);transform:translateY(-50%) scale(1.08);outline:none;border-color:rgba(255,255,255,.6)}
+.vel-home-section__scroll-btn:disabled{visibility:hidden;opacity:0;pointer-events:none}
+@media(hover:none) and (pointer:coarse){
+  .vel-home-section.has-scroll-controls .vel-home-section__scroll-btn{display:none !important}
 }
 
 /* Live channels use square, uncropped logo frames on Accueil. */

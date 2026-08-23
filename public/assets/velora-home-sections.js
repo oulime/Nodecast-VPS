@@ -54,36 +54,49 @@ function bindRailDrag(rail){
   if(!rail||rail.dataset.dragScrollBound==="true")return;
   rail.dataset.dragScrollBound="true";
   var drag=null,blockClick=false;
-  var section=rail.closest(".vel-home-section"),previousButton=null,nextButton=null;
+  var section=rail.closest(".vel-home-section");
+  if(!section)return;
+
+  var previousButton=section.querySelector(".vel-home-section__scroll-btn--prev");
+  var nextButton=section.querySelector(".vel-home-section__scroll-btn--next");
+
   function updateScrollButtons(){
     if(!previousButton||!nextButton)return;
-    var hasOverflow=rail.scrollWidth>rail.clientWidth+3;
+    var hasOverflow=rail.scrollWidth>rail.clientWidth+4;
     section.classList.toggle("has-scroll-controls",hasOverflow);
-    previousButton.disabled=!hasOverflow||rail.scrollLeft<=3;
-    nextButton.disabled=!hasOverflow||rail.scrollLeft+rail.clientWidth>=rail.scrollWidth-3;
+    previousButton.disabled=!hasOverflow||rail.scrollLeft<=4;
+    nextButton.disabled=!hasOverflow||(rail.scrollLeft+rail.clientWidth>=rail.scrollWidth-4);
   }
+
   function addScrollButton(direction,label,modifier){
+    var existing=section.querySelector(".vel-home-section__scroll-btn--"+modifier);
+    if(existing)return existing;
     var button=document.createElement("button");
     button.type="button";
     button.className="vel-home-section__scroll-btn vel-home-section__scroll-btn--"+modifier;
     button.setAttribute("aria-label",label);
     button.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
     if(direction>0)button.querySelector("svg").style.transform="rotate(180deg)";
-    button.addEventListener("click",function(){
+    button.addEventListener("click",function(e){
+      e.stopPropagation();
       rail.scrollBy({left:direction*Math.max(280,rail.clientWidth*.82),behavior:"smooth"});
     });
     section.appendChild(button);
     return button;
   }
-  var hasDesktopPointer=!window.matchMedia||window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-  if(section&&hasDesktopPointer){
-    previousButton=addScrollButton(-1,"Faire défiler vers la gauche","prev");
-    nextButton=addScrollButton(1,"Faire défiler vers la droite","next");
-    rail.addEventListener("scroll",updateScrollButtons,{passive:true});
-    window.addEventListener("resize",updateScrollButtons,{passive:true});
-    if(typeof ResizeObserver!=="undefined")new ResizeObserver(updateScrollButtons).observe(rail);
-    window.setTimeout(updateScrollButtons,0);
-  }
+
+  if(!previousButton) previousButton=addScrollButton(-1,"Faire défiler vers la gauche","prev");
+  if(!nextButton) nextButton=addScrollButton(1,"Faire défiler vers la droite","next");
+
+  rail.addEventListener("scroll",updateScrollButtons,{passive:true});
+  section.addEventListener("mouseenter",updateScrollButtons,{passive:true});
+  if(typeof ResizeObserver!=="undefined")new ResizeObserver(updateScrollButtons).observe(rail);
+
+  // Re-check scroll buttons after initial layout & images load
+  [0, 100, 300, 800, 1500].forEach(function(delay){
+    window.setTimeout(updateScrollButtons, delay);
+  });
+
   rail.addEventListener("pointerdown",function(event){
     if(event.pointerType!=="mouse"||event.button!==0||event.buttons!==1)return;
     drag={id:event.pointerId,x:event.clientX,left:rail.scrollLeft,moved:false};
@@ -124,15 +137,28 @@ function bindRailDrag(rail){
     event.stopImmediatePropagation();
   },true);
 }
-function bindAllRails(root){(root||document).querySelectorAll(".vel-home-section__rail").forEach(bindRailDrag)}
+
+function bindAllRails(root){
+  (root||document).querySelectorAll(".vel-home-section__rail").forEach(bindRailDrag);
+}
+
 function startRailObserver(){
   bindAllRails(document);
-  var attempts=0;
-  var timer=window.setInterval(function(){
-    attempts+=1;
-    bindAllRails(document);
-    if(attempts>=40)window.clearInterval(timer);
-  },500);
+  if(typeof MutationObserver!=="undefined"){
+    var observer=new MutationObserver(function(){
+      bindAllRails(document);
+    });
+    observer.observe(document.body,{childList:true,subtree:true});
+  }
+  document.addEventListener("velora-home-country-rendered",function(){bindAllRails(document);});
+  document.addEventListener("velora-watch-history-updated",function(){bindAllRails(document);});
+  window.addEventListener("resize",function(){
+    document.querySelectorAll(".vel-home-section__rail").forEach(function(r){
+      r.dispatchEvent(new Event("scroll"));
+    });
+  },{passive:true});
 }
-if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",startRailObserver,{once:true});else startRailObserver();
+
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",startRailObserver,{once:true});
+else startRailObserver();
 })();

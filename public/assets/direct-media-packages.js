@@ -554,13 +554,6 @@
     });
   }
 
-  function getRandomPackage(cards) {
-    if (!cards || !cards.length) return null;
-    if (cards.length === 1) return cards[0];
-    const randomIndex = Math.floor(Math.random() * cards.length);
-    return cards[randomIndex];
-  }
-
   function openSelectedPackage(tab, cards) {
     if (
       !MEDIA_TABS.has(tab) ||
@@ -573,9 +566,7 @@
 
     const key = cacheKey(tab);
     const selected = selectedPackages.get(key);
-    const target = (selected ? cards.find(item => item.id === selected) : null) || getRandomPackage(cards);
-    if (!target) return;
-
+    const target = cards.find(item => item.id === selected) || cards[0];
     const openKey = `${key}::${target.id}`;
     if (pendingOpen === openKey) return;
 
@@ -689,34 +680,10 @@
     scheduleUpdate();
   });
 
-  document.addEventListener("velora-home-tab", (e) => {
-    const tab = e.detail?.tab;
-    if (tab && MEDIA_TABS.has(tab)) {
-      selectedPackages.delete(cacheKey(tab));
-    }
+  document.addEventListener("velora-home-tab", () => {
     pendingOpen = "";
     scheduleUpdate();
   });
-
-  document.addEventListener("velora-top-level-tab", (e) => {
-    const tab = e.detail?.tab;
-    if (tab && MEDIA_TABS.has(tab)) {
-      selectedPackages.delete(cacheKey(tab));
-    }
-    pendingOpen = "";
-    scheduleUpdate();
-  });
-
-  document.addEventListener("click", (e) => {
-    const navBtn = e.target.closest?.("[data-bottom-nav], #tab-movies, #tab-series");
-    if (navBtn) {
-      const tab = navBtn.getAttribute("data-bottom-nav") || (navBtn.id === "tab-movies" ? "movies" : navBtn.id === "tab-series" ? "series" : "");
-      if (tab && MEDIA_TABS.has(tab)) {
-        selectedPackages.delete(cacheKey(tab));
-        pendingOpen = "";
-      }
-    }
-  }, true);
 
   function prepareAdultMoviesOpen(event) {
     if (!isAdultMode() || !event.target.closest?.("#adult-tab-movies")) return;

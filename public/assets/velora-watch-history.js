@@ -271,6 +271,7 @@
         height: 100% !important;
         background: #e50914 !important;
         box-shadow: 0 0 6px rgba(229, 9, 20, 0.8) !important;
+        transition: width 0.25s linear !important;
       }
     `;
     document.head.appendChild(style);
@@ -567,11 +568,42 @@
 
     if (!media || !isValidMediaEntry(media)) return;
 
-    var castMedia = window.VeloraCast?.media;
-    var rawDuration = castMedia && Number.isFinite(castMedia.duration) && castMedia.duration > 0 ? castMedia.duration : Number(video.duration);
-    var duration = Number.isFinite(rawDuration) && rawDuration > 0 ? rawDuration : (media.duration || 0);
-    var offset = castMedia && Number.isFinite(castMedia.offset || castMedia.position) ? (Number(castMedia.offset || castMedia.position) || 0) : 0;
-    var currentPos = isFinished ? duration : Math.max(0, offset + (Number(video.currentTime) || 0));
+    var realCurrent = 0;
+    var realDuration = 0;
+
+    if (typeof window.__veloraGetVodPlaybackInfo === "function") {
+      var info = window.__veloraGetVodPlaybackInfo();
+      if (info) {
+        if (Number.isFinite(info.currentSeconds) && info.currentSeconds > 0) realCurrent = info.currentSeconds;
+        if (Number.isFinite(info.durationSeconds) && info.durationSeconds > 0) realDuration = info.durationSeconds;
+      }
+    }
+
+    if (!realCurrent) {
+      var durEl = document.getElementById("vod-ctl-duration");
+      if (durEl && durEl.textContent && durEl.textContent.includes("/")) {
+        var parts = durEl.textContent.split("/");
+        var curParsed = parseVodClock(parts[0]);
+        var durParsed = parseVodClock(parts[1]);
+        if (Number.isFinite(curParsed) && curParsed > 0) realCurrent = curParsed;
+        if (Number.isFinite(durParsed) && durParsed > 0) realDuration = durParsed;
+      }
+    }
+
+    if (!realCurrent) {
+      var castMedia = window.VeloraCast?.media;
+      var offset = castMedia && Number.isFinite(castMedia.offset || castMedia.position) ? (Number(castMedia.offset || castMedia.position) || 0) : 0;
+      realCurrent = offset + (Number(video.currentTime) || 0);
+    }
+
+    if (!realDuration) {
+      var castMedia2 = window.VeloraCast?.media;
+      var rawDuration = castMedia2 && Number.isFinite(castMedia2.duration) && castMedia2.duration > 0 ? castMedia2.duration : Number(video.duration);
+      realDuration = Number.isFinite(rawDuration) && rawDuration > 0 ? rawDuration : (media.duration || 0);
+    }
+
+    var duration = realDuration || (media.duration || 0);
+    var currentPos = isEnd ? duration : Math.max(0, realCurrent);
     var percent = isEnd ? 100 : (duration > 0 ? (currentPos / duration) * 100 : 5);
     var id = media.id;
     var isFinished = isEnd || (duration > 0 && percent >= FINISHED_WATCH_PERCENT);
@@ -748,29 +780,27 @@
   window.__veloraPendingResumeSeek = null;
   function tryApplySeekOnActiveVideo(videoEl) {
     var pending = window.__veloraPendingResumeSeek;
-    if (!pending || pending.applied || !pending.targetSeconds || pending.targetSeconds <= 0 || !videoEl) return;
+    if (!pending || pending.applied || !pending.targetSeconds || pending.targetSeconds <= 0) return;
     if (Date.now() - (pending.timestamp || 0) > 45000) {
       window.__veloraPendingResumeSeek = null;
       return;
     }
 
-    if (videoEl.readyState >= 1) {
-      var target = pending.targetSeconds;
-      var dur = Number(videoEl.duration);
-      if (Number.isFinite(dur) && dur > 0 && target >= dur * 0.95) {
-        pending.applied = true;
-        return;
-      }
-      if (Math.abs(videoEl.currentTime - target) > 1.5) {
-        try {
-          videoEl.currentTime = target;
-          pending.applied = true;
-          console.info("[Watch History] Resumed at", target, "seconds");
-        } catch (err) {
-          console.warn("[Watch History] Seek error:", err);
-        }
-      } else {
-        pending.applied = true;
+    var target = pending.targetSeconds;
+    pending.applied = true;
+
+    if (typeof window.veloraSeekToSeconds === "function") {
+      console.info("[Watch History] Calling window.veloraSeekToSeconds to resume at", target, "seconds");
+      window.veloraSeekToSeconds(target);
+      return;
+    }
+
+    if (videoEl && videoEl.readyState >= 1) {
+      try {
+        videoEl.currentTime = target;
+        console.info("[Watch History] Direct HTML5 resumed at", target, "seconds");
+      } catch (err) {
+        console.warn("[Watch History] Seek error:", err);
       }
     }
   }
@@ -789,6 +819,85 @@
     return sMins + ":" + sSecs;
   }
 
+  function updateActiveEpisodeLiveProgress() {
+    var activeRow = document.querySelector(".vel-vod-detail__episode--playing, .vel-vod-detail__episode[aria-current='true']");
+    if (!activeRow) return;
+    var body = activeRow.querySelector(".vel-vod-detail__episode-body");
+    if (!body) return;
+
+    var realCurrent = 0;
+    var realDuration = 0;
+
+    if (typeof window.__veloraGetVodPlaybackInfo === "function") {
+      var info = window.__veloraGetVodPlaybackInfo();
+      if (info) {
+        if (Number.isFinite(info.currentSeconds) && info.currentSeconds > 0) realCurrent = info.currentSeconds;
+        if (Number.isFinite(info.durationSeconds) && info.durationSeconds > 0) realDuration = info.durationSeconds;
+      }
+    }
+
+    if (!realCurrent) {
+      var durEl = document.getElementById("vod-ctl-duration");
+      if (durEl && durEl.textContent && durEl.textContent.includes("/")) {
+        var parts = durEl.textContent.split("/");
+        var curParsed = parseVodClock(parts[0]);
+        var durParsed = parseVodClock(parts[1]);
+        if (Number.isFinite(curParsed) && curParsed > 0) realCurrent = curParsed;
+        if (Number.isFinite(durParsed) && durParsed > 0) realDuration = durParsed;
+      }
+    }
+
+    if (!realCurrent) {
+      var vodVideo = document.getElementById("video-vod");
+      if (vodVideo && Number.isFinite(vodVideo.currentTime)) realCurrent = vodVideo.currentTime;
+    }
+
+    if (!realDuration || !(realDuration > 0)) {
+      var metaEl = activeRow.querySelector(".vel-vod-detail__episode-meta");
+      if (metaEl && metaEl.textContent) {
+        var p = parseVodClock(metaEl.textContent.trim());
+        if (Number.isFinite(p) && p > 0) realDuration = p;
+      }
+    }
+
+    if (!realDuration || !(realDuration > 0)) return;
+
+    var percent = Math.min(100, Math.max(0, (realCurrent / realDuration) * 100));
+
+    if (percent >= FINISHED_WATCH_PERCENT) {
+      activeRow.classList.add("vel-vod-detail__episode--watched");
+      activeRow.classList.remove("vel-vod-detail__episode--in-progress");
+      var tag = activeRow.querySelector(".vel-ep-watched-tag");
+      if (!tag) {
+        tag = document.createElement("span");
+        tag.className = "vel-ep-watched-tag";
+        tag.textContent = "✓ Vu";
+        activeRow.appendChild(tag);
+      }
+      var oldBar = body.querySelector(".vel-ep-progress-bar");
+      if (oldBar) oldBar.remove();
+    } else if (percent >= 0.5) {
+      activeRow.classList.remove("vel-vod-detail__episode--watched");
+      activeRow.classList.add("vel-vod-detail__episode--in-progress");
+      var oldTag = activeRow.querySelector(".vel-ep-watched-tag");
+      if (oldTag) oldTag.remove();
+
+      var bar = body.querySelector(".vel-ep-progress-bar");
+      if (!bar) {
+        bar = document.createElement("div");
+        bar.className = "vel-ep-progress-bar";
+        var fill = document.createElement("div");
+        fill.className = "vel-ep-progress-fill";
+        fill.style.width = percent.toFixed(2) + "%";
+        bar.appendChild(fill);
+        body.appendChild(bar);
+      } else {
+        var fill = bar.querySelector(".vel-ep-progress-fill");
+        if (fill) fill.style.width = percent.toFixed(2) + "%";
+      }
+    }
+  }
+
   function bindVideoTrackers() {
     // Strictly bind only VOD player (video-vod). Live TV player (video) is live stream and never tracked in resume.
     var vodVideo = document.getElementById("video-vod");
@@ -797,6 +906,7 @@
 
       function onTimeUpdate() {
         if (vodVideo.paused || vodVideo.seeking) return;
+        updateActiveEpisodeLiveProgress();
         var now = Date.now();
         if (now - state.lastSavedTimestamp >= 2000) {
           state.lastSavedTimestamp = now;
@@ -805,15 +915,17 @@
       }
 
       function onPause() {
+        updateActiveEpisodeLiveProgress();
         recordProgress(vodVideo, false);
       }
 
       vodVideo.addEventListener("timeupdate", function () { tryApplySeekOnActiveVideo(vodVideo); onTimeUpdate(); }, { passive: true });
-      vodVideo.addEventListener("playing", function () { tryApplySeekOnActiveVideo(vodVideo); }, { passive: true });
-      vodVideo.addEventListener("canplay", function () { tryApplySeekOnActiveVideo(vodVideo); }, { passive: true });
-      vodVideo.addEventListener("loadedmetadata", function () { tryApplySeekOnActiveVideo(vodVideo); }, { passive: true });
+      vodVideo.addEventListener("playing", function () { tryApplySeekOnActiveVideo(vodVideo); updateActiveEpisodeLiveProgress(); }, { passive: true });
+      vodVideo.addEventListener("canplay", function () { tryApplySeekOnActiveVideo(vodVideo); updateActiveEpisodeLiveProgress(); }, { passive: true });
+      vodVideo.addEventListener("loadedmetadata", function () { tryApplySeekOnActiveVideo(vodVideo); updateActiveEpisodeLiveProgress(); }, { passive: true });
       vodVideo.addEventListener("pause", onPause, { passive: true });
       vodVideo.addEventListener("ended", function () {
+        updateActiveEpisodeLiveProgress();
         recordProgress(vodVideo, true);
       }, { passive: true });
     }

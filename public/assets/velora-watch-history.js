@@ -693,7 +693,38 @@
     return null;
   }
 
+  window.veloraHasSavedProgress = function (streamId, name) {
+    if (!streamId && !name) return false;
+    var sId = String(streamId || "").trim();
+    var normN = name ? normalizeTitle(name) : "";
+    var history = getLocalHistory();
+    var item = history.find(function (it) {
+      if (it.type === "series") return false;
+      if (sId && String(it.streamId) === sId) return true;
+      if (normN && it.name && normalizeTitle(it.name) === normN) return true;
+      return false;
+    });
+    return !!(item && item.currentTime > 3 && !item.isFinished && (item.progressPercent == null || item.progressPercent < FINISHED_WATCH_PERCENT));
+  };
+
+  function updateMovieWatchButtonLabel() {
+    var watchBtn = document.querySelector(".vel-vod-detail__watch--film");
+    if (!watchBtn) return;
+    var labelSpan = watchBtn.querySelector(".vel-vod-detail__watch-label");
+    if (!labelSpan) return;
+
+    var detail = watchBtn.closest(".vel-vod-detail");
+    var titleEl = detail ? detail.querySelector(".vel-vod-detail__title") : null;
+    var movieTitle = titleEl ? titleEl.textContent.trim() : "";
+    var streamId = watchBtn.dataset.streamId || "";
+
+    var hasProgress = window.veloraHasSavedProgress(streamId, movieTitle);
+    labelSpan.textContent = hasProgress ? "Continuer de regarder" : "Regarder maintenant";
+    watchBtn.setAttribute("aria-label", (hasProgress ? "Continuer de regarder" : "Regarder") + (movieTitle ? " « " + movieTitle + " »" : ""));
+  }
+
   function decorateSeriesEpisodes() {
+    updateMovieWatchButtonLabel();
     if (state.isDecorating) return;
     state.isDecorating = true;
 

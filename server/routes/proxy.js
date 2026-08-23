@@ -1344,4 +1344,94 @@ router.get('/image', async (req, res) => {
     }
 });
 
+const personAvatarCache = new Map();
+const PERSON_CACHE_FILE = path.join(__dirname, '..', '..', 'data', 'person-avatar-cache.json');
+let diskPersonAvatarCache = {};
+try {
+    diskPersonAvatarCache = JSON.parse(fs.readFileSync(PERSON_CACHE_FILE, 'utf8')) || {};
+} catch (_) {
+    diskPersonAvatarCache = {};
+}
+
+let personCacheSaveTimer = null;
+function schedulePersonCacheSave() {
+    if (personCacheSaveTimer) return;
+    personCacheSaveTimer = setTimeout(() => {
+        personCacheSaveTimer = null;
+        fs.promises.mkdir(path.dirname(PERSON_CACHE_FILE), { recursive: true })
+            .then(() => fs.promises.writeFile(PERSON_CACHE_FILE, JSON.stringify(diskPersonAvatarCache)))
+            .catch(e => console.warn('[Person cache] Save failed:', e.message));
+    }, 1000);
+    personCacheSaveTimer.unref?.();
+}
+
+/**
+ * Get person / actor avatar photo
+ * GET /api/proxy/person_avatar?name=...
+ */
+router.get('/person_avatar', async (req, res) => {
+    try {
+        const rawName = String(req.query.name || '').trim();
+        if (!rawName) return res.status(400).json({ error: 'Name required' });
+
+        const normName = rawName.toLowerCase();
+        if (personAvatarCache.has(normName)) {
+            res.set('Access-Control-Allow-Origin', '*');
+            res.set('Cache-Control', 'public, max-age=604800');
+            return res.json({ name: rawName, avatarUrl: personAvatarCache.get(normName) });
+        }
+        if (diskPersonAvatarCache[normName] !== undefined) {
+            personAvatarCache.set(normName, diskPersonAvatarCache[normName]);
+            res.set('Access-Control-Allow-Origin', '*');
+            res.set('Cache-Control', 'public, max-age=604800');
+            return res.json({ name: rawName, avatarUrl: diskPersonAvatarCache[normName] });
+        }
+
+        let avatarUrl = null;
+
+        // 1. Try Wikipedia pageimages API
+        try {
+            const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(rawName)}&prop=pageimages&format=json&pithumbsize=280`;
+            const wikiRes = await fetch(wikiUrl, {
+                headers: { 'User-Agent': 'VeloraVIP/1.0 (https://veloravip.net)' },
+                signal: AbortSignal.timeout(3500)
+            });
+            if (wikiRes.ok) {
+                const data = await wikiRes.json();
+                const pages = data?.query?.pages || {};
+                const firstPage = Object.values(pages)[0];
+                if (firstPage?.thumbnail?.source) {
+                    avatarUrl = firstPage.thumbnail.source;
+                }
+            }
+        } catch (_) {}
+
+        // 2. Fallback to TMDB search person API
+        if (!avatarUrl) {
+            try {
+                const tmdbKey = '1bfb17a7415aa804869e2dac761b7192';
+                const tmdbUrl = `https://api.themoviedb.org/3/search/person?api_key=${tmdbKey}&query=${encodeURIComponent(rawName)}&language=fr-FR`;
+                const tmdbRes = await fetch(tmdbUrl, { signal: AbortSignal.timeout(3500) });
+                if (tmdbRes.ok) {
+                    const data = await tmdbRes.json();
+                    const person = (data?.results || []).find(p => p.profile_path);
+                    if (person && person.profile_path) {
+                        avatarUrl = `https://image.tmdb.org/t/p/w185${person.profile_path}`;
+                    }
+                }
+            } catch (_) {}
+        }
+
+        personAvatarCache.set(normName, avatarUrl);
+        diskPersonAvatarCache[normName] = avatarUrl;
+        schedulePersonCacheSave();
+
+        res.set('Access-Control-Allow-Origin', '*');
+        res.set('Cache-Control', 'public, max-age=604800'); // 7 days
+        res.json({ name: rawName, avatarUrl });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;

@@ -1515,13 +1515,13 @@
     <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/velora-home-sections.js?v=instant-nav-v20260821-116"></script>
     <script defer src="/assets/velora-home-cache-fallback.js?v=instant-nav-v20260821-116"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=instant-nav-v20260821-122"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=instant-nav-v20260821-126"></script>
     <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-54"></script>
     <link rel="stylesheet" href="/assets/velora-favorites.css?v=instant-nav-v20260821-54" />
     <script defer src="/assets/velora-favorites.js?v=instant-nav-v20260821-54"></script>
-    <script defer src="/assets/velora-watch-history.js?v=instant-nav-v20260821-123"></script>
+    <script defer src="/assets/velora-watch-history.js?v=instant-nav-v20260821-126"></script>
     <script defer src="/assets/velora-catalog-scroll-memory.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/manual-pays-visible-memberships.js?v=instant-nav-v20260821-54"></script>
@@ -2018,6 +2018,103 @@
 
       .main--velora .vel-vod-detail__episodes-section {
         order: 8 !important;
+      }
+
+      /* Modern Actor / Cast Photo Rail & Cards in Detail View */
+      .main--velora .vel-vod-detail__cast-grid {
+        display: flex !important;
+        gap: 0.95rem !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        padding: 0.6rem 0.25rem 0.85rem !important;
+        margin-top: 0.35rem !important;
+        scroll-behavior: smooth !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: thin !important;
+        scrollbar-color: rgba(255, 255, 255, 0.2) transparent !important;
+      }
+
+      .main--velora .vel-vod-detail__cast-grid::-webkit-scrollbar {
+        height: 4px;
+      }
+      .main--velora .vel-vod-detail__cast-grid::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.22);
+        border-radius: 4px;
+      }
+
+      .main--velora .vel-vod-actor-card {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        width: 5.2rem !important;
+        min-width: 5.2rem !important;
+        cursor: default !important;
+        user-select: none !important;
+        transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+      }
+
+      .main--velora .vel-vod-actor-card:hover {
+        transform: translateY(-4px) scale(1.04) !important;
+      }
+
+      .main--velora .vel-vod-actor-avatar-wrap {
+        position: relative !important;
+        width: 4.35rem !important;
+        height: 4.35rem !important;
+        border-radius: 50% !important;
+        overflow: hidden !important;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.05) 100%) !important;
+        border: 2px solid rgba(255, 255, 255, 0.25) !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.4) !important;
+        display: grid !important;
+        place-items: center !important;
+        transition: border-color 0.22s ease, box-shadow 0.22s ease !important;
+      }
+
+      .main--velora .vel-vod-actor-card:hover .vel-vod-actor-avatar-wrap {
+        border-color: #e50914 !important;
+        box-shadow: 0 6px 22px rgba(229, 9, 20, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+      }
+
+      .main--velora .vel-vod-actor-avatar {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+        display: block !important;
+        border-radius: 50% !important;
+        animation: veloraActorFadeIn 0.3s ease !important;
+      }
+
+      .main--velora .vel-vod-actor-initials {
+        font-size: 1.15rem !important;
+        font-weight: 850 !important;
+        color: rgba(255, 255, 255, 0.85) !important;
+        letter-spacing: 0.02em !important;
+        text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6) !important;
+      }
+
+      .main--velora .vel-vod-actor-name {
+        margin-top: 0.45rem !important;
+        font-size: 0.72rem !important;
+        font-weight: 650 !important;
+        color: #cbd5e1 !important;
+        text-align: center !important;
+        line-height: 1.25 !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        max-width: 5.2rem !important;
+      }
+
+      .main--velora .vel-vod-actor-card:hover .vel-vod-actor-name {
+        color: #ffffff !important;
+      }
+
+      @keyframes veloraActorFadeIn {
+        from { opacity: 0; transform: scale(0.9); }
+        to { opacity: 1; transform: scale(1); }
       }
 
       @keyframes veloraDetailFadeIn {

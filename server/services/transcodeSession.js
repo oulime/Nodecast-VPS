@@ -40,7 +40,7 @@ const SEGMENT_DURATION = readPositiveNumberEnv('TRANSCODE_HLS_SEGMENT_SECONDS', 
 const INITIAL_VOD_SEGMENTS = readPositiveIntegerEnv('TRANSCODE_INITIAL_VOD_SEGMENTS', 1);
 const INITIAL_LIVE_SEGMENTS = readPositiveIntegerEnv('TRANSCODE_INITIAL_LIVE_SEGMENTS', 2);
 const LIVE_PLAYLIST_READY_TIMEOUT_MS = readPositiveNumberEnv('TRANSCODE_LIVE_PLAYLIST_READY_TIMEOUT_MS', 15000);
-const SEGMENT_WAIT_TIMEOUT_MS = readPositiveNumberEnv('TRANSCODE_SEGMENT_WAIT_TIMEOUT_MS', 12000);
+const SEGMENT_WAIT_TIMEOUT_MS = readPositiveNumberEnv('TRANSCODE_SEGMENT_WAIT_TIMEOUT_MS', 25000);
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
 const ORPHAN_SESSION_MAX_AGE_MS = readPositiveNumberEnv('TRANSCODE_ORPHAN_MAX_AGE_MINUTES', 60) * 60 * 1000;
 
@@ -227,6 +227,7 @@ class TranscodeSession extends EventEmitter {
             '-analyzeduration', '5000000',
             '-fflags', '+genpts+discardcorrupt',
             '-err_detect', 'ignore_err',
+            '-rw_timeout', '15000000',
             '-reconnect', '1',
             '-reconnect_streamed', '1',
             '-reconnect_on_network_error', '1',

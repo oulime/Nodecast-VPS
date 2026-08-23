@@ -152,6 +152,10 @@
       homePage.classList.add("hidden");
       homePage.setAttribute("aria-hidden", "true");
     }
+    if (entry && (entry.isResumeCard || entry.rawItem) && typeof window.veloraResumePlayback === "function") {
+      window.veloraResumePlayback(entry.rawItem || entry);
+      return;
+    }
     document.dispatchEvent(new CustomEvent("velora-home-media-open", {
       detail: { title: entry.name || "", contentType: section.content_type }
     }));

@@ -1248,13 +1248,34 @@
       card.setAttribute("tabindex", "0");
       card.setAttribute("aria-label", "Continuer de regarder " + item.name);
 
+      var entryForOpen = isSeries ? {
+        id: "series:" + (item.seriesId || item.streamId),
+        streamId: item.seriesId || item.streamId,
+        seriesId: item.seriesId || item.streamId,
+        episodeStreamId: item.episodeStreamId || item.streamId,
+        seasonNumber: item.seasonNumber,
+        episodeNumber: item.episodeNumber,
+        currentTime: item.currentTime,
+        name: item.seriesName || item.name,
+        thumbUrl: item.thumbUrl || item.cover || item.stream_icon || "",
+        cover: item.thumbUrl || item.cover || item.stream_icon || "",
+        packageId: item.packageId || "series:all",
+        sourceId: item.sourceId || "",
+        contentType: "series",
+        isResumeCard: true,
+        rawItem: item
+      } : Object.assign({}, item, {
+        isResumeCard: true,
+        rawItem: item
+      });
+
       var sectionMeta = {
         id: isSeries ? "series" : "movies",
         content_type: isSeries ? "series" : "movies",
         package_id: item.packageId || (isSeries ? "series:all" : "movies:all")
       };
       if (typeof window.veloraBindHomeCardActivation === "function") {
-        window.veloraBindHomeCardActivation(card, sectionMeta, item);
+        window.veloraBindHomeCardActivation(card, sectionMeta, entryForOpen);
       }
 
       // Poster Media

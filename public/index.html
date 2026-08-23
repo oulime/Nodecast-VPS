@@ -3222,7 +3222,7 @@
       .vel-vod-center-controls .vel-vod-skip-btn svg text {
         fill: currentColor;
         font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-        font-size: 15px;
+        font-size: 13.5px;
         font-weight: 800;
         text-anchor: middle;
         dominant-baseline: middle;
@@ -5853,19 +5853,19 @@
                 <span class="player-buffering__label">Chargement…</span>
               </div>
               <div id="vod-center-controls" class="vel-vod-center-controls hidden" aria-hidden="true">
-                <button id="vod-ctl-back-5" type="button" class="vel-vod-center-btn vel-vod-skip-btn" aria-label="Reculer de 5 secondes" title="−5 secondes" tabindex="0" data-tv-focusable="true">
+                <button id="vod-ctl-back-10" type="button" class="vel-vod-center-btn vel-vod-skip-btn" aria-label="Reculer de 10 secondes" title="−10 secondes" tabindex="0" data-tv-focusable="true">
                   <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
                     <path class="vel-vod-skip-btn__arc" d="M10 13.5A17 17 0 1 1 7.5 30"></path>
                     <path class="vel-vod-skip-btn__head" d="M14 5.5 4 12l10 6.5Z"></path>
-                    <text x="24" y="25">5</text>
+                    <text x="24" y="25">10</text>
                   </svg>
                 </button>
                 <button id="vod-center-play" type="button" class="vel-vod-center-btn vel-vod-center-btn--play" aria-label="Play" tabindex="0" data-tv-focusable="true"></button>
-                <button id="vod-ctl-forward-5" type="button" class="vel-vod-center-btn vel-vod-skip-btn" aria-label="Avancer de 5 secondes" title="+5 secondes" tabindex="0" data-tv-focusable="true">
+                <button id="vod-ctl-forward-10" type="button" class="vel-vod-center-btn vel-vod-skip-btn" aria-label="Avancer de 10 secondes" title="+10 secondes" tabindex="0" data-tv-focusable="true">
                   <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
                     <path class="vel-vod-skip-btn__arc" d="M38 13.5A17 17 0 1 0 40.5 30"></path>
                     <path class="vel-vod-skip-btn__head" d="M34 5.5 44 12l-10 6.5Z"></path>
-                    <text x="24" y="25">5</text>
+                    <text x="24" y="25">10</text>
                   </svg>
                 </button>
               </div>
@@ -11356,10 +11356,10 @@ if (target.closest(".trial-offer-button")) {
           var overlay = document.getElementById("vod-controls-overlay");
           var centerControls = document.getElementById("vod-center-controls");
           var buffering = document.getElementById("vod-player-buffering");
-          var backButton = document.getElementById("vod-ctl-back-5");
+          var backButton = document.getElementById("vod-ctl-back-10") || document.getElementById("vod-ctl-back-5");
           var centerPlayButton = document.getElementById("vod-center-play");
           var toolbarPlayButton = document.getElementById("vod-ctl-play");
-          var forwardButton = document.getElementById("vod-ctl-forward-5");
+          var forwardButton = document.getElementById("vod-ctl-forward-10") || document.getElementById("vod-ctl-forward-5");
           var wrapper = video.closest(".video-wrapper") || player;
           var hoverControlsQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
           if (!video || !player || !overlay || !centerControls || !buffering || !backButton ||
@@ -11479,12 +11479,12 @@ if (target.closest(".trial-offer-button")) {
           backButton.addEventListener("click", function (event) {
             event.preventDefault();
             event.stopPropagation();
-            seekBy(-5);
+            seekBy(-10);
           });
           forwardButton.addEventListener("click", function (event) {
             event.preventDefault();
             event.stopPropagation();
-            seekBy(5);
+            seekBy(10);
           });
           centerPlayButton.addEventListener("click", function (event) {
             event.preventDefault();

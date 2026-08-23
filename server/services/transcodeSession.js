@@ -229,7 +229,9 @@ class TranscodeSession extends EventEmitter {
             '-err_detect', 'ignore_err',
             '-reconnect', '1',
             '-reconnect_streamed', '1',
-            '-reconnect_delay_max', '3'
+            '-reconnect_on_network_error', '1',
+            '-reconnect_on_http_error', '4xx,5xx',
+            '-reconnect_delay_max', '5'
         );
 
         if (!isVodMode) {

@@ -1515,13 +1515,13 @@
     <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/velora-home-sections.js?v=instant-nav-v20260821-116"></script>
     <script defer src="/assets/velora-home-cache-fallback.js?v=instant-nav-v20260821-116"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=instant-nav-v20260821-121"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=instant-nav-v20260821-122"></script>
     <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-54"></script>
     <link rel="stylesheet" href="/assets/velora-favorites.css?v=instant-nav-v20260821-54" />
     <script defer src="/assets/velora-favorites.js?v=instant-nav-v20260821-54"></script>
-    <script defer src="/assets/velora-watch-history.js?v=instant-nav-v20260821-121"></script>
+    <script defer src="/assets/velora-watch-history.js?v=instant-nav-v20260821-123"></script>
     <script defer src="/assets/velora-catalog-scroll-memory.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/manual-pays-visible-memberships.js?v=instant-nav-v20260821-54"></script>
@@ -1940,7 +1940,7 @@
       .main--velora .vel-vod-detail__watch.vel-vod-detail__watch--film {
         order: 7 !important;
         --btn-theme: var(--vel-vod-dominant-color, #f59e0b);
-        display: inline-flex !important;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: 0.72rem;
@@ -1974,6 +1974,14 @@
         cursor: pointer;
         touch-action: manipulation;
         transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease, background 0.22s ease, border-color 0.2s ease;
+      }
+
+      .main--velora .vel-vod-detail__watch.vel-vod-detail__watch--film.hidden,
+      .main--velora .vel-vod-detail__watch.vel-vod-detail__watch--film[hidden],
+      .main--velora:has(#vod-player-container:not(.hidden)) .vel-vod-detail__watch.vel-vod-detail__watch--film {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
       }
 
       .main--velora .vel-vod-detail__watch--film .vel-vod-detail__watch-icon {

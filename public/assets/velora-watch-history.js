@@ -1203,7 +1203,7 @@
 
     var heading = document.createElement("h3");
     heading.className = "vel-home-section__heading";
-    heading.textContent = "Reprendre la lecture";
+    heading.textContent = "Continuer de regarder";
 
     var rail = document.createElement("div");
     rail.className = "vel-home-section__rail";
@@ -1215,7 +1215,7 @@
       card.type = "button";
       card.className = "vel-home-section__card vel-home-section__card--" + (isSeries ? "series" : "movies") + " vel-home-section__card--resume";
       card.setAttribute("tabindex", "0");
-      card.setAttribute("aria-label", "Reprendre " + item.name);
+      card.setAttribute("aria-label", "Continuer de regarder " + item.name);
 
       var sectionMeta = {
         id: isSeries ? "series" : "movies",
@@ -1297,8 +1297,8 @@
       var removeBtn = document.createElement("button");
       removeBtn.type = "button";
       removeBtn.className = "vel-resume-remove-btn";
-      removeBtn.setAttribute("aria-label", "Supprimer de Reprendre la lecture");
-      removeBtn.title = "Supprimer de Reprendre la lecture";
+      removeBtn.setAttribute("aria-label", "Supprimer de Continuer de regarder");
+      removeBtn.title = "Supprimer de Continuer de regarder";
       removeBtn.setAttribute("data-prevent-card-open", "true");
       removeBtn.innerHTML = '<svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
 

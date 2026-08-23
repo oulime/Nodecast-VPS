@@ -29,12 +29,8 @@
   };
 
   document.addEventListener("pointerdown", function (event) {
-    // Use the same direct activation path for mouse and touch. A plain click
-    // is not reliable on desktop because the app also installs global pointer
-    // handlers (notably for TV navigation) which can consume the later click.
-    // Tracking pointer movement still lets users drag a horizontal rail
-    // without accidentally opening a card.
     if (event.pointerType === "mouse" && event.button !== 0) return;
+    if (event.target instanceof Element && event.target.closest(".vel-resume-remove-btn, [data-prevent-card-open]")) return;
     var card = event.target instanceof Element && event.target.closest(".vel-home-section__card");
     if (!card || !registeredHomeCards.has(card)) return;
     homeTouchGesture = { card: card, pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
@@ -47,6 +43,7 @@
   document.addEventListener("pointerup", function (event) {
     var gesture = homeTouchGesture;
     homeTouchGesture = null;
+    if (event.target instanceof Element && event.target.closest(".vel-resume-remove-btn, [data-prevent-card-open]")) return;
     if (!gesture || gesture.pointerId !== event.pointerId || gesture.moved) return;
     var payload = registeredHomeCards.get(gesture.card);
     if (!payload) return;
@@ -56,6 +53,7 @@
   }, true);
   document.addEventListener("pointercancel", function () { homeTouchGesture = null; }, true);
   document.addEventListener("touchstart", function (event) {
+    if (event.target instanceof Element && event.target.closest(".vel-resume-remove-btn, [data-prevent-card-open]")) return;
     var touch = event.touches && event.touches[0];
     var card = event.target instanceof Element && event.target.closest(".vel-home-section__card");
     if (!touch || !card || !registeredHomeCards.has(card)) return;
@@ -70,6 +68,7 @@
   document.addEventListener("touchend", function (event) {
     var gesture = nativeTouchGesture;
     nativeTouchGesture = null;
+    if (event.target instanceof Element && event.target.closest(".vel-resume-remove-btn, [data-prevent-card-open]")) return;
     if (!gesture || gesture.moved) return;
     var payload = registeredHomeCards.get(gesture.card);
     if (!payload || gesture.card.dataset.homeOpenPending === "true") return;

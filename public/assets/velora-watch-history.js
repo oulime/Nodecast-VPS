@@ -25,12 +25,34 @@
         --vel-home-heading-glow: rgba(229, 9, 20, 0.45);
         order: -1;
         margin-bottom: 0.65rem;
+        transition: opacity 0.3s ease, transform 0.3s ease, margin 0.3s ease;
+      }
+      .vel-home-section--resume.is-hiding {
+        opacity: 0 !important;
+        transform: translateY(-8px) !important;
+        margin-bottom: 0 !important;
+        pointer-events: none !important;
       }
       .vel-home-section__card--resume {
         position: relative !important;
         overflow: hidden !important;
         border: 1px solid rgba(255, 255, 255, 0.18) !important;
         background: #0d0c14 !important;
+        transition: transform 0.28s cubic-bezier(0.2, 0, 0, 1), opacity 0.28s cubic-bezier(0.2, 0, 0, 1), width 0.28s cubic-bezier(0.2, 0, 0, 1), min-width 0.28s cubic-bezier(0.2, 0, 0, 1), max-width 0.28s cubic-bezier(0.2, 0, 0, 1), margin 0.28s cubic-bezier(0.2, 0, 0, 1), padding 0.28s cubic-bezier(0.2, 0, 0, 1), border-color 0.28s ease !important;
+      }
+      .vel-home-section__card--resume.is-removing {
+        opacity: 0 !important;
+        transform: scale(0.65) !important;
+        width: 0px !important;
+        min-width: 0px !important;
+        max-width: 0px !important;
+        margin-left: 0px !important;
+        margin-right: 0px !important;
+        padding-left: 0px !important;
+        padding-right: 0px !important;
+        border-width: 0px !important;
+        border-color: transparent !important;
+        pointer-events: none !important;
       }
       .vel-home-section__card--resume .vel-home-section__media {
         display: block;
@@ -332,13 +354,15 @@
     }
   }
 
-  function saveLocalHistory(items) {
+  function saveLocalHistory(items, skipDomRebuild) {
     try {
       var valid = items.filter(isValidMediaEntry);
       var key = getActiveUserKey();
       localStorage.setItem(key, JSON.stringify(valid.slice(0, MAX_ITEMS)));
       document.dispatchEvent(new CustomEvent("velora-watch-history-updated"));
-      injectResumeSectionDirectly();
+      if (!skipDomRebuild) {
+        injectResumeSectionDirectly();
+      }
       requestDecorateEpisodes();
     } catch (_) {}
   }
@@ -360,7 +384,7 @@
     });
   }
 
-  function removeHistoryItem(item) {
+  function removeHistoryItem(item, cardEl) {
     if (!item) return;
 
     // 1. Clean from ALL localStorage keys immediately so it is never resurrected on reload
@@ -383,7 +407,7 @@
     } catch (_) {}
 
     var activeItems = filterHistoryList(getLocalHistory(), item);
-    saveLocalHistory(activeItems);
+    saveLocalHistory(activeItems, !!cardEl);
 
     // 2. Sync removal to backend database for all IDs
     var token = authToken();
@@ -1075,11 +1099,20 @@
     deduplicated.forEach(function (item) {
       if (!isValidMediaEntry(item)) return;
       var isSeries = item.type === "series";
-      var card = document.createElement("div");
+      var card = document.createElement("button");
+      card.type = "button";
       card.className = "vel-home-section__card vel-home-section__card--" + (isSeries ? "series" : "movies") + " vel-home-section__card--resume";
       card.setAttribute("tabindex", "0");
-      card.setAttribute("role", "button");
       card.setAttribute("aria-label", "Reprendre " + item.name);
+
+      var sectionMeta = {
+        id: isSeries ? "series" : "movies",
+        content_type: isSeries ? "series" : "movies",
+        package_id: item.packageId || (isSeries ? "series:all" : "movies:all")
+      };
+      if (typeof window.veloraBindHomeCardActivation === "function") {
+        window.veloraBindHomeCardActivation(card, sectionMeta, item);
+      }
 
       // Poster Media
       var media = document.createElement("img");
@@ -1154,22 +1187,53 @@
       removeBtn.className = "vel-resume-remove-btn";
       removeBtn.setAttribute("aria-label", "Supprimer de Reprendre la lecture");
       removeBtn.title = "Supprimer de Reprendre la lecture";
+      removeBtn.setAttribute("data-prevent-card-open", "true");
       removeBtn.innerHTML = '<svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
 
-      removeBtn.addEventListener("click", function (event) {
-        event.preventDefault();
+      function handleRemoveAction(event) {
+        if (event.cancelable) event.preventDefault();
         event.stopPropagation();
-        card.style.transition = "opacity 0.2s ease, transform 0.2s ease";
-        card.style.opacity = "0";
-        card.style.transform = "scale(0.9)";
+        event.stopImmediatePropagation();
+
+        var parentRail = card.parentElement;
+        var section = card.closest(".vel-home-section--resume");
+        var activeCards = parentRail ? parentRail.querySelectorAll(".vel-home-section__card--resume:not(.is-removing)") : [];
+
+        card.classList.add("is-removing");
+        removeHistoryItem(item, card);
+
+        if (activeCards.length <= 1 && section) {
+          section.classList.add("is-hiding");
+        }
+
         setTimeout(function () {
-          removeHistoryItem(item);
-        }, 180);
-      });
+          card.remove();
+          if (parentRail && parentRail.querySelectorAll(".vel-home-section__card--resume").length === 0) {
+            if (section) section.remove();
+          }
+        }, 280);
+      }
+
+      function stopBubble(event) {
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+      }
+
+      removeBtn.addEventListener("pointerdown", stopBubble);
+      removeBtn.addEventListener("pointerup", stopBubble);
+      removeBtn.addEventListener("touchstart", stopBubble, { passive: false });
+      removeBtn.addEventListener("touchend", stopBubble, { passive: false });
+      removeBtn.addEventListener("click", handleRemoveAction);
 
       card.append(media, centerPlay, badge, removeBtn, name, progressBar);
 
       card.addEventListener("click", function (event) {
+        if (event.target && event.target.closest(".vel-resume-remove-btn, [data-prevent-card-open]")) {
+          event.preventDefault();
+          event.stopPropagation();
+          event.stopImmediatePropagation();
+          return;
+        }
         event.preventDefault();
         event.stopPropagation();
         window.veloraResumePlayback(item);
@@ -1194,6 +1258,13 @@
     var root = document.getElementById("vel-home-sections");
     if (!root) return;
     var existing = root.querySelector(".vel-home-section--resume");
+    var savedScrollLeft = 0;
+    if (existing) {
+      var oldRail = existing.querySelector(".vel-home-section__rail");
+      if (oldRail && Number.isFinite(oldRail.scrollLeft)) {
+        savedScrollLeft = oldRail.scrollLeft;
+      }
+    }
     var block = window.veloraRenderResumeSection();
     if (!block) {
       if (existing) existing.remove();
@@ -1201,6 +1272,10 @@
     }
     if (existing) {
       existing.replaceWith(block);
+      var newRail = block.querySelector(".vel-home-section__rail");
+      if (newRail && savedScrollLeft > 0) {
+        newRail.scrollLeft = savedScrollLeft;
+      }
     } else {
       root.prepend(block);
     }

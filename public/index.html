@@ -1513,15 +1513,15 @@
       rel="stylesheet"
     />
     <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-54"></script>
-    <script defer src="/assets/velora-home-sections.js?v=instant-nav-v20260821-54"></script>
-    <script defer src="/assets/velora-home-cache-fallback.js?v=instant-nav-v20260821-54"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=instant-nav-v20260821-109"></script>
+    <script defer src="/assets/velora-home-sections.js?v=instant-nav-v20260821-116"></script>
+    <script defer src="/assets/velora-home-cache-fallback.js?v=instant-nav-v20260821-116"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=instant-nav-v20260821-116"></script>
     <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-54"></script>
     <link rel="stylesheet" href="/assets/velora-favorites.css?v=instant-nav-v20260821-54" />
     <script defer src="/assets/velora-favorites.js?v=instant-nav-v20260821-54"></script>
-    <script defer src="/assets/velora-watch-history.js?v=instant-nav-v20260821-109"></script>
+    <script defer src="/assets/velora-watch-history.js?v=instant-nav-v20260821-117"></script>
     <script defer src="/assets/velora-catalog-scroll-memory.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/manual-pays-visible-memberships.js?v=instant-nav-v20260821-54"></script>
@@ -1531,7 +1531,7 @@
     <script defer src="/assets/country-switch-loader.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/paid-users-admin.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=instant-nav-v20260821-54"></script>
-    <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=instant-nav-v20260821-109">
+    <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=instant-nav-v20260821-112">
     <link rel="stylesheet" href="/assets/manual-pays.css?v=instant-nav-v20260821-54">
     <link rel="stylesheet" href="/assets/manual-pays-logo-contain.css?v=instant-nav-v20260821-54">
     <link rel="stylesheet" href="/assets/parent-packages.css?v=instant-nav-v20260821-102">
@@ -11485,8 +11485,16 @@ if (target.closest(".trial-offer-button")) {
                    (video.seeking && !video.paused);
           }
 
+          var currentCenterState = "";
+
           function syncCenterPlayButton() {
-            if (isVodLoading()) {
+            var nextState = isVodLoading() ? "loading" : (video.paused ? "play" : "pause");
+            if (nextState === currentCenterState) {
+              return;
+            }
+            currentCenterState = nextState;
+
+            if (nextState === "loading") {
               centerPlayButton.innerHTML = '<div class="vel-vod-center-spinner" aria-hidden="true"></div>';
               centerPlayButton.setAttribute("aria-label", "Chargement...");
               centerPlayButton.title = "Chargement...";
@@ -11494,11 +11502,11 @@ if (target.closest(".trial-offer-button")) {
               return;
             }
             centerPlayButton.classList.remove("is-loading");
-            centerPlayButton.innerHTML = video.paused
+            centerPlayButton.innerHTML = nextState === "play"
               ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 4.8v14.4L19 12 7.5 4.8Z"/></svg>'
               : '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="4.5" width="4.2" height="15" rx="1"/><rect x="13.3" y="4.5" width="4.2" height="15" rx="1"/></svg>';
-            centerPlayButton.setAttribute("aria-label", video.paused ? "Play" : "Pause");
-            centerPlayButton.title = video.paused ? "Lecture" : "Pause";
+            centerPlayButton.setAttribute("aria-label", nextState === "play" ? "Play" : "Pause");
+            centerPlayButton.title = nextState === "play" ? "Lecture" : "Pause";
           }
 
           function resetVodPlayer() {
@@ -11751,13 +11759,26 @@ if (target.closest(".trial-offer-button")) {
             event.stopPropagation();
             seekBy(10);
           });
-          centerPlayButton.addEventListener("click", function (event) {
-            event.preventDefault();
+          function handleCenterPlayClick(event) {
+            if (event.cancelable) event.preventDefault();
             event.stopPropagation();
+            event.stopImmediatePropagation();
             if (isVodLoading()) return;
-            toolbarPlayButton.click();
+            if (toolbarPlayButton && typeof toolbarPlayButton.click === "function") {
+              toolbarPlayButton.click();
+            } else if (video) {
+              if (video.paused) {
+                var p = video.play();
+                if (p && typeof p.catch === "function") p.catch(function () {});
+              } else {
+                video.pause();
+              }
+            }
+            syncCenterPlayButton();
             showControls();
-          });
+          }
+
+          centerPlayButton.addEventListener("click", handleCenterPlayClick);
 
           var controlsVisibleAtTapStart = null;
           var revealOnlyTap = false;
@@ -11774,6 +11795,11 @@ if (target.closest(".trial-offer-button")) {
               event.pointerType === "pen" || (!event.pointerType && !usesHoverControls());
             if (!touchLike) return;
             if (!(event.target instanceof Element) || !event.target.closest("#vod-player-container .video-wrapper")) return;
+            if (event.target.closest("button, [role='slider'], .vel-vod-center-btn, .vod-ctl-btn")) {
+              revealOnlyTap = false;
+              controlsVisibleAtTapStart = true;
+              return;
+            }
             var now = Date.now();
             if (now - lastTapStart < 80) {
               if (revealOnlyTap) consumeTapEvent(event);
@@ -11792,13 +11818,16 @@ if (target.closest(".trial-offer-button")) {
 
           window.addEventListener("click", function (event) {
             if (!(event.target instanceof Element) || !event.target.closest("#vod-player-container .video-wrapper")) return;
+            if (event.target.closest("button, [role='slider'], .vel-vod-center-btn, .vod-ctl-btn")) {
+              revealOnlyTap = false;
+              return;
+            }
             if (revealOnlyTap) {
               revealOnlyTap = false;
               controlsVisibleAtTapStart = null;
               consumeTapEvent(event);
               return;
             }
-            if (event.target.closest("button, [role='slider']")) return;
             event.preventDefault();
             event.stopPropagation();
             event.stopImmediatePropagation();

@@ -16,9 +16,12 @@ router.get('/', (req, res) => {
         const userId = req.user.id;
         const limit = parseInt(req.query.limit) || 20;
 
+        // Clean out any legacy channel/live records from the database
+        db.prepare("DELETE FROM watch_history WHERE user_id = ? AND item_type NOT IN ('movie', 'series')").run(userId);
+
         const rows = db.prepare(`
             SELECT * FROM watch_history 
-            WHERE user_id = ? 
+            WHERE user_id = ? AND item_type IN ('movie', 'series')
             ORDER BY updated_at DESC 
             LIMIT ?
         `).all(userId, limit);
@@ -49,8 +52,17 @@ router.post('/', (req, res) => {
             return res.status(400).json({ error: 'Missing required fields (id, type)' });
         }
 
+        // Strictly reject live TV channels
+        if (type !== 'movie' && type !== 'series') {
+            return res.status(400).json({ error: 'Only movies and series are supported in history' });
+        }
+
         const compositeId = `${userId}:${id}`;
         const timestamp = Date.now();
+
+        // Auto-cleanup: remove items older than 90 days to keep DB fast and compact
+        const ninetyDaysAgo = timestamp - (90 * 24 * 60 * 60 * 1000);
+        db.prepare('DELETE FROM watch_history WHERE user_id = ? AND updated_at < ?').run(userId, ninetyDaysAgo);
 
         const stmt = db.prepare(`
             INSERT INTO watch_history (id, user_id, source_id, item_type, item_id, parent_id, progress, duration, updated_at, data)
@@ -85,24 +97,49 @@ router.post('/', (req, res) => {
 
 /**
  * DELETE /api/history/:itemId
- * Removes an item from the user's watch history
+ * Removes an item and all associated episodes from the user's watch history
  */
 router.delete('/:itemId', (req, res) => {
     try {
         const db = getDb();
         const userId = req.user.id;
-        const itemId = req.params.itemId;
+        const itemId = String(req.params.itemId).trim();
 
         const compositeId = `${userId}:${itemId}`;
 
-        const stmt = db.prepare('DELETE FROM watch_history WHERE id = ? AND user_id = ?');
-        const result = stmt.run(compositeId, userId);
+        const stmt = db.prepare(`
+            DELETE FROM watch_history 
+            WHERE user_id = ? AND (
+                id = ? 
+                OR id = ?
+                OR item_id = ? 
+                OR parent_id = ? 
+                OR id LIKE ?
+                OR id LIKE ?
+                OR id LIKE ?
+                OR json_extract(data, '$.streamId') = ?
+                OR json_extract(data, '$.seriesId') = ?
+                OR json_extract(data, '$.episodeStreamId') = ?
+                OR json_extract(data, '$.id') = ?
+            )
+        `);
+        const result = stmt.run(
+            userId,
+            compositeId,
+            itemId,
+            itemId,
+            itemId,
+            `${userId}:%:${itemId}`,
+            `${userId}:%:${itemId}:%`,
+            `%${itemId}%`,
+            itemId,
+            itemId,
+            itemId,
+            itemId
+        );
 
-        if (result.changes === 0) {
-            return res.status(404).json({ error: 'Item not found in history' });
-        }
-
-        res.json({ success: true });
+        console.log(`[History] Deleted ${result.changes} rows for item ${itemId} (user ${userId})`);
+        res.json({ success: true, changes: result.changes });
     } catch (err) {
         console.error('[History] Error deleting history item:', err);
         res.status(500).json({ error: 'Failed to delete history item' });

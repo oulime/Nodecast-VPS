@@ -213,27 +213,35 @@
   }
 
   function collapseInlineLiveParent() {
-    if (!inlineLiveParentId || !inlineLiveParentClose) return false;
-    const closeButton = inlineLiveParentClose;
     const children = packagesView.querySelector(".vel-parent-package-children");
+    const parentId = inlineLiveParentId || children?.dataset?.parentPackageId;
     if (children) {
+      if (parentId) rememberLiveParentChildren(parentId, children);
       children.remove();
-      rememberLiveParentChildren(inlineLiveParentId, children);
     }
+    for (const node of packagesView.querySelectorAll(".vel-package-card--parent-expanded")) {
+      node.classList.remove("vel-package-card--parent-expanded");
+      node.removeAttribute("aria-expanded");
+    }
+    delete packagesView.dataset.parentPackageId;
+    packagesView.removeAttribute("data-parent-package-id");
     inlineLiveParentId = "";
     inlineLiveParentClose = null;
-    closeButton.click();
+    if (typeof window.__velCloseParentPackage === "function") {
+      try { window.__velCloseParentPackage(); } catch (_) {}
+    }
     document.body.dataset.velTopLevel = "live";
     document.dispatchEvent(new CustomEvent("velora-top-level-tab", { detail: { tab: "live" } }));
-    scheduleUpdate();
     return true;
   }
 
   function closeInlineLiveParent(event) {
-    if (!inlineLiveParentId || !inlineLiveParentClose) return false;
     const card = event.target.closest?.(".vel-package-card[data-package-id]");
-    if (!card || String(card.dataset.packageId || "") !== inlineLiveParentId) return false;
+    if (!card) return false;
+    const isExpanded = card.classList.contains("vel-package-card--parent-expanded") || (inlineLiveParentId && String(card.dataset.packageId || "") === inlineLiveParentId);
+    if (!isExpanded) return false;
     event.preventDefault();
+    event.stopPropagation();
     event.stopImmediatePropagation();
     return collapseInlineLiveParent();
   }
@@ -695,11 +703,6 @@
     pendingOpen = "";
   });
 
-  document.addEventListener("pointerup", event => {
-    if (isAdultMode() || activeTab() !== "live") return;
-    closeInlineLiveParent(event);
-  }, true);
-
   document.addEventListener("click", event => {
     if (isAdultMode()) {
       const card = event.target.closest?.(".vel-package-card[data-package-id]");
@@ -729,11 +732,6 @@
       scheduleUpdate();
       return;
     }
-    if (!MEDIA_TABS.has(tab) || contentView.classList.contains("hidden") || isDetail) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    pendingOpen = "";
-    document.dispatchEvent(new CustomEvent("velora-show-home"));
   }, true);
 
   document.addEventListener("keydown", event => {

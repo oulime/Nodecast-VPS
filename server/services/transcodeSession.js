@@ -141,9 +141,17 @@ class TranscodeSession extends EventEmitter {
                 const lines = stderrBuffer.split('\n');
                 if (lines.length > 1) {
                     lines.slice(0, -1).forEach(line => {
-                        if (line.trim()) {
-                            console.log(`[FFmpeg ${this.id}] ${line}`);
+                        const trimmed = line.trim();
+                        if (!trimmed) return;
+                        // Suppress harmless repetitive demuxer/container noise
+                        if (trimmed.includes('Unexpected BlockAdditions found') ||
+                            trimmed.includes('Last message repeated') ||
+                            trimmed.includes('non-monotonous DTS in output stream') ||
+                            trimmed.includes('Application provided invalid, non-monotonous DTS') ||
+                            trimmed.includes('co located POCs unavailable')) {
+                            return;
                         }
+                        console.log(`[FFmpeg ${this.id}] ${trimmed}`);
                     });
                     stderrBuffer = lines[lines.length - 1];
                 }

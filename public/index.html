@@ -1515,13 +1515,13 @@
     <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/velora-home-sections.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/velora-home-cache-fallback.js?v=instant-nav-v20260821-54"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=instant-nav-v20260821-102"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=instant-nav-v20260821-109"></script>
     <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-54"></script>
     <link rel="stylesheet" href="/assets/velora-favorites.css?v=instant-nav-v20260821-54" />
     <script defer src="/assets/velora-favorites.js?v=instant-nav-v20260821-54"></script>
-    <script defer src="/assets/velora-watch-history.js?v=instant-nav-v20260821-102"></script>
+    <script defer src="/assets/velora-watch-history.js?v=instant-nav-v20260821-109"></script>
     <script defer src="/assets/velora-catalog-scroll-memory.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/manual-pays-visible-memberships.js?v=instant-nav-v20260821-54"></script>
@@ -1531,7 +1531,7 @@
     <script defer src="/assets/country-switch-loader.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/paid-users-admin.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=instant-nav-v20260821-54"></script>
-    <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=instant-nav-v20260821-102">
+    <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=instant-nav-v20260821-109">
     <link rel="stylesheet" href="/assets/manual-pays.css?v=instant-nav-v20260821-54">
     <link rel="stylesheet" href="/assets/manual-pays-logo-contain.css?v=instant-nav-v20260821-54">
     <link rel="stylesheet" href="/assets/parent-packages.css?v=instant-nav-v20260821-102">
@@ -2907,6 +2907,9 @@
         opacity: 1 !important;
       }
 
+      .player-buffering,
+      #player-container .player-buffering,
+      #vod-player-container .player-buffering,
       #player-container:fullscreen .player-buffering,
       #vod-player-container:fullscreen .player-buffering,
       #player-container:-webkit-full-screen .player-buffering,
@@ -2918,6 +2921,9 @@
         backdrop-filter: none !important;
       }
 
+      .player-buffering.hidden,
+      #player-container .player-buffering.hidden,
+      #vod-player-container .player-buffering.hidden,
       #player-container:fullscreen .player-buffering.hidden,
       #vod-player-container:fullscreen .player-buffering.hidden,
       #player-container:-webkit-full-screen .player-buffering.hidden,
@@ -2928,6 +2934,10 @@
         background: transparent !important;
         -webkit-backdrop-filter: none !important;
         backdrop-filter: none !important;
+      }
+
+      .player-buffering__label {
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.95), 0 0 20px rgba(0, 0, 0, 0.8) !important;
       }
 
       #player-container:fullscreen video::-webkit-media-controls,
@@ -3198,6 +3208,54 @@
         height: 58% !important;
         display: block;
         fill: currentColor;
+      }
+
+      .vel-vod-center-btn--play.is-loading {
+        pointer-events: none;
+        opacity: 1 !important;
+        transform: none !important;
+      }
+
+      .vel-vod-center-spinner {
+        width: clamp(2.4rem, 7.5vw, 3.4rem);
+        height: clamp(2.4rem, 7.5vw, 3.4rem);
+        border-radius: 50%;
+        border: 3.5px solid rgba(255, 255, 255, 0.22);
+        border-top-color: var(--vel-primary, #a855f7);
+        animation: velVodCenterSpin 0.75s linear infinite;
+        box-shadow: 0 0 24px var(--vel-accent-glow, rgba(168, 85, 247, 0.45));
+        display: block;
+      }
+
+      @keyframes velVodCenterSpin {
+        to { transform: rotate(360deg); }
+      }
+
+      .vod-frame-freeze {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        pointer-events: none;
+        z-index: 2;
+        background: transparent;
+      }
+
+      .vod-frame-freeze.hidden {
+        display: none !important;
+      }
+
+      #vod-player-buffering {
+        display: none !important;
+      }
+
+      #vod-player-container:fullscreen .vod-frame-freeze,
+      #vod-player-container:-webkit-full-screen .vod-frame-freeze,
+      #vod-player-container.player-container--fullscreen .vod-frame-freeze {
+        width: 100vw !important;
+        height: 100vh !important;
+        object-fit: fill !important;
       }
 
       .vel-vod-center-controls .vel-vod-skip-btn svg {
@@ -5841,6 +5899,7 @@
                 preload="auto"
                 crossorigin="anonymous"
               ></video>
+              <canvas id="vod-frame-freeze" class="vod-frame-freeze hidden" aria-hidden="true"></canvas>
               <div
                 id="vod-player-buffering"
                 class="player-buffering hidden"
@@ -11398,22 +11457,106 @@ if (target.closest(".trial-offer-button")) {
             centerControls.setAttribute("aria-hidden", "true");
           }
 
-          function showControls() {
-            if (!buffering.classList.contains("hidden") &&
-                buffering.getAttribute("aria-hidden") !== "true") {
-              hideControls();
+          var freezeCanvas = document.getElementById("vod-frame-freeze");
+
+          function freezeVodFrame() {
+            try {
+              if (!freezeCanvas || !video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return;
+              freezeCanvas.width = video.videoWidth;
+              freezeCanvas.height = video.videoHeight;
+              var ctx = freezeCanvas.getContext("2d");
+              if (ctx) {
+                ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+                freezeCanvas.classList.remove("hidden");
+              }
+            } catch (e) {}
+          }
+
+          function unfreezeVodFrame() {
+            if (freezeCanvas && !freezeCanvas.classList.contains("hidden")) {
+              freezeCanvas.classList.add("hidden");
+            }
+          }
+
+          function isVodLoading() {
+            return window.__veloraVodSeeking === true ||
+                   window.__veloraVodBuffering === true ||
+                   (!buffering.classList.contains("hidden") && buffering.getAttribute("aria-hidden") !== "true") ||
+                   (video.seeking && !video.paused);
+          }
+
+          function syncCenterPlayButton() {
+            if (isVodLoading()) {
+              centerPlayButton.innerHTML = '<div class="vel-vod-center-spinner" aria-hidden="true"></div>';
+              centerPlayButton.setAttribute("aria-label", "Chargement...");
+              centerPlayButton.title = "Chargement...";
+              centerPlayButton.classList.add("is-loading");
               return;
             }
+            centerPlayButton.classList.remove("is-loading");
+            centerPlayButton.innerHTML = video.paused
+              ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 4.8v14.4L19 12 7.5 4.8Z"/></svg>'
+              : '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="4.5" width="4.2" height="15" rx="1"/><rect x="13.3" y="4.5" width="4.2" height="15" rx="1"/></svg>';
+            centerPlayButton.setAttribute("aria-label", video.paused ? "Play" : "Pause");
+            centerPlayButton.title = video.paused ? "Lecture" : "Pause";
+          }
+
+          function resetVodPlayer() {
+            pendingSeekTarget = null;
+            window.__veloraOptimisticSeekTime = null;
+            if (pendingSeekTimer) {
+              clearTimeout(pendingSeekTimer);
+              pendingSeekTimer = null;
+            }
+            window.__veloraVodSeeking = false;
+            window.__veloraVodBuffering = true;
+            window.__veloraPendingResumeSeek = null;
+
+            if (freezeCanvas) {
+              freezeCanvas.classList.add("hidden");
+              try {
+                var ctx = freezeCanvas.getContext("2d");
+                if (ctx && freezeCanvas.width && freezeCanvas.height) {
+                  ctx.clearRect(0, 0, freezeCanvas.width, freezeCanvas.height);
+                }
+              } catch (_) {}
+            }
+
+            var durEl = document.getElementById("vod-ctl-duration");
+            if (durEl) durEl.textContent = "00:00 / 00:00";
+            var curEl = document.getElementById("vod-ctl-current");
+            if (curEl) curEl.textContent = "00:00";
+            var fill = document.getElementById("vod-ctl-seek-fill");
+            if (fill) fill.style.width = "0%";
+            var handle = document.getElementById("vod-ctl-seek-handle");
+            if (handle) handle.style.left = "0%";
+            var track = document.getElementById("vod-ctl-seek-track");
+            if (track) track.setAttribute("aria-valuenow", "0");
+
+            syncCenterPlayButton();
+          }
+
+          window.__veloraFreezeVodFrame = freezeVodFrame;
+          window.__veloraUnfreezeVodFrame = unfreezeVodFrame;
+          window.__veloraSyncVodCenterPlay = syncCenterPlayButton;
+          window.__veloraResetVodPlayer = resetVodPlayer;
+
+          window.addEventListener("velora-playback-started", function () {
+            resetVodPlayer();
+          });
+
+          function showControls() {
             if (hideTimer) window.clearTimeout(hideTimer);
             if (usesHoverControls()) lastHoverActivity = Date.now();
             overlay.classList.remove("hidden", "vod-controls-overlay--idle");
             overlay.setAttribute("aria-hidden", "false");
             centerControls.classList.remove("hidden", "vel-vod-center-controls--idle");
             centerControls.setAttribute("aria-hidden", "false");
-            if (usesHoverControls() || (!video.paused && !video.ended)) {
+            syncCenterPlayButton();
+            if (!isVodLoading() && (usesHoverControls() || (!video.paused && !video.ended))) {
               var hideDelay = usesHoverControls() ? 3000 : 2800;
               hideTimer = window.setTimeout(function () {
-                if (usesHoverControls() || (!video.paused && !video.ended)) {
+                if (!isVodLoading() && (usesHoverControls() || (!video.paused && !video.ended))) {
                   overlay.classList.add("vod-controls-overlay--idle");
                   centerControls.classList.add("vel-vod-center-controls--idle");
                   centerControls.setAttribute("aria-hidden", "true");
@@ -11422,59 +11565,181 @@ if (target.closest(".trial-offer-button")) {
             }
           }
 
+          function formatPlayerClock(seconds) {
+            if (!Number.isFinite(seconds) || seconds < 0) return "00:00";
+            var total = Math.max(0, Math.floor(seconds));
+            var hrs = Math.floor(total / 3600);
+            var mins = Math.floor((total % 3600) / 60);
+            var secs = total % 60;
+            var sMins = mins < 10 ? "0" + mins : String(mins);
+            var sSecs = secs < 10 ? "0" + secs : String(secs);
+            if (hrs > 0) {
+              return hrs + ":" + sMins + ":" + sSecs;
+            }
+            return sMins + ":" + sSecs;
+          }
+
           function parseVodClock(value) {
-            var parts = String(value || "").trim().split(":").map(Number);
+            var str = String(value || "").trim();
+            if (str.includes("/")) {
+              var split = str.split("/");
+              str = split[split.length - 1].trim();
+            }
+            var parts = str.split(":").map(Number);
             if (parts.some(function (part) { return !Number.isFinite(part); })) return NaN;
             if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
             if (parts.length === 2) return parts[0] * 60 + parts[1];
             return NaN;
           }
 
-          function seekViaVodTimeline(seconds) {
-            var track = document.getElementById("vod-ctl-seek-track");
-            var current = parseVodClock(document.getElementById("vod-ctl-current")?.textContent);
-            var duration = parseVodClock(document.getElementById("vod-ctl-duration")?.textContent);
-            if (!track || !Number.isFinite(current) || !Number.isFinite(duration) || duration <= 0) return false;
-            var target = Math.max(0, Math.min(duration, current + seconds));
-            var rect = track.getBoundingClientRect();
-            if (!rect.width) return false;
-            var x = rect.left + rect.width * (target / duration);
-            var y = rect.top + rect.height / 2;
-            track.dispatchEvent(new MouseEvent("click", {
-              bubbles: true,
-              cancelable: true,
-              clientX: x,
-              clientY: y,
-              detail: 1
-            }));
-            return true;
+          var pendingSeekTarget = null;
+          var pendingSeekTimer = null;
+
+          function getVodDurationSeconds() {
+            var durEl = document.getElementById("vod-ctl-duration");
+            var parsed = parseVodClock(durEl?.textContent);
+            if (Number.isFinite(parsed) && parsed > 0) return parsed;
+            var castMedia = window.VeloraCast?.media;
+            if (castMedia && Number.isFinite(castMedia.duration) && castMedia.duration > 0) return castMedia.duration;
+            return Number.isFinite(video.duration) && video.duration > 0 ? video.duration : Infinity;
+          }
+
+          var pendingSeekTarget = null;
+          var pendingSeekTimer = null;
+          var isSeekingActive = false;
+
+          function getVodCurrentSeconds() {
+            if (pendingSeekTarget !== null && Number.isFinite(pendingSeekTarget)) {
+              return pendingSeekTarget;
+            }
+            if (typeof window.__veloraGetOptimisticPosition === "function") {
+              var opt = window.__veloraGetOptimisticPosition();
+              if (opt !== null && Number.isFinite(opt)) return opt;
+            }
+            var durEl = document.getElementById("vod-ctl-duration");
+            if (durEl && durEl.textContent && durEl.textContent.includes("/")) {
+              var left = durEl.textContent.split("/")[0].trim();
+              var parsed = parseVodClock(left);
+              if (Number.isFinite(parsed)) return parsed;
+            }
+            var currentEl = document.getElementById("vod-ctl-current");
+            var cur = parseVodClock(currentEl?.textContent);
+            if (Number.isFinite(cur)) return cur;
+            var castMedia = window.VeloraCast?.media;
+            if (castMedia && Number.isFinite(castMedia.position || castMedia.offset)) {
+              return (Number(castMedia.position || castMedia.offset) || 0) + (Number(video.currentTime) || 0);
+            }
+            return Number(video.currentTime) || 0;
+          }
+
+          function executeVodSeek(targetSeconds) {
+            var duration = getVodDurationSeconds();
+            var maxDur = Number.isFinite(duration) && duration > 0 ? duration : Infinity;
+            var clampedTarget = Math.max(0, Math.min(maxDur, targetSeconds));
+
+            if (typeof window.veloraSeekToSeconds === "function") {
+              window.veloraSeekToSeconds(clampedTarget);
+              return;
+            }
+
+            // 1. Seek via timeline click simulation if seek track and duration exist
+            if (Number.isFinite(duration) && duration > 0 && duration !== Infinity) {
+              var track = document.getElementById("vod-ctl-seek-track");
+              if (track) {
+                var rect = track.getBoundingClientRect();
+                if (rect.width > 0) {
+                  var x = rect.left + rect.width * (clampedTarget / duration);
+                  var y = rect.top + rect.height / 2;
+                  track.dispatchEvent(new MouseEvent("click", {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: x,
+                    clientY: y,
+                    detail: 1
+                  }));
+                  return;
+                }
+              }
+            }
+
+            // 2. Direct HTML5 seek if media is currently decoded
+            if (video && video.readyState >= 1 && Number.isFinite(video.duration) && video.duration > 0) {
+              var localOffset = getVodCurrentSeconds() - (video.currentTime || 0);
+              var localTarget = clampedTarget - localOffset;
+              if (localTarget >= 0 && localTarget <= video.duration) {
+                try {
+                  video.currentTime = localTarget;
+                  return;
+                } catch (e) {}
+              }
+            }
+
+            // 3. If stream is still loading/preparing, register pending seek for when playback starts
+            window.__veloraPendingResumeSeek = {
+              targetSeconds: clampedTarget,
+              applied: false,
+              timestamp: Date.now()
+            };
           }
 
           function seekBy(seconds) {
-            var current = parseVodClock(document.getElementById("vod-ctl-current")?.textContent);
-            var duration = parseVodClock(document.getElementById("vod-ctl-duration")?.textContent);
-            if (Number.isFinite(current) && Number.isFinite(duration) && duration > 0) {
-              var target = Math.max(0, Math.min(duration, current + seconds));
-              var localOffset = current - (video.currentTime || 0);
-              var localTarget = target - localOffset;
-              var localDuration = Number.isFinite(video.duration) ? video.duration : Infinity;
-              if (localTarget >= 0 && localTarget <= localDuration) {
-                try {
-                  video.currentTime = localTarget;
-                  showControls();
-                  return;
-                } catch (error) {}
+            var duration = getVodDurationSeconds();
+            var current = getVodCurrentSeconds();
+            var maxDur = Number.isFinite(duration) && duration > 0 ? duration : Infinity;
+            var target = Math.max(0, Math.min(maxDur, current + seconds));
+
+            pendingSeekTarget = target;
+            window.__veloraOptimisticSeekTime = target;
+            isSeekingActive = true;
+            window.__veloraVodSeeking = true;
+            freezeVodFrame();
+            syncCenterPlayButton();
+            showControls();
+
+            // Optimistic UI updates
+            var durEl = document.getElementById("vod-ctl-duration");
+            var curEl = document.getElementById("vod-ctl-current");
+            var track = document.getElementById("vod-ctl-seek-track");
+            var fill = document.getElementById("vod-ctl-seek-fill");
+            var handle = document.getElementById("vod-ctl-seek-handle");
+            var formattedTarget = formatPlayerClock(target);
+
+            if (curEl) curEl.textContent = formattedTarget;
+            if (durEl) {
+              if (Number.isFinite(duration) && duration > 0 && duration !== Infinity) {
+                durEl.textContent = formattedTarget + " / " + formatPlayerClock(duration);
+              } else if (durEl.textContent.includes("/")) {
+                var split = durEl.textContent.split("/");
+                durEl.textContent = formattedTarget + " / " + split[1].trim();
+              } else {
+                durEl.textContent = formattedTarget;
               }
             }
-            if (seekViaVodTimeline(seconds)) {
-              showControls();
-              return;
+            if (Number.isFinite(duration) && duration > 0 && duration !== Infinity) {
+              var ratio = Math.max(0, Math.min(1, target / duration));
+              var percentStr = (ratio * 100).toFixed(3) + "%";
+              if (fill) fill.style.width = percentStr;
+              if (handle) handle.style.left = percentStr;
+              if (track) track.setAttribute("aria-valuenow", String(Math.round(ratio * 100)));
             }
-            var duration = Number.isFinite(video.duration) ? video.duration : Infinity;
-            var nextTime = Math.max(0, Math.min(duration, (video.currentTime || 0) + seconds));
-            try { video.currentTime = nextTime; } catch (error) {}
-            showControls();
+
+            if (pendingSeekTimer) clearTimeout(pendingSeekTimer);
+            pendingSeekTimer = setTimeout(function () {
+              var finalTarget = pendingSeekTarget !== null ? pendingSeekTarget : target;
+              pendingSeekTimer = null;
+              executeVodSeek(finalTarget);
+            }, 350);
           }
+
+          window.__veloraOnSeekCompleted = function () {
+            pendingSeekTarget = null;
+            window.__veloraOptimisticSeekTime = null;
+            isSeekingActive = false;
+            window.__veloraVodSeeking = false;
+            window.__veloraVodBuffering = false;
+            unfreezeVodFrame();
+            syncCenterPlayButton();
+          };
 
           backButton.addEventListener("click", function (event) {
             event.preventDefault();
@@ -11489,17 +11754,10 @@ if (target.closest(".trial-offer-button")) {
           centerPlayButton.addEventListener("click", function (event) {
             event.preventDefault();
             event.stopPropagation();
+            if (isVodLoading()) return;
             toolbarPlayButton.click();
             showControls();
           });
-
-          function syncCenterPlayButton() {
-            centerPlayButton.innerHTML = video.paused
-              ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 4.8v14.4L19 12 7.5 4.8Z"/></svg>'
-              : '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="4.5" width="4.2" height="15" rx="1"/><rect x="13.3" y="4.5" width="4.2" height="15" rx="1"/></svg>';
-            centerPlayButton.setAttribute("aria-label", video.paused ? "Play" : "Pause");
-            centerPlayButton.title = video.paused ? "Lecture" : "Pause";
-          }
 
           var controlsVisibleAtTapStart = null;
           var revealOnlyTap = false;
@@ -11569,18 +11827,31 @@ if (target.closest(".trial-offer-button")) {
           video.addEventListener("play", function () {
             syncCenterPlayButton();
             window.requestAnimationFrame(function () {
-              if (!video.paused) hideControls();
+              if (!video.paused && !isVodLoading()) hideControls();
             });
           });
           video.addEventListener("playing", function () {
-            syncCenterPlayButton();
-            if (buffering) {
-              buffering.classList.add("hidden");
-              buffering.setAttribute("aria-hidden", "true");
+            if (!isSeekingActive && pendingSeekTimer === null) {
+              pendingSeekTarget = null;
+              window.__veloraVodSeeking = false;
+              window.__veloraVodBuffering = false;
+              unfreezeVodFrame();
+              syncCenterPlayButton();
+              if (buffering) {
+                buffering.classList.add("hidden");
+                buffering.setAttribute("aria-hidden", "true");
+              }
             }
           });
           video.addEventListener("timeupdate", function () {
+            if (isSeekingActive || pendingSeekTarget !== null || pendingSeekTimer !== null) {
+              return;
+            }
             if (!video.paused && !video.seeking && video.currentTime > 0.05) {
+              window.__veloraVodSeeking = false;
+              window.__veloraVodBuffering = false;
+              unfreezeVodFrame();
+              syncCenterPlayButton();
               if (buffering && !buffering.classList.contains("hidden")) {
                 buffering.classList.add("hidden");
                 buffering.setAttribute("aria-hidden", "true");
@@ -11588,17 +11859,34 @@ if (target.closest(".trial-offer-button")) {
             }
           });
           video.addEventListener("ended", function () {
+            pendingSeekTarget = null;
+            isSeekingActive = false;
+            window.__veloraVodSeeking = false;
+            window.__veloraVodBuffering = false;
+            unfreezeVodFrame();
             syncCenterPlayButton();
             showControls();
           });
-          video.addEventListener("waiting", hideControls);
-          video.addEventListener("seeking", hideControls);
-          video.addEventListener("stalled", hideControls);
+          video.addEventListener("waiting", function () {
+            freezeVodFrame();
+            window.__veloraVodBuffering = true;
+            syncCenterPlayButton();
+            showControls();
+          });
+          video.addEventListener("seeking", function () {
+            freezeVodFrame();
+            window.__veloraVodSeeking = true;
+            syncCenterPlayButton();
+            showControls();
+          });
+          video.addEventListener("stalled", function () {
+            freezeVodFrame();
+            window.__veloraVodBuffering = true;
+            syncCenterPlayButton();
+            showControls();
+          });
           new MutationObserver(function () {
-            if (!buffering.classList.contains("hidden") &&
-                buffering.getAttribute("aria-hidden") !== "true") {
-              hideControls();
-            }
+            syncCenterPlayButton();
           }).observe(buffering, {
             attributes: true,
             attributeFilter: ["class", "aria-hidden"]

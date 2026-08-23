@@ -543,9 +543,12 @@
 
     if (!media || !isValidMediaEntry(media)) return;
 
-    var rawDuration = Number(video.duration);
+    var castMedia = window.VeloraCast?.media;
+    var rawDuration = castMedia && Number.isFinite(castMedia.duration) && castMedia.duration > 0 ? castMedia.duration : Number(video.duration);
     var duration = Number.isFinite(rawDuration) && rawDuration > 0 ? rawDuration : (media.duration || 0);
-    var percent = isEnd ? 100 : (duration > 0 ? (video.currentTime / duration) * 100 : 5);
+    var offset = castMedia && Number.isFinite(castMedia.offset || castMedia.position) ? (Number(castMedia.offset || castMedia.position) || 0) : 0;
+    var currentPos = isFinished ? duration : Math.max(0, offset + (Number(video.currentTime) || 0));
+    var percent = isEnd ? 100 : (duration > 0 ? (currentPos / duration) * 100 : 5);
     var id = media.id;
     var isFinished = isEnd || (duration > 0 && percent >= FINISHED_WATCH_PERCENT);
 
@@ -570,7 +573,7 @@
       packageId: media.packageId || "",
       sourceId: media.sourceId || "",
       containerExtension: media.containerExtension || "mp4",
-      currentTime: isFinished ? Math.round(duration || video.currentTime) : Math.round(video.currentTime),
+      currentTime: isFinished ? Math.round(duration || currentPos) : Math.round(currentPos),
       duration: Math.round(duration),
       progressPercent: isFinished ? 100 : Math.min(100, Math.max(1, Math.round(percent || 5))),
       isFinished: isFinished,
@@ -749,15 +752,17 @@
   }
 
   function formatPlayerTime(seconds) {
-    if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
-    var totalSec = Math.floor(seconds);
+    if (!Number.isFinite(seconds) || seconds < 0) return "00:00";
+    var totalSec = Math.max(0, Math.floor(seconds));
     var hrs = Math.floor(totalSec / 3600);
     var mins = Math.floor((totalSec % 3600) / 60);
     var secs = totalSec % 60;
+    var sMins = (mins < 10 ? "0" : "") + mins;
+    var sSecs = (secs < 10 ? "0" : "") + secs;
     if (hrs > 0) {
-      return hrs + ":" + (mins < 10 ? "0" : "") + mins + ":" + (secs < 10 ? "0" : "") + secs;
+      return hrs + ":" + sMins + ":" + sSecs;
     }
-    return (mins < 10 ? "0" : "") + mins + ":" + (secs < 10 ? "0" : "") + secs;
+    return sMins + ":" + sSecs;
   }
 
   function bindVideoTrackers() {
@@ -766,18 +771,7 @@
     if (vodVideo && !vodVideo.__veloraResumeTrackerBound) {
       vodVideo.__veloraResumeTrackerBound = true;
 
-      function updateCombinedTimeDisplay() {
-        var durEl = document.getElementById("vod-ctl-duration");
-        if (!durEl || !vodVideo) return;
-        var dur = Number(vodVideo.duration);
-        var cur = Number(vodVideo.currentTime) || 0;
-        if (Number.isFinite(dur) && dur > 0) {
-          durEl.textContent = formatPlayerTime(cur) + " / " + formatPlayerTime(dur);
-        }
-      }
-
       function onTimeUpdate() {
-        updateCombinedTimeDisplay();
         if (vodVideo.paused || vodVideo.seeking) return;
         var now = Date.now();
         if (now - state.lastSavedTimestamp >= 2000) {
@@ -791,11 +785,9 @@
       }
 
       vodVideo.addEventListener("timeupdate", function () { tryApplySeekOnActiveVideo(vodVideo); onTimeUpdate(); }, { passive: true });
-      vodVideo.addEventListener("playing", function () { tryApplySeekOnActiveVideo(vodVideo); updateCombinedTimeDisplay(); }, { passive: true });
-      vodVideo.addEventListener("canplay", function () { tryApplySeekOnActiveVideo(vodVideo); updateCombinedTimeDisplay(); }, { passive: true });
-      vodVideo.addEventListener("loadedmetadata", function () { tryApplySeekOnActiveVideo(vodVideo); updateCombinedTimeDisplay(); }, { passive: true });
-      vodVideo.addEventListener("durationchange", updateCombinedTimeDisplay, { passive: true });
-      vodVideo.addEventListener("seeked", updateCombinedTimeDisplay, { passive: true });
+      vodVideo.addEventListener("playing", function () { tryApplySeekOnActiveVideo(vodVideo); }, { passive: true });
+      vodVideo.addEventListener("canplay", function () { tryApplySeekOnActiveVideo(vodVideo); }, { passive: true });
+      vodVideo.addEventListener("loadedmetadata", function () { tryApplySeekOnActiveVideo(vodVideo); }, { passive: true });
       vodVideo.addEventListener("pause", onPause, { passive: true });
       vodVideo.addEventListener("ended", function () {
         recordProgress(vodVideo, true);

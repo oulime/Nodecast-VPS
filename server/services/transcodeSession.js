@@ -423,6 +423,14 @@ class TranscodeSession extends EventEmitter {
                 this.addSoftwareEncoderArgs(args, resolution, qp.software);
                 break;
         }
+
+        // Standardize Rec.709 HDTV colorimetry & TV range for accurate color rendering on TV / Chromecast
+        args.push(
+            '-color_primaries', 'bt709',
+            '-color_trc', 'bt709',
+            '-colorspace', 'bt709',
+            '-color_range', 'tv'
+        );
     }
 
     /**

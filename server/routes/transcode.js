@@ -430,7 +430,9 @@ router.get('/:sessionId/stream.m3u8', async (req, res) => {
 
     setCastMediaHeaders(res);
     res.setHeader('Content-Type', 'application/x-mpegURL');
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.send(playlist);
 });
 

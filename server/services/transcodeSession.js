@@ -236,7 +236,7 @@ class TranscodeSession extends EventEmitter {
         );
 
         if (!isVodMode) {
-            args.push('-re');
+            args.push('-flags', '+low_delay');
         }
 
         // Fast input seeking for VOD/session restart seeks.
@@ -288,44 +288,64 @@ class TranscodeSession extends EventEmitter {
             // Passthrough: Always copy audio, no processing
             console.log(`[TranscodeSession ${this.id}] Audio: Passthrough (copy)`);
             args.push('-c:a', 'copy');
-        } else if (audioMixPreset === 'auto' && isStereoAac) {
-            // Auto + Stereo AAC source: Smart copy
-            console.log(`[TranscodeSession ${this.id}] Audio: Auto (Smart Copy) - Source is Stereo AAC`);
+        } else if (audioCodec === 'unknown') {
+            // Unknown audio codec: transcode to AAC to ensure browser playback
+            console.log(`[TranscodeSession ${this.id}] Audio: Unknown codec -> AAC 2ch`);
+            args.push(
+                '-c:a', 'aac',
+                '-ac', '2',
+                '-ar', '48000',
+                '-b:a', '192k',
+                '-af', 'aresample=async=1'
+            );
+        } else if (isStereoAac && audioMixPreset === 'auto') {
+            // Stereo AAC already compatible, copy without re-encoding (clean audio)
+            console.log(`[TranscodeSession ${this.id}] Audio: Passthrough (AAC stereo)`);
             args.push('-c:a', 'copy');
         } else {
-            // Transcode to AAC with selected mix preset (default to ITU for 'auto')
-            const mixPreset = (audioMixPreset === 'auto') ? 'itu' : audioMixPreset;
-            const use51Matrix = audioChannels >= 6;
-            const panFilter = use51Matrix ? (AUDIO_MIX_FILTERS[mixPreset] || AUDIO_MIX_FILTERS.itu) : null;
-
-            console.log(`[TranscodeSession ${this.id}] Audio: ${mixPreset.toUpperCase()} mix (${audioCodec} ${audioChannels}ch -> Stereo AAC${use51Matrix ? ' via 5.1 matrix' : ''})`);
+            // Multi-channel or non-AAC audio: transcode with selected mix preset
+            const mixFilter = AUDIO_MIX_FILTERS[audioMixPreset] || AUDIO_MIX_FILTERS.itu;
+            const presetLabel = audioMixPreset === 'auto' ? 'ITU mix' : `${audioMixPreset} mix`;
+            console.log(`[TranscodeSession ${this.id}] Audio: ${presetLabel} (${audioCodec} ${audioChannels}ch -> Stereo AAC via ${audioMixPreset === 'cinematic' ? 'cinematic boost' : audioMixPreset === 'night' ? 'night boost' : '5.1 matrix'})`);
             args.push(
                 '-c:a', 'aac',
                 '-ac', '2',
                 '-ar', '48000',
                 '-b:a', '192k'
             );
-            if (panFilter) {
-                args.push('-af', `${panFilter},aresample=async=1`);
+            if (audioChannels > 2) {
+                args.push('-af', `${mixFilter},aresample=async=1`);
             } else {
                 args.push('-af', 'aresample=async=1');
             }
         }
 
-        // HLS output options. VOD sessions are generated progressively, so expose
-        // them as EVENT playlists until FFmpeg finishes and writes ENDLIST.
-        const hlsFlags = isVodMode ? 'independent_segments' : 'independent_segments+append_list';
-        const livePlaylistTypeArgs = ['-hls_playlist_type', 'event'];
-        args.push(
-            '-f', 'hls',
-            '-hls_time', String(SEGMENT_DURATION),
-            '-hls_list_size', '0', // Keep all segments in playlist
-            '-hls_flags', hlsFlags,
-            ...livePlaylistTypeArgs,
-            '-hls_segment_type', 'mpegts',
-            '-hls_segment_filename', path.join(this.dir, 'seg%04d.ts'),
-            this.playlistPath
-        );
+        // HLS output options.
+        if (isVodMode) {
+            // VOD sessions are generated progressively, exposed as EVENT playlists until FFmpeg finishes
+            args.push(
+                '-f', 'hls',
+                '-hls_time', String(SEGMENT_DURATION),
+                '-hls_list_size', '0',
+                '-hls_flags', 'independent_segments',
+                '-hls_playlist_type', 'event',
+                '-hls_segment_type', 'mpegts',
+                '-hls_segment_filename', path.join(this.dir, 'seg%04d.ts'),
+                this.playlistPath
+            );
+        } else {
+            // Live TV: Sliding 6-segment live window (12-18s) with auto-cleanup of expired segments.
+            // Prevents infinite playlist growth, memory leaks, and player backwards jump/looping.
+            args.push(
+                '-f', 'hls',
+                '-hls_time', String(SEGMENT_DURATION),
+                '-hls_list_size', '6',
+                '-hls_flags', 'delete_segments+independent_segments+split_by_time',
+                '-hls_segment_type', 'mpegts',
+                '-hls_segment_filename', path.join(this.dir, 'seg%04d.ts'),
+                this.playlistPath
+            );
+        }
 
         return args;
     }

@@ -527,10 +527,8 @@
     if (show) {
       if (headerContextText) headerContextText.textContent = "";
     }
-    const slot = document.getElementById("vel-brand-slider-slot");
     if (!show) {
       closePackageMenu(picker);
-      if (slot) slot.innerHTML = "";
       return;
     }
 
@@ -574,13 +572,6 @@
         option.setAttribute("aria-selected", String(active));
       }
     });
-
-    // Mount or update the modern Brand & Genre Slider directly into persistent slot
-    if (typeof window.veloraMountBrandSlider === "function" && slot) {
-      window.veloraMountBrandSlider(slot, packages, selectedPackage.id, (selectedId) => {
-        activateMediaPackage(selectedId);
-      });
-    }
   }
 
   function openSelectedPackage(tab, cards) {

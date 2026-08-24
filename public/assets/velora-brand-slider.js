@@ -238,9 +238,6 @@
     wrap.dataset.pkgSignature = packageSignature;
 
     wrap.innerHTML = `
-      <div class="vel-brand-slider-header">
-        <div class="vel-brand-slider-title">Univers & Catégories</div>
-      </div>
       <div class="vel-brand-slider-container">
         <button type="button" class="vel-brand-slider-arrow vel-brand-slider-arrow--prev" aria-label="Faire défiler à gauche" title="Précédent">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>

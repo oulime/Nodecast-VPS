@@ -1,0 +1,334 @@
+/* ==========================================================================
+   VELORA VIP — ULTRA-MODERN BRAND & GENRE SLIDER (Disney+ / Netflix / Apple Style)
+   ========================================================================== */
+
+.vel-brand-slider-wrap {
+  position: relative;
+  width: 100%;
+  margin: 0.25rem 0 0.85rem 0;
+  padding: 0 0.25rem;
+  box-sizing: border-box;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.vel-brand-slider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.25rem;
+}
+
+.vel-brand-slider-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.vel-brand-slider-title::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--vel-primary, #e50914);
+  box-shadow: 0 0 8px var(--vel-primary, #e50914);
+}
+
+.vel-brand-slider-container {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+/* Horizontal Scroll Rail */
+.vel-brand-slider-rail {
+  display: flex;
+  gap: 0.65rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y !important;
+  padding: 0.35rem 0.25rem 0.65rem 0.25rem;
+  width: 100%;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.vel-brand-slider-rail.is-dragging {
+  cursor: grabbing !important;
+  scroll-behavior: auto !important;
+}
+
+.vel-brand-slider-rail::-webkit-scrollbar {
+  display: none;
+}
+
+/* Navigation Arrow Buttons — Always visible on PC */
+.vel-brand-slider-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(18, 18, 26, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 30;
+  opacity: 0.9;
+  pointer-events: auto;
+  transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.75), 0 0 8px rgba(255, 255, 255, 0.15);
+}
+
+.vel-brand-slider-arrow:hover {
+  opacity: 1;
+  transform: translateY(-50%) scale(1.12);
+  background: rgba(35, 35, 48, 0.98);
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.9), 0 0 14px rgba(255, 255, 255, 0.35);
+}
+
+.vel-brand-slider-arrow:active {
+  transform: translateY(-50%) scale(0.94);
+}
+
+.vel-brand-slider-arrow--prev {
+  left: 2px;
+}
+
+.vel-brand-slider-arrow--next {
+  right: 2px;
+}
+
+.vel-brand-slider-arrow.is-disabled {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Individual Brand Card */
+.vel-brand-card {
+  flex: 0 0 auto;
+  min-width: 125px;
+  max-width: 160px;
+  height: 70px;
+  border-radius: 14px;
+  background: var(--brand-bg, linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%));
+  border: 1px solid var(--brand-border, rgba(255, 255, 255, 0.14));
+  padding: 0.45rem 0.65rem;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-x pan-y !important;
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+              border-color 0.28s ease,
+              box-shadow 0.28s ease,
+              background 0.28s ease;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+/* Brand Shimmer Overlay */
+.vel-brand-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 20%, rgba(255, 255, 255, 0.12) 45%, rgba(255, 255, 255, 0.25) 50%, rgba(255, 255, 255, 0.12) 55%, transparent 80%);
+  background-size: 200% 200%;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+/* Dynamic ambient glow behind card */
+.vel-brand-card::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: var(--brand-glow-grad, transparent);
+  opacity: 0;
+  z-index: -1;
+  transition: opacity 0.35s ease;
+}
+
+/* Hover & Focus Interactions */
+.vel-brand-card:hover {
+  transform: translateY(-4px) scale(1.03);
+  border-color: var(--brand-glow-color, rgba(255, 255, 255, 0.4));
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5), 0 0 20px var(--brand-glow-color, rgba(255, 255, 255, 0.2));
+}
+
+.vel-brand-card:hover::before {
+  opacity: 1;
+  animation: vel-brand-shimmer 1.4s infinite linear;
+}
+
+.vel-brand-card:hover::after {
+  opacity: 0.6;
+}
+
+.vel-brand-card:active {
+  transform: translateY(-1px) scale(0.97);
+}
+
+/* Active State (Selected Package) */
+.vel-brand-card.is-active {
+  background: var(--brand-active-bg, linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.08) 100%));
+  border-color: var(--brand-glow-color, #ffffff);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 22px var(--brand-glow-color, rgba(229, 9, 20, 0.55)), inset 0 0 12px var(--brand-glow-color, rgba(255, 255, 255, 0.2));
+  transform: translateY(-2px) scale(1.02);
+}
+
+.vel-brand-card.is-active::after {
+  opacity: 0.85;
+}
+
+/* Active Pill Indicator Dot */
+.vel-brand-card.is-active .vel-brand-card__indicator {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.vel-brand-card__indicator {
+  position: absolute;
+  bottom: 3px;
+  width: 18px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--brand-glow-color, #ffffff);
+  box-shadow: 0 0 8px var(--brand-glow-color, #ffffff);
+  opacity: 0;
+  transform: scale(0.5);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+/* Brand Logo Vector Frame */
+.vel-brand-card__logo-wrap {
+  height: 28px;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
+}
+
+.vel-brand-card__logo-svg {
+  height: 100%;
+  max-height: 25px;
+  width: auto;
+  max-width: 105px;
+  object-fit: contain;
+  fill: currentColor;
+}
+
+.vel-brand-card__logo-img {
+  height: 100%;
+  max-height: 25px;
+  width: auto;
+  max-width: 100px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.vel-brand-card__flag-badge {
+  width: 28px;
+  height: 19px;
+  border-radius: 4px;
+  object-fit: cover;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+.vel-brand-card__monogram {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ffffff;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+}
+
+.vel-brand-card__logo-emoji {
+  font-size: 1.35rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
+}
+
+/* Brand Name / Subtitle */
+.vel-brand-card__name {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  pointer-events: none;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+}
+
+/* Shimmer Animation */
+@keyframes vel-brand-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Responsive Tweaks */
+@media (max-width: 680px) {
+  .vel-brand-card {
+    min-width: 110px;
+    max-width: 135px;
+    height: 64px;
+    padding: 0.4rem 0.55rem;
+    border-radius: 12px;
+  }
+  .vel-brand-card__logo-wrap {
+    height: 24px;
+  }
+  .vel-brand-card__name {
+    font-size: 0.66rem;
+  }
+  .vel-brand-slider-arrow {
+    display: none !important;
+  }
+}

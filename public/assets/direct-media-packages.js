@@ -49,7 +49,8 @@
 
   function gridBelongsTo(tab) {
     const renderKey = String(packagesView.dataset.renderedGridKey || "");
-    return renderKey.startsWith(`${tab}|`);
+    if (renderKey.startsWith(`${tab}|`)) return true;
+    return activeTab() === tab && !packagesView.querySelector(".vel-package-skeleton");
   }
 
   function isParentPackageView() {
@@ -366,19 +367,24 @@
   function currentPackageCards(tab) {
     if (!gridBelongsTo(tab)) return [];
     return [...packagesView.querySelectorAll(".vel-package-card[data-package-id]")]
-      .filter(card => card instanceof HTMLElement && !card.hidden)
-      .map(card => ({
-        id: String(card.dataset.packageId || ""),
-        name: packageName(card),
-        card
-      }))
+      .filter(card => card instanceof HTMLElement && !card.hidden && !card.classList.contains("vel-package-skeleton"))
+      .map(card => {
+        const image = card.querySelector(":scope > img, img");
+        const imageSrc = image?.getAttribute("src") || "";
+        return {
+          id: String(card.dataset.packageId || ""),
+          name: packageName(card),
+          image: imageSrc,
+          card
+        };
+      })
       .filter(item => item.id);
   }
 
   function rememberPackages(tab) {
     const cards = currentPackageCards(tab);
     if (cards.length) {
-      packageCache.set(cacheKey(tab), cards.map(({ id, name }) => ({ id, name })));
+      packageCache.set(cacheKey(tab), cards.map(({ id, name, image }) => ({ id, name, image })));
     }
     return cards;
   }
@@ -507,8 +513,10 @@
     if (show) {
       if (headerContextText) headerContextText.textContent = "";
     }
+    const slot = document.getElementById("vel-brand-slider-slot");
     if (!show) {
       closePackageMenu(picker);
+      if (slot) slot.innerHTML = "";
       return;
     }
 
@@ -552,6 +560,13 @@
         option.setAttribute("aria-selected", String(active));
       }
     });
+
+    // Mount or update the modern Brand & Genre Slider directly into persistent slot
+    if (typeof window.veloraMountBrandSlider === "function" && slot) {
+      window.veloraMountBrandSlider(slot, packages, selectedPackage.id, (selectedId) => {
+        activateMediaPackage(selectedId);
+      });
+    }
   }
 
   function openSelectedPackage(tab, cards) {
@@ -560,13 +575,17 @@
       isParentPackageView() ||
       packagesView.classList.contains("hidden") ||
       !contentView.classList.contains("hidden") ||
+      packagesView.hasAttribute("aria-busy") ||
+      packagesView.querySelector(".vel-package-skeleton") ||
       !gridBelongsTo(tab) ||
       !cards.length
     ) return;
 
     const key = cacheKey(tab);
     const selected = selectedPackages.get(key);
-    const target = cards.find(item => item.id === selected) || cards[0];
+    const target = (selected ? cards.find(item => item.id === selected) : null) || cards[0];
+    if (!target) return;
+
     const openKey = `${key}::${target.id}`;
     if (pendingOpen === openKey) return;
 
@@ -675,10 +694,20 @@
     attributeFilter: ["class", "data-vel-active-tab", "data-rendered-grid-key", "data-parent-package-id"]
   });
 
-  countrySelect?.addEventListener("change", () => {
+  function handleCountrySwitch() {
     pendingOpen = "";
+    selectedPackages.delete(cacheKey("movies"));
+    selectedPackages.delete(cacheKey("series"));
+    packageCache.delete(cacheKey("movies"));
+    packageCache.delete(cacheKey("series"));
+    const slot = document.getElementById("vel-brand-slider-slot");
+    if (slot) slot.innerHTML = "";
     scheduleUpdate();
-  });
+  }
+
+  countrySelect?.addEventListener("change", handleCountrySwitch);
+  document.addEventListener("velora-country-switch-start", handleCountrySwitch);
+  document.addEventListener("velora-countries-ready", handleCountrySwitch);
 
   document.addEventListener("velora-home-tab", () => {
     pendingOpen = "";

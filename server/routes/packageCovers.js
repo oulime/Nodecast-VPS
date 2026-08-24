@@ -11,6 +11,7 @@ const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const PUBLIC_UPLOAD_PATH = '/uploads/package-covers';
 const UPLOAD_DIR = path.join(__dirname, '..', '..', 'public', 'uploads', 'package-covers');
 const TMP_DIR = path.join(UPLOAD_DIR, '.tmp');
+const DISCOVERED_COVERS_FILE = path.join(__dirname, '..', '..', 'data', 'package-discovered-covers.json');
 
 const IMAGE_TYPES = {
     jpg: 'image/jpeg',
@@ -19,6 +20,32 @@ const IMAGE_TYPES = {
     webp: 'image/webp',
     gif: 'image/gif'
 };
+
+// In-memory cache for discovered package covers
+let discoveredCoversMap = null;
+
+async function loadDiscoveredCovers() {
+    if (discoveredCoversMap !== null) return discoveredCoversMap;
+    try {
+        const raw = await fsp.readFile(DISCOVERED_COVERS_FILE, 'utf8');
+        discoveredCoversMap = JSON.parse(raw) || {};
+    } catch {
+        discoveredCoversMap = {};
+    }
+    return discoveredCoversMap;
+}
+
+async function saveDiscoveredCovers(map) {
+    discoveredCoversMap = map;
+    try {
+        await fsp.mkdir(path.dirname(DISCOVERED_COVERS_FILE), { recursive: true });
+        const temp = `${DISCOVERED_COVERS_FILE}.${process.pid}.${Date.now()}.tmp`;
+        await fsp.writeFile(temp, `${JSON.stringify(map, null, 2)}\n`, 'utf8');
+        await fsp.rename(temp, DISCOVERED_COVERS_FILE);
+    } catch (err) {
+        console.warn('[package-covers] Failed to write discovered covers file:', err.message);
+    }
+}
 
 function getBoundary(contentType) {
     const match = /(?:^|;)\s*boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType || '');
@@ -227,6 +254,115 @@ async function removeOldPackageCovers(packageSlug, keepFileName) {
     }));
 }
 
+/**
+ * GET /api/package-covers/all
+ * Returns all package covers (admin manual + user auto-discovered) as a map: { [packageId]: coverUrl }
+ */
+router.get('/package-covers/all', async (_req, res) => {
+    try {
+        const discovered = await loadDiscoveredCovers();
+        const covers = {};
+
+        // 1. Add auto-discovered covers
+        for (const [id, item] of Object.entries(discovered)) {
+            const url = typeof item === 'string' ? item : item?.coverUrl;
+            if (url) covers[id] = url;
+        }
+
+        // 2. Add or override with admin explicit covers from SQLite DB
+        try {
+            const veloraData = require('./veloraData');
+            const adminCovers = veloraData.allRows('admin_package_covers') || [];
+            for (const row of adminCovers) {
+                const id = String(row.package_id || '');
+                const url = String(row.cover_url || '').trim();
+                if (id && url && !row.deleted) {
+                    covers[id] = url;
+                }
+            }
+        } catch (_) {}
+
+        res.set('Cache-Control', 'public, max-age=60');
+        return res.json({ ok: true, covers, count: Object.keys(covers).length });
+    } catch (err) {
+        console.error('[package-cover] get all covers failed:', err);
+        return res.status(500).json({ error: 'Unable to load package covers.' });
+    }
+});
+
+/**
+ * POST /api/package-covers/auto-backfill
+ * Crowd-sourced package cover backfill: whenever any user opens a package without a cover,
+ * the first channel image is saved to server storage so every user sees it.
+ */
+router.post('/package-covers/auto-backfill', express.json(), async (req, res) => {
+    try {
+        const items = Array.isArray(req.body?.items)
+            ? req.body.items
+            : (req.body?.packageId && req.body?.coverUrl ? [req.body] : []);
+
+        if (!items.length) {
+            return res.status(400).json({ error: 'packageId and coverUrl required' });
+        }
+
+        const map = await loadDiscoveredCovers();
+        let changed = false;
+        let veloraData = null;
+        try { veloraData = require('./veloraData'); } catch (_) {}
+
+        for (const item of items) {
+            const packageId = String(item.packageId || '').trim();
+            const coverUrl = String(item.coverUrl || '').trim();
+
+            if (!packageId || !coverUrl) continue;
+            if (!/^https?:\/\//i.test(coverUrl) && !coverUrl.startsWith('/uploads/')) continue;
+
+            const existing = map[packageId];
+            const currentUrl = typeof existing === 'string' ? existing : existing?.coverUrl;
+
+            if (currentUrl !== coverUrl) {
+                map[packageId] = {
+                    packageId,
+                    coverUrl,
+                    updatedAt: new Date().toISOString()
+                };
+                changed = true;
+
+                // Also sync into SQLite admin_package_covers if available
+                if (veloraData && typeof veloraData.saveRow === 'function') {
+                    try {
+                        const dbRows = veloraData.allRows('admin_package_covers') || [];
+                        const dbExisting = dbRows.find(r => String(r.package_id) === packageId);
+                        // Do not overwrite manual admin-uploaded covers
+                        if (!dbExisting || dbExisting.auto_discovered || !dbExisting.cover_url) {
+                            veloraData.saveRow('admin_package_covers', {
+                                package_id: packageId,
+                                cover_url: coverUrl,
+                                auto_discovered: 1
+                            });
+                        }
+                    } catch (dbErr) {
+                        console.warn('[package-cover] DB saveRow error:', dbErr.message);
+                    }
+                }
+            }
+        }
+
+        if (changed) {
+            await saveDiscoveredCovers(map);
+            if (veloraData && typeof veloraData.invalidateCountryPackageCache === 'function') {
+                try { veloraData.invalidateCountryPackageCache(); } catch (_) {}
+            }
+        }
+
+        return res.json({ ok: true, saved: items.length });
+    } catch (err) {
+        console.error('[package-cover] auto-backfill failed:', err);
+        return res.status(500).json({ error: 'Auto-backfill failed.' });
+    }
+});
+
+// Admin upload cover
 router.post('/r2-package-cover', async (req, res) => {
     const boundary = getBoundary(req.headers['content-type']);
     if (!boundary) {
@@ -274,9 +410,21 @@ router.post('/r2-package-cover', async (req, res) => {
         webpPath = useWebp ? null : webpPath;
         await removeOldPackageCovers(packageSlug, finalName);
 
+        const coverUrl = publicUrl(req, finalName);
+
+        // Update in-memory and persistent map
+        const map = await loadDiscoveredCovers();
+        map[packageId] = {
+            packageId,
+            coverUrl,
+            adminManual: true,
+            updatedAt: new Date().toISOString()
+        };
+        await saveDiscoveredCovers(map);
+
         return res.json({
             ok: true,
-            url: publicUrl(req, finalName),
+            url: coverUrl,
             path: `${PUBLIC_UPLOAD_PATH}/${finalName}`,
             storage: 'nodecast-vps',
             convertedToWebp: useWebp

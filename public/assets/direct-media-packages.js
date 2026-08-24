@@ -416,6 +416,7 @@
   function activateMediaPackage(id) {
     const tab = activeTab();
     if (!MEDIA_TABS.has(tab) || !id || !gridBelongsTo(tab)) return;
+    document.body.dataset.veloraActivePackageId = String(id);
     const target = currentPackageCards(tab).find(item => item.id === id);
     if (!target) return;
     selectedPackages.set(cacheKey(tab), id);

@@ -166,6 +166,19 @@
     parentCard.insertAdjacentElement("afterend", children);
     inlineLiveParentId = parentId;
     inlineLiveParentClose = closeButton;
+
+    // Auto-inherit cover for parent package if it has no image yet
+    if (typeof window.veloraReportPackageCover === "function" && !parentCard.querySelector(":scope > img, .vel-package-card__live-logo")) {
+      for (const card of childCards) {
+        const image = card.querySelector(":scope > img, .vel-package-card__live-logo");
+        const imageSrc = image?.getAttribute("src") || window.__veloraCustomPackageLogos?.[card.dataset.packageId];
+        if (imageSrc && !imageSrc.includes("data:image") && !imageSrc.includes("transparent.png")) {
+          window.veloraReportPackageCover(parentId, imageSrc);
+          break;
+        }
+      }
+    }
+
     restoreLiveParentScroll();
     document.body.dataset.velTopLevel = "live";
     document.dispatchEvent(new CustomEvent("velora-top-level-tab", { detail: { tab: "live" } }));

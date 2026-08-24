@@ -1,7 +1,7 @@
 /**
- * VELORA VIP — CROWD-SOURCED PACKAGE COVER AUTO-SYNC
- * Automatically discovers, persists, and shares the first channel/item image
- * across all users and browsers for every live and media package.
+ * VELORA VIP — CROWD-SOURCED PACKAGE & PARENT PACKAGE COVER AUTO-SYNC
+ * Automatically discovers, persists, and shares the first channel/subpackage image
+ * across all users and browsers for every live, parent, and media package.
  */
 (function () {
   "use strict";
@@ -9,6 +9,7 @@
   window.__veloraCustomPackageLogos = window.__veloraCustomPackageLogos || {};
   const backfillQueue = new Set();
   let flushTimer = null;
+  let activeParentPackageId = "";
 
   function safeUrl(url) {
     if (!url || typeof url !== "string") return "";
@@ -115,7 +116,46 @@
   }
 
   /**
-   * Inspect current items/channels when a user views a package
+   * Track parent packages and auto-adopt the first subpackage's image
+   */
+  function checkParentPackages() {
+    const packagesView = document.getElementById("packages-view");
+    if (!packagesView) return;
+
+    const currentParentId = String(
+      packagesView.dataset.parentPackageId ||
+      document.querySelector(".vel-parent-package-children")?.dataset?.parentPackageId ||
+      ""
+    ).trim();
+
+    if (currentParentId) {
+      activeParentPackageId = currentParentId;
+    }
+
+    if (!activeParentPackageId) return;
+
+    // Check if the parent package already has a cover
+    if (!window.__veloraCustomPackageLogos[activeParentPackageId]) {
+      // Look for the first child card with an image
+      const childCards = packagesView.querySelectorAll(
+        ".vel-parent-package-children .vel-package-card[data-package-id], .vel-parent-package-view .vel-package-card[data-package-id]"
+      );
+
+      for (const childCard of childCards) {
+        const childId = String(childCard.dataset.packageId || "");
+        const childImg = childCard.querySelector("img")?.src || window.__veloraCustomPackageLogos[childId];
+        const safeChildImg = safeUrl(childImg);
+
+        if (safeChildImg && !safeChildImg.includes("data:image") && !safeChildImg.includes("transparent.png")) {
+          reportDiscoveredCover(activeParentPackageId, safeChildImg);
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Inspect current items/channels when a user views a package or subpackage
    */
   function inspectCurrentPackageItems() {
     const packagesView = document.getElementById("packages-view");
@@ -134,9 +174,6 @@
 
     if (!packageId) return;
 
-    // Check if cover is already known
-    if (window.__veloraCustomPackageLogos[packageId]) return;
-
     // Find the first media item image in #dynamic-list or #item-list
     const firstItemImg = document.querySelector(
       "#dynamic-list .media-item img, #item-list .media-item img, #content-view .media-item img, #dynamic-list img, #item-list img"
@@ -144,9 +181,39 @@
 
     const imgSrc = safeUrl(firstItemImg?.src || firstItemImg?.dataset?.src || firstItemImg?.getAttribute("src"));
     if (imgSrc && !imgSrc.includes("data:image") && !imgSrc.includes("transparent.png")) {
-      reportDiscoveredCover(packageId, imgSrc);
+      // 1. Report for the subpackage itself if missing
+      if (!window.__veloraCustomPackageLogos[packageId]) {
+        reportDiscoveredCover(packageId, imgSrc);
+      }
+
+      // 2. If this subpackage belongs to a parent package without a cover, assign to parent package too!
+      if (activeParentPackageId && !window.__veloraCustomPackageLogos[activeParentPackageId]) {
+        reportDiscoveredCover(activeParentPackageId, imgSrc);
+      }
     }
   }
+
+  // Intercept click on subpackage cards to link to parent package
+  document.addEventListener("click", event => {
+    const card = event.target.closest?.(".vel-package-card[data-package-id]");
+    if (!card) return;
+
+    const parentContainer = card.closest(".vel-parent-package-children, .vel-parent-package-view");
+    const parentId = String(
+      document.getElementById("packages-view")?.dataset?.parentPackageId ||
+      parentContainer?.dataset?.parentPackageId ||
+      ""
+    ).trim();
+
+    if (parentId) {
+      activeParentPackageId = parentId;
+      // If the clicked child card has an image and parent has none, immediately adopt
+      const cardImg = safeUrl(card.querySelector("img")?.src || window.__veloraCustomPackageLogos[card.dataset.packageId]);
+      if (cardImg && !window.__veloraCustomPackageLogos[parentId]) {
+        reportDiscoveredCover(parentId, cardImg);
+      }
+    }
+  }, true);
 
   // Global helper
   window.veloraReportPackageCover = reportDiscoveredCover;
@@ -155,14 +222,18 @@
   document.addEventListener("DOMContentLoaded", () => {
     loadAllCovers();
 
-    // Observe media item insertions to detect package stream logos
+    // Observe DOM mutations to catch stream logos & parent package expansions
     const target = document.getElementById("content-view") || document.body;
     const observer = new MutationObserver(() => {
+      checkParentPackages();
       inspectCurrentPackageItems();
       applyCoversToDOM();
     });
 
     observer.observe(target, { childList: true, subtree: true });
+    if (document.getElementById("packages-view")) {
+      observer.observe(document.getElementById("packages-view"), { childList: true, subtree: true });
+    }
   });
 
   // Start immediately if DOM already loaded

@@ -62,10 +62,28 @@
     document.querySelectorAll(".vel-brand-card[data-package-id]").forEach(card => {
       const pkgId = card.dataset.packageId;
       const coverUrl = covers[pkgId];
-      if (coverUrl && !card.querySelector(".vel-brand-card__logo-img")) {
+      if (coverUrl && !card.querySelector(".vel-brand-card__bg-poster")) {
+        card.classList.add("vel-brand-card--has-poster");
         const logoWrap = card.querySelector(".vel-brand-card__logo-wrap");
-        if (logoWrap) {
-          logoWrap.innerHTML = `<img class="vel-brand-card__logo-img" src="${coverUrl}" alt="" loading="lazy" decoding="async" onerror="this.remove()" />`;
+        if (logoWrap) logoWrap.remove();
+
+        let poster = card.querySelector(".vel-brand-card__bg-poster");
+        if (!poster) {
+          poster = document.createElement("img");
+          poster.className = "vel-brand-card__bg-poster";
+          poster.alt = "";
+          poster.loading = "lazy";
+          poster.decoding = "async";
+          poster.src = coverUrl;
+          poster.onerror = () => { card.classList.remove("vel-brand-card--has-poster"); poster.remove(); };
+          card.prepend(poster);
+        }
+        let overlay = card.querySelector(".vel-brand-card__poster-overlay");
+        if (!overlay) {
+          overlay = document.createElement("div");
+          overlay.className = "vel-brand-card__poster-overlay";
+          overlay.setAttribute("aria-hidden", "true");
+          poster.insertAdjacentElement("afterend", overlay);
         }
       }
     });

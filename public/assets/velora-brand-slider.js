@@ -273,24 +273,32 @@
       card.style.setProperty("--brand-glow-color", visual.theme.glowColor);
       card.style.setProperty("--brand-glow-grad", visual.theme.glowGrad);
 
-      let visualHtml = "";
       if (visual.type === "image") {
-        visualHtml = `<div class="vel-brand-card__logo-wrap"><img class="vel-brand-card__logo-img" src="${visual.src}" alt="" loading="lazy" decoding="async" onerror="this.remove()" /></div>`;
-      } else if (visual.type === "flag") {
-        visualHtml = `<div class="vel-brand-card__logo-wrap"><img class="vel-brand-card__flag-badge" src="${visual.src}" alt="" loading="lazy" decoding="async" onerror="this.remove()" /></div>`;
-      } else if (visual.type === "svg") {
-        visualHtml = `<div class="vel-brand-card__logo-wrap">${visual.svg}</div>`;
-      } else if (visual.type === "emoji") {
-        visualHtml = `<div class="vel-brand-card__logo-wrap"><span class="vel-brand-card__logo-emoji">${visual.emoji}</span></div>`;
+        card.classList.add("vel-brand-card--has-poster");
+        card.innerHTML = `
+          <img class="vel-brand-card__bg-poster" src="${visual.src}" alt="" loading="lazy" decoding="async" onerror="this.parentElement.classList.remove('vel-brand-card--has-poster'); this.remove();" />
+          <div class="vel-brand-card__poster-overlay" aria-hidden="true"></div>
+          <span class="vel-brand-card__name">${cleanTitle}</span>
+          <div class="vel-brand-card__indicator" aria-hidden="true"></div>
+        `;
       } else {
-        visualHtml = `<div class="vel-brand-card__logo-wrap"><span class="vel-brand-card__monogram">${visual.monogram}</span></div>`;
-      }
+        let visualHtml = "";
+        if (visual.type === "flag") {
+          visualHtml = `<div class="vel-brand-card__logo-wrap"><img class="vel-brand-card__flag-badge" src="${visual.src}" alt="" loading="lazy" decoding="async" onerror="this.remove()" /></div>`;
+        } else if (visual.type === "svg") {
+          visualHtml = `<div class="vel-brand-card__logo-wrap">${visual.svg}</div>`;
+        } else if (visual.type === "emoji") {
+          visualHtml = `<div class="vel-brand-card__logo-wrap"><span class="vel-brand-card__logo-emoji">${visual.emoji}</span></div>`;
+        } else {
+          visualHtml = `<div class="vel-brand-card__logo-wrap"><span class="vel-brand-card__monogram">${visual.monogram}</span></div>`;
+        }
 
-      card.innerHTML = `
-        ${visualHtml}
-        <span class="vel-brand-card__name">${cleanTitle}</span>
-        <div class="vel-brand-card__indicator" aria-hidden="true"></div>
-      `;
+        card.innerHTML = `
+          ${visualHtml}
+          <span class="vel-brand-card__name">${cleanTitle}</span>
+          <div class="vel-brand-card__indicator" aria-hidden="true"></div>
+        `;
+      }
 
       card.addEventListener("click", (e) => {
         e.preventDefault();

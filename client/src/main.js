@@ -10,6 +10,7 @@ import './styles/parent-packages.css';
 import './styles/velora-home-sections.css';
 import './styles/velora-bigscreen-performance.css';
 import './styles/velora-favorites.css';
+import './styles/compact-media-loading.css';
 import './styles/main.css';
 
 const app = createApp(App);

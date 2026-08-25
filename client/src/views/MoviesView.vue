@@ -134,17 +134,25 @@
         />
       </div>
 
-      <!-- Modern HTML5 Skeleton Card Loading Grid -->
-      <div v-if="vod.loadingMovies" class="vel-vod-grid" aria-busy="true" aria-label="Chargement des films">
-        <div
-          v-for="i in 18"
-          :key="'skeleton-movie-' + i"
-          class="vel-skeleton-vod-card"
-        >
-          <div class="vel-skeleton-vod-poster"></div>
-          <div class="vel-skeleton-vod-body">
-            <div class="vel-skeleton-line w-3/4"></div>
-            <div class="vel-skeleton-line w-1/2 opacity-60"></div>
+      <!-- Exact Old Front Movie Media Loading Animation -->
+      <div v-if="vod.loadingMovies" class="space-y-4">
+        <div class="item-list item-list--media-loading py-6">
+          <div class="vel-media-package-loader">
+            <span class="vel-media-package-loader__text">Chargement des films</span>
+            <span class="vel-media-package-loader__dots"><i></i><i></i><i></i></span>
+          </div>
+        </div>
+        <div class="vel-vod-grid" aria-busy="true" aria-label="Chargement des films">
+          <div
+            v-for="i in 18"
+            :key="'skeleton-movie-' + i"
+            class="vel-skeleton-vod-card"
+          >
+            <div class="vel-skeleton-vod-poster"></div>
+            <div class="vel-skeleton-vod-body">
+              <div class="vel-skeleton-line w-3/4"></div>
+              <div class="vel-skeleton-line w-1/2 opacity-60"></div>
+            </div>
           </div>
         </div>
       </div>

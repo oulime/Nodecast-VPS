@@ -8,20 +8,42 @@
       <!-- Channels List Container -->
       <div class="item-list item-list--media-ready" id="dynamic-list" data-show-more-ready="true">
 
-        <!-- Modern HTML5 Skeleton Channel Rows Loading State -->
-        <template v-if="catalog.loadingChannels">
-          <div
-            v-for="i in 12"
-            :key="'skeleton-ch-' + i"
-            class="vel-skeleton-channel-row"
-          >
-            <div class="vel-skeleton-thumb"></div>
-            <div class="vel-skeleton-info">
-              <div class="vel-skeleton-line w-3/5"></div>
-              <div class="vel-skeleton-line w-1/4 h-2 opacity-60"></div>
+        <!-- Exact Old Front Live Channels Loading Animation -->
+        <div v-if="catalog.loadingChannels" class="item-list item-list--media-loading item-list--media-loading-live col-span-full">
+          <div class="vel-channel-loader">
+            <div class="vel-channel-loader__visual">
+              <div class="vel-channel-loader__halo"></div>
+              <div class="vel-channel-loader__spinner"></div>
+              <div class="vel-channel-loader__icon">
+                <span class="vel-channel-loader__bar"></span>
+                <span class="vel-channel-loader__bar"></span>
+                <span class="vel-channel-loader__bar"></span>
+                <span class="vel-channel-loader__bar"></span>
+                <span class="vel-channel-loader__bar"></span>
+              </div>
+            </div>
+            <div class="vel-channel-loader__text-wrap">
+              <span class="vel-channel-loader__pill">
+                <span class="vel-channel-loader__pulse-dot"></span>
+                <span>Synchronisation</span>
+              </span>
+              <span class="vel-channel-loader__label">
+                <span>Chargement des chaînes</span>
+                <span class="vel-channel-loader__dots"><i></i><i></i><i></i></span>
+              </span>
+            </div>
+            <div class="vel-channel-skeleton-list">
+              <div v-for="n in 6" :key="'skel-' + n" class="vel-channel-skeleton-row">
+                <div class="vel-channel-skeleton-thumb"></div>
+                <div class="vel-channel-skeleton-info">
+                  <div class="vel-channel-skeleton-line vel-channel-skeleton-line--title"></div>
+                  <div class="vel-channel-skeleton-line vel-channel-skeleton-line--sub"></div>
+                </div>
+                <div class="vel-channel-skeleton-pill"></div>
+              </div>
             </div>
           </div>
-        </template>
+        </div>
 
         <!-- Channels List Rows -->
         <template v-else-if="filteredChannels.length > 0">

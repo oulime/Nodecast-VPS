@@ -86,6 +86,8 @@ export const useCatalogStore = defineStore('catalog', {
     activePackage: null,
     channels: [],
     loading: false,
+    loadingStatus: 'Chargement du catalogue…',
+    loadingAccent: null,
     loadingChannels: false
   }),
   getters: {
@@ -263,19 +265,25 @@ export const useCatalogStore = defineStore('catalog', {
         if (initial) {
           this.selectedCountry = initial;
         }
+        this.loadingStatus = 'Chargement du catalogue…';
       } catch (err) {
         console.error('Failed to load catalog', err);
       } finally {
         this.loading = false;
       }
     },
-    selectCountry(country) {
+    async selectCountry(country) {
       if (!country) return;
+      this.loading = true;
+      this.loadingStatus = `Chargement de ${country.name || 'ce pays'}…`;
       this.selectedCountry = country;
       localStorage.setItem('velora_country_id', country.id);
       this.activeParentPackage = null;
       this.activePackage = null;
       this.channels = [];
+      // Replicate the 300ms minimum smooth transition from country-switch-loader
+      await new Promise(resolve => setTimeout(resolve, 320));
+      this.loading = false;
     },
     openParentPackage(pkg) {
       this.activeParentPackage = pkg;

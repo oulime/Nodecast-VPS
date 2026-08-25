@@ -35,6 +35,13 @@
       <BottomNav />
       <SearchModal />
     </div>
+
+    <!-- Exact Old Front Fullscreen Catalog & Page Loading Overlay -->
+    <CatalogLoadingOverlay
+      :show="catalog.loading"
+      :status="catalog.loadingStatus"
+      :accent="catalog.loadingAccent"
+    />
   </main>
 </template>
 
@@ -49,6 +56,7 @@ import LoginView from './views/LoginView.vue';
 import Header from './components/Header.vue';
 import BottomNav from './components/BottomNav.vue';
 import SearchModal from './components/SearchModal.vue';
+import CatalogLoadingOverlay from './components/CatalogLoadingOverlay.vue';
 import HomeView from './views/HomeView.vue';
 import LiveView from './views/LiveView.vue';
 import MoviesView from './views/MoviesView.vue';

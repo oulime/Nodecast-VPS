@@ -557,6 +557,13 @@ function buildCountryPackageCache() {
     const packages = resolvedAdminPackages(allRows('admin_packages'), rawCurations);
     const memberships = compactMemberships(effectiveCurations(null, { rawCurations, packages }));
     const countries = allRows('admin_countries');
+    const prefixes = [...new Set(allRows('admin_channel_name_prefixes')
+        .map(row => String(row.prefix || '').trim()).filter(Boolean))]
+        .sort((left, right) => right.length - left.length);
+    const hiddenFilters = [...new Set([
+        ...DEFAULT_CHANNEL_HIDDEN_FILTERS,
+        ...allRows('admin_hidden_filters').map(row => String(row.needle || '').trim()).filter(Boolean)
+    ])];
     const payload = {
         version: 3,
         generatedAt: new Date().toISOString(),
@@ -567,6 +574,8 @@ function buildCountryPackageCache() {
         packageOrders: allRows('admin_country_package_order'),
         packageChannelOrders: allRows('admin_package_channel_order'),
         packageCovers: allRows('admin_package_covers'),
+        prefixes,
+        hiddenFilters,
         memberships,
         counts: {
             countries: countries.length,
@@ -1255,6 +1264,28 @@ router.get('/country-package-cache', (req, res) => {
         return res.json(payload);
     } catch (error) {
         console.error('[Velora data] Country/package cache failed:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+router.get('/hidden-filters', (req, res) => {
+    try {
+        const { prefixes, hiddenFilters } = homeChannelNameRules();
+        res.set('Cache-Control', 'private, no-cache');
+        return res.json({ filters: hiddenFilters, prefixes });
+    } catch (error) {
+        console.error('[Velora data] Hidden filters endpoint failed:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+router.get('/channel-rules', (req, res) => {
+    try {
+        const { prefixes, hiddenFilters } = homeChannelNameRules();
+        res.set('Cache-Control', 'private, no-cache');
+        return res.json({ prefixes, hiddenFilters });
+    } catch (error) {
+        console.error('[Velora data] Channel rules endpoint failed:', error);
         return res.status(500).json({ error: error.message });
     }
 });

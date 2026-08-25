@@ -142,53 +142,28 @@
         </span>
       </div>
 
-      <!-- Packages Grid (STRICTLY LIVE PACKAGES ONLY - EXACT OLD FRONT REPLICA) -->
-      <div id="packages-view" class="grid vel-packages">
-        <!-- Modern Skeleton Packages Loading State -->
-        <template v-if="catalog.loadingPackages">
-          <div
-            v-for="i in 16"
-            :key="'skeleton-pkg-' + i"
-            class="vel-skeleton-package-card"
-          >
-            <div class="vel-skeleton-pkg-logo"></div>
-            <div class="vel-skeleton-line w-2/3 mx-auto mt-2"></div>
-          </div>
-        </template>
-
+      <!-- Modern Skeleton Packages Loading State -->
+      <div v-if="catalog.loadingPackages" class="grid vel-packages">
         <div
-          v-for="pkg in catalog.visibleLivePackages"
-          :key="pkg.id"
-          @click="handlePackageClick(pkg)"
-          tabindex="0"
-          role="button"
-          :data-package-id="pkg.id"
-          :aria-label="pkg.display_name || pkg.name"
-          :class="[
-            'vel-package-card vel-package-card--db vel-package-card--live vel-package-card--live-default-art vel-image-loaded-host cursor-pointer',
-            pkg.cover_url ? 'vel-package-card--has-live-logo' : ''
-          ]"
+          v-for="i in 16"
+          :key="'skeleton-pkg-' + i"
+          class="vel-skeleton-package-card"
         >
-          <img
-            v-if="pkg.cover_url"
-            class="vel-package-card__live-logo vel-image-loaded"
-            alt=""
-            role="presentation"
-            loading="lazy"
-            decoding="async"
-            referrerpolicy="no-referrer"
-            crossorigin="anonymous"
-            :src="resolveImageUrl(pkg.cover_url)"
-          />
-          <span class="vel-package-card__title vel-package-card__title--live-default-art">
-            {{ pkg.display_name || pkg.name }}
-          </span>
+          <div class="vel-skeleton-pkg-logo"></div>
+          <div class="vel-skeleton-line w-2/3 mx-auto mt-2"></div>
         </div>
       </div>
 
+      <!-- 3D HTML5 Casino Wheel View for Live Packages -->
+      <LiveWheelView
+        v-else-if="catalog.visibleLivePackages.length > 0"
+        :packages="catalog.visibleLivePackages"
+        @select-package="handlePackageClick"
+      />
+
       <!-- Modern HTML5 Empty State for Live Packages -->
       <EmptyState
-        v-if="!catalog.loadingPackages && catalog.visibleLivePackages.length === 0"
+        v-else-if="!catalog.loadingPackages && catalog.visibleLivePackages.length === 0"
         icon="live"
         title="Aucun bouquet TV"
         message="Aucun bouquet de chaînes en direct n'est disponible pour ce pays. Choisissez un autre pays dans le menu en haut."
@@ -205,6 +180,7 @@ import { useCatalogStore } from '../stores/catalogStore.js';
 import { usePlayerStore } from '../stores/playerStore.js';
 import { useFavoritesStore } from '../stores/favoritesStore.js';
 import VideoPlayer from '../components/VideoPlayer.vue';
+import LiveWheelView from '../components/LiveWheelView.vue';
 import EmptyState from '../components/EmptyState.vue';
 import { resolveImageUrl } from '../utils/image.js';
 

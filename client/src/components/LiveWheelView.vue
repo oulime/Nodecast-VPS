@@ -293,28 +293,51 @@ function extractColorFromImage(imageUrl) {
       ctx.drawImage(img, 0, 0, 40, 40);
       const data = ctx.getImageData(0, 0, 40, 40).data;
 
+      let visiblePixels = 0;
+      let chromaticPixels = 0;
       let bestColor = null;
       let highestScore = -1;
       const bins = {};
 
       for (let i = 0; i < data.length; i += 4) {
         const a = data[i + 3];
-        if (a < 80) continue;
+        if (a < 70) continue;
+        visiblePixels++;
+
         const r = data[i], g = data[i + 1], b = data[i + 2];
         const max = Math.max(r, g, b);
         const min = Math.min(r, g, b);
         const chroma = max - min;
         const brightness = (r + g + b) / 3;
 
-        if (chroma < 18 || brightness < 25 || brightness > 245) continue;
+        // Skip non-vibrant or monochrome pixels (must have real color saturation > 32)
+        if (chroma < 32 || brightness < 28 || brightness > 235) continue;
 
-        const score = chroma * 1.5 + (brightness > 60 && brightness < 200 ? 50 : 0);
-        const qKey = `${Math.round(r / 20) * 20},${Math.round(g / 20) * 20},${Math.round(b / 20) * 20}`;
+        chromaticPixels++;
+        const score = chroma * 2 + (brightness > 60 && brightness < 190 ? 40 : 0);
+        const qKey = `${Math.round(r / 25) * 25},${Math.round(g / 25) * 25},${Math.round(b / 25) * 25}`;
         if (!bins[qKey]) {
-          bins[qKey] = { r, g, b, count: 0, score: 0 };
+          bins[qKey] = { rSum: 0, gSum: 0, bSum: 0, count: 0, score: 0 };
         }
+        bins[qKey].rSum += r;
+        bins[qKey].gSum += g;
+        bins[qKey].bSum += b;
         bins[qKey].count++;
         bins[qKey].score += score;
+      }
+
+      // If chromatic pixels are too few (monochrome or black & white logo), use pure Ice Silver / Platinum theme
+      if (chromaticPixels < 25 || (visiblePixels > 0 && (chromaticPixels / visiblePixels) < 0.04)) {
+        const bwTheme = {
+          primary: '#e2e8f0', // Crisp Ice Silver / Platinum
+          glow: 'rgba(255, 255, 255, 0.65)',
+          subtle: 'rgba(255, 255, 255, 0.16)',
+          border: 'rgba(255, 255, 255, 0.45)',
+          arenaBg: 'radial-gradient(circle at 50% 35%, rgba(65, 70, 85, 0.55) 0%, rgba(10, 10, 16, 0.98) 75%)'
+        };
+        colorCache.set(imageUrl, bwTheme);
+        extractedColor.value = bwTheme;
+        return;
       }
 
       for (const key in bins) {
@@ -322,7 +345,11 @@ function extractColorFromImage(imageUrl) {
         const totalScore = bin.score * Math.sqrt(bin.count);
         if (totalScore > highestScore) {
           highestScore = totalScore;
-          bestColor = { r: bin.r, g: bin.g, b: bin.b };
+          bestColor = {
+            r: Math.round(bin.rSum / bin.count),
+            g: Math.round(bin.gSum / bin.count),
+            b: Math.round(bin.bSum / bin.count)
+          };
         }
       }
 

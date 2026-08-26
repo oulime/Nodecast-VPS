@@ -1,0 +1,332 @@
+/* 3D Casino / Coverflow Wheel Navigation for Live TV */
+.vel-casino-wheel-wrapper {
+  display: none;
+  perspective: 1200px;
+  width: 100%;
+  max-width: 56rem;
+  margin: 0.25rem auto 0.5rem;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Only display the wheel when specifically on Live TV, NEVER on Home, Movies, Series, or Adult */
+body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]) .vel-casino-wheel-wrapper,
+body[data-vel-top-level="live"]:not(.vel-home-empty-active) .vel-casino-wheel-wrapper {
+  display: block;
+}
+
+/* Ensure the header and player container (.vel-sticky-top) are PINNED and non-scrollable on Live TV */
+body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]) .vel-sticky-top,
+body[data-vel-top-level="live"]:not(.vel-home-empty-active) .vel-sticky-top {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 200 !important;
+  background: #06050a !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85) !important;
+}
+
+/* Ensure the player container is ALWAYS visible when Live TV is open */
+body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]) #player-container,
+body[data-vel-top-level="live"]:not(.vel-home-empty-active) #player-container {
+  display: block !important;
+}
+
+/* Hide the close button on player in Live TV mode so player is permanently pinned */
+body[data-vel-active-tab="live"] #btn-close-player,
+body[data-vel-top-level="live"] #btn-close-player {
+  display: none !important;
+}
+
+/* Hide unnecessary back button in live view since player and wheel are always present */
+body[data-vel-active-tab="live"] #btn-back-home,
+body[data-vel-top-level="live"] #btn-back-home {
+  display: none !important;
+}
+
+/* Hide the old static header when the 3D wheel is active in Live TV */
+body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]) #vel-packages-section-heading,
+body[data-vel-top-level="live"]:not(.vel-home-empty-active) #vel-packages-section-heading {
+  display: none !important;
+}
+
+/* Ensure the channel list content-view is ALWAYS visible in Live TV mode */
+body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]) #content-view,
+body[data-vel-top-level="live"]:not(.vel-home-empty-active) #content-view {
+  display: block !important;
+}
+
+/* Hide legacy grid packages-view in Live TV mode since the 3D wheel replaces it */
+body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]) #packages-view,
+body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
+  display: none !important;
+}
+
+/* Single Big Arena */
+.vel-wheel-arena {
+  position: relative;
+  width: 100%;
+  height: 148px;
+  background: var(--theme-arena-bg, radial-gradient(circle at 50% 35%, rgba(55, 25, 95, 0.55) 0%, rgba(10, 8, 22, 0.98) 75%));
+  border: 1.5px solid var(--theme-border, rgba(168, 85, 247, 0.35));
+  border-radius: 1rem;
+  box-shadow: inset 0 0 40px var(--theme-glow, rgba(138, 43, 226, 0.18)), 0 12px 32px rgba(0, 0, 0, 0.65);
+  transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+  overflow: hidden;
+}
+
+.vel-wheel-ambient-glow {
+  position: absolute;
+  top: 15%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 320px;
+  height: 100px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--theme-glow, rgba(168, 85, 247, 0.32)) 0%, transparent 70%);
+  filter: blur(24px);
+  pointer-events: none;
+  transition: background 0.4s ease;
+}
+
+/* Center Pointer Ticker */
+.vel-wheel-pointer {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  filter: drop-shadow(0 2px 8px var(--theme-glow, rgba(192, 132, 252, 0.95)));
+  transition: transform 0.08s cubic-bezier(0.18, 0.89, 0.32, 1.28), filter 0.4s ease;
+  pointer-events: none;
+}
+
+.vel-wheel-pointer.is-ticking {
+  transform: translateX(-50%) translateY(-2px) scale(1.15);
+}
+
+.vel-wheel-pointer__triangle {
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 11px solid var(--theme-primary, #c084fc);
+  transition: border-top-color 0.4s ease;
+}
+
+/* Main 3D Arc Stage (Occupies full arena) */
+.vel-coverflow-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  perspective: 1000px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.vel-coverflow-stage:active {
+  cursor: grabbing;
+}
+
+/* Full Size Main Cards */
+.vel-coverflow-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 92px;
+  height: 106px;
+  border-radius: 14px;
+  cursor: pointer;
+  will-change: transform, opacity;
+  transition: box-shadow 0.22s ease, border-color 0.22s ease;
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
+.vel-coverflow-card__inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 6px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
+  background: linear-gradient(145deg, rgba(32, 18, 58, 0.94), rgba(12, 10, 24, 0.96));
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: border-color 0.35s ease, box-shadow 0.35s ease, transform 0.22s ease;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.vel-coverflow-card.is-center-card .vel-coverflow-card__inner {
+  border-color: var(--theme-primary, #c084fc);
+  background: linear-gradient(145deg, rgba(50, 22, 90, 0.98), rgba(16, 12, 32, 0.98));
+  box-shadow: 0 0 26px var(--theme-glow, rgba(168, 85, 247, 0.65)), 0 8px 24px rgba(0, 0, 0, 0.75);
+  transform: scale(1.06);
+}
+
+.vel-coverflow-card__logo-wrap {
+  width: 50px;
+  height: 50px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.vel-coverflow-card__logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 3px;
+  box-sizing: border-box;
+  -webkit-user-drag: none;
+  user-drag: none;
+  pointer-events: none;
+}
+
+.vel-coverflow-card__title {
+  color: #ffffff;
+  font-size: 0.7rem;
+  font-weight: 850;
+  line-height: 1.15;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  padding: 0 2px;
+  pointer-events: none;
+}
+
+/* =========================================================
+   Search Bar Between Wheel & Channels
+   ========================================================= */
+.vel-live-search-bar-wrap {
+  width: 100%;
+  max-width: 56rem;
+  margin: 0.5rem auto 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  box-sizing: border-box;
+  padding: 0 0.25rem;
+}
+
+.vel-live-search-input-box {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: rgba(18, 14, 28, 0.85);
+  border: 1px solid var(--theme-border, rgba(168, 85, 247, 0.3));
+  border-radius: 0.75rem;
+  padding: 0.45rem 0.75rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.vel-live-search-input-box:focus-within {
+  border-color: var(--theme-primary, #c084fc);
+  box-shadow: 0 0 16px var(--theme-glow, rgba(168, 85, 247, 0.35)), 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+
+.vel-live-search-icon {
+  font-size: 0.85rem;
+  margin-right: 0.5rem;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.vel-live-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.vel-live-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.vel-live-search-clear {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0 0.25rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vel-live-search-clear:hover {
+  color: #ffffff;
+}
+
+.vel-live-search-clear.hidden {
+  display: none !important;
+}
+
+.vel-live-channel-count {
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0.35rem 0.65rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+/* Hide flat grid ONLY when specifically in Live view */
+body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]) #packages-view,
+body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
+  display: none !important;
+}
+
+@media (max-width: 640px) {
+  .vel-wheel-arena {
+    height: 124px;
+  }
+  .vel-coverflow-card {
+    width: 82px;
+    height: 94px;
+  }
+  .vel-coverflow-card__logo-wrap {
+    width: 42px;
+    height: 42px;
+  }
+  .vel-coverflow-card__title {
+    font-size: 0.62rem;
+  }
+  .vel-live-search-bar-wrap {
+    padding: 0 0.1rem;
+    margin: 0.3rem auto 0.5rem;
+  }
+}

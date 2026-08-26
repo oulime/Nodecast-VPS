@@ -166,11 +166,17 @@ if (USE_VPS_DATA_API) {
             && req.path === '/api/velora-db/home-cache/rebuild';
         const isFullCatalogSync = req.method === 'POST'
             && req.path === '/api/sources/sync-catalog';
+        const isCatalogStream = req.path.startsWith('/api/proxy/xtream/')
+            || req.path.startsWith('/api/channels')
+            || req.path.startsWith('/api/velora/catalog')
+            || req.path.startsWith('/api/velora-db');
         const requestTimeoutMs = isFullCatalogSync
             ? 10 * 60 * 1000
             : isHomeCacheRebuild
                 ? 2 * 60 * 1000
-                : 30000;
+                : isCatalogStream
+                    ? 3 * 60 * 1000
+                    : 60000;
         const timeout = setTimeout(() => {
             timedOut = true;
             controller.abort();
@@ -221,11 +227,16 @@ if (USE_VPS_DATA_API) {
             res.setHeader('X-Nodecast-Data-Source', VPS_DATA_API_BASE);
 
             const vodRoute = req.path.match(/^\/api\/proxy\/xtream\/([^/]+)\/vod_streams$/i);
-            if (upstream.ok && vodRoute && req.query.category_id && /application\/json/i.test(String(upstream.headers.get('content-type') || ''))) {
-                const items = await upstream.json();
-                if (Array.isArray(items)) await enrichVpsVodPosters(items, vodRoute[1] === 'all' ? '' : vodRoute[1], headers);
-                return res.json(items);
+            const contentType = String(upstream.headers.get('content-type') || '').toLowerCase();
+
+            if (upstream.ok && vodRoute && (req.query.category_id || req.query.cat_id) && contentType.includes('application/json')) {
+                const items = await upstream.json().catch(() => null);
+                if (Array.isArray(items)) {
+                    await enrichVpsVodPosters(items, vodRoute[1] === 'all' ? '' : vodRoute[1], headers);
+                    return res.json(items);
+                }
             }
+
             if (!upstream.body || req.method === 'HEAD') return res.end();
             await pipeline(Readable.fromWeb(upstream.body), res);
         } catch (err) {

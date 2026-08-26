@@ -72,11 +72,19 @@ function normalizeChannelRuleValue(value) {
 
 function isHomeChannelHidden(rawName, hiddenFilters) {
     const name = normalizeChannelRuleValue(rawName);
+    if ((name.match(/#/g) || []).length >= 3) return true;
+    if (/^[-=*~_]{3,}.*[-=*~_]{3,}$/.test(name)) return true;
     return hiddenFilters.some(filter => {
         const normalized = normalizeChannelRuleValue(filter);
-        return normalized.startsWith('suffix:')
-            ? name.endsWith(normalized.slice(7).trim())
-            : name.includes(normalized);
+        if (normalized.startsWith('suffix:')) {
+            const s = normalized.slice(7).trim();
+            return s && (name.endsWith(s) || name.includes(s));
+        }
+        if (normalized.startsWith('prefix:')) {
+            const p = normalized.slice(7).trim();
+            return p && (name.startsWith(p) || name.includes(p));
+        }
+        return name.includes(normalized);
     });
 }
 

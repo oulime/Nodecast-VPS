@@ -1263,58 +1263,43 @@ body {
   display: block !important;
 }
 
-/* Beautiful Country Pill */
+/* Beautiful Country Flag Button */
 .vel-header-country-btn {
+  width: 2.25rem !important;
+  height: 2.25rem !important;
+  min-width: 2.25rem !important;
+  border-radius: 999px !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 0.45rem !important;
-  height: 2.25rem !important;
-  padding: 0 0.85rem !important;
-  border-radius: 999px !important;
+  padding: 0 !important;
   border: 1px solid rgba(168, 85, 247, 0.4) !important;
   background: rgba(28, 20, 50, 0.85) !important;
-  color: #f3e8ff !important;
-  font-size: 0.82rem !important;
-  font-weight: 700 !important;
-  white-space: nowrap !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
   cursor: pointer !important;
   transition: all 0.18s ease !important;
+  overflow: hidden !important;
 }
 
 .vel-header-country-btn:hover {
   background: rgba(139, 92, 246, 0.4) !important;
   border-color: rgba(192, 132, 252, 0.8) !important;
-  color: #ffffff !important;
   box-shadow: 0 0 14px rgba(168, 85, 247, 0.45) !important;
+  transform: scale(1.05) !important;
+}
+
+.vel-header-country-btn:active {
+  transform: scale(0.95) !important;
 }
 
 .vel-header-country-flag {
-  width: 1.35rem !important;
-  height: 0.95rem !important;
+  width: 1.45rem !important;
+  height: 1.05rem !important;
   border-radius: 3px !important;
   object-fit: cover !important;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5) !important;
   flex-shrink: 0 !important;
-}
-
-.vel-header-country-name {
-  max-width: 110px !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-  font-size: 0.82rem !important;
-  letter-spacing: -0.01em !important;
-  line-height: 1 !important;
-}
-
-.vel-header-country-chevron {
-  width: 0.85rem !important;
-  height: 0.85rem !important;
-  flex-shrink: 0 !important;
-  color: #c084fc !important;
-  transition: transform 0.2s ease !important;
+  display: block !important;
 }
 
 /* Header Back Button */

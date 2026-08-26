@@ -61,6 +61,7 @@
           type="button"
           id="btn-header-country"
           class="vel-header-country-btn"
+          :title="catalog.selectedCountry?.name || 'Choisir un pays'"
           aria-label="Choisir un pays"
         >
           <img
@@ -69,17 +70,7 @@
             :alt="catalog.selectedCountry?.name"
             class="vel-header-country-flag"
           />
-          <span class="vel-header-country-name">{{ catalog.selectedCountry?.name || 'Pays' }}</span>
-          <svg
-            class="vel-header-country-chevron"
-            :class="isHeaderCountryOpen ? 'rotate-180' : ''"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-          >
-            <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <span v-else class="text-sm">🌍</span>
         </button>
 
         <CountryDropdown

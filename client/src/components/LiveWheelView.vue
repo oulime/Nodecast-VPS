@@ -5,10 +5,7 @@
     :style="themeStyle"
   >
     <!-- Single Wheel Arena: Hosts BOTH the Main Wheel & Intersecting Sub-Wheel in the EXACT SAME space -->
-    <div
-      class="vel-wheel-arena relative overflow-hidden rounded-3xl p-2 md:p-3 flex flex-col items-center justify-center"
-      :class="{ 'is-pure-single': !hasAnyParentPackages }"
-    >
+    <div class="vel-wheel-arena relative overflow-hidden rounded-3xl p-2 md:p-3 flex flex-col items-center justify-center">
       <!-- Dynamic Brand Ambient Lighting -->
       <div class="vel-wheel-ambient-glow" aria-hidden="true"></div>
       <div class="vel-wheel-radial-track" aria-hidden="true"></div>
@@ -18,10 +15,9 @@
         <div class="vel-wheel-pointer__triangle"></div>
       </div>
 
-      <!-- 1. Main 3D Circular Arc Track (Steady position: Never jumps up & down) -->
+      <!-- 1. Main 3D Circular Arc Track (100% Fixed Constant Position) -->
       <div
         class="vel-coverflow-stage"
-        :class="{ 'has-sub-tier': hasAnyParentPackages }"
         @mousedown="startDrag"
         @touchstart.passive="startTouch"
         @wheel.prevent="handleWheelScroll"
@@ -756,10 +752,6 @@ watch(activePackage, () => {
   transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
-.vel-wheel-arena.is-pure-single {
-  height: 142px;
-}
-
 .vel-wheel-ambient-glow {
   position: absolute;
   top: 10%;
@@ -829,22 +821,17 @@ watch(activePackage, () => {
   cursor: grabbing;
 }
 
-/* Main Cards */
+/* Main Cards: Permanently fixed at top 40% with zero vertical movement */
 .vel-coverflow-card {
   position: absolute;
   left: 50%;
-  top: 50%;
+  top: 40%;
   width: 92px;
   height: 106px;
   border-radius: 15px;
   cursor: pointer;
   will-change: transform, opacity;
   transition: box-shadow 0.22s ease, border-color 0.22s ease;
-}
-
-/* Stable upper position when parent packages exist in this list */
-.vel-coverflow-stage.has-sub-tier .vel-coverflow-card {
-  top: 40%;
 }
 
 .vel-coverflow-card__inner {

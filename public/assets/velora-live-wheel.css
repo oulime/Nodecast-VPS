@@ -56,6 +56,44 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active) #content-view {
   display: block !important;
 }
 
+/* Force Live TV channel list into a responsive 1-channel-per-row (single-column) list */
+body[data-vel-active-tab="live"] #dynamic-list,
+body[data-vel-top-level="live"] #dynamic-list,
+#dynamic-list.item-list--live,
+#dynamic-list:has(.vel-media-item-row) {
+  display: flex !important;
+  flex-direction: column !important;
+  grid-template-columns: none !important;
+  gap: 0.5rem !important;
+  width: 100% !important;
+  max-width: 56rem !important;
+  margin: 0 auto !important;
+  padding: 0 0.5rem 3rem !important;
+  box-sizing: border-box !important;
+}
+
+body[data-vel-active-tab="live"] #dynamic-list > .vel-media-item-row,
+body[data-vel-top-level="live"] #dynamic-list > .vel-media-item-row,
+#dynamic-list.item-list--live > .vel-media-item-row,
+.vel-media-item-row {
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 0 0 auto !important;
+  display: block !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+}
+
+body[data-vel-active-tab="live"] #dynamic-list .media-item__main,
+body[data-vel-top-level="live"] #dynamic-list .media-item__main,
+.vel-media-item-row .media-item__main {
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+}
+
 /* Hide legacy grid packages-view in Live TV mode since the 3D wheel replaces it */
 body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]) #packages-view,
 body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {

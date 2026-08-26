@@ -389,6 +389,27 @@
     }
 
     async init() {
+      // Hook veloraDescribeFavoriteCard for custom live wheel rows
+      const originalDescribe = window.veloraDescribeFavoriteCard;
+      window.veloraDescribeFavoriteCard = (card) => {
+        if (card && card.classList.contains("vel-media-item-row")) {
+          const sId = card.dataset.streamId;
+          if (sId) {
+            const btn = card.querySelector(".media-item__main");
+            const img = card.querySelector("img");
+            return {
+              sourceId: String(card.dataset.favoriteSourceId || "1"),
+              itemId: String(sId),
+              itemType: "channel",
+              name: btn ? (btn.getAttribute("aria-label") || "") : "",
+              thumbUrl: img ? (img.getAttribute("src") || "") : "",
+              packageId: String(card.dataset.favoritePackageId || "")
+            };
+          }
+        }
+        return typeof originalDescribe === "function" ? originalDescribe(card) : null;
+      };
+
       this.createDom();
       this.bindEvents();
       this.observeState();
@@ -829,7 +850,11 @@
 
       this.renderedCount = 0;
       const dynamicList = document.getElementById("dynamic-list");
-      if (dynamicList) dynamicList.innerHTML = "";
+      if (dynamicList) {
+        dynamicList.classList.remove("item-list--vod-vertical", "item-list--vod-film-detail");
+        dynamicList.classList.add("item-list--live");
+        dynamicList.innerHTML = "";
+      }
 
       this.renderNextBatch();
 
@@ -919,6 +944,31 @@
         });
 
         row.appendChild(btn);
+
+        // Attach Favorite Heart Button
+        const heartDesc = {
+          sourceId: String(ch.nodecast_source_id || ch.source_id || "1"),
+          itemId: String(streamId),
+          itemType: "channel",
+          name: name,
+          thumbUrl: logo,
+          packageId: String(ch.package_id || ""),
+          globalStreamId: String(ch.nodecast_global_stream_id || ch.global_stream_id || ""),
+          containerExtension: String(ch.container_extension || "")
+        };
+
+        row.dataset.favoriteSourceId = heartDesc.sourceId;
+        row.dataset.favoriteItemId = heartDesc.itemId;
+        row.dataset.favoriteItemType = heartDesc.itemType;
+        row.dataset.favoriteName = heartDesc.name;
+        row.dataset.favoriteThumbUrl = heartDesc.thumbUrl;
+        row.dataset.favoritePackageId = heartDesc.packageId;
+
+        if (typeof window.veloraCreateFavoriteHeart === "function") {
+          const heart = window.veloraCreateFavoriteHeart(heartDesc);
+          if (heart) row.appendChild(heart);
+        }
+
         fragment.appendChild(row);
       });
 

@@ -15,13 +15,15 @@
           data-drag-scroll-bound="true"
           :ref="el => setRailRef(el, 'resume')"
         >
-          <button
+          <div
             v-for="item in history.resumeItems"
             :key="item.stream_id || item.item_id"
             @click="resumePlayback(item)"
-            type="button"
+            @keydown.enter.prevent="resumePlayback(item)"
+            role="button"
+            tabindex="0"
             :class="[
-              'vel-home-section__card vel-home-section__card--resume',
+              'vel-home-section__card vel-home-section__card--resume cursor-pointer',
               item.type === 'series' || item.series_id ? 'vel-home-section__card--series' : 'vel-home-section__card--movies',
               isImageLoaded(item.stream_id || item.item_id) ? 'is-poster-ready' : 'is-poster-loading'
             ]"
@@ -58,13 +60,13 @@
 
             <!-- Top-Right Remove Button -->
             <button
-              @click.stop="history.removeResumeItem(item.stream_id || item.item_id)"
+              @click.stop.prevent="history.removeResumeItem(item.stream_id || item.item_id)"
               type="button"
               class="vel-resume-remove-btn"
               aria-label="Supprimer de Continuer de regarder"
               title="Supprimer"
             >
-              <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
                 <line x1="6" y1="6" x2="18" y2="18"></line>
               </svg>
@@ -83,7 +85,7 @@
                 :style="{ width: Math.max(6, Math.min(100, item.percent || 15)) + '%' }"
               ></div>
             </div>
-          </button>
+          </div>
         </div>
 
         <!-- Scroll Prev / Next Buttons -->

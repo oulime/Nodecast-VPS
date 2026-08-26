@@ -1,6 +1,6 @@
 <template>
   <div
-    class="vel-live-container max-w-[1720px] w-full mx-auto px-3 py-2 md:px-6 xl:px-10 space-y-5"
+    class="vel-live-container w-full mx-auto px-2 sm:px-4 py-1 space-y-2"
     :style="liveThemeStyle"
   >
     <!-- Video Player (If Stream Playing) -->
@@ -37,7 +37,7 @@
     />
 
     <!-- Channels List of the Selected Package (Directly Below the Picked Package) -->
-    <div v-if="catalog.activePackage" class="vel-channels-section mt-4" id="content-view">
+    <div v-if="catalog.activePackage" class="vel-channels-section mt-2 w-full" id="content-view">
       <button type="button" id="btn-back-home" class="vel-vod-detail-back hidden" aria-label="Précédent" title="Précédent" data-tv-focusable="true" data-analytics-playback-end-bound="1">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M14.7 5.3a1 1 0 0 1 0 1.4L10.41 11H20a1 1 0 1 1 0 2h-9.59l4.3 4.3a1 1 0 0 1-1.42 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.42 0Z"></path>

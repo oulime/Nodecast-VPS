@@ -1,11 +1,14 @@
-﻿<template>
+<template>
   <div
     class="vel-casino-wheel-wrapper w-full max-w-4xl mx-auto select-none"
     ref="wheelWrapperRef"
     :style="themeStyle"
   >
     <!-- Single Wheel Arena: Hosts BOTH the Main Wheel & Intersecting Sub-Wheel in the EXACT SAME space -->
-    <div class="vel-wheel-arena relative overflow-hidden rounded-3xl p-2 md:p-3 flex flex-col items-center justify-center">
+    <div
+      class="vel-wheel-arena relative overflow-hidden rounded-3xl p-2 md:p-3 flex flex-col items-center justify-center"
+      :class="{ 'is-pure-single': !hasAnyParentPackages }"
+    >
       <!-- Dynamic Brand Ambient Lighting -->
       <div class="vel-wheel-ambient-glow" aria-hidden="true"></div>
       <div class="vel-wheel-radial-track" aria-hidden="true"></div>
@@ -15,10 +18,10 @@
         <div class="vel-wheel-pointer__triangle"></div>
       </div>
 
-      <!-- 1. Main 3D Circular Arc Track -->
+      <!-- 1. Main 3D Circular Arc Track (Steady position: Never jumps up & down) -->
       <div
         class="vel-coverflow-stage"
-        :class="{ 'has-sub-tier': activePackage && activePackage.is_parent && childPackages.length > 0 }"
+        :class="{ 'has-sub-tier': hasAnyParentPackages }"
         @mousedown="startDrag"
         @touchstart.passive="startTouch"
         @wheel.prevent="handleWheelScroll"
@@ -138,6 +141,10 @@ let subDragStartIndex = 0;
 let subAnimFrameId = null;
 
 const totalItems = computed(() => Math.max(1, props.packages.length));
+
+const hasAnyParentPackages = computed(() => {
+  return props.packages.some(p => p && p.is_parent && Array.isArray(p.child_package_ids) && p.child_package_ids.length > 0);
+});
 
 const activePackage = computed(() => {
   if (props.packages.length === 0) return null;
@@ -749,6 +756,10 @@ watch(activePackage, () => {
   transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
+.vel-wheel-arena.is-pure-single {
+  height: 142px;
+}
+
 .vel-wheel-ambient-glow {
   position: absolute;
   top: 10%;
@@ -812,7 +823,6 @@ watch(activePackage, () => {
   justify-content: center;
   cursor: grab;
   touch-action: pan-y;
-  transition: all 0.3s ease;
 }
 
 .vel-coverflow-stage:active {
@@ -829,10 +839,10 @@ watch(activePackage, () => {
   border-radius: 15px;
   cursor: pointer;
   will-change: transform, opacity;
-  transition: box-shadow 0.22s ease, border-color 0.22s ease, top 0.3s ease;
+  transition: box-shadow 0.22s ease, border-color 0.22s ease;
 }
 
-/* When sub-wheel intersects, main cards gently elevate to make room for intersecting sub-cards */
+/* Stable upper position when parent packages exist in this list */
 .vel-coverflow-stage.has-sub-tier .vel-coverflow-card {
   top: 40%;
 }

@@ -455,7 +455,7 @@ const visibleCards = computed(() => {
         transform: `translate3d(calc(-50% + ${tx}px), -50%, ${tz}px) rotateY(${rotY}deg)`,
         opacity: opacity,
         zIndex: zIndex,
-        pointerEvents: absDist < 2.5 ? 'auto' : 'none'
+        pointerEvents: 'auto'
       }
     });
   }
@@ -560,8 +560,7 @@ function smoothAnimateToIndex(targetIdx, duration = 340, easing = (t) => 1 - Mat
 }
 
 function selectCard(idx) {
-  if (isSpinning.value) return;
-  smoothAnimateToIndex(idx, 300);
+  smoothAnimateToIndex(idx, 320);
 }
 
 // Sub-Wheel Animation & Drag Handlers
@@ -616,9 +615,11 @@ function selectSubCard(idx) {
   smoothAnimateSubToIndex(idx, 300);
 }
 
+let hasSubMoved = false;
 function startSubDrag(e) {
   if (subAnimFrameId) cancelAnimationFrame(subAnimFrameId);
   isSubDragging.value = true;
+  hasSubMoved = false;
   subStartX = e.clientX;
   subDragStartIndex = subAnimatedIndex.value;
   subDragStartTime = performance.now();
@@ -630,28 +631,33 @@ function startSubDrag(e) {
 function onSubDragMove(e) {
   if (!isSubDragging.value) return;
   const dx = e.clientX - subStartX;
+  if (Math.abs(dx) > 4) hasSubMoved = true;
   const sensitivity = window.innerWidth < 640 ? 0.01 : 0.008;
   subAnimatedIndex.value = subDragStartIndex - dx * sensitivity;
 }
 
 function endSubDrag() {
   if (!isSubDragging.value) return;
+  isSubDragging.value = false;
   window.removeEventListener('mousemove', onSubDragMove);
   window.removeEventListener('mouseup', endSubDrag);
 
-  const dt = Math.max(16, performance.now() - subDragStartTime);
-  const deltaUnits = subAnimatedIndex.value - subDragStartIndex;
-  const velocity = deltaUnits / dt;
-  const momentum = velocity * 120;
-  const target = Math.round(subAnimatedIndex.value + momentum);
-
-  smoothAnimateSubToIndex(target, 280);
+  if (hasSubMoved) {
+    const dt = Math.max(16, performance.now() - subDragStartTime);
+    const deltaUnits = subAnimatedIndex.value - subDragStartIndex;
+    const velocity = deltaUnits / dt;
+    const momentum = velocity * 120;
+    const target = Math.round(subAnimatedIndex.value + momentum);
+    smoothAnimateSubToIndex(target, 280);
+  }
 }
 
+let hasSubTouchMoved = false;
 function startSubTouch(e) {
   if (!e.touches[0]) return;
   if (subAnimFrameId) cancelAnimationFrame(subAnimFrameId);
   isSubDragging.value = true;
+  hasSubTouchMoved = false;
   subStartX = e.touches[0].clientX;
   subDragStartIndex = subAnimatedIndex.value;
   subDragStartTime = performance.now();
@@ -663,21 +669,24 @@ function startSubTouch(e) {
 function onSubTouchMove(e) {
   if (!isSubDragging.value || !e.touches[0]) return;
   const dx = e.touches[0].clientX - subStartX;
+  if (Math.abs(dx) > 4) hasSubTouchMoved = true;
   subAnimatedIndex.value = subDragStartIndex - dx * 0.01;
 }
 
 function endSubTouch() {
   if (!isSubDragging.value) return;
+  isSubDragging.value = false;
   window.removeEventListener('touchmove', onSubTouchMove);
   window.removeEventListener('touchend', endSubTouch);
 
-  const dt = Math.max(16, performance.now() - subDragStartTime);
-  const deltaUnits = subAnimatedIndex.value - subDragStartIndex;
-  const velocity = deltaUnits / dt;
-  const momentum = velocity * 120;
-  const target = Math.round(subAnimatedIndex.value + momentum);
-
-  smoothAnimateSubToIndex(target, 280);
+  if (hasSubTouchMoved) {
+    const dt = Math.max(16, performance.now() - subDragStartTime);
+    const deltaUnits = subAnimatedIndex.value - subDragStartIndex;
+    const velocity = deltaUnits / dt;
+    const momentum = velocity * 120;
+    const target = Math.round(subAnimatedIndex.value + momentum);
+    smoothAnimateSubToIndex(target, 280);
+  }
 }
 
 function handleSubWheelScroll(e) {
@@ -686,11 +695,12 @@ function handleSubWheelScroll(e) {
   smoothAnimateSubToIndex(target, 240);
 }
 
-// Main Wheel Drag & Touch with Smooth Release
+// Main Wheel Drag & Touch with Instant Click Handling
+let hasDragMoved = false;
 function startDrag(e) {
-  if (isSpinning.value) return;
   if (animFrameId) cancelAnimationFrame(animFrameId);
   isDragging.value = true;
+  hasDragMoved = false;
   startX = e.clientX;
   dragStartIndex = animatedIndex.value;
   dragStartTime = performance.now();
@@ -702,28 +712,33 @@ function startDrag(e) {
 function onDragMove(e) {
   if (!isDragging.value) return;
   const dx = e.clientX - startX;
+  if (Math.abs(dx) > 4) hasDragMoved = true;
   const sensitivity = window.innerWidth < 640 ? 0.009 : 0.007;
   animatedIndex.value = dragStartIndex - dx * sensitivity;
 }
 
 function endDrag() {
   if (!isDragging.value) return;
+  isDragging.value = false;
   window.removeEventListener('mousemove', onDragMove);
   window.removeEventListener('mouseup', endDrag);
 
-  const dt = Math.max(16, performance.now() - dragStartTime);
-  const deltaUnits = animatedIndex.value - dragStartIndex;
-  const velocity = deltaUnits / dt;
-  const momentum = velocity * 130;
-  const target = Math.round(animatedIndex.value + momentum);
-
-  smoothAnimateToIndex(target, 320);
+  if (hasDragMoved) {
+    const dt = Math.max(16, performance.now() - dragStartTime);
+    const deltaUnits = animatedIndex.value - dragStartIndex;
+    const velocity = deltaUnits / dt;
+    const momentum = velocity * 130;
+    const target = Math.round(animatedIndex.value + momentum);
+    smoothAnimateToIndex(target, 320);
+  }
 }
 
+let hasTouchMoved = false;
 function startTouch(e) {
-  if (isSpinning.value || !e.touches[0]) return;
+  if (!e.touches[0]) return;
   if (animFrameId) cancelAnimationFrame(animFrameId);
   isDragging.value = true;
+  hasTouchMoved = false;
   startX = e.touches[0].clientX;
   dragStartIndex = animatedIndex.value;
   dragStartTime = performance.now();
@@ -735,21 +750,24 @@ function startTouch(e) {
 function onTouchMove(e) {
   if (!isDragging.value || !e.touches[0]) return;
   const dx = e.touches[0].clientX - startX;
+  if (Math.abs(dx) > 4) hasTouchMoved = true;
   animatedIndex.value = dragStartIndex - dx * 0.0095;
 }
 
 function endTouch() {
   if (!isDragging.value) return;
+  isDragging.value = false;
   window.removeEventListener('touchmove', onTouchMove);
   window.removeEventListener('touchend', endTouch);
 
-  const dt = Math.max(16, performance.now() - dragStartTime);
-  const deltaUnits = animatedIndex.value - dragStartIndex;
-  const velocity = deltaUnits / dt;
-  const momentum = velocity * 130;
-  const target = Math.round(animatedIndex.value + momentum);
-
-  smoothAnimateToIndex(target, 320);
+  if (hasTouchMoved) {
+    const dt = Math.max(16, performance.now() - dragStartTime);
+    const deltaUnits = animatedIndex.value - dragStartIndex;
+    const velocity = deltaUnits / dt;
+    const momentum = velocity * 130;
+    const target = Math.round(animatedIndex.value + momentum);
+    smoothAnimateToIndex(target, 320);
+  }
 }
 
 function handleWheelScroll(e) {

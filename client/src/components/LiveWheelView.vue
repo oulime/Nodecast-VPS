@@ -57,8 +57,8 @@
       <!-- 2. Sub-Wheel: Cleanly positioned UNDER the main cards -->
       <Transition name="vel-sub-intersect" mode="out-in">
         <div
-          v-if="activePackage && activePackage.is_parent && childPackages.length > 0"
-          :key="'sub-intersect-' + activePackage.id"
+          v-if="settledPackage && settledPackage.is_parent && childPackages.length > 0"
+          :key="'sub-intersect-' + settledPackage.id"
           class="vel-sub-intersect-tier absolute bottom-1.5 left-0 right-0 z-30 flex items-center justify-center pointer-events-none"
         >
           <div
@@ -118,6 +118,7 @@ const catalog = useCatalogStore();
 // Main Wheel State
 const currentIndex = ref(0);
 const animatedIndex = ref(0);
+const settledPackageIndex = ref(0);
 const isDragging = ref(false);
 const isSpinning = ref(false);
 const isTicking = ref(false);
@@ -125,29 +126,33 @@ const wheelWrapperRef = ref(null);
 
 let startX = 0;
 let dragStartIndex = 0;
+let dragStartTime = 0;
 let animFrameId = null;
 
 // Sub-Wheel State
 const subCurrentIndex = ref(0);
 const subAnimatedIndex = ref(0);
+const settledSubIndex = ref(0);
 const isSubDragging = ref(false);
 let subStartX = 0;
 let subDragStartIndex = 0;
+let subDragStartTime = 0;
 let subAnimFrameId = null;
 
 const totalItems = computed(() => Math.max(1, props.packages.length));
 
-const activePackage = computed(() => {
+// Currently settled/locked main package (only updates when wheel has completely stopped)
+const settledPackage = computed(() => {
   if (props.packages.length === 0) return null;
-  const idx = ((Math.round(animatedIndex.value) % totalItems.value) + totalItems.value) % totalItems.value;
+  const idx = ((settledPackageIndex.value % totalItems.value) + totalItems.value) % totalItems.value;
   return props.packages[idx] || props.packages[0];
 });
 
 const childPackages = computed(() => {
-  if (!activePackage.value || !activePackage.value.is_parent) return [];
+  if (!settledPackage.value || !settledPackage.value.is_parent) return [];
   const childIds = new Set(
-    Array.isArray(activePackage.value.child_package_ids)
-      ? activePackage.value.child_package_ids.map(String)
+    Array.isArray(settledPackage.value.child_package_ids)
+      ? settledPackage.value.child_package_ids.map(String)
       : []
   );
   return catalog.allPackages
@@ -160,18 +165,20 @@ const childPackages = computed(() => {
 
 const totalSubItems = computed(() => Math.max(1, childPackages.value.length));
 
-const activeSubPackage = computed(() => {
-  if (!activePackage.value || !activePackage.value.is_parent || childPackages.value.length === 0) return null;
-  const subIdx = ((Math.round(subAnimatedIndex.value) % totalSubItems.value) + totalSubItems.value) % totalSubItems.value;
+// Currently settled sub package
+const settledSubPackage = computed(() => {
+  if (!settledPackage.value || !settledPackage.value.is_parent || childPackages.value.length === 0) return null;
+  const subIdx = ((settledSubIndex.value % totalSubItems.value) + totalSubItems.value) % totalSubItems.value;
   return childPackages.value[subIdx] || childPackages.value[0];
 });
 
+// Final Selected Package to load: ONLY emitted when wheel completely stops!
 const currentSelectedPackage = computed(() => {
-  if (!activePackage.value) return null;
-  if (activePackage.value.is_parent) {
-    return activeSubPackage.value;
+  if (!settledPackage.value) return null;
+  if (settledPackage.value.is_parent) {
+    return settledSubPackage.value;
   }
-  return activePackage.value;
+  return settledPackage.value;
 });
 
 // Dynamic Brand Adaptive Theming
@@ -371,7 +378,7 @@ function extractColorFromImage(imageUrl) {
 }
 
 const rawTheme = computed(() => {
-  const pkg = activePackage.value;
+  const pkg = settledPackage.value;
   const name = pkg ? (pkg.display_name || pkg.name || '') : '';
   const brand = getBrandThemeByName(name);
 
@@ -399,16 +406,12 @@ watch(rawTheme, (t) => {
   emit('theme-change', t);
 }, { immediate: true });
 
-let notifyTimer = null;
 watch(currentSelectedPackage, (pkg) => {
   if (!pkg) return;
-  if (notifyTimer) clearTimeout(notifyTimer);
-  notifyTimer = setTimeout(() => {
-    emit('select-package', pkg);
-  }, 120);
+  emit('select-package', pkg);
 }, { immediate: true });
 
-watch(activePackage, (pkg) => {
+watch(settledPackage, (pkg) => {
   extractedColor.value = null;
   if (pkg && pkg.cover_url) {
     extractColorFromImage(pkg.cover_url);
@@ -515,6 +518,7 @@ function triggerTick() {
 
 function smoothAnimateToIndex(targetIdx, duration = 340, easing = (t) => 1 - Math.pow(1 - t, 3)) {
   if (animFrameId) cancelAnimationFrame(animFrameId);
+  isSpinning.value = true;
 
   const startVal = animatedIndex.value;
   const total = totalItems.value;
@@ -543,9 +547,12 @@ function smoothAnimateToIndex(targetIdx, duration = 340, easing = (t) => 1 - Mat
     if (progress < 1) {
       animFrameId = requestAnimationFrame(loop);
     } else {
-      animatedIndex.value = ((targetVal % total) + total) % total;
-      currentIndex.value = Math.round(animatedIndex.value);
+      const finalIdx = ((Math.round(targetVal) % total) + total) % total;
+      animatedIndex.value = finalIdx;
+      currentIndex.value = finalIdx;
+      settledPackageIndex.value = finalIdx;
       isSpinning.value = false;
+      isDragging.value = false;
     }
   }
 
@@ -566,6 +573,7 @@ function smoothAnimateSubToIndex(targetIdx, duration = 300) {
   if (total <= 1) {
     subAnimatedIndex.value = 0;
     subCurrentIndex.value = 0;
+    settledSubIndex.value = 0;
     return;
   }
 
@@ -593,8 +601,11 @@ function smoothAnimateSubToIndex(targetIdx, duration = 300) {
     if (progress < 1) {
       subAnimFrameId = requestAnimationFrame(loop);
     } else {
-      subAnimatedIndex.value = ((targetVal % total) + total) % total;
-      subCurrentIndex.value = Math.round(subAnimatedIndex.value);
+      const finalIdx = ((Math.round(targetVal) % total) + total) % total;
+      subAnimatedIndex.value = finalIdx;
+      subCurrentIndex.value = finalIdx;
+      settledSubIndex.value = finalIdx;
+      isSubDragging.value = false;
     }
   }
 
@@ -610,6 +621,7 @@ function startSubDrag(e) {
   isSubDragging.value = true;
   subStartX = e.clientX;
   subDragStartIndex = subAnimatedIndex.value;
+  subDragStartTime = performance.now();
 
   window.addEventListener('mousemove', onSubDragMove);
   window.addEventListener('mouseup', endSubDrag);
@@ -624,12 +636,16 @@ function onSubDragMove(e) {
 
 function endSubDrag() {
   if (!isSubDragging.value) return;
-  isSubDragging.value = false;
   window.removeEventListener('mousemove', onSubDragMove);
   window.removeEventListener('mouseup', endSubDrag);
 
-  const snapped = Math.round(subAnimatedIndex.value);
-  smoothAnimateSubToIndex(snapped, 220);
+  const dt = Math.max(16, performance.now() - subDragStartTime);
+  const deltaUnits = subAnimatedIndex.value - subDragStartIndex;
+  const velocity = deltaUnits / dt;
+  const momentum = velocity * 120;
+  const target = Math.round(subAnimatedIndex.value + momentum);
+
+  smoothAnimateSubToIndex(target, 280);
 }
 
 function startSubTouch(e) {
@@ -638,6 +654,7 @@ function startSubTouch(e) {
   isSubDragging.value = true;
   subStartX = e.touches[0].clientX;
   subDragStartIndex = subAnimatedIndex.value;
+  subDragStartTime = performance.now();
 
   window.addEventListener('touchmove', onSubTouchMove, { passive: true });
   window.addEventListener('touchend', endSubTouch);
@@ -651,12 +668,16 @@ function onSubTouchMove(e) {
 
 function endSubTouch() {
   if (!isSubDragging.value) return;
-  isSubDragging.value = false;
   window.removeEventListener('touchmove', onSubTouchMove);
   window.removeEventListener('touchend', endSubTouch);
 
-  const snapped = Math.round(subAnimatedIndex.value);
-  smoothAnimateSubToIndex(snapped, 220);
+  const dt = Math.max(16, performance.now() - subDragStartTime);
+  const deltaUnits = subAnimatedIndex.value - subDragStartIndex;
+  const velocity = deltaUnits / dt;
+  const momentum = velocity * 120;
+  const target = Math.round(subAnimatedIndex.value + momentum);
+
+  smoothAnimateSubToIndex(target, 280);
 }
 
 function handleSubWheelScroll(e) {
@@ -665,13 +686,14 @@ function handleSubWheelScroll(e) {
   smoothAnimateSubToIndex(target, 240);
 }
 
-// Main Wheel Drag
+// Main Wheel Drag & Touch with Smooth Release
 function startDrag(e) {
   if (isSpinning.value) return;
   if (animFrameId) cancelAnimationFrame(animFrameId);
   isDragging.value = true;
   startX = e.clientX;
   dragStartIndex = animatedIndex.value;
+  dragStartTime = performance.now();
 
   window.addEventListener('mousemove', onDragMove);
   window.addEventListener('mouseup', endDrag);
@@ -686,12 +708,16 @@ function onDragMove(e) {
 
 function endDrag() {
   if (!isDragging.value) return;
-  isDragging.value = false;
   window.removeEventListener('mousemove', onDragMove);
   window.removeEventListener('mouseup', endDrag);
 
-  const snapped = Math.round(animatedIndex.value);
-  smoothAnimateToIndex(snapped, 250);
+  const dt = Math.max(16, performance.now() - dragStartTime);
+  const deltaUnits = animatedIndex.value - dragStartIndex;
+  const velocity = deltaUnits / dt;
+  const momentum = velocity * 130;
+  const target = Math.round(animatedIndex.value + momentum);
+
+  smoothAnimateToIndex(target, 320);
 }
 
 function startTouch(e) {
@@ -700,6 +726,7 @@ function startTouch(e) {
   isDragging.value = true;
   startX = e.touches[0].clientX;
   dragStartIndex = animatedIndex.value;
+  dragStartTime = performance.now();
 
   window.addEventListener('touchmove', onTouchMove, { passive: true });
   window.addEventListener('touchend', endTouch);
@@ -713,12 +740,16 @@ function onTouchMove(e) {
 
 function endTouch() {
   if (!isDragging.value) return;
-  isDragging.value = false;
   window.removeEventListener('touchmove', onTouchMove);
   window.removeEventListener('touchend', endTouch);
 
-  const snapped = Math.round(animatedIndex.value);
-  smoothAnimateToIndex(snapped, 250);
+  const dt = Math.max(16, performance.now() - dragStartTime);
+  const deltaUnits = animatedIndex.value - dragStartIndex;
+  const velocity = deltaUnits / dt;
+  const momentum = velocity * 130;
+  const target = Math.round(animatedIndex.value + momentum);
+
+  smoothAnimateToIndex(target, 320);
 }
 
 function handleWheelScroll(e) {
@@ -736,8 +767,8 @@ function handleKeydown(e) {
     const target = (currentIndex.value + 1 + totalItems.value) % totalItems.value;
     smoothAnimateToIndex(target, 280);
   } else if (e.key === 'Enter') {
-    if (activePackage.value && !activePackage.value.is_parent) {
-      emit('select-package', activePackage.value);
+    if (settledPackage.value && !settledPackage.value.is_parent) {
+      emit('select-package', settledPackage.value);
     }
   }
 }
@@ -747,6 +778,7 @@ onMounted(() => {
   if (props.packages.length > 0) {
     currentIndex.value = 0;
     animatedIndex.value = 0;
+    settledPackageIndex.value = 0;
   }
 });
 
@@ -768,12 +800,14 @@ watch(() => props.packages, (pkgs) => {
   if (pkgs && pkgs.length > 0) {
     currentIndex.value = 0;
     animatedIndex.value = 0;
+    settledPackageIndex.value = 0;
   }
 });
 
-watch(activePackage, () => {
+watch(settledPackage, () => {
   subCurrentIndex.value = 0;
   subAnimatedIndex.value = 0;
+  settledSubIndex.value = 0;
 });
 </script>
 

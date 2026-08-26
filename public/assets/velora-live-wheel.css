@@ -68,7 +68,7 @@ body[data-vel-top-level="live"] .main--velora {
   transition: background-image 0.4s ease;
 }
 
-/* Force Live TV channel list into a responsive 1-channel-per-row (single-column) list */
+/* Force Live TV channel list into a responsive 1-channel-per-row (single-column) list with fluid apparition */
 body[data-vel-active-tab="live"] #dynamic-list,
 body[data-vel-top-level="live"] #dynamic-list,
 #dynamic-list.item-list--live,
@@ -82,6 +82,28 @@ body[data-vel-top-level="live"] #dynamic-list,
   margin: 0 auto !important;
   padding: 0 0.5rem 3rem !important;
   box-sizing: border-box !important;
+  min-height: 420px !important;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+#dynamic-list.vel-list-fading {
+  opacity: 0.25 !important;
+  transform: translateY(6px) !important;
+  pointer-events: none !important;
+}
+
+@keyframes velChannelCardEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 body[data-vel-active-tab="live"] #dynamic-list > .vel-media-item-row,
@@ -94,6 +116,11 @@ body[data-vel-top-level="live"] #dynamic-list > .vel-media-item-row,
   display: block !important;
   box-sizing: border-box !important;
   margin: 0 !important;
+}
+
+.vel-media-item-row.vel-channel-card-enter {
+  animation: velChannelCardEnter 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
 }
 
 body[data-vel-active-tab="live"] #dynamic-list .media-item__main,
@@ -116,13 +143,14 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
 .vel-wheel-arena {
   position: relative;
   width: 100%;
-  height: 148px;
+  height: 156px;
   background: var(--theme-arena-bg, radial-gradient(circle at 50% 35%, rgba(35, 35, 45, 0.45) 0%, rgba(6, 6, 10, 0.98) 75%));
   border: 1.5px solid var(--theme-border, rgba(255, 255, 255, 0.2));
   border-radius: 1rem;
   box-shadow: inset 0 0 40px var(--theme-glow, rgba(255, 255, 255, 0.1)), 0 12px 32px rgba(0, 0, 0, 0.75);
   transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
   overflow: hidden;
+  perspective: 1200px;
 }
 
 .vel-wheel-ambient-glow {
@@ -130,11 +158,11 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
   top: 15%;
   left: 50%;
   transform: translateX(-50%);
-  width: 320px;
-  height: 100px;
+  width: 340px;
+  height: 110px;
   border-radius: 50%;
   background: radial-gradient(circle, var(--theme-glow, rgba(255, 255, 255, 0.25)) 0%, transparent 70%);
-  filter: blur(24px);
+  filter: blur(26px);
   pointer-events: none;
   transition: background 0.4s ease;
 }
@@ -145,14 +173,14 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
   top: 2px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 40;
+  z-index: 150;
   filter: drop-shadow(0 2px 8px var(--theme-glow, rgba(255, 255, 255, 0.85)));
   transition: transform 0.08s cubic-bezier(0.18, 0.89, 0.32, 1.28), filter 0.4s ease;
   pointer-events: none;
 }
 
 .vel-wheel-pointer.is-ticking {
-  transform: translateX(-50%) translateY(-2px) scale(1.15);
+  transform: translateX(-50%) translateY(-2px) scale(1.2);
 }
 
 .vel-wheel-pointer__triangle {
@@ -160,7 +188,7 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
   height: 0;
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
-  border-top: 11px solid var(--theme-primary, #ffffff);
+  border-top: 12px solid var(--theme-primary, #ffffff);
   transition: border-top-color 0.4s ease;
 }
 
@@ -173,7 +201,8 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
   bottom: 0;
   width: 100%;
   height: 100%;
-  perspective: 1000px;
+  perspective: 1200px;
+  transform-style: preserve-3d;
   cursor: grab;
   touch-action: none;
 }
@@ -187,12 +216,12 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 92px;
-  height: 106px;
+  width: 94px;
+  height: 108px;
   border-radius: 14px;
   cursor: pointer;
   will-change: transform, opacity;
-  transition: box-shadow 0.22s ease, border-color 0.22s ease;
+  transform-style: preserve-3d;
   -webkit-user-drag: none;
   user-drag: none;
 }
@@ -211,24 +240,28 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
   background: var(--theme-card-bg, linear-gradient(145deg, rgba(20, 20, 26, 0.94), rgba(8, 8, 12, 0.96)));
   border: 1.5px solid rgba(255, 255, 255, 0.12);
   border-radius: 14px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  transition: border-color 0.35s ease, box-shadow 0.35s ease, transform 0.22s ease, background 0.35s ease;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
   box-sizing: border-box;
   pointer-events: none;
+  transform-style: preserve-3d;
+}
+
+.vel-coverflow-card.is-center-card {
+  z-index: 120 !important;
 }
 
 .vel-coverflow-card.is-center-card .vel-coverflow-card__inner {
-  border-color: var(--theme-primary, #ffffff);
-  background: var(--theme-center-bg, linear-gradient(145deg, rgba(30, 30, 40, 0.98), rgba(8, 8, 12, 0.98)));
-  box-shadow: 0 0 26px var(--theme-glow, rgba(255, 255, 255, 0.45)), 0 8px 24px rgba(0, 0, 0, 0.85);
-  transform: scale(1.06);
+  border: 2px solid var(--theme-primary, #ffffff);
+  background: var(--theme-center-bg, linear-gradient(145deg, rgba(35, 35, 48, 0.98), rgba(8, 8, 12, 0.98)));
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.85), 0 0 32px var(--theme-glow, rgba(255, 255, 255, 0.55)), inset 0 1px 2px rgba(255, 255, 255, 0.4);
 }
 
 .vel-coverflow-card__logo-wrap {
-  width: 50px;
-  height: 50px;
+  width: 48px;
+  height: 48px;
   border-radius: 11px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -238,6 +271,14 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
   overflow: hidden;
   flex-shrink: 0;
   pointer-events: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.vel-coverflow-card.is-center-card .vel-coverflow-card__logo-wrap {
+  width: 52px;
+  height: 52px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5), 0 0 12px var(--theme-glow, rgba(255, 255, 255, 0.3));
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 .vel-coverflow-card__logo {
@@ -253,7 +294,7 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
 
 .vel-coverflow-card__title {
   color: #ffffff;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 850;
   line-height: 1.15;
   display: -webkit-box;
@@ -265,6 +306,12 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
   pointer-events: none;
 }
 
+.vel-coverflow-card.is-center-card .vel-coverflow-card__title {
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95);
+}
+
 /* Hide flat grid ONLY when specifically in Live view */
 body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]) #packages-view,
 body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
@@ -273,17 +320,24 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
 
 @media (max-width: 640px) {
   .vel-wheel-arena {
-    height: 124px;
+    height: 136px;
   }
   .vel-coverflow-card {
     width: 82px;
-    height: 94px;
+    height: 96px;
   }
   .vel-coverflow-card__logo-wrap {
-    width: 42px;
-    height: 42px;
+    width: 40px;
+    height: 40px;
+  }
+  .vel-coverflow-card.is-center-card .vel-coverflow-card__logo-wrap {
+    width: 44px;
+    height: 44px;
   }
   .vel-coverflow-card__title {
     font-size: 0.62rem;
+  }
+  .vel-coverflow-card.is-center-card .vel-coverflow-card__title {
+    font-size: 0.68rem;
   }
 }

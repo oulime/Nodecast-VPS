@@ -3,6 +3,9 @@
 
   // Dynamic Theme Builder based on exact logo colors
   function buildThemeFromRgb(r, g, b) {
+    r = Math.round(Math.max(0, Math.min(255, r)));
+    g = Math.round(Math.max(0, Math.min(255, g)));
+    b = Math.round(Math.max(0, Math.min(255, b)));
     const primary = `rgb(${r}, ${g}, ${b})`;
     const glow = `rgba(${r}, ${g}, ${b}, 0.65)`;
     const border = `rgba(${r}, ${g}, ${b}, 0.45)`;
@@ -12,6 +15,9 @@
     const cardBg = `linear-gradient(145deg, rgba(20, 20, 26, 0.94), rgba(8, 8, 12, 0.96))`;
 
     return {
+      r,
+      g,
+      b,
       primary,
       glow,
       subtle,
@@ -309,6 +315,9 @@
       this.hasLoadedInitialLiveChannel = false;
 
       this.currentTheme = null;
+      this.activeRgb = { r: 56, g: 189, b: 248 };
+      this.lastThemedIndex = -1;
+      this.colorAnimFrameId = null;
       this.init();
     }
 
@@ -583,6 +592,15 @@
       this.packages = list;
       this.childPackagesMap = childMap;
 
+      // Pre-extract colors in background for instant fluid transitions
+      this.packages.forEach(pkg => {
+        if (pkg.cover_url && !pkg._cachedTheme) {
+          extractColorFromImage(pkg.cover_url, (extractedTheme) => {
+            pkg._cachedTheme = extractedTheme;
+          });
+        }
+      });
+
       if (this.packages.length > 0) {
         const targetIdx = (this.settledPackageIndex >= 0 && this.settledPackageIndex < this.packages.length)
           ? this.settledPackageIndex
@@ -618,6 +636,66 @@
       }, 75);
     }
 
+    getPackageTheme(pkg) {
+      if (!pkg) return buildThemeFromRgb(56, 189, 248);
+      if (pkg._cachedTheme) return pkg._cachedTheme;
+      if (pkg.cover_url && colorCache.has(pkg.cover_url)) {
+        pkg._cachedTheme = colorCache.get(pkg.cover_url);
+        return pkg._cachedTheme;
+      }
+      return getBrandThemeByName(pkg.name);
+    }
+
+    transitionToTheme(targetTheme, duration = 380) {
+      if (!targetTheme || typeof targetTheme.r !== "number" || isNaN(targetTheme.r)) return;
+      if (this.colorAnimFrameId) cancelAnimationFrame(this.colorAnimFrameId);
+
+      if (!this.activeRgb) {
+        this.activeRgb = { r: targetTheme.r, g: targetTheme.g, b: targetTheme.b };
+        this.applyTheme(targetTheme);
+        return;
+      }
+
+      const startR = this.activeRgb.r;
+      const startG = this.activeRgb.g;
+      const startB = this.activeRgb.b;
+
+      const endR = targetTheme.r;
+      const endG = targetTheme.g;
+      const endB = targetTheme.b;
+
+      if (Math.abs(startR - endR) < 2 && Math.abs(startG - endG) < 2 && Math.abs(startB - endB) < 2) {
+        this.activeRgb = { r: endR, g: endG, b: endB };
+        this.applyTheme(targetTheme);
+        return;
+      }
+
+      const startTime = performance.now();
+
+      const colorLoop = (now) => {
+        const elapsed = now - startTime;
+        const p = Math.min(1, elapsed / duration);
+        // HTML5 smooth easeOutCubic curve
+        const eased = 1 - Math.pow(1 - p, 3);
+
+        const curR = startR + (endR - startR) * eased;
+        const curG = startG + (endG - startG) * eased;
+        const curB = startB + (endB - startB) * eased;
+
+        this.activeRgb = { r: curR, g: curG, b: curB };
+        this.applyTheme(buildThemeFromRgb(curR, curG, curB));
+
+        if (p < 1) {
+          this.colorAnimFrameId = requestAnimationFrame(colorLoop);
+        } else {
+          this.activeRgb = { r: endR, g: endG, b: endB };
+          this.applyTheme(targetTheme);
+        }
+      };
+
+      this.colorAnimFrameId = requestAnimationFrame(colorLoop);
+    }
+
     applyTheme(theme) {
       if (!theme) return;
       this.currentTheme = theme;
@@ -632,15 +710,19 @@
 
       const contentView = document.getElementById("content-view");
       if (contentView) {
-        contentView.style.setProperty("--theme-primary", theme.primary);
+        contentView.style.removeProperty("--theme-primary");
+        contentView.style.removeProperty("--theme-border");
+        contentView.style.removeProperty("--vel-primary");
+        contentView.style.removeProperty("--vel-accent-glow");
         contentView.style.setProperty("--theme-glow", theme.glow);
-        contentView.style.setProperty("--theme-border", theme.border);
       }
 
       if (document.body) {
-        document.body.style.setProperty("--theme-primary", theme.primary);
+        document.body.style.removeProperty("--theme-primary");
+        document.body.style.removeProperty("--theme-border");
+        document.body.style.removeProperty("--vel-primary");
+        document.body.style.removeProperty("--vel-accent-glow");
         document.body.style.setProperty("--theme-glow", theme.glow);
-        document.body.style.setProperty("--theme-border", theme.border);
       }
     }
 
@@ -654,13 +736,16 @@
     async onPackageSettled(pkg, options = {}) {
       if (!pkg || !this.isLiveActive()) return;
 
-      // Extract color / apply theme
-      const brandTheme = getBrandThemeByName(pkg.name);
-      this.applyTheme(brandTheme);
+      // Extract color / apply theme with fluid HTML5 transition
+      const brandTheme = this.getPackageTheme(pkg);
+      this.transitionToTheme(brandTheme, 380);
 
-      if (pkg.cover_url) {
+      if (pkg.cover_url && !pkg._cachedTheme) {
         extractColorFromImage(pkg.cover_url, (extractedTheme) => {
-          this.applyTheme(extractedTheme);
+          pkg._cachedTheme = extractedTheme;
+          if (this.getSettledPackage()?.id === pkg.id) {
+            this.transitionToTheme(extractedTheme, 360);
+          }
         });
       }
 
@@ -668,15 +753,37 @@
     }
 
     async loadPackageChannels(pkg, options = {}) {
-      if (!this.isLiveActive()) return;
-      this.isLoadingChannels = true;
-      this.showChannelLoadingSkeleton();
+      if (!this.isLiveActive() || !pkg) return;
+
+      const dynamicList = document.getElementById("dynamic-list");
+      if (dynamicList) {
+        dynamicList.classList.add("vel-list-fading");
+      }
+
+      this.currentLoadReqId = (this.currentLoadReqId || 0) + 1;
+      const reqId = this.currentLoadReqId;
 
       // Ensure content view is visible
       const contentView = document.getElementById("content-view");
       if (contentView) contentView.classList.remove("hidden");
       const packagesView = document.getElementById("packages-view");
       if (packagesView) packagesView.classList.add("hidden");
+
+      // Fast path: Instant cached channels for buttery fluidity
+      if (Array.isArray(pkg._cachedChannels) && pkg._cachedChannels.length > 0) {
+        this.allChannels = pkg._cachedChannels;
+        this.filterAndRenderChannels(options);
+        return;
+      }
+
+      this.isLoadingChannels = true;
+
+      // Only show skeleton if fetch takes longer than 130ms (prevents flicker)
+      const skeletonTimer = setTimeout(() => {
+        if (this.isLoadingChannels && reqId === this.currentLoadReqId) {
+          this.showChannelLoadingSkeleton();
+        }
+      }, 130);
 
       try {
         let raw = await fetchLiveStreamsForPkg(pkg);
@@ -711,11 +818,15 @@
           }
         });
 
+        if (reqId !== this.currentLoadReqId) return;
+
+        pkg._cachedChannels = filtered;
         this.allChannels = filtered;
         this.filterAndRenderChannels(options);
       } catch (err) {
         console.error("Failed to load package channels", err);
       } finally {
+        clearTimeout(skeletonTimer);
         this.isLoadingChannels = false;
       }
     }
@@ -760,6 +871,12 @@
 
       this.renderNextBatch();
 
+      if (dynamicList) {
+        requestAnimationFrame(() => {
+          dynamicList.classList.remove("vel-list-fading");
+        });
+      }
+
       if (options && options.isInitialLoad && this.filteredChannels.length > 0) {
         const first = this.filteredChannels[0];
         console.log("%c[Velora Live] 📺 Initial open - Preselecting & playing first channel:", "color: #38bdf8; font-weight: bold;", first);
@@ -793,6 +910,9 @@
         const row = document.createElement("div");
         row.className = `vel-media-item-row vel-channel-card-enter ${isActive ? "vel-media-item-row--active" : ""}`;
         row.dataset.streamId = streamId;
+        if (globalIdx < 20) {
+          row.style.animationDelay = `${Math.min(idx * 20, 260)}ms`;
+        }
 
         const btn = document.createElement("button");
         btn.type = "button";
@@ -953,8 +1073,9 @@
       if (total === 0 || !this.stage) return;
 
       const current = this.animatedIndex;
-      const radius = window.innerWidth < 640 ? 240 : 290;
-      const angleStep = window.innerWidth < 640 ? 20 : 17.5;
+      const isMobile = window.innerWidth < 640;
+      const radius = isMobile ? 250 : 310;
+      const angleStep = isMobile ? 22 : 18.5;
 
       let html = "";
       for (let i = 0; i < total; i++) {
@@ -971,6 +1092,11 @@
         const tz = -(1 - Math.cos(angleRad)) * radius;
         const rotY = -angleDeg;
 
+        // Enhanced 3D scale and depth: Center selected card pops forward with 1.28x size
+        const scaleFactor = Math.max(0.72, 1.28 - absDist * 0.26);
+        const forwardZ = Math.max(0, (1 - absDist / 1.5) * 48);
+        const finalTz = tz + forwardZ;
+
         const opacity = Math.max(0, 1 - absDist * 0.28);
         const zIndex = Math.round(100 - absDist * 10);
         const isCenter = absDist < 0.45;
@@ -984,7 +1110,7 @@
           <div
             class="vel-coverflow-card ${isCenter ? 'is-center-card' : ''}"
             data-index="${i}"
-            style="transform: translate3d(calc(-50% + ${tx}px), -50%, ${tz}px) rotateY(${rotY}deg); opacity: ${opacity}; z-index: ${zIndex}; pointer-events: auto;"
+            style="transform: translate3d(calc(-50% + ${tx.toFixed(2)}px), -50%, ${finalTz.toFixed(2)}px) rotateY(${rotY.toFixed(2)}deg) scale(${scaleFactor.toFixed(3)}); opacity: ${opacity.toFixed(3)}; z-index: ${zIndex}; pointer-events: auto;"
           >
             <div class="vel-coverflow-card__inner">
               <div class="vel-coverflow-card__logo-wrap">
@@ -997,6 +1123,14 @@
       }
 
       this.stage.innerHTML = html;
+
+      // Real-time fluid color transition to the nearest center package
+      const nearestIdx = ((Math.round(current) % total) + total) % total;
+      if (nearestIdx !== this.lastThemedIndex && this.packages[nearestIdx]) {
+        this.lastThemedIndex = nearestIdx;
+        const nearestPkg = this.packages[nearestIdx];
+        this.transitionToTheme(this.getPackageTheme(nearestPkg), 360);
+      }
     }
 
     smoothAnimateToIndex(targetIdx, duration = 340) {

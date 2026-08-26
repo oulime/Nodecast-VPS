@@ -54,12 +54,12 @@
         </div>
       </div>
 
-      <!-- 2. Intersecting Sub-Wheel: Snug along the bottom arc with zero empty floor space -->
+      <!-- 2. Intersecting Sub-Wheel: Floating directly in the Middle Belt of the Arena -->
       <Transition name="vel-sub-intersect" mode="out-in">
         <div
           v-if="activePackage && activePackage.is_parent && childPackages.length > 0"
           :key="'sub-intersect-' + activePackage.id"
-          class="vel-sub-intersect-tier absolute bottom-0 left-0 right-0 z-30 flex items-center justify-center pointer-events-none"
+          class="vel-sub-intersect-tier absolute top-1/2 left-0 right-0 -translate-y-1/2 z-30 flex items-center justify-center pointer-events-none"
         >
           <div
             class="vel-sub-stage-intersect pointer-events-auto"
@@ -921,16 +921,22 @@ watch(activePackage, () => {
   padding: 0 1px;
 }
 
-/* 2. Intersecting Sub-Wheel Tier: Sitting snugly at the bottom */
+/* 2. Intersecting Sub-Wheel Tier: Floating directly across the Middle Belt */
 .vel-sub-intersect-tier {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
   width: 100%;
-  height: 40px;
+  height: 42px;
+  z-index: 120;
 }
 
 .vel-sub-stage-intersect {
   position: relative;
   width: 100%;
-  height: 40px;
+  height: 42px;
   perspective: 750px;
   display: flex;
   align-items: center;
@@ -943,14 +949,14 @@ watch(activePackage, () => {
   cursor: grabbing;
 }
 
-/* Intersecting Sub-Cards: Compact horizontal badges */
+/* Intersecting Sub-Cards: Sleek floating badges across the middle belt */
 .vel-sub-card-3d {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 72px;
-  height: 34px;
-  border-radius: 10px;
+  width: 78px;
+  height: 36px;
+  border-radius: 12px;
   cursor: pointer;
   will-change: transform, opacity;
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
@@ -960,26 +966,26 @@ watch(activePackage, () => {
   position: relative;
   width: 100%;
   height: 100%;
-  padding: 2px 4px;
+  padding: 3px 5px;
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: center;
   gap: 4px;
   text-align: left;
-  background: linear-gradient(135deg, rgba(22, 12, 38, 0.94), rgba(10, 8, 20, 0.96));
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 10px;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(8px);
+  background: linear-gradient(135deg, rgba(24, 14, 42, 0.95), rgba(12, 10, 24, 0.97));
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(10px);
   transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
 }
 
 .vel-sub-card-3d.is-sub-center .vel-sub-card-3d__inner {
   border-color: var(--theme-primary, #c084fc);
-  background: linear-gradient(135deg, rgba(46, 18, 76, 0.98), rgba(16, 10, 30, 0.98));
-  box-shadow: 0 0 14px var(--theme-glow, rgba(168, 85, 247, 0.65)), 0 3px 10px rgba(0, 0, 0, 0.7);
-  transform: scale(1.05);
+  background: linear-gradient(135deg, rgba(50, 20, 80, 0.98), rgba(18, 12, 34, 0.98));
+  box-shadow: 0 0 18px var(--theme-glow, rgba(168, 85, 247, 0.7)), 0 4px 14px rgba(0, 0, 0, 0.8);
+  transform: scale(1.08);
 }
 
 .vel-sub-card-3d__logo-wrap {

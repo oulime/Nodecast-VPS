@@ -54,12 +54,12 @@
         </div>
       </div>
 
-      <!-- 2. Intersecting Sub-Wheel: Floating directly in the Middle Belt of the Arena -->
+      <!-- 2. Sub-Wheel: Cleanly positioned UNDER the main cards -->
       <Transition name="vel-sub-intersect" mode="out-in">
         <div
           v-if="activePackage && activePackage.is_parent && childPackages.length > 0"
           :key="'sub-intersect-' + activePackage.id"
-          class="vel-sub-intersect-tier absolute top-1/2 left-0 right-0 -translate-y-1/2 z-30 flex items-center justify-center pointer-events-none"
+          class="vel-sub-intersect-tier absolute bottom-1.5 left-0 right-0 z-30 flex items-center justify-center pointer-events-none"
         >
           <div
             class="vel-sub-stage-intersect pointer-events-auto"
@@ -782,11 +782,11 @@ watch(activePackage, () => {
   perspective: 1200px;
 }
 
-/* Compact Snug Arena: Zero wasted vertical or bottom space */
+/* Compact Snug Arena */
 .vel-wheel-arena {
   position: relative;
   width: 100%;
-  height: 128px;
+  height: 145px;
   background: var(--theme-arena-bg, radial-gradient(circle at 50% 35%, rgba(55, 25, 95, 0.55) 0%, rgba(10, 8, 22, 0.98) 75%));
   border: 1.5px solid var(--theme-border, rgba(168, 85, 247, 0.35));
   box-shadow: inset 0 0 35px var(--theme-glow, rgba(138, 43, 226, 0.16)), 0 10px 30px rgba(0, 0, 0, 0.65);
@@ -850,13 +850,13 @@ watch(activePackage, () => {
   cursor: grabbing;
 }
 
-/* Main Cards: Centered cleanly inside 128px arena with zero bottom gap */
+/* Main Cards: Upper deck position */
 .vel-coverflow-card {
   position: absolute;
   left: 50%;
-  top: 48%;
+  top: 36%;
   width: 86px;
-  height: 98px;
+  height: 94px;
   border-radius: 14px;
   cursor: pointer;
   will-change: transform, opacity;
@@ -921,22 +921,21 @@ watch(activePackage, () => {
   padding: 0 1px;
 }
 
-/* 2. Intersecting Sub-Wheel Tier: Floating directly across the Middle Belt */
+/* 2. Sub-Wheel Tier: Positioned cleanly UNDER the main cards */
 .vel-sub-intersect-tier {
   position: absolute;
-  top: 50%;
+  bottom: 6px;
   left: 0;
   right: 0;
-  transform: translateY(-50%);
   width: 100%;
-  height: 42px;
-  z-index: 120;
+  height: 38px;
+  z-index: 30;
 }
 
 .vel-sub-stage-intersect {
   position: relative;
   width: 100%;
-  height: 42px;
+  height: 38px;
   perspective: 750px;
   display: flex;
   align-items: center;
@@ -949,14 +948,14 @@ watch(activePackage, () => {
   cursor: grabbing;
 }
 
-/* Intersecting Sub-Cards: Sleek floating badges across the middle belt */
+/* Sub-Cards: Sleek horizontal badges under the main cards */
 .vel-sub-card-3d {
   position: absolute;
   left: 50%;
   top: 50%;
   width: 78px;
-  height: 36px;
-  border-radius: 12px;
+  height: 34px;
+  border-radius: 10px;
   cursor: pointer;
   will-change: transform, opacity;
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
@@ -966,26 +965,26 @@ watch(activePackage, () => {
   position: relative;
   width: 100%;
   height: 100%;
-  padding: 3px 5px;
+  padding: 2px 5px;
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: center;
   gap: 4px;
   text-align: left;
-  background: linear-gradient(135deg, rgba(24, 14, 42, 0.95), rgba(12, 10, 24, 0.97));
-  border: 1.5px solid rgba(255, 255, 255, 0.18);
-  border-radius: 12px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(10px);
+  background: linear-gradient(135deg, rgba(22, 12, 38, 0.95), rgba(10, 8, 20, 0.97));
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
   transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
 }
 
 .vel-sub-card-3d.is-sub-center .vel-sub-card-3d__inner {
   border-color: var(--theme-primary, #c084fc);
-  background: linear-gradient(135deg, rgba(50, 20, 80, 0.98), rgba(18, 12, 34, 0.98));
-  box-shadow: 0 0 18px var(--theme-glow, rgba(168, 85, 247, 0.7)), 0 4px 14px rgba(0, 0, 0, 0.8);
-  transform: scale(1.08);
+  background: linear-gradient(135deg, rgba(46, 18, 76, 0.98), rgba(16, 10, 30, 0.98));
+  box-shadow: 0 0 16px var(--theme-glow, rgba(168, 85, 247, 0.65)), 0 4px 12px rgba(0, 0, 0, 0.8);
+  transform: scale(1.06);
 }
 
 .vel-sub-card-3d__logo-wrap {

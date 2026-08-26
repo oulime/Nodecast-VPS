@@ -4,8 +4,8 @@
     ref="wheelWrapperRef"
     :style="themeStyle"
   >
-    <!-- Single Wheel Arena: Hosts BOTH the Main Wheel & Intersecting Sub-Wheel in the EXACT SAME space -->
-    <div class="vel-wheel-arena relative overflow-hidden rounded-3xl p-2 md:p-3 flex flex-col items-center justify-center">
+    <!-- Single Wheel Arena: Absolute Decoupled Layout (Zero Vertical Shifts) -->
+    <div class="vel-wheel-arena relative overflow-hidden rounded-3xl">
       <!-- Dynamic Brand Ambient Lighting -->
       <div class="vel-wheel-ambient-glow" aria-hidden="true"></div>
       <div class="vel-wheel-radial-track" aria-hidden="true"></div>
@@ -745,11 +745,14 @@ watch(activePackage, () => {
 
 /* Single Arena: Fixed constant height for entire wheel area */
 .vel-wheel-arena {
+  position: relative;
+  width: 100%;
   height: 165px;
   background: var(--theme-arena-bg, radial-gradient(circle at 50% 35%, rgba(55, 25, 95, 0.55) 0%, rgba(10, 8, 22, 0.98) 75%));
   border: 1.5px solid var(--theme-border, rgba(168, 85, 247, 0.35));
   box-shadow: inset 0 0 40px var(--theme-glow, rgba(138, 43, 226, 0.16)), 0 12px 35px rgba(0, 0, 0, 0.65);
   transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+  overflow: hidden;
 }
 
 .vel-wheel-ambient-glow {
@@ -804,15 +807,16 @@ watch(activePackage, () => {
   transition: border-top-color 0.4s ease;
 }
 
-/* Main 3D Arc Stage */
+/* Main 3D Arc Stage: Pinned absolutely with zero layout impact */
 .vel-coverflow-stage {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   width: 100%;
   height: 100%;
   perspective: 1000px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   cursor: grab;
   touch-action: pan-y;
 }
@@ -821,11 +825,11 @@ watch(activePackage, () => {
   cursor: grabbing;
 }
 
-/* Main Cards: Permanently fixed at top 40% with zero vertical movement */
+/* Main Cards: Permanently fixed at top 42% with zero vertical movement */
 .vel-coverflow-card {
   position: absolute;
   left: 50%;
-  top: 40%;
+  top: 42%;
   width: 92px;
   height: 106px;
   border-radius: 15px;

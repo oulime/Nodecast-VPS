@@ -737,8 +737,8 @@
     state.page.hidden = true;
     state.open = false;
     document.body.classList.remove("vel-favorites-open");
-    delete document.body.dataset.veloraReturnFavorites;
     if (andReturnHome !== false) {
+      delete document.body.dataset.veloraReturnFavorites;
       document.dispatchEvent(new CustomEvent("velora-show-home"));
     }
   }
@@ -783,7 +783,7 @@
       var target = event.target.closest("[data-bottom-nav]");
       if (!target) return;
       var action = target.getAttribute("data-bottom-nav");
-      if (action === "country" || action === "profile") return;
+      if (action === "country" || action === "profile" || action === "favorites") return;
       if (state.open) closePage(false);
     }, true);
     document.addEventListener("velora-return-favorites", function (event) {

@@ -6099,9 +6099,26 @@
 
           <div class="vel-body">
             <section id="vel-home-empty-page" class="vel-home-empty-page" aria-label="Accueil">
-              <div class="vel-home-brand" aria-label="VeloraVIP">
-                <img class="vel-home-brand__icon" src="/logos/android-chrome-192x192.png" alt="" width="52" height="52" />
-                <span class="vel-home-brand__name">Velora<span>VIP</span></span>
+              <div class="vel-home-header">
+                <div class="vel-home-brand" aria-label="VeloraVIP">
+                  <img class="vel-home-brand__icon" src="/logos/android-chrome-192x192.png" alt="" width="52" height="52" />
+                  <span class="vel-home-brand__name">Velora<span>VIP</span></span>
+                </div>
+                <div class="vel-home-header__actions">
+                  <button
+                    type="button"
+                    id="vel-home-profile-trigger"
+                    class="vel-home-profile-trigger"
+                    aria-label="Profil"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    title="Profil"
+                  >
+                    <svg class="vel-home-profile-trigger__icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-5 0-9 2.5-9 5.5V22h18v-2.5c0-3-4-5.5-9-5.5Z"/>
+                    </svg>
+                  </button>
+                </div>
               </div>
               <div id="vel-home-sections" class="vel-home-sections" aria-live="polite"></div>
               <div class="vel-home-empty-page__canvas" hidden aria-hidden="true"></div>
@@ -12428,6 +12445,105 @@ if (target.closest(".trial-offer-button")) {
         line-height: 1;
       }
 
+      .vel-home-header {
+        position: relative;
+        z-index: 30;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        margin: 0.25rem 0 0.85rem;
+        padding: 0 max(0.75rem, env(safe-area-inset-left, 0px)) 0 max(0.75rem, env(safe-area-inset-right, 0px));
+        box-sizing: border-box;
+      }
+
+      .vel-home-header .vel-home-brand {
+        margin: 0;
+        padding: 0;
+      }
+
+      .vel-home-profile-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        border-radius: 9px;
+        border: 1px solid rgba(168, 85, 247, 0.35);
+        background: linear-gradient(145deg, rgba(139, 92, 246, 0.22), rgba(15, 12, 36, 0.75));
+        color: #fff;
+        cursor: pointer;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 8px rgba(139, 92, 246, 0.15);
+      }
+
+      .vel-home-profile-trigger:hover,
+      .vel-home-profile-trigger:focus-visible {
+        background: linear-gradient(135deg, rgba(168, 85, 247, 0.38), rgba(99, 102, 241, 0.32));
+        border-color: rgba(216, 180, 254, 0.8);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 14px rgba(168, 85, 247, 0.45);
+        outline: none;
+        transform: none;
+      }
+
+      .vel-home-profile-trigger.is-active {
+        background: linear-gradient(135deg, rgba(168, 85, 247, 0.45), rgba(99, 102, 241, 0.38));
+        border-color: rgba(216, 180, 254, 0.95);
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55), 0 0 16px rgba(168, 85, 247, 0.55);
+        outline: none;
+        transform: none;
+      }
+
+      .vel-home-profile-trigger:active {
+        transform: scale(0.95);
+      }
+
+      .vel-home-profile-trigger__icon {
+        width: 17px;
+        height: 17px;
+        fill: currentColor;
+        filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.4));
+      }
+
+      .vel-bottom-profile-menu {
+        position: fixed;
+        z-index: 2600;
+        top: max(3.8rem, calc(env(safe-area-inset-top, 0px) + 3.4rem));
+        right: max(0.85rem, env(safe-area-inset-right, 0px));
+        left: auto !important;
+        bottom: auto !important;
+        transform: none !important;
+        width: min(220px, calc(100vw - 24px));
+      }
+
+      .vel-bottom-nav__button--favorites .vel-bottom-nav__icon,
+      .vel-bottom-nav__icon--favorites {
+        width: 27px !important;
+        height: 27px !important;
+        color: #ff2d55 !important;
+        fill: #ff2d55 !important;
+        filter: drop-shadow(0 0 7px rgba(255, 45, 85, 0.8)) drop-shadow(0 0 14px rgba(255, 45, 85, 0.5));
+        transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease, color 0.2s ease;
+      }
+
+      .vel-bottom-nav__button--favorites:hover .vel-bottom-nav__icon,
+      .vel-bottom-nav__button--favorites:focus-visible .vel-bottom-nav__icon,
+      .vel-bottom-nav__button--favorites.is-active .vel-bottom-nav__icon {
+        color: #ff1244 !important;
+        fill: #ff1244 !important;
+        transform: scale(1.18);
+        filter: drop-shadow(0 0 10px rgba(255, 18, 68, 1)) drop-shadow(0 0 20px rgba(255, 18, 68, 0.75)) drop-shadow(0 0 32px rgba(255, 18, 68, 0.45));
+      }
+
+      .vel-bottom-nav__button--favorites.is-active .vel-bottom-nav__label {
+        color: #ff3366 !important;
+        font-weight: 750;
+        text-shadow: 0 0 10px rgba(255, 51, 102, 0.75);
+      }
+
       /* Kept only as an internal catalogue-readiness hook. */
       #vel-home-choice {
         display: none !important;
@@ -12962,6 +13078,11 @@ if (target.closest(".trial-offer-button")) {
           height: 24px;
         }
 
+        .vel-bottom-nav__button[data-bottom-nav="favorites"] .vel-bottom-nav__icon {
+          width: 25.5px !important;
+          height: 25.5px !important;
+        }
+
         .vel-bottom-nav__label {
           font-size: 9px;
         }
@@ -12995,9 +13116,9 @@ if (target.closest(".trial-offer-button")) {
         </span>
         <span class="vel-bottom-nav__label">Pays</span>
       </button>
-      <button type="button" class="vel-bottom-nav__button" data-bottom-nav="profile" aria-label="Profil">
-        <svg class="vel-bottom-nav__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-5 0-9 2.5-9 5.5V22h18v-2.5c0-3-4-5.5-9-5.5Z"/></svg>
-        <span class="vel-bottom-nav__label">Profil</span>
+      <button type="button" class="vel-bottom-nav__button vel-bottom-nav__button--favorites" data-bottom-nav="favorites" aria-label="Favoris">
+        <svg class="vel-bottom-nav__icon vel-bottom-nav__icon--favorites" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        <span class="vel-bottom-nav__label">Favoris</span>
       </button>
     </nav>
     <div id="vel-bottom-country-menu" class="vel-bottom-country-menu" role="listbox" aria-label="Choisir un pays" hidden>
@@ -13006,15 +13127,11 @@ if (target.closest(".trial-offer-button")) {
     </div>
     <div id="vel-bottom-profile-menu" class="vel-bottom-country-menu vel-bottom-profile-menu" aria-label="Menu du profil" hidden>
       <button type="button" id="vel-profile-account-open" class="vel-bottom-country-menu__option">
-        <span>Profil</span>
+        <span>Mon compte</span>
       </button>
       <button type="button" id="btn-adult-portal" class="vel-bottom-country-menu__option" aria-label="Contenu adulte +18">
         <span>Adulte +18</span>
         <img src="/logos/adult-18.svg" alt="" aria-hidden="true" width="26" height="26" />
-      </button>
-      <button type="button" id="vel-profile-favorites" class="vel-bottom-country-menu__option" hidden>
-        <span>Favoris</span>
-        <span class="vel-bottom-country-menu__check" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 21s-8.5-4.8-8.5-11.2A4.8 4.8 0 0 1 12 6.7a4.8 4.8 0 0 1 8.5 3.1C20.5 16.2 12 21 12 21Z"/></svg></span>
       </button>
       <button type="button" id="vel-profile-session" class="vel-bottom-country-menu__option">
         <span id="vel-profile-session-label">Connexion</span>
@@ -13031,11 +13148,10 @@ if (target.closest(".trial-offer-button")) {
         var bottomCountryOptions = document.getElementById("vel-bottom-country-options");
         var bottomCountryFlag = document.getElementById("vel-bottom-country-flag");
         var bottomCountryLabel = bottomCountryButton && bottomCountryButton.querySelector(".vel-bottom-nav__label");
-        var bottomProfileButton = nav.querySelector('[data-bottom-nav="profile"]');
+        var homeProfileTrigger = document.getElementById("vel-home-profile-trigger");
         var floatingSearchButton = document.getElementById("vel-floating-search");
         var bottomProfileMenu = document.getElementById("vel-bottom-profile-menu");
         var profileAdultButton = document.getElementById("btn-adult-portal");
-        var profileFavoritesButton = document.getElementById("vel-profile-favorites");
         var profileSessionButton = document.getElementById("vel-profile-session");
         var profileSessionLabel = document.getElementById("vel-profile-session-label");
 
@@ -13058,7 +13174,6 @@ if (target.closest(".trial-offer-button")) {
 
         function syncProfile() {
           var loggedIn = isLoggedIn();
-          if (profileFavoritesButton) profileFavoritesButton.hidden = !loggedIn;
           if (profileSessionLabel) profileSessionLabel.textContent = loggedIn ? "Déconnexion" : "Connexion";
           if (profileSessionButton) {
             profileSessionButton.setAttribute("aria-label", loggedIn ? "Déconnexion" : "Connexion");
@@ -13241,8 +13356,10 @@ if (target.closest(".trial-offer-button")) {
         function closeProfileMenu() {
           if (!bottomProfileMenu || bottomProfileMenu.hidden) return;
           bottomProfileMenu.hidden = true;
-          if (bottomProfileButton) bottomProfileButton.setAttribute("aria-expanded", "false");
-          restoreBottomNavActive();
+          if (homeProfileTrigger) {
+            homeProfileTrigger.setAttribute("aria-expanded", "false");
+            homeProfileTrigger.classList.remove("is-active");
+          }
         }
 
         function openCountryPicker() {
@@ -13264,12 +13381,12 @@ if (target.closest(".trial-offer-button")) {
         function openFavorites() {
           closeBottomCountryMenu();
           closeProfileMenu();
+          setActive("favorites");
           if (typeof window.veloraOpenFavoritesPage === "function") {
             window.veloraOpenFavoritesPage();
             return;
           }
           openTab("live");
-          setActive("profile");
         }
 
         function openProfile() {
@@ -13281,8 +13398,10 @@ if (target.closest(".trial-offer-button")) {
           }
           syncProfile();
           bottomProfileMenu.hidden = false;
-          if (bottomProfileButton) bottomProfileButton.setAttribute("aria-expanded", "true");
-          setActive("profile");
+          if (homeProfileTrigger) {
+            homeProfileTrigger.setAttribute("aria-expanded", "true");
+            homeProfileTrigger.classList.add("is-active");
+          }
         }
 
         function handleProfileSession() {
@@ -13323,7 +13442,7 @@ if (target.closest(".trial-offer-button")) {
           else if (action === "live" || action === "movies" || action === "series") openTab(action);
           else if (action === "country") openCountryPicker();
           else if (action === "search") openSearch();
-          else if (action === "profile") openProfile();
+          else if (action === "favorites") openFavorites();
         }
 
         nav.addEventListener("pointerdown", function (event) {
@@ -13339,12 +13458,13 @@ if (target.closest(".trial-offer-button")) {
           handleNavAction(button, event);
         }, true);
 
-        if (profileFavoritesButton) {
-          profileFavoritesButton.addEventListener("click", function () {
-            closeProfileMenu();
-            openFavorites();
+        if (homeProfileTrigger) {
+          homeProfileTrigger.addEventListener("click", function (event) {
+            event.stopPropagation();
+            openProfile();
           });
         }
+
         if (profileAdultButton) {
           profileAdultButton.addEventListener("click", function () {
             closeProfileMenu();
@@ -13385,7 +13505,7 @@ if (target.closest(".trial-offer-button")) {
             bottomProfileMenu &&
             !bottomProfileMenu.hidden &&
             !bottomProfileMenu.contains(event.target) &&
-            !(bottomProfileButton && bottomProfileButton.contains(event.target))
+            !(homeProfileTrigger && homeProfileTrigger.contains(event.target))
           ) {
             closeProfileMenu();
           }

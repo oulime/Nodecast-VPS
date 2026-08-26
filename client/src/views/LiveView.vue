@@ -1,14 +1,65 @@
 <template>
-  <div class="vel-live-container max-w-[1720px] w-full mx-auto px-3 py-2 md:px-6 xl:px-10">
-    <!-- Channel View inside Package (Clean & Optimized Replica) -->
-    <div v-if="catalog.activePackage" id="content-view">
-      <!-- Video Player (If Stream Playing) -->
-      <VideoPlayer v-if="player.currentStream" />
+  <div class="vel-live-container max-w-[1720px] w-full mx-auto px-3 py-2 md:px-6 xl:px-10 space-y-5">
+    <!-- Video Player (If Stream Playing) -->
+    <VideoPlayer v-if="player.currentStream" />
+
+    <!-- Modern Skeleton Packages Loading State -->
+    <div v-if="catalog.loadingPackages" class="grid vel-packages">
+      <div
+        v-for="i in 16"
+        :key="'skeleton-pkg-' + i"
+        class="vel-skeleton-package-card"
+      >
+        <div class="vel-skeleton-pkg-logo"></div>
+        <div class="vel-skeleton-line w-2/3 mx-auto mt-2"></div>
+      </div>
+    </div>
+
+    <!-- 3D HTML5 Wheel View for Live Packages -->
+    <LiveWheelView
+      v-else-if="catalog.visibleLivePackages.length > 0"
+      :packages="catalog.visibleLivePackages"
+      @select-package="handlePackageClick"
+    />
+
+    <!-- Modern HTML5 Empty State for Live Packages -->
+    <EmptyState
+      v-else-if="!catalog.loadingPackages && catalog.visibleLivePackages.length === 0"
+      icon="live"
+      title="Aucun bouquet TV"
+      message="Aucun bouquet de chaînes en direct n'est disponible pour ce pays. Choisissez un autre pays dans le menu en haut."
+      action-text="Changer de pays"
+      @action="openCountryPicker"
+    />
+
+    <!-- Channels List of the Selected Package (Directly Below the Picked Package) -->
+    <div v-if="catalog.activePackage" class="vel-channels-section mt-4" id="content-view">
+      <!-- Section Header Bar -->
+      <div class="flex items-center justify-between gap-3 mb-3 px-2 py-2 rounded-2xl bg-purple-950/40 border border-purple-800/30">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/80 animate-pulse"></span>
+          <h3 class="text-xs md:text-sm font-extrabold text-purple-200 uppercase tracking-wider">
+            Chaînes • {{ catalog.activePackage.display_name || catalog.activePackage.name }}
+          </h3>
+          <span v-if="!catalog.loadingChannels" class="text-xs text-purple-300/70 font-bold hidden sm:inline">
+            ({{ filteredChannels.length }})
+          </span>
+        </div>
+
+        <!-- Filter / Search input -->
+        <div v-if="catalog.channels.length > 6" class="relative">
+          <input
+            v-model="channelSearch"
+            type="text"
+            placeholder="Filtrer une chaîne..."
+            class="bg-purple-900/40 border border-purple-700/40 rounded-xl px-3 py-1 text-xs text-white placeholder-purple-300/50 focus:outline-none focus:border-purple-400 transition-colors w-40 sm:w-56"
+          />
+        </div>
+      </div>
 
       <!-- Channels List Container -->
       <div class="item-list item-list--media-ready" id="dynamic-list" data-show-more-ready="true">
-
-        <!-- Exact Old Front Live Channels Loading Animation -->
+        <!-- Live Channels Loading Animation -->
         <div v-if="catalog.loadingChannels" class="item-list item-list--media-loading item-list--media-loading-live col-span-full">
           <div class="vel-channel-loader">
             <div class="vel-channel-loader__visual">
@@ -116,66 +167,16 @@
           </div>
         </template>
 
-        <div v-else class="col-span-full text-center py-12 text-xs text-slate-500">
-          Aucune chaîne disponible dans ce bouquet.
+        <div v-else class="col-span-full text-center py-10 text-xs text-slate-500">
+          Aucune chaîne trouvée dans ce bouquet.
         </div>
       </div>
-    </div>
-
-    <!-- Bouquets Grid View -->
-    <div v-else class="space-y-4">
-      <!-- Parent Package Header Bar -->
-      <div v-if="catalog.activeParentPackage" class="vel-parent-package-bar flex items-center justify-between p-3.5 rounded-2xl bg-purple-950/60 border border-purple-700/40">
-        <div class="flex items-center gap-3">
-          <button
-            @click="catalog.closeParentPackage()"
-            type="button"
-            class="vel-parent-package-bar__back px-3 py-1.5 rounded-xl bg-purple-900/40 border border-purple-500/30 text-xs font-bold text-purple-200 hover:bg-purple-800/50 transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
-          >
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg>
-            <span>Retour</span>
-          </button>
-          <h2 class="text-sm md:text-base font-extrabold text-white">{{ catalog.activeParentPackage.display_name || catalog.activeParentPackage.name }}</h2>
-        </div>
-        <span class="vel-parent-package-bar__badge text-[10px] font-bold uppercase tracking-wider text-purple-300 px-2.5 py-1 rounded-full bg-purple-950 border border-purple-500/30">
-          {{ (catalog.activeParentPackage.child_package_ids || []).length }} bouquets
-        </span>
-      </div>
-
-      <!-- Modern Skeleton Packages Loading State -->
-      <div v-if="catalog.loadingPackages" class="grid vel-packages">
-        <div
-          v-for="i in 16"
-          :key="'skeleton-pkg-' + i"
-          class="vel-skeleton-package-card"
-        >
-          <div class="vel-skeleton-pkg-logo"></div>
-          <div class="vel-skeleton-line w-2/3 mx-auto mt-2"></div>
-        </div>
-      </div>
-
-      <!-- 3D HTML5 Casino Wheel View for Live Packages -->
-      <LiveWheelView
-        v-else-if="catalog.visibleLivePackages.length > 0"
-        :packages="catalog.visibleLivePackages"
-        @select-package="handlePackageClick"
-      />
-
-      <!-- Modern HTML5 Empty State for Live Packages -->
-      <EmptyState
-        v-else-if="!catalog.loadingPackages && catalog.visibleLivePackages.length === 0"
-        icon="live"
-        title="Aucun bouquet TV"
-        message="Aucun bouquet de chaînes en direct n'est disponible pour ce pays. Choisissez un autre pays dans le menu en haut."
-        action-text="Changer de pays"
-        @action="openCountryPicker"
-      />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useCatalogStore } from '../stores/catalogStore.js';
 import { usePlayerStore } from '../stores/playerStore.js';
 import { useFavoritesStore } from '../stores/favoritesStore.js';
@@ -206,15 +207,9 @@ const filteredChannels = computed(() => {
 });
 
 async function handlePackageClick(pkg) {
-  if (pkg.is_parent) {
-    catalog.openParentPackage(pkg);
-  } else {
-    channelSearch.value = '';
-    await catalog.openPackage(pkg);
-    if (catalog.channels.length > 0) {
-      playChannel(catalog.channels[0]);
-    }
-  }
+  if (!pkg) return;
+  channelSearch.value = '';
+  await catalog.openPackage(pkg);
 }
 
 function playChannel(ch) {
@@ -222,4 +217,21 @@ function playChannel(ch) {
   const url = `/proxy/live/${streamId}.m3u8`;
   player.playStream(ch, url);
 }
+
+// Auto-load channels for the active package if none is selected yet
+watch(
+  () => catalog.visibleLivePackages,
+  (pkgs) => {
+    if (pkgs && pkgs.length > 0 && !catalog.activePackage) {
+      const first = pkgs[0];
+      if (first.is_parent && Array.isArray(first.child_package_ids) && first.child_package_ids.length > 0) {
+        const child = catalog.allPackages.find(p => String(p.id) === String(first.child_package_ids[0]));
+        if (child) handlePackageClick(child);
+      } else {
+        handlePackageClick(first);
+      }
+    }
+  },
+  { immediate: true }
+);
 </script>

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { api } from '../api/index.js';
 import { useCatalogStore, cleanItemName, isItemHiddenByAdmin } from './catalogStore.js';
+import { usePlayerStore } from './playerStore.js';
 
 export const useVodStore = defineStore('vod', {
   state: () => ({

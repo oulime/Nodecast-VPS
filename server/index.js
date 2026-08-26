@@ -249,7 +249,11 @@ if (USE_VPS_DATA_API) {
     });
 }
 
-const publicDir = path.join(__dirname, '..', 'public');
+const clientDistDir = path.join(__dirname, '..', 'public-dist');
+const legacyPublicDir = path.join(__dirname, '..', 'public');
+const publicDir = fs.existsSync(clientDistDir) && fs.existsSync(path.join(clientDistDir, 'index.html'))
+    ? clientDistDir
+    : legacyPublicDir;
 
 app.use(express.static(publicDir, {
     index: false,
@@ -264,6 +268,10 @@ app.use(express.static(publicDir, {
         }
     }
 }));
+
+if (publicDir !== legacyPublicDir) {
+    app.use(express.static(legacyPublicDir, { index: false }));
+}
 
 // FFMPEG Configuration (optional - for transcoding support)
 // Priority: 1. System FFmpeg (better Docker DNS support), 2. ffmpeg-static npm package
@@ -448,7 +456,9 @@ app.get('/api/version', (req, res) => {
 });
 
 function sendLoginPage(req, res) {
-    res.sendFile(path.join(publicDir, 'login.html'));
+    const p = path.join(publicDir, 'login.html');
+    if (fs.existsSync(p)) return res.sendFile(p);
+    res.sendFile(path.join(legacyPublicDir, 'login.html'));
 }
 
 function sendVeloraApp(req, res) {
@@ -463,7 +473,9 @@ app.get('/login', sendLoginPage);
 
 // Backend admin iframe. express.static has index disabled, so serve it explicitly.
 app.get('/nodecast-admin/', (req, res) => {
-    res.sendFile(path.join(publicDir, 'nodecast-admin', 'index.html'));
+    const p = path.join(publicDir, 'nodecast-admin', 'index.html');
+    if (fs.existsSync(p)) return res.sendFile(p);
+    res.sendFile(path.join(legacyPublicDir, 'nodecast-admin', 'index.html'));
 });
 
 // Trial mode was removed. All viewers authenticate with username/password.

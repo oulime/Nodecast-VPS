@@ -31,9 +31,57 @@ export const api = {
   getHomeCache: () => request(`/api/velora-db/home-cache?t=${Date.now()}`),
 
   // Package Media Items (VOD Movies & Series)
-  getPackageMediaItems: (countryId, packageId, kind) => {
-    const k = kind === 'movies' ? 'vod' : kind;
-    return request(`/api/velora-db/admin/package-media-items?countryId=${encodeURIComponent(countryId)}&packageId=${encodeURIComponent(packageId)}&kind=${k}`);
+  getPackageMediaItems: async (countryId, packageId, kind, sourceId = null, categoryId = null) => {
+    const k = (kind === 'movies' || kind === 'vod') ? 'vod' : 'series';
+    let cleanSourceId = sourceId;
+    let cleanCatId = categoryId;
+
+    // Parse compound IDs like "11:movie:126" or "11:126"
+    const rawPkg = String(packageId || '').trim();
+    if (!cleanCatId && rawPkg.includes(':')) {
+      const parts = rawPkg.split(':');
+      cleanCatId = parts[parts.length - 1];
+      if (!cleanSourceId && parts.length >= 2) {
+        cleanSourceId = parts[0];
+      }
+    } else if (!cleanCatId) {
+      cleanCatId = rawPkg;
+    }
+
+    // 1. Try curated package media items first
+    try {
+      const res = await request(`/api/velora-db/admin/package-media-items?countryId=${encodeURIComponent(countryId)}&packageId=${encodeURIComponent(packageId)}&kind=${k}`);
+      if (res && Array.isArray(res.items) && res.items.length > 0) {
+        return res;
+      }
+    } catch (e) {}
+
+    // 2. Direct Xtream Proxy endpoints for Movies & Series
+    try {
+      const endpoint = k === 'vod' ? 'vod_streams' : 'series';
+      let rawItems = [];
+      if (cleanSourceId) {
+        try {
+          rawItems = await request(`/api/proxy/xtream/${encodeURIComponent(cleanSourceId)}/${endpoint}?category_id=${encodeURIComponent(cleanCatId)}`);
+        } catch (e) {}
+      }
+      if (!Array.isArray(rawItems) || rawItems.length === 0) {
+        rawItems = await request(`/api/proxy/xtream/all/${endpoint}?category_id=${encodeURIComponent(cleanCatId)}`);
+      }
+
+      const list = Array.isArray(rawItems) ? rawItems : (rawItems?.items || rawItems?.data || rawItems?.series || []);
+      return {
+        items: list.map(item => ({
+          ...item,
+          stream_id: item.stream_id || item.series_id || item.id,
+          source_id: item.source_id || cleanSourceId || 10,
+          container_extension: item.container_extension || 'mkv'
+        }))
+      };
+    } catch (err) {
+      console.warn(`[API] Proxy media fetch failed for ${k} (pkg: ${packageId})`, err);
+      return { items: [] };
+    }
   },
 
   // Channels for Live Package (Streams)

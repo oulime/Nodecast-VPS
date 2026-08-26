@@ -20,8 +20,10 @@ export const useNavStore = defineStore('nav', {
       this.isCountryModalOpen = false;
       this.isSearchOpen = false;
       
+      // Stop playback immediately on any tab / page change
+      player.stop();
+
       if (tab === 'home') {
-        player.stop();
         catalog.closePackage();
         catalog.closeParentPackage();
         vod.closeMovieDetail();
@@ -64,12 +66,14 @@ export const useNavStore = defineStore('nav', {
 
       // 3. Movie Detail page -> back to Movies catalog
       if (vod.selectedMovie) {
+        player.stop();
         vod.closeMovieDetail();
         return;
       }
 
       // 4. Series Detail page -> back to Series catalog
       if (vod.selectedSeries) {
+        player.stop();
         vod.closeSeriesDetail();
         return;
       }

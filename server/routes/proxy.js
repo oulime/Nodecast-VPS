@@ -304,19 +304,36 @@ function getCategoriesFromDbForSources(sourceIds, type, includeHidden = false) {
 // Helper to get formatted streams from DB
 function getStreamsFromDb(sourceId, type, categoryId = null, includeHidden = false) {
     const db = getDb();
+    let cleanCatId = categoryId;
+    let cleanSourceId = sourceId;
+
+    if (categoryId && typeof categoryId === 'string' && categoryId.includes(':')) {
+        const parts = categoryId.split(':');
+        cleanCatId = parts[parts.length - 1];
+        if (!cleanSourceId && parts.length >= 2) {
+            cleanSourceId = parseInt(parts[0], 10);
+        }
+    }
+
     let query = `
         SELECT source_id, item_id, name, stream_icon, stream_url, added_at, rating, container_extension, year, category_id, provider_order, data
         FROM playlist_items 
-        WHERE source_id = ? AND type = ?
+        WHERE type = ?
     `;
+    const params = [type];
+
+    if (cleanSourceId && !isNaN(cleanSourceId)) {
+        query += ` AND source_id = ?`;
+        params.push(cleanSourceId);
+    }
+
     if (!includeHidden) {
         query += ` AND is_hidden = 0`;
     }
-    const params = [sourceId, type];
 
-    if (categoryId) {
+    if (cleanCatId) {
         query += ` AND category_id = ?`;
-        params.push(categoryId);
+        params.push(cleanCatId);
     }
 
     query += ` ORDER BY provider_order ASC, rowid ASC`;

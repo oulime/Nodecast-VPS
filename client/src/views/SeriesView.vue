@@ -135,15 +135,15 @@
     <!-- === 2. SERIES CATALOG GRID VIEW === -->
     <div v-else class="space-y-4 w-full min-w-0">
       <!-- Series Category / Package Pills -->
-      <div v-drag-scroll class="vel-horizontal-category-rail flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none touch-pan-x">
+      <div class="vel-horizontal-category-rail flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none touch-pan-x">
         <button
           v-for="pkg in catalog.seriesPackagesForCountry"
           :key="pkg.id"
-          @click="vod.selectSeriesPackage(pkg)"
+          @click.stop="vod.selectSeriesPackage(pkg)"
           type="button"
           :class="[
-            'px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-2 flex-shrink-0 cursor-pointer',
-            vod.selectedSeriesPackage?.id === pkg.id
+            'px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-2 flex-shrink-0 cursor-pointer select-none',
+            String(vod.selectedSeriesPackage?.id) === String(pkg.id)
               ? 'bg-purple-600 text-white shadow-lg shadow-purple-950/60 border border-purple-400'
               : 'glass-panel text-slate-300 hover:text-white hover:bg-purple-900/30'
           ]"
@@ -310,8 +310,11 @@ function playEpisode(ep) {
 }
 
 watch(() => catalog.seriesPackagesForCountry, (pkgs) => {
-  if (pkgs.length > 0 && !vod.selectedSeriesPackage) {
-    vod.selectSeriesPackage(pkgs[0]);
+  if (pkgs.length > 0) {
+    const exists = vod.selectedSeriesPackage && pkgs.some(p => String(p.id) === String(vod.selectedSeriesPackage.id));
+    if (!exists || (vod.seriesList.length === 0 && !vod.loadingSeries)) {
+      vod.selectSeriesPackage(exists ? vod.selectedSeriesPackage : pkgs[0]);
+    }
   }
 }, { immediate: true });
 
@@ -319,8 +322,12 @@ onMounted(async () => {
   if (catalog.allPackages.length === 0) {
     await catalog.loadCatalog();
   }
-  if (catalog.seriesPackagesForCountry.length > 0 && !vod.selectedSeriesPackage) {
-    vod.selectSeriesPackage(catalog.seriesPackagesForCountry[0]);
+  const pkgs = catalog.seriesPackagesForCountry;
+  if (pkgs.length > 0) {
+    const exists = vod.selectedSeriesPackage && pkgs.some(p => String(p.id) === String(vod.selectedSeriesPackage.id));
+    if (!exists || (vod.seriesList.length === 0 && !vod.loadingSeries)) {
+      vod.selectSeriesPackage(exists ? vod.selectedSeriesPackage : pkgs[0]);
+    }
   }
 });
 </script>

@@ -205,9 +205,23 @@ export const useCatalogStore = defineStore('catalog', {
 
         this.allPackages = rawPackages.map(p => {
           const pkgId = String(p.id);
+          let derivedSourceId = p.source_id;
+          let derivedCatId = p.category_id;
+          if (pkgId.includes(':')) {
+            const parts = pkgId.split(':');
+            if (parts.length === 3) {
+              derivedSourceId = derivedSourceId || parseInt(parts[0], 10);
+              derivedCatId = derivedCatId || parts[2];
+            } else if (parts.length === 2) {
+              derivedSourceId = derivedSourceId || parseInt(parts[0], 10);
+              derivedCatId = derivedCatId || parts[1];
+            }
+          }
           const explicitCover = coversMap[pkgId] || p.cover_url || null;
           return {
             ...p,
+            source_id: derivedSourceId,
+            category_id: derivedCatId || pkgId,
             cover_url: explicitCover
           };
         });

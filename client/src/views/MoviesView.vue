@@ -107,15 +107,15 @@
     <!-- === 2. MOVIES CATALOG GRID VIEW === -->
     <div v-else class="space-y-4 w-full min-w-0">
       <!-- Movie Category / Package Pills -->
-      <div v-drag-scroll class="vel-horizontal-category-rail flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none touch-pan-x">
+      <div class="vel-horizontal-category-rail flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none touch-pan-x">
         <button
           v-for="pkg in catalog.vodPackagesForCountry"
           :key="pkg.id"
-          @click="vod.selectMoviePackage(pkg)"
+          @click.stop="vod.selectMoviePackage(pkg)"
           type="button"
           :class="[
-            'px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-2 flex-shrink-0 cursor-pointer',
-            vod.selectedMoviePackage?.id === pkg.id
+            'px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-2 flex-shrink-0 cursor-pointer select-none',
+            String(vod.selectedMoviePackage?.id) === String(pkg.id)
               ? 'bg-purple-600 text-white shadow-lg shadow-purple-950/60 border border-purple-400'
               : 'glass-panel text-slate-300 hover:text-white hover:bg-purple-900/30'
           ]"
@@ -276,8 +276,11 @@ function playMovie(movie) {
 }
 
 watch(() => catalog.vodPackagesForCountry, (pkgs) => {
-  if (pkgs.length > 0 && !vod.selectedMoviePackage) {
-    vod.selectMoviePackage(pkgs[0]);
+  if (pkgs.length > 0) {
+    const exists = vod.selectedMoviePackage && pkgs.some(p => String(p.id) === String(vod.selectedMoviePackage.id));
+    if (!exists || (vod.movies.length === 0 && !vod.loadingMovies)) {
+      vod.selectMoviePackage(exists ? vod.selectedMoviePackage : pkgs[0]);
+    }
   }
 }, { immediate: true });
 
@@ -285,8 +288,12 @@ onMounted(async () => {
   if (catalog.allPackages.length === 0) {
     await catalog.loadCatalog();
   }
-  if (catalog.vodPackagesForCountry.length > 0 && !vod.selectedMoviePackage) {
-    vod.selectMoviePackage(catalog.vodPackagesForCountry[0]);
+  const pkgs = catalog.vodPackagesForCountry;
+  if (pkgs.length > 0) {
+    const exists = vod.selectedMoviePackage && pkgs.some(p => String(p.id) === String(vod.selectedMoviePackage.id));
+    if (!exists || (vod.movies.length === 0 && !vod.loadingMovies)) {
+      vod.selectMoviePackage(exists ? vod.selectedMoviePackage : pkgs[0]);
+    }
   }
 });
 </script>

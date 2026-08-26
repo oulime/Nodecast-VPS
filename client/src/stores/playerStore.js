@@ -53,22 +53,34 @@ export const usePlayerStore = defineStore('player', {
 
       try {
         const rawId = String(stream.stream_id || stream.item_id || stream.id || '');
-        const sourceId = String(stream.source_id || '10');
-        const ext = String(stream.container_extension || 'mkv').toLowerCase();
+        const sourceId = String(stream.source_id || stream.nodecast_source_id || stream.sourceId || '');
+        const ext = String(stream.container_extension || (stream.kind === 'vod' || stream.stream_type === 'movie' ? 'mkv' : 'm3u8')).toLowerCase();
         const isSeries = !!(stream.season_number || stream.seasonNumber || stream.type === 'series');
-        const streamKind = isSeries ? 'series' : (stream.container_extension || stream.kind === 'vod' ? 'movie' : 'live');
+        const streamKind = isSeries ? 'series' : (stream.container_extension || stream.kind === 'vod' || stream.stream_type === 'movie' ? 'movie' : 'live');
 
         // 1. Resolve raw upstream stream URL
         let resolvedUpstreamUrl = '';
-        try {
-          const res = await fetch(`/api/proxy/xtream/${encodeURIComponent(sourceId)}/stream/${encodeURIComponent(rawId)}/${streamKind}?container=${ext}`);
-          if (res.ok) {
-            const data = await res.json();
-            resolvedUpstreamUrl = data.url;
-          }
-        } catch (e) {}
+        if (sourceId && sourceId !== 'all') {
+          try {
+            const res = await fetch(`/api/proxy/xtream/${encodeURIComponent(sourceId)}/stream/${encodeURIComponent(rawId)}/${streamKind}?container=${ext}`);
+            if (res.ok) {
+              const data = await res.json();
+              resolvedUpstreamUrl = data.url;
+            }
+          } catch (e) {}
+        }
 
         if (!resolvedUpstreamUrl) {
+          try {
+            const res = await fetch(`/api/proxy/xtream/all/stream/${encodeURIComponent(rawId)}/${streamKind}?container=${ext}`);
+            if (res.ok) {
+              const data = await res.json();
+              resolvedUpstreamUrl = data.url;
+            }
+          } catch (e) {}
+        }
+
+        if (!resolvedUpstreamUrl && sourceId) {
           const globalId = toBase64Url(`${sourceId}:${rawId}`);
           try {
             const res = await fetch(`/api/proxy/xtream/stream/${encodeURIComponent(globalId)}/${streamKind}?container=${ext}`);
@@ -83,7 +95,7 @@ export const usePlayerStore = defineStore('player', {
           this.sourceUrl = resolvedUpstreamUrl;
           const lower = resolvedUpstreamUrl.toLowerCase();
           
-          if (streamKind === 'movie' || streamKind === 'series' || lower.includes('.mkv') || lower.includes('.avi') || lower.includes('.mp4')) {
+          if (streamKind === 'movie' || streamKind === 'series' || lower.includes('.mkv') || lower.includes('.avi') || lower.includes('.webm') || lower.includes('.mov') || lower.includes('.flv')) {
             // Start transcoding session with startAt for instant seek & full duration
             try {
               const transcodeRes = await fetch('/api/transcode/session', {
@@ -106,7 +118,9 @@ export const usePlayerStore = defineStore('player', {
                   return;
                 }
               }
-            } catch (err) {}
+            } catch (err) {
+              console.warn('[Player] VOD transcode session error, falling back', err);
+            }
 
             // Fallback
             if (lower.includes('.mkv') || lower.includes('.avi')) {
@@ -115,6 +129,7 @@ export const usePlayerStore = defineStore('player', {
               this.streamUrl = `/api/proxy/stream?url=${encodeURIComponent(resolvedUpstreamUrl)}`;
             }
           } else {
+            // Live or direct MP4/HLS
             this.streamUrl = `/api/proxy/stream?url=${encodeURIComponent(resolvedUpstreamUrl)}`;
           }
         } else {
@@ -123,6 +138,28 @@ export const usePlayerStore = defineStore('player', {
       } catch (err) {
         console.error('[Player] Failed to prepare stream', err);
         this.error = err.message || 'Erreur de flux';
+      }
+    },
+    async transcodeLive() {
+      if (!this.sourceUrl) return;
+      try {
+        const transcodeRes = await fetch('/api/transcode/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: this.sourceUrl,
+            mode: 'live'
+          })
+        });
+        if (transcodeRes.ok) {
+          const transcodeData = await transcodeRes.json();
+          this.sessionId = transcodeData.sessionId;
+          if (transcodeData.playlistUrl) {
+            this.streamUrl = transcodeData.playlistUrl;
+          }
+        }
+      } catch (err) {
+        console.warn('[Player] Live transcode error', err);
       }
     },
     async seekToTime(targetSeconds) {
@@ -192,6 +229,11 @@ export const usePlayerStore = defineStore('player', {
       }
     },
     stop() {
+      if (this.sessionId) {
+        try {
+          fetch(`/api/transcode/session/${encodeURIComponent(this.sessionId)}`, { method: 'DELETE' }).catch(() => {});
+        } catch {}
+      }
       this.currentStream = null;
       this.streamUrl = '';
       this.sourceUrl = '';

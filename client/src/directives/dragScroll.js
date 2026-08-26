@@ -30,9 +30,11 @@ export const vDragScroll = {
         const preventClick = (clickEvent) => {
           clickEvent.stopPropagation();
           clickEvent.preventDefault();
-          window.removeEventListener('click', preventClick, true);
         };
-        window.addEventListener('click', preventClick, true);
+        window.addEventListener('click', preventClick, { capture: true, once: true });
+        setTimeout(() => {
+          window.removeEventListener('click', preventClick, { capture: true });
+        }, 100);
       }
     };
 
@@ -43,11 +45,11 @@ export const vDragScroll = {
       if (!isDown) return;
       const x = e.pageX - el.offsetLeft;
       const walk = (x - startX) * 1.6;
-      if (Math.abs(walk) > 4) {
+      if (Math.abs(walk) > 12) {
         isDragging = true;
         e.preventDefault();
+        el.scrollLeft = scrollLeft - walk;
       }
-      el.scrollLeft = scrollLeft - walk;
     });
 
     // Support horizontal scrolling with vertical mouse wheel

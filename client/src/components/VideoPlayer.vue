@@ -175,12 +175,16 @@ function loadStream(url) {
     hls.on(Hls.Events.ERROR, (event, data) => {
       if (data.fatal) {
         console.warn('[Player] HLS fatal error', data);
+        if (data.details === Hls.ErrorDetails.BUFFER_ADD_CODEC_ERROR ||
+            data.details === Hls.ErrorDetails.BUFFER_INCOMPATIBLE_CODECS_ERROR ||
+            data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+          console.info('[Player] Incompatible codec detected, falling back to server transcode');
+          player.transcodeLive();
+          return;
+        }
         switch (data.type) {
           case Hls.ErrorTypes.NETWORK_ERROR:
             hls.startLoad();
-            break;
-          case Hls.ErrorTypes.MEDIA_ERROR:
-            hls.recoverMediaError();
             break;
           default:
             hls.destroy();

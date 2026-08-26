@@ -5,26 +5,11 @@
       'player-container player-container--vod relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-2xl border border-purple-900/40 select-none group',
       player.isSeries ? 'player-container--series-episode' : ''
     ]"
+    @mousemove="onMouseMove"
+    @mouseenter="onMouseMove"
+    @touchstart="onMouseMove"
   >
-    <!-- Dismiss button (Top Right ×) -->
-    <button
-      @click="player.stop()"
-      type="button"
-      id="btn-close-vod-player"
-      class="vel-player-dismiss-x"
-      title="Fermer le lecteur VOD"
-      aria-label="Fermer le lecteur VOD"
-    >
-      ×
-    </button>
-
-    <div
-      class="video-wrapper w-full h-full relative"
-      @mousemove="onMouseMove"
-      @mouseenter="onMouseMove"
-      @touchstart="onMouseMove"
-      @click="onWrapperClick"
-    >
+    <div class="video-wrapper w-full h-full relative" @click="onWrapperClick">
       <!-- Video Element -->
       <video
         ref="videoRef"
@@ -35,12 +20,11 @@
         x5-video-player-type="h5-page"
         x5-video-player-fullscreen="false"
         x5-video-orientation="landscape"
-        controlslist="nofullscreen nodownload noremoteplayback"
+        controlslist="nofullscreen nodownload noplaybackrate"
         disablepictureinpicture
-        disableremoteplayback
         preload="auto"
         crossorigin="anonymous"
-        :class="['w-full h-full', player.isStretched ? 'vel-video-format-stretched object-fill' : 'vel-video-format-original object-contain']"
+        :class="['w-full h-full', player.isStretched ? 'object-fill' : 'object-contain']"
         @playing="onPlaying"
         @pause="onPause"
         @waiting="onWaiting"
@@ -55,160 +39,197 @@
       <div
         v-if="player.isBuffering"
         id="vod-player-buffering"
-        class="player-buffering"
+        class="player-buffering absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm z-20 pointer-events-none"
         role="status"
         aria-live="polite"
       >
-        <div class="player-buffering__spinner" aria-hidden="true"></div>
-        <span class="player-buffering__label">Chargement…</span>
+        <div class="player-buffering__spinner w-10 h-10 border-3 border-purple-500/20 border-t-purple-500 rounded-full animate-spin"></div>
+        <span class="player-buffering__label text-xs font-bold text-purple-200 mt-3 tracking-wide">Chargement…</span>
       </div>
 
-      <!-- Center Controls (-10s, Big Play, +10s) with Exact SVG and classes -->
+      <!-- Top Overlay Header: Title Badge & Close Button -->
       <div
-        id="vod-center-controls"
-        class="vel-vod-center-controls"
-        :class="{ 'hidden': !showControls, 'vel-vod-center-controls--idle': !showControls }"
-        :aria-hidden="!showControls"
+        class="absolute top-3 inset-x-3 z-30 flex items-center justify-between pointer-events-none transition-opacity duration-300"
+        :class="showControls ? 'opacity-100' : 'opacity-0'"
       >
-        <!-- -10s Button -->
-        <button
-          id="vod-ctl-back-10"
-          @click.stop="skip(-10)"
-          type="button"
-          class="vel-vod-center-btn vel-vod-skip-btn"
-          aria-label="Reculer de 10 secondes"
-          title="−10 secondes"
+        <!-- Title Badge -->
+        <div
+          v-if="player.currentStream"
+          class="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-black/75 backdrop-blur-md border border-purple-800/40 text-white shadow-lg pointer-events-auto"
         >
-          <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
-            <path class="vel-vod-skip-btn__arc" d="M10 13.5A17 17 0 1 1 7.5 30"></path>
-            <path class="vel-vod-skip-btn__head" d="M14 5.5 4 12l10 6.5Z"></path>
-            <text x="24" y="27">10</text>
-          </svg>
-        </button>
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-xs font-bold truncate max-w-[260px] md:max-w-[420px]">
+            {{ player.currentStream.clean_name || player.currentStream.name }}
+          </span>
+        </div>
+        <div v-else></div>
 
-        <!-- Big Center Play / Pause -->
+        <!-- Sleek Close X Button -->
         <button
-          id="vod-center-play"
-          @click.stop="togglePlay"
+          @click.stop="player.stop()"
           type="button"
-          class="vel-vod-center-btn vel-vod-center-btn--play"
-          :aria-label="player.isPlaying ? 'Pause' : 'Play'"
+          id="btn-close-vod-player"
+          class="w-8 h-8 rounded-xl bg-black/75 hover:bg-rose-600/80 border border-purple-800/40 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer backdrop-blur-md shadow-lg pointer-events-auto active:scale-95"
+          title="Fermer le lecteur"
+          aria-label="Fermer le lecteur"
         >
-          <svg v-if="!player.isPlaying" viewBox="0 0 24 24" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>
-          <svg v-else viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-        </button>
-
-        <!-- +10s Button -->
-        <button
-          id="vod-ctl-forward-10"
-          @click.stop="skip(10)"
-          type="button"
-          class="vel-vod-center-btn vel-vod-skip-btn"
-          aria-label="Avancer de 10 secondes"
-          title="+10 secondes"
-        >
-          <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
-            <path class="vel-vod-skip-btn__arc" d="M38 13.5A17 17 0 1 0 40.5 30"></path>
-            <path class="vel-vod-skip-btn__head" d="M34 5.5 44 12l-10 6.5Z"></path>
-            <text x="24" y="27">10</text>
+          <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
         </button>
       </div>
 
-      <!-- Bottom Controls Bar -->
+      <!-- Center Quick Play/Pause Feedback Flash -->
+      <div
+        v-if="flashCenterIcon"
+        class="absolute inset-0 flex items-center justify-center z-25 pointer-events-none animate-ping-once"
+      >
+        <div class="w-14 h-14 rounded-full bg-purple-900/70 backdrop-blur-md border border-purple-400/50 flex items-center justify-center text-white shadow-2xl">
+          <svg v-if="player.isPlaying" class="w-6 h-6 fill-current" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <svg v-else class="w-6 h-6 fill-current" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        </div>
+      </div>
+
+      <!-- Bottom Controls Overlay -->
       <div
         id="vod-controls-overlay"
-        class="vod-controls-overlay"
-        :class="{ 'vod-controls-overlay--idle': !showControls }"
+        class="absolute bottom-0 inset-x-0 p-3 pt-6 bg-gradient-to-t from-black/95 via-black/60 to-transparent z-30 flex flex-col gap-2.5 transition-opacity duration-200"
+        :class="showControls ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
+        @click.stop
       >
-        <div class="vod-controls-row">
-          <!-- Level 1: Full-Width Seek Track -->
+        <!-- 1. Full-Width Interactive Seek Progress Bar -->
+        <div
+          ref="seekTrackRef"
+          class="group/track relative w-full h-1.5 hover:h-2.5 bg-white/20 hover:bg-white/30 rounded-full cursor-pointer transition-all duration-150"
+          @click.stop="onSeekClick"
+          role="slider"
+          aria-label="Seek"
+          :aria-valuenow="progressPercent"
+        >
+          <!-- Progress Fill -->
           <div
-            id="vod-ctl-seek-track"
-            ref="seekTrackRef"
-            class="vod-ctl-seek-track"
-            @click.stop="onSeekClick"
-            role="slider"
-            aria-label="Seek"
-            :aria-valuenow="progressPercent"
-          >
-            <div id="vod-ctl-seek-fill" class="vod-ctl-seek-fill" :style="{ width: progressPercent + '%' }"></div>
-            <div id="vod-ctl-seek-handle" class="vod-ctl-seek-handle" :style="{ left: progressPercent + '%' }"></div>
+            class="h-full rounded-full bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 shadow-sm shadow-pink-500/50"
+            :style="{ width: progressPercent + '%' }"
+          ></div>
+          <!-- Seek Handle Thumb -->
+          <div
+            class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-white border border-purple-400 shadow-md shadow-purple-500/60 transition-transform"
+            :style="{ left: progressPercent + '%' }"
+          ></div>
+        </div>
+
+        <!-- 2. Controls Action Row -->
+        <div class="flex items-center justify-between gap-3 w-full">
+          <!-- Left: Playback & Navigation & Time -->
+          <div class="flex items-center gap-2 sm:gap-2.5">
+            <!-- Play / Pause Button -->
+            <button
+              id="vod-ctl-play"
+              @click.stop="togglePlay"
+              type="button"
+              class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl bg-purple-900/50 hover:bg-purple-700/80 border border-purple-500/40 text-white transition-all active:scale-95 cursor-pointer shadow-md"
+              :aria-label="player.isPlaying ? 'Pause' : 'Play'"
+            >
+              <svg v-if="!player.isPlaying" class="w-4 h-4 fill-current ml-0.5" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <svg v-else class="w-4 h-4 fill-current" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+            </button>
+
+            <!-- Rewind -10s Button -->
+            <button
+              id="vod-ctl-back-10"
+              @click.stop="skip(-10)"
+              type="button"
+              class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl bg-purple-950/60 hover:bg-purple-800/60 border border-purple-800/40 text-purple-200 hover:text-white transition-all active:scale-95 cursor-pointer"
+              title="−10 secondes"
+              aria-label="−10 secondes"
+            >
+              <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                <path d="M3 3v5h5"></path>
+                <text x="12" y="15.5" font-size="8" font-weight="bold" fill="currentColor" stroke="none" text-anchor="middle">10</text>
+              </svg>
+            </button>
+
+            <!-- Forward +10s Button -->
+            <button
+              id="vod-ctl-forward-10"
+              @click.stop="skip(10)"
+              type="button"
+              class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl bg-purple-950/60 hover:bg-purple-800/60 border border-purple-800/40 text-purple-200 hover:text-white transition-all active:scale-95 cursor-pointer"
+              title="+10 secondes"
+              aria-label="+10 secondes"
+            >
+              <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                <path d="M21 3v5h-5"></path>
+                <text x="12" y="15.5" font-size="8" font-weight="bold" fill="currentColor" stroke="none" text-anchor="middle">10</text>
+              </svg>
+            </button>
+
+            <!-- Previous Episode (Series only) -->
+            <button
+              v-if="player.isSeries"
+              id="vod-ctl-prev-episode"
+              @click.stop="player.playPrevEpisode()"
+              :disabled="!player.hasPrevEpisode"
+              type="button"
+              class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl bg-purple-950/60 hover:bg-purple-800/60 border border-purple-800/40 text-purple-200 hover:text-white transition-all active:scale-95 cursor-pointer"
+              :class="{ 'opacity-30 pointer-events-none': !player.hasPrevEpisode }"
+              title="Épisode précédent"
+              aria-label="Épisode précédent"
+            >
+              <svg viewBox="0 0 24 24" class="w-4 h-4 fill-current"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+            </button>
+
+            <!-- Next Episode (Series only) -->
+            <button
+              v-if="player.isSeries"
+              id="vod-ctl-next-episode"
+              @click.stop="player.playNextEpisode()"
+              :disabled="!player.hasNextEpisode"
+              type="button"
+              class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl bg-purple-950/60 hover:bg-purple-800/60 border border-purple-800/40 text-purple-200 hover:text-white transition-all active:scale-95 cursor-pointer"
+              :class="{ 'opacity-30 pointer-events-none': !player.hasNextEpisode }"
+              title="Épisode suivant"
+              aria-label="Épisode suivant"
+            >
+              <svg viewBox="0 0 24 24" class="w-4 h-4 fill-current"><path d="M16 6h2v12h-2zm-10.5 12l8.5-6-8.5-6z"/></svg>
+            </button>
+
+            <!-- Duration Time Display -->
+            <span class="text-[11px] sm:text-xs font-bold text-slate-300 font-mono tracking-wide ml-1">
+              {{ formatTime(realCurrentTime) }} / {{ formatTime(effectiveDuration) }}
+            </span>
           </div>
 
-          <!-- Level 2 Left: Previous Episode (for series) -->
-          <button
-            v-if="player.isSeries"
-            id="vod-ctl-prev-episode"
-            @click.stop="player.playPrevEpisode()"
-            :disabled="!player.hasPrevEpisode"
-            type="button"
-            class="vod-ctl-btn vel-episode-nav-btn"
-            :class="{ 'opacity-30 pointer-events-none': !player.hasPrevEpisode }"
-            aria-label="Épisode précédent"
-            title="Épisode précédent"
-          >
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
-          </button>
+          <!-- Right: Format & Fullscreen -->
+          <div class="flex items-center gap-2">
+            <!-- Aspect Ratio Button -->
+            <button
+              id="vod-ctl-format"
+              @click.stop="toggleFormat"
+              type="button"
+              :class="[
+                'px-2.5 py-1 rounded-xl border text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer',
+                player.isStretched ? 'bg-purple-600 border-purple-400 text-white' : 'bg-purple-950/60 border-purple-700/40 text-purple-300 hover:text-white'
+              ]"
+              title="Changer le format d'image"
+            >
+              <span>{{ player.isStretched ? '16:9 Rempli' : 'Original' }}</span>
+            </button>
 
-          <!-- Level 2 Left: Play / Pause -->
-          <button
-            id="vod-ctl-play"
-            @click.stop="togglePlay"
-            type="button"
-            class="vod-ctl-btn"
-            :aria-label="player.isPlaying ? 'Pause' : 'Play'"
-          >
-            <svg v-if="!player.isPlaying" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg>
-            <svg v-else viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-          </button>
-
-          <!-- Level 2 Left: Next Episode (for series) -->
-          <button
-            v-if="player.isSeries"
-            id="vod-ctl-next-episode"
-            @click.stop="player.playNextEpisode()"
-            :disabled="!player.hasNextEpisode"
-            type="button"
-            class="vod-ctl-btn vel-episode-nav-btn"
-            :class="{ 'opacity-30 pointer-events-none': !player.hasNextEpisode }"
-            aria-label="Épisode suivant"
-            title="Épisode suivant"
-          >
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M16 6h2v12h-2zm-10.5 12l8.5-6-8.5-6z"/></svg>
-          </button>
-
-          <!-- Level 2 Left: Duration Clock (00:00 / 01:54:20) -->
-          <span id="vod-ctl-duration" class="vod-ctl-time">
-            {{ formatTime(realCurrentTime) }} / {{ formatTime(effectiveDuration) }}
-          </span>
-
-          <!-- Level 2 Right: Aspect Ratio Toggle -->
-          <button
-            id="vod-ctl-format"
-            @click.stop="toggleFormat"
-            type="button"
-            class="vod-ctl-btn vel-format-btn"
-            :class="player.isStretched ? 'is-stretched' : 'is-original'"
-            title="Changer le format d'image"
-          >
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <rect x="3" y="5" width="18" height="14" rx="2"></rect>
-              <path class="vel-format-btn__original" d="M7 8h10v8H7z" fill="currentColor" stroke="none"></path>
-              <path class="vel-format-btn__stretch" d="M4.5 8h15v8h-15z" fill="currentColor" stroke="none"></path>
-            </svg>
-          </button>
-
-          <!-- Level 2 Right: Fullscreen Button -->
-          <button
-            id="vod-ctl-fullscreen"
-            @click.stop="toggleFullscreen"
-            type="button"
-            class="vod-ctl-btn"
-            aria-label="Plein écran"
-          >
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-          </button>
+            <!-- Fullscreen Button -->
+            <button
+              id="vod-ctl-fullscreen"
+              @click.stop="toggleFullscreen"
+              type="button"
+              class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl bg-purple-900/40 hover:bg-purple-800/60 border border-purple-500/40 text-white transition-all active:scale-95 cursor-pointer"
+              aria-label="Plein écran"
+            >
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -228,9 +249,11 @@ const seekTrackRef = ref(null);
 const videoCurrentTime = ref(0);
 const videoDuration = ref(0);
 const showControls = ref(true);
+const flashCenterIcon = ref(false);
 
 let hls = null;
 let controlsTimer = null;
+let flashTimer = null;
 let lastProgressSave = 0;
 
 const effectiveDuration = computed(() => {
@@ -256,11 +279,11 @@ function formatTime(seconds) {
   const hrs = Math.floor(total / 3600);
   const mins = Math.floor((total % 3600) / 60);
   const secs = total % 60;
-  var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+  const pad = (n) => (n < 10 ? '0' : '') + n;
   if (hrs > 0) {
-    return pad(hrs) + ':' + pad(mins) + ':' + pad(secs);
+    return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
   }
-  return pad(mins) + ':' + pad(secs);
+  return `${pad(mins)}:${pad(secs)}`;
 }
 
 function onMouseMove() {
@@ -268,11 +291,21 @@ function onMouseMove() {
   if (controlsTimer) clearTimeout(controlsTimer);
   controlsTimer = setTimeout(() => {
     if (player.isPlaying) showControls.value = false;
-  }, 4000);
+  }, 3500);
 }
 
-function onWrapperClick() {
-  showControls.value = !showControls.value;
+function onWrapperClick(e) {
+  if (e.target.closest('#vod-controls-overlay') || e.target.closest('#btn-close-vod-player')) return;
+  togglePlay();
+  triggerFlashIcon();
+}
+
+function triggerFlashIcon() {
+  flashCenterIcon.value = true;
+  if (flashTimer) clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => {
+    flashCenterIcon.value = false;
+  }, 450);
 }
 
 function loadStream(url) {
@@ -286,7 +319,7 @@ function loadStream(url) {
     hls = null;
   }
 
-  if (Hls.isSupported() && url.includes('.m3u8')) {
+  if (Hls.isSupported() && (url.includes('.m3u8') || url.includes('/api/transcode/'))) {
     hls = new Hls({
       enableWorker: true,
       lowLatencyMode: false,
@@ -329,6 +362,7 @@ function loadStream(url) {
 function onPlaying() {
   player.isBuffering = false;
   player.isPlaying = true;
+  onMouseMove();
 }
 
 function onPause() {
@@ -381,15 +415,19 @@ function onError(e) {
 function togglePlay() {
   if (!videoRef.value) return;
   if (videoRef.value.paused) {
-    videoRef.value.play();
+    videoRef.value.play().catch(() => {});
+    player.isPlaying = true;
   } else {
     videoRef.value.pause();
+    player.isPlaying = false;
   }
+  onMouseMove();
 }
 
 function skip(seconds) {
   const target = Math.max(0, Math.min(effectiveDuration.value || 999999, realCurrentTime.value + seconds));
   player.seekToTime(target);
+  onMouseMove();
 }
 
 function onSeekClick(e) {
@@ -402,6 +440,7 @@ function onSeekClick(e) {
     const target = ratio * dur;
     player.seekToTime(target);
   }
+  onMouseMove();
 }
 
 function toggleFormat() {
@@ -452,6 +491,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown);
   if (controlsTimer) clearTimeout(controlsTimer);
+  if (flashTimer) clearTimeout(flashTimer);
   if (hls) {
     hls.destroy();
     hls = null;
@@ -460,221 +500,13 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.vel-vod-center-controls {
-  position: absolute;
-  inset: 0;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(2.2rem, 12vw, 7rem);
-  background: rgba(0, 0, 0, 0.25);
-  pointer-events: none;
-  opacity: 1;
-  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+@keyframes pingOnce {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1.25); opacity: 0; }
 }
 
-.vel-vod-center-controls.hidden,
-.vel-vod-center-controls.vel-vod-center-controls--idle {
-  opacity: 0 !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
-
-.vel-vod-center-btn {
-  width: clamp(3.5rem, 11vw, 5.2rem);
-  height: clamp(3.5rem, 11vw, 5.2rem);
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  border: 1.5px solid rgba(255, 255, 255, 0.25);
-  border-radius: 999px;
-  color: #fff;
-  background: rgba(15, 10, 30, 0.65);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 20px rgba(168, 85, 247, 0.25);
-  cursor: pointer;
-  pointer-events: auto;
-  opacity: 0.9;
-  transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1), background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease;
-}
-
-.vel-vod-center-btn:hover,
-.vel-vod-center-btn:focus-visible {
-  outline: none;
-  background: rgba(168, 85, 247, 0.85);
-  border-color: rgba(255, 255, 255, 0.8);
-  opacity: 1;
-  transform: scale(1.12);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7), 0 0 28px rgba(168, 85, 247, 0.6);
-}
-
-.vel-vod-center-btn:active {
-  transform: scale(0.92);
-}
-
-.vel-vod-center-btn--play {
-  width: clamp(4.5rem, 14vw, 6.5rem);
-  height: clamp(4.5rem, 14vw, 6.5rem);
-  background: rgba(168, 85, 247, 0.4);
-  border-color: rgba(168, 85, 247, 0.7);
-}
-
-.vel-vod-center-btn--play > svg {
-  width: 50% !important;
-  height: 50% !important;
-  display: block;
-  fill: currentColor;
-}
-
-.vel-vod-skip-btn svg {
-  width: 68%;
-  height: 68%;
-  overflow: visible;
-}
-
-.vel-vod-skip-btn svg path.vel-vod-skip-btn__arc {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 3.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.vel-vod-skip-btn svg path.vel-vod-skip-btn__head {
-  fill: currentColor;
-  stroke: none;
-}
-
-.vel-vod-skip-btn svg text {
-  fill: currentColor;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  font-size: 13.5px;
-  font-weight: 800;
-  text-anchor: middle;
-  dominant-baseline: middle;
-}
-
-.vod-controls-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 25;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  padding: 1.2rem calc(1.2rem + env(safe-area-inset-right, 0px)) calc(1rem + env(safe-area-inset-bottom, 0px)) calc(1.2rem + env(safe-area-inset-left, 0px));
-  background: linear-gradient(0deg, rgba(6, 8, 17, 0.98) 0%, rgba(6, 8, 17, 0.75) 60%, transparent 100%);
-  pointer-events: auto;
-  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.vod-controls-overlay.vod-controls-overlay--idle {
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
-
-.vod-controls-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  width: 100%;
-  gap: 0.45rem 0.6rem;
-}
-
-.vod-ctl-seek-track {
-  order: 1;
-  width: 100%;
-  flex: 0 0 100%;
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.25);
-  cursor: pointer;
-  margin-bottom: 0.35rem;
-  position: relative;
-  transition: height 0.16s ease;
-  touch-action: none;
-}
-
-.vod-ctl-seek-track:hover {
-  height: 9px;
-  background: rgba(255, 255, 255, 0.35);
-}
-
-.vod-ctl-seek-fill {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #8a2be2 0%, #a855f7 60%, #e50914 100%);
-  box-shadow: 0 0 12px rgba(229, 9, 20, 0.75);
-}
-
-.vod-ctl-seek-handle {
-  position: absolute;
-  top: 50%;
-  width: 15px;
-  height: 15px;
-  margin-top: -7.5px;
-  margin-left: -7.5px;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.8), 0 0 10px rgba(168, 85, 247, 0.9);
-  transform: scale(0.9);
-  transition: transform 0.15s ease;
-}
-
-.vod-ctl-seek-track:hover .vod-ctl-seek-handle {
-  transform: scale(1.3);
-}
-
-.vod-ctl-btn {
-  order: 2;
-  width: 2.2rem;
-  height: 2.2rem;
-  min-width: 2.2rem;
-  min-height: 2.2rem;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: #f8fafc;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  transition: all 0.18s ease;
-}
-
-.vod-ctl-btn:hover {
-  background: rgba(255, 255, 255, 0.25);
-  border-color: rgba(255, 255, 255, 0.5);
-  transform: scale(1.08);
-}
-
-.vod-ctl-time {
-  order: 2;
-  margin-left: 0.35rem;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: rgba(248, 250, 252, 0.95);
-  letter-spacing: 0.02em;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-#vod-ctl-format {
-  order: 3;
-  margin-left: auto;
-}
-
-#vod-ctl-fullscreen {
-  order: 4;
+.animate-ping-once {
+  animation: pingOnce 0.45s cubic-bezier(0, 0, 0.2, 1) forwards;
 }
 </style>

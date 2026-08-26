@@ -22,18 +22,23 @@ export const useVodStore = defineStore('vod', {
     async selectMoviePackage(pkg) {
       if (!pkg) return;
       const catalog = useCatalogStore();
+      const player = usePlayerStore();
+      player.stop();
       const countryId = catalog.selectedCountry?.id || 'country_france';
       this.selectedMoviePackage = pkg;
       this.selectedMovie = null;
       this.loadingMovies = true;
+      this.movies = [];
       try {
-        const res = await api.getPackageMediaItems(countryId, pkg.id, 'vod');
+        const catId = pkg.category_id || pkg.id;
+        const sourceId = pkg.source_id || null;
+        const res = await api.getPackageMediaItems(countryId, pkg.id, 'vod', sourceId, catId);
         const rawItems = res.items || [];
         this.movies = rawItems
           .filter(m => !isItemHiddenByAdmin(m.name, catalog.hiddenFilters))
           .map(m => ({
             ...m,
-            clean_name: cleanItemName(m.name)
+            clean_name: cleanItemName(m.name, catalog.channelPrefixes)
           }));
       } catch (err) {
         console.error('Failed to load movie items', err);
@@ -43,6 +48,8 @@ export const useVodStore = defineStore('vod', {
       }
     },
     async openMovieDetail(movie) {
+      const player = usePlayerStore();
+      player.stop();
       this.selectedMovie = movie;
       this.movieDetail = null;
       this.detailLoading = true;
@@ -59,6 +66,8 @@ export const useVodStore = defineStore('vod', {
       }
     },
     closeMovieDetail() {
+      const player = usePlayerStore();
+      player.stop();
       this.selectedMovie = null;
       this.movieDetail = null;
     },
@@ -67,18 +76,23 @@ export const useVodStore = defineStore('vod', {
     async selectSeriesPackage(pkg) {
       if (!pkg) return;
       const catalog = useCatalogStore();
+      const player = usePlayerStore();
+      player.stop();
       const countryId = catalog.selectedCountry?.id || 'country_france';
       this.selectedSeriesPackage = pkg;
       this.selectedSeries = null;
       this.loadingSeries = true;
+      this.seriesList = [];
       try {
-        const res = await api.getPackageMediaItems(countryId, pkg.id, 'series');
+        const catId = pkg.category_id || pkg.id;
+        const sourceId = pkg.source_id || null;
+        const res = await api.getPackageMediaItems(countryId, pkg.id, 'series', sourceId, catId);
         const rawItems = res.items || [];
         this.seriesList = rawItems
           .filter(s => !isItemHiddenByAdmin(s.name, catalog.hiddenFilters))
           .map(s => ({
             ...s,
-            clean_name: cleanItemName(s.name)
+            clean_name: cleanItemName(s.name, catalog.channelPrefixes)
           }));
       } catch (err) {
         console.error('Failed to load series items', err);
@@ -88,6 +102,8 @@ export const useVodStore = defineStore('vod', {
       }
     },
     async openSeriesDetail(series) {
+      const player = usePlayerStore();
+      player.stop();
       this.selectedSeries = series;
       this.seriesDetail = null;
       this.selectedSeason = 1;
@@ -105,6 +121,8 @@ export const useVodStore = defineStore('vod', {
       }
     },
     closeSeriesDetail() {
+      const player = usePlayerStore();
+      player.stop();
       this.selectedSeries = null;
       this.seriesDetail = null;
     }

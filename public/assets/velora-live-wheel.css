@@ -133,6 +133,29 @@ body[data-vel-top-level="live"] #dynamic-list .media-item__main,
   box-sizing: border-box !important;
 }
 
+.vel-media-item-row .media-item__thumb {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  flex: 0 0 44px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.vel-media-item-row .media-item__thumb img {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+
 /* Hide legacy grid packages-view in Live TV mode since the 3D wheel replaces it */
 body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]) #packages-view,
 body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {

@@ -51,6 +51,22 @@
     return buildThemeFromRgb(56, 189, 248);
   }
 
+  // Mixed-content safe HTTPS Image Proxy Helper for Mobile & Desktop
+  function toProxiedImageUrl(url) {
+    if (!url) return "";
+    const clean = String(url).trim().replace(/^url\(["']?/, "").replace(/["']?\)$/, "");
+    if (!clean) return "";
+    if (clean.startsWith("/proxy") || clean.startsWith("/api/proxy") || clean.startsWith("data:")) return clean;
+    if (/^https?:\/\//i.test(clean)) {
+      try {
+        const u = new URL(clean, window.location.origin);
+        if (u.origin === window.location.origin) return clean;
+      } catch (e) {}
+      return "/proxy?target=" + encodeURIComponent(clean) + "&from=" + encodeURIComponent(clean);
+    }
+    return clean;
+  }
+
   // Color Extraction Canvas Cache
   const colorCache = new Map();
   function extractColorFromImage(imageUrl, callback) {
@@ -60,9 +76,10 @@
       return;
     }
 
+    const proxiedUrl = toProxiedImageUrl(imageUrl);
     const img = new Image();
     img.crossOrigin = "anonymous";
-    img.src = imageUrl;
+    img.src = proxiedUrl;
 
     img.onload = () => {
       try {
@@ -548,7 +565,8 @@
         const titleEl = card.querySelector(".vel-package-card__title");
         const title = titleEl ? titleEl.textContent.trim() : card.getAttribute("aria-label") || `Bouquet ${i+1}`;
         const imgEl = card.querySelector(":scope > img, .vel-package-card__live-logo");
-        const cover_url = imgEl ? (imgEl.getAttribute("src") || "") : (window.__veloraCustomPackageLogos?.[id] || "");
+        const rawCover = imgEl ? (imgEl.getAttribute("src") || "") : (window.__veloraCustomPackageLogos?.[id] || "");
+        const cover_url = toProxiedImageUrl(rawCover);
         
         const apiPkg = this.cachedApiPackages.find(p => String(p.id) === id);
         const is_parent = card.classList.contains("vel-package-card--parent") || Boolean(apiPkg?.is_parent) || (Array.isArray(apiPkg?.child_package_ids) && apiPkg.child_package_ids.length > 0);
@@ -577,7 +595,7 @@
                 id: String(childApi.id),
                 name: childApi.name,
                 display_name: childApi.name,
-                cover_url: childApi.cover_url || cover_url || "",
+                cover_url: toProxiedImageUrl(childApi.cover_url || cover_url || ""),
                 source_id: childApi.source_id,
                 category_id: childApi.category_id
               });
@@ -904,7 +922,8 @@
         const globalIdx = start + idx;
         const streamId = String(ch.stream_id || ch.id || "");
         const name = String(ch.name || ch.title || "Chaîne");
-        const logo = String(ch.stream_icon || ch.logo || "").trim();
+        const rawLogo = String(ch.stream_icon || ch.logo || ch.cover || "").trim();
+        const logo = toProxiedImageUrl(rawLogo);
         const isActive = this.currentPlayingStreamId === streamId;
 
         const row = document.createElement("div");
@@ -925,10 +944,19 @@
         if (logo) {
           const img = document.createElement("img");
           img.className = "vel-image-loaded vel-image-fade is-ready";
-          img.loading = globalIdx < 12 ? "eager" : "lazy";
+          img.loading = globalIdx < 16 ? "eager" : "lazy";
+          img.decoding = "async";
           img.src = logo;
           img.alt = "";
-          img.onerror = () => { img.remove(); thumbWrap.innerHTML = `<span class="text-sm">📺</span>`; };
+          img.onerror = () => {
+            if (!img.dataset.retried && rawLogo && !rawLogo.startsWith("/api/proxy") && !rawLogo.startsWith("/proxy")) {
+              img.dataset.retried = "true";
+              img.src = `/api/proxy/image?url=${encodeURIComponent(rawLogo)}`;
+            } else {
+              img.remove();
+              thumbWrap.innerHTML = `<span class="text-sm">📺</span>`;
+            }
+          };
           thumbWrap.appendChild(img);
         } else {
           thumbWrap.innerHTML = `<span class="text-sm">📺</span>`;

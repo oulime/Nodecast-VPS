@@ -1,11 +1,15 @@
-<template>
-  <div class="vel-casino-wheel-wrapper w-full max-w-4xl mx-auto select-none" ref="wheelWrapperRef">
+﻿<template>
+  <div
+    class="vel-casino-wheel-wrapper w-full max-w-4xl mx-auto select-none"
+    ref="wheelWrapperRef"
+    :style="themeStyle"
+  >
     <!-- 1. Main Wheel Stage -->
     <div
       class="vel-wheel-arena relative overflow-hidden p-3 md:p-5 flex flex-col items-center justify-center"
       :class="activePackage && activePackage.is_parent && childPackages.length > 0 ? 'rounded-t-3xl rounded-b-xl' : 'rounded-3xl'"
     >
-      <!-- Ambient Radial Lighting -->
+      <!-- Dynamic Brand Ambient Lighting -->
       <div class="vel-wheel-ambient-glow" aria-hidden="true"></div>
       <div class="vel-wheel-radial-track" aria-hidden="true"></div>
 
@@ -55,7 +59,7 @@
       </div>
     </div>
 
-    <!-- 2. Sub-Wheel Area: Visibly Connected & Attached Directly Under the Main Parent Item -->
+    <!-- 2. Sub-Wheel Area: Connected Directly Under Active Parent Item -->
     <Transition name="vel-sub-pop" mode="out-in">
       <div
         v-if="activePackage && activePackage.is_parent && childPackages.length > 0"
@@ -181,6 +185,172 @@ const currentSelectedPackage = computed(() => {
   return activePackage.value;
 });
 
+// Dynamic Brand Theming (Netflix Red, Prime Blue, Disney Cyan, Max Purple, Canal Gold, etc.)
+const extractedColor = ref(null);
+const colorCache = new Map();
+
+function getBrandThemeByName(name = '') {
+  const n = name.toLowerCase();
+  if (n.includes('netflix')) {
+    return {
+      primary: '#E50914',
+      glow: 'rgba(229, 9, 20, 0.55)',
+      border: 'rgba(229, 9, 20, 0.45)',
+      arenaBg: 'radial-gradient(circle at 50% 35%, rgba(160, 10, 20, 0.48) 0%, rgba(14, 5, 8, 0.98) 75%)'
+    };
+  }
+  if (n.includes('prime') || n.includes('amazon')) {
+    return {
+      primary: '#00A8E1',
+      glow: 'rgba(0, 168, 225, 0.55)',
+      border: 'rgba(0, 168, 225, 0.45)',
+      arenaBg: 'radial-gradient(circle at 50% 35%, rgba(0, 110, 180, 0.45) 0%, rgba(4, 10, 22, 0.98) 75%)'
+    };
+  }
+  if (n.includes('disney') || n.includes('marvel') || n.includes('star wars')) {
+    return {
+      primary: '#00D6FE',
+      glow: 'rgba(0, 214, 254, 0.55)',
+      border: 'rgba(0, 214, 254, 0.45)',
+      arenaBg: 'radial-gradient(circle at 50% 35%, rgba(10, 60, 180, 0.45) 0%, rgba(4, 8, 24, 0.98) 75%)'
+    };
+  }
+  if (n.includes('max') || n.includes('hbo') || n.includes('warner')) {
+    return {
+      primary: '#9d4edd',
+      glow: 'rgba(157, 78, 221, 0.55)',
+      border: 'rgba(157, 78, 221, 0.45)',
+      arenaBg: 'radial-gradient(circle at 50% 35%, rgba(90, 25, 140, 0.48) 0%, rgba(14, 6, 26, 0.98) 75%)'
+    };
+  }
+  if (n.includes('canal') || n.includes('c+')) {
+    return {
+      primary: '#FFE600',
+      glow: 'rgba(255, 230, 0, 0.45)',
+      border: 'rgba(255, 230, 0, 0.35)',
+      arenaBg: 'radial-gradient(circle at 50% 35%, rgba(120, 100, 10, 0.42) 0%, rgba(12, 10, 6, 0.98) 75%)'
+    };
+  }
+  if (n.includes('apple') || n.includes('apple tv')) {
+    return {
+      primary: '#38bdf8',
+      glow: 'rgba(56, 189, 248, 0.5)',
+      border: 'rgba(56, 189, 248, 0.4)',
+      arenaBg: 'radial-gradient(circle at 50% 35%, rgba(30, 70, 100, 0.45) 0%, rgba(8, 12, 18, 0.98) 75%)'
+    };
+  }
+  if (n.includes('paramount')) {
+    return {
+      primary: '#0064FF',
+      glow: 'rgba(0, 100, 255, 0.55)',
+      border: 'rgba(0, 100, 255, 0.45)',
+      arenaBg: 'radial-gradient(circle at 50% 35%, rgba(0, 60, 160, 0.45) 0%, rgba(4, 8, 22, 0.98) 75%)'
+    };
+  }
+  if (n.includes('bein')) {
+    return {
+      primary: '#c026d3',
+      glow: 'rgba(192, 38, 211, 0.55)',
+      border: 'rgba(192, 38, 211, 0.45)',
+      arenaBg: 'radial-gradient(circle at 50% 35%, rgba(100, 15, 120, 0.48) 0%, rgba(18, 6, 22, 0.98) 75%)'
+    };
+  }
+  if (n.includes('dazn')) {
+    return {
+      primary: '#E2FF00',
+      glow: 'rgba(226, 255, 0, 0.5)',
+      border: 'rgba(226, 255, 0, 0.35)',
+      arenaBg: 'radial-gradient(circle at 50% 35%, rgba(90, 100, 10, 0.4) 0%, rgba(10, 12, 6, 0.98) 75%)'
+    };
+  }
+  if (n.includes('eurosport') || n.includes('rmc') || n.includes('tf1')) {
+    return {
+      primary: '#0284c7',
+      glow: 'rgba(2, 132, 199, 0.55)',
+      border: 'rgba(2, 132, 199, 0.45)',
+      arenaBg: 'radial-gradient(circle at 50% 35%, rgba(10, 60, 120, 0.45) 0%, rgba(6, 10, 20, 0.98) 75%)'
+    };
+  }
+  return null;
+}
+
+// Extract dominant color from image via canvas
+function extractColorFromImage(imageUrl) {
+  if (!imageUrl) return;
+  if (colorCache.has(imageUrl)) {
+    extractedColor.value = colorCache.get(imageUrl);
+    return;
+  }
+
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.src = resolveImageUrl(imageUrl);
+
+  img.onload = () => {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      canvas.width = 30;
+      canvas.height = 30;
+      ctx.drawImage(img, 0, 0, 30, 30);
+      const data = ctx.getImageData(0, 0, 30, 30).data;
+
+      let rSum = 0, gSum = 0, bSum = 0, count = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const a = data[i + 3];
+        if (a < 120) continue;
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        // Exclude near-black, near-white, or completely unsaturated grey
+        if (max - min > 24 && max > 45 && max < 240) {
+          rSum += r;
+          gSum += g;
+          bSum += b;
+          count++;
+        }
+      }
+
+      if (count > 0) {
+        const r = Math.round(rSum / count);
+        const g = Math.round(gSum / count);
+        const b = Math.round(bSum / count);
+        const hex = `rgb(${r}, ${g}, ${b})`;
+        const theme = {
+          primary: hex,
+          glow: `rgba(${r}, ${g}, ${b}, 0.55)`,
+          border: `rgba(${r}, ${g}, ${b}, 0.45)`,
+          arenaBg: `radial-gradient(circle at 50% 35%, rgba(${Math.round(r * 0.5)}, ${Math.round(g * 0.5)}, ${Math.round(b * 0.5)}, 0.45) 0%, rgba(10, 8, 22, 0.98) 75%)`
+        };
+        colorCache.set(imageUrl, theme);
+        extractedColor.value = theme;
+      }
+    } catch {
+      // Ignore canvas CORS if protected
+    }
+  };
+}
+
+const themeStyle = computed(() => {
+  const pkg = activePackage.value;
+  const name = pkg ? (pkg.display_name || pkg.name || '') : '';
+  const brand = getBrandThemeByName(name);
+
+  const theme = brand || extractedColor.value || {
+    primary: '#c084fc',
+    glow: 'rgba(168, 85, 247, 0.55)',
+    border: 'rgba(168, 85, 247, 0.35)',
+    arenaBg: 'radial-gradient(circle at 50% 35%, rgba(55, 25, 95, 0.55) 0%, rgba(10, 8, 22, 0.98) 75%)'
+  };
+
+  return {
+    '--theme-primary': theme.primary,
+    '--theme-glow': theme.glow,
+    '--theme-border': theme.border,
+    '--theme-arena-bg': theme.arenaBg
+  };
+});
+
 let notifyTimer = null;
 watch(currentSelectedPackage, (pkg) => {
   if (!pkg) return;
@@ -188,6 +358,13 @@ watch(currentSelectedPackage, (pkg) => {
   notifyTimer = setTimeout(() => {
     emit('select-package', pkg);
   }, 120);
+}, { immediate: true });
+
+watch(activePackage, (pkg) => {
+  extractedColor.value = null;
+  if (pkg && pkg.cover_url) {
+    extractColorFromImage(pkg.cover_url);
+  }
 }, { immediate: true });
 
 // Main Wheel 3D Arc (Prominent Main Wheel)
@@ -557,13 +734,13 @@ watch(activePackage, () => {
   perspective: 1200px;
 }
 
-/* 1. Main Wheel Arena (Prominent Primary Deck) */
+/* 1. Main Wheel Arena (Prominent Primary Deck with Dynamic Theme) */
 .vel-wheel-arena {
   height: 155px;
-  background: radial-gradient(circle at 50% 35%, rgba(55, 25, 95, 0.55) 0%, rgba(10, 8, 22, 0.98) 75%);
-  border: 1.5px solid rgba(168, 85, 247, 0.35);
-  box-shadow: inset 0 0 40px rgba(138, 43, 226, 0.16), 0 12px 35px rgba(0, 0, 0, 0.65);
-  transition: border-radius 0.25s ease;
+  background: var(--theme-arena-bg, radial-gradient(circle at 50% 35%, rgba(55, 25, 95, 0.55) 0%, rgba(10, 8, 22, 0.98) 75%));
+  border: 1.5px solid var(--theme-border, rgba(168, 85, 247, 0.35));
+  box-shadow: inset 0 0 40px var(--theme-glow, rgba(138, 43, 226, 0.16)), 0 12px 35px rgba(0, 0, 0, 0.65);
+  transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease, border-radius 0.25s ease;
 }
 
 .vel-wheel-ambient-glow {
@@ -574,9 +751,10 @@ watch(activePackage, () => {
   width: 300px;
   height: 110px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(168, 85, 247, 0.28) 0%, transparent 70%);
+  background: radial-gradient(circle, var(--theme-glow, rgba(168, 85, 247, 0.28)) 0%, transparent 70%);
   filter: blur(25px);
   pointer-events: none;
+  transition: background 0.4s ease;
 }
 
 .vel-wheel-radial-track {
@@ -587,9 +765,10 @@ watch(activePackage, () => {
   width: 90%;
   height: 85px;
   border-radius: 50%;
-  border: 1.5px solid rgba(168, 85, 247, 0.25);
-  box-shadow: 0 0 20px rgba(168, 85, 247, 0.15), inset 0 0 20px rgba(168, 85, 247, 0.1);
+  border: 1.5px solid var(--theme-border, rgba(168, 85, 247, 0.25));
+  box-shadow: 0 0 20px var(--theme-glow, rgba(168, 85, 247, 0.15)), inset 0 0 20px rgba(0, 0, 0, 0.2);
   pointer-events: none;
+  transition: border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
 /* Center Pointer Ticker */
@@ -599,8 +778,8 @@ watch(activePackage, () => {
   left: 50%;
   transform: translateX(-50%);
   z-index: 40;
-  filter: drop-shadow(0 2px 6px rgba(192, 132, 252, 0.9));
-  transition: transform 0.08s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+  filter: drop-shadow(0 2px 6px var(--theme-glow, rgba(192, 132, 252, 0.9)));
+  transition: transform 0.08s cubic-bezier(0.18, 0.89, 0.32, 1.28), filter 0.4s ease;
 }
 
 .vel-wheel-pointer.is-ticking {
@@ -612,7 +791,8 @@ watch(activePackage, () => {
   height: 0;
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
-  border-top: 11px solid #c084fc;
+  border-top: 11px solid var(--theme-primary, #c084fc);
+  transition: border-top-color 0.4s ease;
 }
 
 /* 3D Arc Stage */
@@ -657,16 +837,17 @@ watch(activePackage, () => {
   gap: 5px;
   text-align: center;
   background: linear-gradient(145deg, rgba(30, 18, 56, 0.94), rgba(12, 10, 24, 0.96));
-  border: 1.5px solid rgba(168, 85, 247, 0.3);
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(8px);
+  transition: border-color 0.35s ease, box-shadow 0.35s ease;
 }
 
 .vel-coverflow-card.is-center-card .vel-coverflow-card__inner {
-  border-color: #c084fc;
-  background: linear-gradient(145deg, rgba(60, 22, 105, 0.98), rgba(20, 12, 40, 0.98));
-  box-shadow: 0 0 24px rgba(168, 85, 247, 0.6), 0 8px 22px rgba(0, 0, 0, 0.7);
+  border-color: var(--theme-primary, #c084fc);
+  background: linear-gradient(145deg, rgba(45, 20, 80, 0.98), rgba(14, 10, 28, 0.98));
+  box-shadow: 0 0 24px var(--theme-glow, rgba(168, 85, 247, 0.6)), 0 8px 22px rgba(0, 0, 0, 0.7);
 }
 
 .vel-coverflow-card__logo-wrap {
@@ -705,10 +886,11 @@ watch(activePackage, () => {
 /* 2. Sub-Wheel Attached Tray (Visibly Attached Extension of Parent Card) */
 .vel-sub-wheel-attached-tray {
   height: 98px;
-  background: linear-gradient(180deg, rgba(32, 14, 56, 0.95) 0%, rgba(10, 8, 20, 0.98) 100%);
-  border: 1.5px solid rgba(192, 132, 252, 0.35);
+  background: linear-gradient(180deg, rgba(24, 12, 44, 0.95) 0%, rgba(10, 8, 20, 0.98) 100%);
+  border: 1.5px solid var(--theme-border, rgba(192, 132, 252, 0.35));
   border-top: none;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.65), inset 0 6px 20px rgba(168, 85, 247, 0.12);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.65), inset 0 6px 20px var(--theme-glow, rgba(168, 85, 247, 0.12));
+  transition: border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
 .vel-sub-connector-notch {
@@ -719,9 +901,10 @@ watch(activePackage, () => {
   width: 44px;
   height: 4px;
   border-radius: 0 0 6px 6px;
-  background: #c084fc;
-  box-shadow: 0 0 10px #c084fc;
+  background: var(--theme-primary, #c084fc);
+  box-shadow: 0 0 10px var(--theme-primary, #c084fc);
   z-index: 30;
+  transition: background 0.4s ease, box-shadow 0.4s ease;
 }
 
 .vel-sub-ambient-glow {
@@ -732,9 +915,10 @@ watch(activePackage, () => {
   width: 180px;
   height: 60px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, transparent 70%);
+  background: radial-gradient(circle, var(--theme-glow, rgba(168, 85, 247, 0.2)) 0%, transparent 70%);
   filter: blur(18px);
   pointer-events: none;
+  transition: background 0.4s ease;
 }
 
 .vel-sub-stage {
@@ -778,16 +962,17 @@ watch(activePackage, () => {
   gap: 2px;
   text-align: center;
   background: linear-gradient(145deg, rgba(26, 16, 48, 0.92), rgba(10, 8, 20, 0.95));
-  border: 1px solid rgba(168, 85, 247, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(6px);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .vel-sub-card-3d.is-sub-center .vel-sub-card-3d__inner {
-  border-color: #c084fc;
-  background: linear-gradient(145deg, rgba(55, 20, 95, 0.96), rgba(18, 10, 36, 0.98));
-  box-shadow: 0 0 14px rgba(168, 85, 247, 0.5), 0 4px 12px rgba(0, 0, 0, 0.55);
+  border-color: var(--theme-primary, #c084fc);
+  background: linear-gradient(145deg, rgba(40, 18, 70, 0.96), rgba(14, 10, 26, 0.98));
+  box-shadow: 0 0 14px var(--theme-glow, rgba(168, 85, 247, 0.5)), 0 4px 12px rgba(0, 0, 0, 0.55);
 }
 
 .vel-sub-card-3d__logo-wrap {

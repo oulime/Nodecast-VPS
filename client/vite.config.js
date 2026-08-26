@@ -13,12 +13,12 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: process.env.VITE_API_TARGET || 'http://localhost:3000',
+        target: process.env.VITE_API_TARGET || 'https://nodecast.veloravip.net',
         changeOrigin: true,
         secure: false
       },
       '/proxy': {
-        target: process.env.VITE_API_TARGET || 'http://localhost:3000',
+        target: process.env.VITE_API_TARGET || 'https://nodecast.veloravip.net',
         changeOrigin: true,
         secure: false
       }

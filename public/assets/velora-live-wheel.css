@@ -50,10 +50,22 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active) #vel-packages-sectio
   display: none !important;
 }
 
-/* Ensure the channel list content-view is ALWAYS visible in Live TV mode */
+/* Ensure the channel list content-view is ALWAYS visible in Live TV mode with dynamic background */
 body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]) #content-view,
 body[data-vel-top-level="live"]:not(.vel-home-empty-active) #content-view {
   display: block !important;
+  position: relative;
+  background: radial-gradient(ellipse 80% 50% at 50% 0%, var(--theme-glow, rgba(138, 43, 226, 0.18)) 0%, transparent 75%) !important;
+  transition: background 0.4s ease;
+}
+
+/* Ambient Live TV page background infected by logo color */
+body[data-vel-active-tab="live"] .main--velora,
+body[data-vel-top-level="live"] .main--velora {
+  background-image:
+    radial-gradient(ellipse 70% 45% at 50% 12%, var(--theme-glow, rgba(138, 43, 226, 0.18)), transparent 68%),
+    linear-gradient(180deg, var(--vel-bg, #06050a), color-mix(in srgb, var(--vel-bg, #06050a) 88%, #101729)) !important;
+  transition: background-image 0.4s ease;
 }
 
 /* Force Live TV channel list into a responsive 1-channel-per-row (single-column) list */
@@ -105,10 +117,10 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
   position: relative;
   width: 100%;
   height: 148px;
-  background: var(--theme-arena-bg, radial-gradient(circle at 50% 35%, rgba(55, 25, 95, 0.55) 0%, rgba(10, 8, 22, 0.98) 75%));
-  border: 1.5px solid var(--theme-border, rgba(168, 85, 247, 0.35));
+  background: var(--theme-arena-bg, radial-gradient(circle at 50% 35%, rgba(35, 35, 45, 0.45) 0%, rgba(6, 6, 10, 0.98) 75%));
+  border: 1.5px solid var(--theme-border, rgba(255, 255, 255, 0.2));
   border-radius: 1rem;
-  box-shadow: inset 0 0 40px var(--theme-glow, rgba(138, 43, 226, 0.18)), 0 12px 32px rgba(0, 0, 0, 0.65);
+  box-shadow: inset 0 0 40px var(--theme-glow, rgba(255, 255, 255, 0.1)), 0 12px 32px rgba(0, 0, 0, 0.75);
   transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
   overflow: hidden;
 }
@@ -121,7 +133,7 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
   width: 320px;
   height: 100px;
   border-radius: 50%;
-  background: radial-gradient(circle, var(--theme-glow, rgba(168, 85, 247, 0.32)) 0%, transparent 70%);
+  background: radial-gradient(circle, var(--theme-glow, rgba(255, 255, 255, 0.25)) 0%, transparent 70%);
   filter: blur(24px);
   pointer-events: none;
   transition: background 0.4s ease;
@@ -134,7 +146,7 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
   left: 50%;
   transform: translateX(-50%);
   z-index: 40;
-  filter: drop-shadow(0 2px 8px var(--theme-glow, rgba(192, 132, 252, 0.95)));
+  filter: drop-shadow(0 2px 8px var(--theme-glow, rgba(255, 255, 255, 0.85)));
   transition: transform 0.08s cubic-bezier(0.18, 0.89, 0.32, 1.28), filter 0.4s ease;
   pointer-events: none;
 }
@@ -148,7 +160,7 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
   height: 0;
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
-  border-top: 11px solid var(--theme-primary, #c084fc);
+  border-top: 11px solid var(--theme-primary, #ffffff);
   transition: border-top-color 0.4s ease;
 }
 
@@ -196,21 +208,21 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
   justify-content: center;
   gap: 4px;
   text-align: center;
-  background: linear-gradient(145deg, rgba(32, 18, 58, 0.94), rgba(12, 10, 24, 0.96));
+  background: var(--theme-card-bg, linear-gradient(145deg, rgba(20, 20, 26, 0.94), rgba(8, 8, 12, 0.96)));
   border: 1.5px solid rgba(255, 255, 255, 0.12);
   border-radius: 14px;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  transition: border-color 0.35s ease, box-shadow 0.35s ease, transform 0.22s ease;
+  transition: border-color 0.35s ease, box-shadow 0.35s ease, transform 0.22s ease, background 0.35s ease;
   box-sizing: border-box;
   pointer-events: none;
 }
 
 .vel-coverflow-card.is-center-card .vel-coverflow-card__inner {
-  border-color: var(--theme-primary, #c084fc);
-  background: linear-gradient(145deg, rgba(50, 22, 90, 0.98), rgba(16, 12, 32, 0.98));
-  box-shadow: 0 0 26px var(--theme-glow, rgba(168, 85, 247, 0.65)), 0 8px 24px rgba(0, 0, 0, 0.75);
+  border-color: var(--theme-primary, #ffffff);
+  background: var(--theme-center-bg, linear-gradient(145deg, rgba(30, 30, 40, 0.98), rgba(8, 8, 12, 0.98)));
+  box-shadow: 0 0 26px var(--theme-glow, rgba(255, 255, 255, 0.45)), 0 8px 24px rgba(0, 0, 0, 0.85);
   transform: scale(1.06);
 }
 
@@ -253,95 +265,6 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
   pointer-events: none;
 }
 
-/* =========================================================
-   Search Bar Between Wheel & Channels
-   ========================================================= */
-.vel-live-search-bar-wrap {
-  width: 100%;
-  max-width: 56rem;
-  margin: 0.5rem auto 0.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  box-sizing: border-box;
-  padding: 0 0.25rem;
-}
-
-.vel-live-search-input-box {
-  position: relative;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  background: rgba(18, 14, 28, 0.85);
-  border: 1px solid var(--theme-border, rgba(168, 85, 247, 0.3));
-  border-radius: 0.75rem;
-  padding: 0.45rem 0.75rem;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  transition: border-color 0.25s ease, box-shadow 0.25s ease;
-}
-
-.vel-live-search-input-box:focus-within {
-  border-color: var(--theme-primary, #c084fc);
-  box-shadow: 0 0 16px var(--theme-glow, rgba(168, 85, 247, 0.35)), 0 4px 14px rgba(0, 0, 0, 0.5);
-}
-
-.vel-live-search-icon {
-  font-size: 0.85rem;
-  margin-right: 0.5rem;
-  opacity: 0.7;
-  pointer-events: none;
-}
-
-.vel-live-search-input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: #ffffff;
-  font-family: inherit;
-  font-size: 0.82rem;
-  font-weight: 500;
-}
-
-.vel-live-search-input::placeholder {
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.vel-live-search-clear {
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 1.1rem;
-  cursor: pointer;
-  padding: 0 0.25rem;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.vel-live-search-clear:hover {
-  color: #ffffff;
-}
-
-.vel-live-search-clear.hidden {
-  display: none !important;
-}
-
-.vel-live-channel-count {
-  font-size: 0.72rem;
-  font-weight: 650;
-  color: rgba(255, 255, 255, 0.75);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 0.35rem 0.65rem;
-  border-radius: 9999px;
-  white-space: nowrap;
-}
-
 /* Hide flat grid ONLY when specifically in Live view */
 body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]) #packages-view,
 body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
@@ -362,9 +285,5 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
   }
   .vel-coverflow-card__title {
     font-size: 0.62rem;
-  }
-  .vel-live-search-bar-wrap {
-    padding: 0 0.1rem;
-    margin: 0.3rem auto 0.5rem;
   }
 }

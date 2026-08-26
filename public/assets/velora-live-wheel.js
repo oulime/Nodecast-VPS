@@ -1,106 +1,48 @@
 (() => {
   "use strict";
 
+  // Dynamic Theme Builder based on exact logo colors
+  function buildThemeFromRgb(r, g, b) {
+    const primary = `rgb(${r}, ${g}, ${b})`;
+    const glow = `rgba(${r}, ${g}, ${b}, 0.65)`;
+    const border = `rgba(${r}, ${g}, ${b}, 0.45)`;
+    const subtle = `rgba(${r}, ${g}, ${b}, 0.16)`;
+    const arenaBg = `radial-gradient(circle at 50% 35%, rgba(${Math.round(r * 0.4)}, ${Math.round(g * 0.4)}, ${Math.round(b * 0.4)}, 0.45) 0%, rgba(6, 6, 10, 0.98) 75%)`;
+    const centerBg = `linear-gradient(145deg, rgba(${Math.round(r * 0.3)}, ${Math.round(g * 0.3)}, ${Math.round(b * 0.3)}, 0.96), rgba(8, 8, 12, 0.98))`;
+    const cardBg = `linear-gradient(145deg, rgba(20, 20, 26, 0.94), rgba(8, 8, 12, 0.96))`;
+
+    return {
+      primary,
+      glow,
+      subtle,
+      border,
+      arenaBg,
+      centerBg,
+      cardBg
+    };
+  }
+
   // Brand Theme Fallbacks
   function getBrandThemeByName(name = "") {
     const n = String(name || "").toLowerCase();
-    if (n.includes("netflix")) {
-      return {
-        primary: "#E50914",
-        glow: "rgba(229, 9, 20, 0.55)",
-        subtle: "rgba(229, 9, 20, 0.16)",
-        border: "rgba(229, 9, 20, 0.45)",
-        arenaBg: "radial-gradient(circle at 50% 35%, rgba(160, 10, 20, 0.48) 0%, rgba(14, 5, 8, 0.98) 75%)"
-      };
-    }
-    if (n.includes("prime") || n.includes("amazon")) {
-      return {
-        primary: "#00A8E1",
-        glow: "rgba(0, 168, 225, 0.55)",
-        subtle: "rgba(0, 168, 225, 0.16)",
-        border: "rgba(0, 168, 225, 0.45)",
-        arenaBg: "radial-gradient(circle at 50% 35%, rgba(0, 110, 180, 0.45) 0%, rgba(4, 10, 22, 0.98) 75%)"
-      };
-    }
-    if (n.includes("disney") || n.includes("marvel") || n.includes("star wars")) {
-      return {
-        primary: "#00D6FE",
-        glow: "rgba(0, 214, 254, 0.55)",
-        subtle: "rgba(0, 214, 254, 0.16)",
-        border: "rgba(0, 214, 254, 0.45)",
-        arenaBg: "radial-gradient(circle at 50% 35%, rgba(10, 60, 180, 0.45) 0%, rgba(4, 8, 24, 0.98) 75%)"
-      };
-    }
-    if (n.includes("max") || n.includes("hbo") || n.includes("warner")) {
-      return {
-        primary: "#002BE7",
-        glow: "rgba(0, 43, 231, 0.55)",
-        subtle: "rgba(0, 43, 231, 0.16)",
-        border: "rgba(0, 43, 231, 0.45)",
-        arenaBg: "radial-gradient(circle at 50% 35%, rgba(0, 30, 130, 0.48) 0%, rgba(6, 8, 26, 0.98) 75%)"
-      };
-    }
-    if (n.includes("canal") || n.includes("c+")) {
-      return {
-        primary: "#FFE600",
-        glow: "rgba(255, 230, 0, 0.45)",
-        subtle: "rgba(255, 230, 0, 0.14)",
-        border: "rgba(255, 230, 0, 0.35)",
-        arenaBg: "radial-gradient(circle at 50% 35%, rgba(120, 100, 10, 0.42) 0%, rgba(12, 10, 6, 0.98) 75%)"
-      };
-    }
-    if (n.includes("apple") || n.includes("apple tv")) {
-      return {
-        primary: "#38bdf8",
-        glow: "rgba(56, 189, 248, 0.5)",
-        subtle: "rgba(56, 189, 248, 0.15)",
-        border: "rgba(56, 189, 248, 0.4)",
-        arenaBg: "radial-gradient(circle at 50% 35%, rgba(30, 70, 100, 0.45) 0%, rgba(8, 12, 18, 0.98) 75%)"
-      };
-    }
-    if (n.includes("paramount")) {
-      return {
-        primary: "#0064FF",
-        glow: "rgba(0, 100, 255, 0.55)",
-        subtle: "rgba(0, 100, 255, 0.16)",
-        border: "rgba(0, 100, 255, 0.45)",
-        arenaBg: "radial-gradient(circle at 50% 35%, rgba(0, 60, 160, 0.45) 0%, rgba(4, 8, 22, 0.98) 75%)"
-      };
-    }
-    if (n.includes("bein")) {
-      return {
-        primary: "#c026d3",
-        glow: "rgba(192, 38, 211, 0.55)",
-        subtle: "rgba(192, 38, 211, 0.16)",
-        border: "rgba(192, 38, 211, 0.45)",
-        arenaBg: "radial-gradient(circle at 50% 35%, rgba(100, 15, 120, 0.48) 0%, rgba(18, 6, 22, 0.98) 75%)"
-      };
-    }
-    if (n.includes("dazn")) {
-      return {
-        primary: "#E2FF00",
-        glow: "rgba(226, 255, 0, 0.5)",
-        subtle: "rgba(226, 255, 0, 0.14)",
-        border: "rgba(226, 255, 0, 0.35)",
-        arenaBg: "radial-gradient(circle at 50% 35%, rgba(90, 100, 10, 0.4) 0%, rgba(10, 12, 6, 0.98) 75%)"
-      };
-    }
-    if (n.includes("eurosport") || n.includes("rmc") || n.includes("tf1")) {
-      return {
-        primary: "#0284c7",
-        glow: "rgba(2, 132, 199, 0.55)",
-        subtle: "rgba(2, 132, 199, 0.15)",
-        border: "rgba(2, 132, 199, 0.45)",
-        arenaBg: "radial-gradient(circle at 50% 35%, rgba(10, 60, 120, 0.45) 0%, rgba(6, 10, 20, 0.98) 75%)"
-      };
-    }
-    return {
-      primary: "#c084fc",
-      glow: "rgba(168, 85, 247, 0.55)",
-      subtle: "rgba(168, 85, 247, 0.15)",
-      border: "rgba(168, 85, 247, 0.35)",
-      arenaBg: "radial-gradient(circle at 50% 35%, rgba(55, 25, 95, 0.55) 0%, rgba(10, 8, 22, 0.98) 75%)"
-    };
+    if (n.includes("shahid")) return buildThemeFromRgb(0, 207, 126);
+    if (n.includes("netflix")) return buildThemeFromRgb(229, 9, 20);
+    if (n.includes("prime") || n.includes("amazon")) return buildThemeFromRgb(0, 168, 225);
+    if (n.includes("disney") || n.includes("marvel") || n.includes("star wars")) return buildThemeFromRgb(0, 214, 254);
+    if (n.includes("max") || n.includes("hbo") || n.includes("warner")) return buildThemeFromRgb(0, 43, 231);
+    if (n.includes("canal") || n.includes("c+")) return buildThemeFromRgb(255, 230, 0);
+    if (n.includes("apple")) return buildThemeFromRgb(56, 189, 248);
+    if (n.includes("paramount")) return buildThemeFromRgb(0, 100, 255);
+    if (n.includes("bein")) return buildThemeFromRgb(192, 38, 211);
+    if (n.includes("dazn")) return buildThemeFromRgb(226, 255, 0);
+    if (n.includes("starzplay") || n.includes("starz")) return buildThemeFromRgb(249, 115, 22);
+    if (n.includes("osn")) return buildThemeFromRgb(239, 68, 68);
+    if (n.includes("stc")) return buildThemeFromRgb(79, 70, 229);
+    if (n.includes("rotana")) return buildThemeFromRgb(34, 197, 94);
+    if (n.includes("eurosport") || n.includes("rmc") || n.includes("tf1")) return buildThemeFromRgb(2, 132, 199);
+
+    // Clean neutral slate/cyan default
+    return buildThemeFromRgb(56, 189, 248);
   }
 
   // Color Extraction Canvas Cache
@@ -142,7 +84,7 @@
           const chroma = max - min;
           const brightness = (r + g + b) / 3;
 
-          if (chroma < 32 || brightness < 28 || brightness > 235) continue;
+          if (chroma < 30 || brightness < 28 || brightness > 235) continue;
 
           chromaticPixels++;
           const score = chroma * 2 + (brightness > 60 && brightness < 190 ? 40 : 0);
@@ -157,14 +99,8 @@
           bins[qKey].score += score;
         }
 
-        if (chromaticPixels < 25 || (visiblePixels > 0 && (chromaticPixels / visiblePixels) < 0.04)) {
-          const bwTheme = {
-            primary: "#e2e8f0",
-            glow: "rgba(255, 255, 255, 0.65)",
-            subtle: "rgba(255, 255, 255, 0.16)",
-            border: "rgba(255, 255, 255, 0.45)",
-            arenaBg: "radial-gradient(circle at 50% 35%, rgba(65, 70, 85, 0.55) 0%, rgba(10, 10, 16, 0.98) 75%)"
-          };
+        if (chromaticPixels < 20 || (visiblePixels > 0 && (chromaticPixels / visiblePixels) < 0.04)) {
+          const bwTheme = buildThemeFromRgb(210, 215, 225);
           colorCache.set(imageUrl, bwTheme);
           callback(bwTheme);
           return;
@@ -184,15 +120,7 @@
         }
 
         if (bestColor) {
-          const { r, g, b } = bestColor;
-          const hex = `rgb(${r}, ${g}, ${b})`;
-          const theme = {
-            primary: hex,
-            glow: `rgba(${r}, ${g}, ${b}, 0.55)`,
-            subtle: `rgba(${r}, ${g}, ${b}, 0.16)`,
-            border: `rgba(${r}, ${g}, ${b}, 0.45)`,
-            arenaBg: `radial-gradient(circle at 50% 35%, rgba(${Math.round(r * 0.45)}, ${Math.round(g * 0.45)}, ${Math.round(b * 0.45)}, 0.45) 0%, rgba(10, 8, 22, 0.98) 75%)`
-          };
+          const theme = buildThemeFromRgb(bestColor.r, bestColor.g, bestColor.b);
           colorCache.set(imageUrl, theme);
           callback(theme);
         }
@@ -351,10 +279,6 @@
       this.wrapper = null;
       this.stage = null;
       this.pointer = null;
-      this.searchBarWrap = null;
-      this.searchInput = null;
-      this.searchClearBtn = null;
-      this.searchCountEl = null;
 
       this.packages = [];
       this.childPackagesMap = new Map();
@@ -380,9 +304,9 @@
       this.filteredChannels = [];
       this.renderedCount = 0;
       this.pageSize = 500;
-      this.searchQuery = "";
       this.currentPlayingStreamId = null;
       this.isLoadingChannels = false;
+      this.hasLoadedInitialLiveChannel = false;
 
       this.currentTheme = null;
       this.init();
@@ -433,23 +357,11 @@
           </div>
           <div class="vel-coverflow-stage" tabindex="0" role="region" aria-label="Carrousel bouquets TV"></div>
         </div>
-        <div class="vel-live-search-bar-wrap" id="vel-live-search-bar-wrap">
-          <div class="vel-live-search-input-box">
-            <span class="vel-live-search-icon" aria-hidden="true">🔍</span>
-            <input type="text" id="vel-live-channel-search" class="vel-live-search-input" placeholder="Rechercher une chaîne..." autocomplete="off" spellcheck="false" />
-            <button type="button" id="vel-live-channel-search-clear" class="vel-live-search-clear hidden" aria-label="Effacer la recherche">×</button>
-          </div>
-          <span class="vel-live-channel-count" id="vel-live-channel-count">0 chaîne</span>
-        </div>
       `;
 
       this.wrapper = root;
       this.stage = root.querySelector(".vel-coverflow-stage");
       this.pointer = root.querySelector(".vel-wheel-pointer");
-      this.searchBarWrap = root.querySelector("#vel-live-search-bar-wrap");
-      this.searchInput = root.querySelector("#vel-live-channel-search");
-      this.searchClearBtn = root.querySelector("#vel-live-channel-search-clear");
-      this.searchCountEl = root.querySelector("#vel-live-channel-count");
 
       const packagesView = document.getElementById("packages-view");
       if (packagesView && packagesView.parentNode) {
@@ -473,29 +385,6 @@
         const target = ((this.currentIndex + delta) % total + total) % total;
         this.smoothAnimateToIndex(target, 280);
       }, { passive: false });
-
-      // Search Bar Input & Clear
-      if (this.searchInput) {
-        this.searchInput.addEventListener("input", (e) => {
-          this.searchQuery = e.target.value.trim().toLowerCase();
-          if (this.searchClearBtn) {
-            this.searchClearBtn.classList.toggle("hidden", this.searchQuery.length === 0);
-          }
-          this.filterAndRenderChannels();
-        });
-      }
-
-      if (this.searchClearBtn) {
-        this.searchClearBtn.addEventListener("click", () => {
-          if (this.searchInput) {
-            this.searchInput.value = "";
-            this.searchInput.focus();
-          }
-          this.searchQuery = "";
-          this.searchClearBtn.classList.add("hidden");
-          this.filterAndRenderChannels();
-        });
-      }
 
       // Keyboard navigation
       window.addEventListener("keydown", (e) => {
@@ -572,6 +461,9 @@
 
     checkVisibility() {
       const isLive = this.isLiveActive();
+      if (!isLive) {
+        this.hasLoadedInitialLiveChannel = false;
+      }
       if (this.wrapper) {
         this.wrapper.style.display = isLive ? "block" : "none";
       }
@@ -709,8 +601,10 @@
         const dynamicList = document.getElementById("dynamic-list");
         const isListEmpty = !dynamicList || dynamicList.children.length === 0;
 
-        if (this.allChannels.length === 0 || isListEmpty) {
-          this.onPackageSettled(this.packages[targetIdx]);
+        const isFirstOpen = !this.hasLoadedInitialLiveChannel;
+        if (isFirstOpen || this.allChannels.length === 0 || isListEmpty) {
+          this.hasLoadedInitialLiveChannel = true;
+          this.onPackageSettled(this.packages[targetIdx], { isInitialLoad: isFirstOpen });
         }
         this.renderMainCards();
       }
@@ -725,12 +619,29 @@
     }
 
     applyTheme(theme) {
-      if (!theme || !this.wrapper) return;
+      if (!theme) return;
       this.currentTheme = theme;
-      this.wrapper.style.setProperty("--theme-primary", theme.primary);
-      this.wrapper.style.setProperty("--theme-glow", theme.glow);
-      this.wrapper.style.setProperty("--theme-border", theme.border);
-      this.wrapper.style.setProperty("--theme-arena-bg", theme.arenaBg);
+      if (this.wrapper) {
+        this.wrapper.style.setProperty("--theme-primary", theme.primary);
+        this.wrapper.style.setProperty("--theme-glow", theme.glow);
+        this.wrapper.style.setProperty("--theme-border", theme.border);
+        this.wrapper.style.setProperty("--theme-arena-bg", theme.arenaBg);
+        this.wrapper.style.setProperty("--theme-center-bg", theme.centerBg || theme.arenaBg);
+        this.wrapper.style.setProperty("--theme-card-bg", theme.cardBg || "linear-gradient(145deg, rgba(20, 20, 26, 0.94), rgba(8, 8, 12, 0.96))");
+      }
+
+      const contentView = document.getElementById("content-view");
+      if (contentView) {
+        contentView.style.setProperty("--theme-primary", theme.primary);
+        contentView.style.setProperty("--theme-glow", theme.glow);
+        contentView.style.setProperty("--theme-border", theme.border);
+      }
+
+      if (document.body) {
+        document.body.style.setProperty("--theme-primary", theme.primary);
+        document.body.style.setProperty("--theme-glow", theme.glow);
+        document.body.style.setProperty("--theme-border", theme.border);
+      }
     }
 
     getSettledPackage() {
@@ -740,7 +651,7 @@
       return this.packages[idx] || this.packages[0];
     }
 
-    async onPackageSettled(pkg) {
+    async onPackageSettled(pkg, options = {}) {
       if (!pkg || !this.isLiveActive()) return;
 
       // Extract color / apply theme
@@ -753,10 +664,10 @@
         });
       }
 
-      await this.loadPackageChannels(pkg);
+      await this.loadPackageChannels(pkg, options);
     }
 
-    async loadPackageChannels(pkg) {
+    async loadPackageChannels(pkg, options = {}) {
       if (!this.isLiveActive()) return;
       this.isLoadingChannels = true;
       this.showChannelLoadingSkeleton();
@@ -801,7 +712,7 @@
         });
 
         this.allChannels = filtered;
-        this.filterAndRenderChannels({ autoPlayFirst: true });
+        this.filterAndRenderChannels(options);
       } catch (err) {
         console.error("Failed to load package channels", err);
       } finally {
@@ -838,22 +749,7 @@
     }
 
     filterAndRenderChannels(options = {}) {
-      const q = this.searchQuery;
-      if (!q) {
-        this.filteredChannels = this.allChannels;
-      } else {
-        this.filteredChannels = this.allChannels.filter(ch => {
-          const name = String(ch.name || ch.title || "").toLowerCase();
-          const cat = String(ch.category_name || "").toLowerCase();
-          return name.includes(q) || cat.includes(q);
-        });
-      }
-
-      if (this.searchCountEl) {
-        const count = this.filteredChannels.length;
-        this.searchCountEl.textContent = `${count} chaîne${count > 1 ? "s" : ""}`;
-      }
-
+      this.filteredChannels = this.allChannels;
       this.renderedCount = 0;
       const dynamicList = document.getElementById("dynamic-list");
       if (dynamicList) {
@@ -864,10 +760,9 @@
 
       this.renderNextBatch();
 
-      // Auto-play the first channel of the selected package
-      if (options.autoPlayFirst && this.filteredChannels.length > 0) {
+      if (options && options.isInitialLoad && this.filteredChannels.length > 0) {
         const first = this.filteredChannels[0];
-        console.log("%c[Velora Live] 📺 Auto-playing first channel of package:", "color: #38bdf8; font-weight: bold;", first);
+        console.log("%c[Velora Live] 📺 Initial open - Preselecting & playing first channel:", "color: #38bdf8; font-weight: bold;", first);
         this.playChannel(first);
       }
     }

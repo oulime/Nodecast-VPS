@@ -1,21 +1,20 @@
-<template>
+﻿<template>
   <div
     class="vel-casino-wheel-wrapper w-full max-w-4xl mx-auto select-none"
     ref="wheelWrapperRef"
     :style="themeStyle"
   >
-    <!-- Single Wheel Arena: Absolute Decoupled Layout (Zero Vertical Shifts) -->
-    <div class="vel-wheel-arena relative overflow-hidden rounded-3xl">
+    <!-- Single Wheel Arena: Snug, Compact, Zero Wasted Space -->
+    <div class="vel-wheel-arena relative overflow-hidden rounded-2xl">
       <!-- Dynamic Brand Ambient Lighting -->
       <div class="vel-wheel-ambient-glow" aria-hidden="true"></div>
-      <div class="vel-wheel-radial-track" aria-hidden="true"></div>
 
       <!-- Center Ticker Pointer Indicator -->
       <div class="vel-wheel-pointer" :class="{ 'is-ticking': isTicking }" aria-hidden="true">
         <div class="vel-wheel-pointer__triangle"></div>
       </div>
 
-      <!-- 1. Main 3D Circular Arc Track (100% Fixed Constant Position) -->
+      <!-- 1. Main 3D Circular Arc Track -->
       <div
         class="vel-coverflow-stage"
         @mousedown="startDrag"
@@ -55,12 +54,12 @@
         </div>
       </div>
 
-      <!-- 2. Intersecting Sub-Wheel: Directly Inside the Same Arena at the Bottom Arc -->
+      <!-- 2. Intersecting Sub-Wheel: Snug along the bottom arc with zero empty floor space -->
       <Transition name="vel-sub-intersect" mode="out-in">
         <div
           v-if="activePackage && activePackage.is_parent && childPackages.length > 0"
           :key="'sub-intersect-' + activePackage.id"
-          class="vel-sub-intersect-tier absolute bottom-2 left-0 right-0 z-30 flex items-center justify-center pointer-events-none"
+          class="vel-sub-intersect-tier absolute bottom-0 left-0 right-0 z-30 flex items-center justify-center pointer-events-none"
         >
           <div
             class="vel-sub-stage-intersect pointer-events-auto"
@@ -137,10 +136,6 @@ let subDragStartIndex = 0;
 let subAnimFrameId = null;
 
 const totalItems = computed(() => Math.max(1, props.packages.length));
-
-const hasAnyParentPackages = computed(() => {
-  return props.packages.some(p => p && p.is_parent && Array.isArray(p.child_package_ids) && p.child_package_ids.length > 0);
-});
 
 const activePackage = computed(() => {
   if (props.packages.length === 0) return null;
@@ -383,8 +378,8 @@ const visibleCards = computed(() => {
 
   const current = animatedIndex.value;
   const result = [];
-  const radius = window.innerWidth < 640 ? 240 : 300;
-  const angleStep = window.innerWidth < 640 ? 19.5 : 17;
+  const radius = window.innerWidth < 640 ? 230 : 280;
+  const angleStep = window.innerWidth < 640 ? 20 : 17.5;
 
   for (let i = 0; i < total; i++) {
     let diff = (i - current) % total;
@@ -421,7 +416,7 @@ const visibleCards = computed(() => {
   return result;
 });
 
-// Intersecting Sub-Wheel 3D Arc (Concentric Lower Arc)
+// Intersecting Sub-Wheel 3D Arc
 const visibleSubCards = computed(() => {
   const list = childPackages.value;
   const total = list.length;
@@ -429,8 +424,8 @@ const visibleSubCards = computed(() => {
 
   const current = subAnimatedIndex.value;
   const result = [];
-  const radius = window.innerWidth < 640 ? 180 : 230;
-  const angleStep = window.innerWidth < 640 ? 21 : 18;
+  const radius = window.innerWidth < 640 ? 170 : 210;
+  const angleStep = window.innerWidth < 640 ? 22 : 18.5;
 
   for (let i = 0; i < total; i++) {
     let diff = (i - current) % total;
@@ -743,14 +738,14 @@ watch(activePackage, () => {
   perspective: 1200px;
 }
 
-/* Single Arena: Fixed constant height for entire wheel area */
+/* Compact Snug Arena: Zero wasted vertical or bottom space */
 .vel-wheel-arena {
   position: relative;
   width: 100%;
-  height: 165px;
+  height: 128px;
   background: var(--theme-arena-bg, radial-gradient(circle at 50% 35%, rgba(55, 25, 95, 0.55) 0%, rgba(10, 8, 22, 0.98) 75%));
   border: 1.5px solid var(--theme-border, rgba(168, 85, 247, 0.35));
-  box-shadow: inset 0 0 40px var(--theme-glow, rgba(138, 43, 226, 0.16)), 0 12px 35px rgba(0, 0, 0, 0.65);
+  box-shadow: inset 0 0 35px var(--theme-glow, rgba(138, 43, 226, 0.16)), 0 10px 30px rgba(0, 0, 0, 0.65);
   transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
   overflow: hidden;
 }
@@ -760,33 +755,19 @@ watch(activePackage, () => {
   top: 10%;
   left: 50%;
   transform: translateX(-50%);
-  width: 300px;
-  height: 110px;
+  width: 280px;
+  height: 90px;
   border-radius: 50%;
   background: radial-gradient(circle, var(--theme-glow, rgba(168, 85, 247, 0.28)) 0%, transparent 70%);
-  filter: blur(25px);
+  filter: blur(22px);
   pointer-events: none;
   transition: background 0.4s ease;
-}
-
-.vel-wheel-radial-track {
-  position: absolute;
-  bottom: -35px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 90%;
-  height: 85px;
-  border-radius: 50%;
-  border: 1.5px solid var(--theme-border, rgba(168, 85, 247, 0.25));
-  box-shadow: 0 0 20px var(--theme-glow, rgba(168, 85, 247, 0.15)), inset 0 0 20px rgba(0, 0, 0, 0.2);
-  pointer-events: none;
-  transition: border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
 /* Center Pointer Ticker */
 .vel-wheel-pointer {
   position: absolute;
-  top: 3px;
+  top: 2px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 40;
@@ -801,9 +782,9 @@ watch(activePackage, () => {
 .vel-wheel-pointer__triangle {
   width: 0;
   height: 0;
-  border-left: 8px solid transparent;
-  border-right: 8px solid transparent;
-  border-top: 11px solid var(--theme-primary, #c084fc);
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 10px solid var(--theme-primary, #c084fc);
   transition: border-top-color 0.4s ease;
 }
 
@@ -825,14 +806,14 @@ watch(activePackage, () => {
   cursor: grabbing;
 }
 
-/* Main Cards: Permanently fixed at top 42% with zero vertical movement */
+/* Main Cards: Centered cleanly inside 128px arena with zero bottom gap */
 .vel-coverflow-card {
   position: absolute;
   left: 50%;
-  top: 42%;
-  width: 92px;
-  height: 106px;
-  border-radius: 15px;
+  top: 48%;
+  width: 86px;
+  height: 98px;
+  border-radius: 14px;
   cursor: pointer;
   will-change: transform, opacity;
   transition: box-shadow 0.22s ease, border-color 0.22s ease;
@@ -842,16 +823,16 @@ watch(activePackage, () => {
   position: relative;
   width: 100%;
   height: 100%;
-  padding: 5px 3px;
+  padding: 4px 3px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 3px;
   text-align: center;
   background: linear-gradient(145deg, rgba(30, 18, 56, 0.94), rgba(12, 10, 24, 0.96));
   border: 1.5px solid rgba(255, 255, 255, 0.12);
-  border-radius: 15px;
+  border-radius: 14px;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(8px);
   transition: border-color 0.35s ease, box-shadow 0.35s ease;
@@ -860,13 +841,13 @@ watch(activePackage, () => {
 .vel-coverflow-card.is-center-card .vel-coverflow-card__inner {
   border-color: var(--theme-primary, #c084fc);
   background: linear-gradient(145deg, rgba(45, 20, 80, 0.98), rgba(14, 10, 28, 0.98));
-  box-shadow: 0 0 24px var(--theme-glow, rgba(168, 85, 247, 0.6)), 0 8px 22px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 0 22px var(--theme-glow, rgba(168, 85, 247, 0.6)), 0 6px 18px rgba(0, 0, 0, 0.7);
 }
 
 .vel-coverflow-card__logo-wrap {
-  width: 46px;
-  height: 46px;
-  border-radius: 11px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
@@ -880,12 +861,12 @@ watch(activePackage, () => {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 3px;
+  padding: 2.5px;
 }
 
 .vel-coverflow-card__title {
   color: #ffffff;
-  font-size: 0.68rem;
+  font-size: 0.67rem;
   font-weight: 850;
   line-height: 1.1;
   display: -webkit-box;
@@ -893,19 +874,19 @@ watch(activePackage, () => {
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
-  padding: 0 2px;
+  padding: 0 1px;
 }
 
-/* 2. Intersecting Sub-Wheel Tier: Occupies bottom arc of SAME arena */
+/* 2. Intersecting Sub-Wheel Tier: Sitting snugly at the bottom */
 .vel-sub-intersect-tier {
   width: 100%;
-  height: 58px;
+  height: 40px;
 }
 
 .vel-sub-stage-intersect {
   position: relative;
   width: 100%;
-  height: 58px;
+  height: 40px;
   perspective: 750px;
   display: flex;
   align-items: center;
@@ -918,14 +899,14 @@ watch(activePackage, () => {
   cursor: grabbing;
 }
 
-/* Intersecting Sub-Cards */
+/* Intersecting Sub-Cards: Compact horizontal badges */
 .vel-sub-card-3d {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 76px;
-  height: 48px;
-  border-radius: 12px;
+  width: 72px;
+  height: 34px;
+  border-radius: 10px;
   cursor: pointer;
   will-change: transform, opacity;
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
@@ -935,17 +916,17 @@ watch(activePackage, () => {
   position: relative;
   width: 100%;
   height: 100%;
-  padding: 3px 6px;
+  padding: 2px 4px;
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 4px;
   text-align: left;
   background: linear-gradient(135deg, rgba(22, 12, 38, 0.94), rgba(10, 8, 20, 0.96));
   border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 12px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.65);
+  border-radius: 10px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(8px);
   transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
 }
@@ -953,14 +934,14 @@ watch(activePackage, () => {
 .vel-sub-card-3d.is-sub-center .vel-sub-card-3d__inner {
   border-color: var(--theme-primary, #c084fc);
   background: linear-gradient(135deg, rgba(46, 18, 76, 0.98), rgba(16, 10, 30, 0.98));
-  box-shadow: 0 0 16px var(--theme-glow, rgba(168, 85, 247, 0.65)), 0 4px 12px rgba(0, 0, 0, 0.7);
-  transform: scale(1.06);
+  box-shadow: 0 0 14px var(--theme-glow, rgba(168, 85, 247, 0.65)), 0 3px 10px rgba(0, 0, 0, 0.7);
+  transform: scale(1.05);
 }
 
 .vel-sub-card-3d__logo-wrap {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
   background: rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
@@ -973,14 +954,14 @@ watch(activePackage, () => {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 1.5px;
+  padding: 1px;
 }
 
 .vel-sub-card-3d__title {
   color: #ffffff;
-  font-size: 0.58rem;
+  font-size: 0.54rem;
   font-weight: 800;
-  line-height: 1.1;
+  line-height: 1.05;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -999,41 +980,41 @@ watch(activePackage, () => {
 .vel-sub-intersect-enter-from,
 .vel-sub-intersect-leave-to {
   opacity: 0;
-  transform: translateY(12px) scale(0.95);
+  transform: translateY(8px) scale(0.95);
 }
 
 @media (max-width: 640px) {
   .vel-wheel-arena {
-    height: 152px;
+    height: 118px;
   }
   .vel-coverflow-card {
-    width: 82px;
-    height: 94px;
+    width: 78px;
+    height: 88px;
   }
   .vel-coverflow-card__logo-wrap {
-    width: 40px;
-    height: 40px;
+    width: 38px;
+    height: 38px;
   }
   .vel-coverflow-card__title {
-    font-size: 0.64rem;
+    font-size: 0.62rem;
   }
 
   .vel-sub-intersect-tier {
-    height: 52px;
+    height: 34px;
   }
   .vel-sub-stage-intersect {
-    height: 52px;
+    height: 34px;
   }
   .vel-sub-card-3d {
-    width: 68px;
-    height: 42px;
+    width: 64px;
+    height: 30px;
   }
   .vel-sub-card-3d__logo-wrap {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
   }
   .vel-sub-card-3d__title {
-    font-size: 0.52rem;
+    font-size: 0.5rem;
   }
 }
 </style>

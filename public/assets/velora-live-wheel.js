@@ -533,6 +533,10 @@
       const body = document.body;
       if (body.classList.contains("vel-home-empty-active")) return false;
       if (body.dataset.velTopLevel === "home") return false;
+      if (body.dataset.veloraReturnFavorites || body.classList.contains("vel-favorites-open") || body.classList.contains("vel-favorites-player-active")) {
+        return false;
+      }
+      if (body.dataset.velActiveTab === "favorites") return false;
 
       const homeEmptyPage = document.getElementById("vel-home-empty-page");
       if (homeEmptyPage && !homeEmptyPage.classList.contains("hidden") && homeEmptyPage.style.display !== "none") {
@@ -542,7 +546,7 @@
       const activeTab = String(body.dataset.velActiveTab || "").toLowerCase();
       const topLevel = String(body.dataset.velTopLevel || "").toLowerCase();
 
-      return activeTab === "live" || topLevel === "live";
+      return (activeTab === "live" || topLevel === "live") && !body.dataset.veloraReturnFavorites;
     }
 
     checkVisibility() {
@@ -551,9 +555,10 @@
         this.wrapper.style.display = isLive ? "block" : "none";
       }
 
-      // Keep player visible when on Live TV
+      // Keep player visible when on Live TV or playing favorite live channel
+      const isFavoritesChannel = !!document.body.dataset.veloraReturnFavorites && document.body.dataset.veloraReturnFavorites === "channel";
       const playerContainer = document.getElementById("player-container");
-      if (playerContainer && isLive) {
+      if (playerContainer && (isLive || isFavoritesChannel)) {
         playerContainer.classList.remove("hidden");
         playerContainer.setAttribute("aria-hidden", "false");
       }
@@ -715,7 +720,7 @@
     }
 
     async onPackageSettled(pkg) {
-      if (!pkg) return;
+      if (!pkg || !this.isLiveActive()) return;
 
       // Extract color / apply theme
       const brandTheme = getBrandThemeByName(pkg.name);
@@ -731,6 +736,7 @@
     }
 
     async loadPackageChannels(pkg) {
+      if (!this.isLiveActive()) return;
       this.isLoadingChannels = true;
       this.showChannelLoadingSkeleton();
 

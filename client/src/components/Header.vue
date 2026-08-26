@@ -32,7 +32,7 @@
       class="vel-header-context-title vel-category-heading vel-category-heading--neutral is-visible"
       aria-live="polite"
     >
-      <h2 id="vel-header-context-title-text" class="vel-category-heading__title">{{ contextTitle }}</h2>
+      <h2 id="vel-header-context-title-text" class="vel-category-heading__title" :title="contextTitle">{{ contextTitle }}</h2>
       <span class="vel-category-heading__accent-line" aria-hidden="true"></span>
     </div>
     <div v-else class="flex-1"></div>

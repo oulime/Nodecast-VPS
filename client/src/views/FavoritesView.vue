@@ -1,6 +1,6 @@
 <template>
-  <div class="p-4 md:p-8 xl:px-12 max-w-[1720px] mx-auto space-y-6">
-    <header class="vel-favorites-page__header flex items-center justify-between">
+  <div class="w-full min-w-0 p-4 md:p-8 xl:px-12 max-w-[1720px] mx-auto space-y-6 box-border">
+    <header class="vel-favorites-page__header flex items-center justify-between w-full">
       <h1 class="text-2xl md:text-3xl font-black text-white tracking-tight">Mes favoris</h1>
       <span class="text-xs font-bold text-purple-300 px-3 py-1 rounded-full bg-purple-950/60 border border-purple-800/40">
         {{ favs.totalCount }} au total
@@ -8,13 +8,13 @@
     </header>
 
     <!-- Sticky Video Player (if a favorite channel/movie is playing) -->
-    <div v-if="player.currentStream" class="vel-player-sticky-wrap mb-4">
+    <div v-if="player.currentStream" class="vel-player-sticky-wrap mb-4 w-full">
       <VideoPlayer v-if="player.currentStream.stream_type === 'live' || activeType === 'channel'" />
       <VodPlayer v-else />
     </div>
 
     <!-- Category Tabs -->
-    <nav class="vel-favorites-tabs" role="tablist" aria-label="Catégories de favoris">
+    <nav class="vel-favorites-tabs w-full" role="tablist" aria-label="Catégories de favoris">
       <button
         type="button"
         @click="activeType = 'channel'"
@@ -50,10 +50,10 @@
     </nav>
 
     <!-- Main Content Panel -->
-    <main class="vel-favorites-page__content">
+    <main class="vel-favorites-page__content w-full min-w-0">
       <!-- 1. CHANNELS TAB -->
-      <section v-if="activeType === 'channel'" class="vel-favorites-group vel-favorites-group--channel">
-        <div v-if="favs.channels.length > 0" class="vel-favorites-grid">
+      <section v-if="activeType === 'channel'" class="vel-favorites-group vel-favorites-group--channel w-full min-w-0">
+        <div v-if="favs.channels.length > 0" class="vel-favorites-grid w-full">
           <article
             v-for="item in favs.channels"
             :key="item.item_id || item.stream_id"
@@ -105,8 +105,8 @@
       </section>
 
       <!-- 2. MOVIES TAB -->
-      <section v-else-if="activeType === 'movie'" class="vel-favorites-group vel-favorites-group--movie">
-        <div v-if="favs.movies.length > 0" class="vel-favorites-grid">
+      <section v-else-if="activeType === 'movie'" class="vel-favorites-group vel-favorites-group--movie w-full min-w-0">
+        <div v-if="favs.movies.length > 0" class="vel-favorites-grid w-full">
           <article
             v-for="item in favs.movies"
             :key="item.item_id || item.stream_id"
@@ -158,8 +158,8 @@
       </section>
 
       <!-- 3. SERIES TAB -->
-      <section v-else-if="activeType === 'series'" class="vel-favorites-group vel-favorites-group--series">
-        <div v-if="favs.series.length > 0" class="vel-favorites-grid">
+      <section v-else-if="activeType === 'series'" class="vel-favorites-group vel-favorites-group--series w-full min-w-0">
+        <div v-if="favs.series.length > 0" class="vel-favorites-grid w-full">
           <article
             v-for="item in favs.series"
             :key="item.item_id || item.stream_id"

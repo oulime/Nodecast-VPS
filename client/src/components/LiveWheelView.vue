@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div
     class="vel-casino-wheel-wrapper w-full max-w-4xl mx-auto select-none"
     ref="wheelWrapperRef"
@@ -209,11 +209,11 @@ function getBrandThemeByName(name = '') {
   }
   if (n.includes('max') || n.includes('hbo') || n.includes('warner')) {
     return {
-      primary: '#9d4edd',
-      glow: 'rgba(157, 78, 221, 0.55)',
-      subtle: 'rgba(157, 78, 221, 0.16)',
-      border: 'rgba(157, 78, 221, 0.45)',
-      arenaBg: 'radial-gradient(circle at 50% 35%, rgba(90, 25, 140, 0.48) 0%, rgba(14, 6, 26, 0.98) 75%)'
+      primary: '#002BE7',
+      glow: 'rgba(0, 43, 231, 0.55)',
+      subtle: 'rgba(0, 43, 231, 0.16)',
+      border: 'rgba(0, 43, 231, 0.45)',
+      arenaBg: 'radial-gradient(circle at 50% 35%, rgba(0, 30, 130, 0.48) 0%, rgba(6, 8, 26, 0.98) 75%)'
     };
   }
   if (n.includes('canal') || n.includes('c+')) {
@@ -288,37 +288,53 @@ function extractColorFromImage(imageUrl) {
     try {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      canvas.width = 30;
-      canvas.height = 30;
-      ctx.drawImage(img, 0, 0, 30, 30);
-      const data = ctx.getImageData(0, 0, 30, 30).data;
+      canvas.width = 40;
+      canvas.height = 40;
+      ctx.drawImage(img, 0, 0, 40, 40);
+      const data = ctx.getImageData(0, 0, 40, 40).data;
 
-      let rSum = 0, gSum = 0, bSum = 0, count = 0;
+      let bestColor = null;
+      let highestScore = -1;
+      const bins = {};
+
       for (let i = 0; i < data.length; i += 4) {
         const a = data[i + 3];
-        if (a < 120) continue;
+        if (a < 80) continue;
         const r = data[i], g = data[i + 1], b = data[i + 2];
         const max = Math.max(r, g, b);
         const min = Math.min(r, g, b);
-        if (max - min > 24 && max > 45 && max < 240) {
-          rSum += r;
-          gSum += g;
-          bSum += b;
-          count++;
+        const chroma = max - min;
+        const brightness = (r + g + b) / 3;
+
+        if (chroma < 18 || brightness < 25 || brightness > 245) continue;
+
+        const score = chroma * 1.5 + (brightness > 60 && brightness < 200 ? 50 : 0);
+        const qKey = `${Math.round(r / 20) * 20},${Math.round(g / 20) * 20},${Math.round(b / 20) * 20}`;
+        if (!bins[qKey]) {
+          bins[qKey] = { r, g, b, count: 0, score: 0 };
+        }
+        bins[qKey].count++;
+        bins[qKey].score += score;
+      }
+
+      for (const key in bins) {
+        const bin = bins[key];
+        const totalScore = bin.score * Math.sqrt(bin.count);
+        if (totalScore > highestScore) {
+          highestScore = totalScore;
+          bestColor = { r: bin.r, g: bin.g, b: bin.b };
         }
       }
 
-      if (count > 0) {
-        const r = Math.round(rSum / count);
-        const g = Math.round(gSum / count);
-        const b = Math.round(bSum / count);
+      if (bestColor) {
+        const { r, g, b } = bestColor;
         const hex = `rgb(${r}, ${g}, ${b})`;
         const theme = {
           primary: hex,
           glow: `rgba(${r}, ${g}, ${b}, 0.55)`,
-          subtle: `rgba(${r}, ${g}, ${b}, 0.15)`,
+          subtle: `rgba(${r}, ${g}, ${b}, 0.16)`,
           border: `rgba(${r}, ${g}, ${b}, 0.45)`,
-          arenaBg: `radial-gradient(circle at 50% 35%, rgba(${Math.round(r * 0.5)}, ${Math.round(g * 0.5)}, ${Math.round(b * 0.5)}, 0.45) 0%, rgba(10, 8, 22, 0.98) 75%)`
+          arenaBg: `radial-gradient(circle at 50% 35%, rgba(${Math.round(r * 0.45)}, ${Math.round(g * 0.45)}, ${Math.round(b * 0.45)}, 0.45) 0%, rgba(10, 8, 22, 0.98) 75%)`
         };
         colorCache.set(imageUrl, theme);
         extractedColor.value = theme;
@@ -332,7 +348,8 @@ const rawTheme = computed(() => {
   const name = pkg ? (pkg.display_name || pkg.name || '') : '';
   const brand = getBrandThemeByName(name);
 
-  return brand || extractedColor.value || {
+  // Directly extracted color from the logo image takes priority!
+  return extractedColor.value || brand || {
     primary: '#c084fc',
     glow: 'rgba(168, 85, 247, 0.55)',
     subtle: 'rgba(168, 85, 247, 0.15)',

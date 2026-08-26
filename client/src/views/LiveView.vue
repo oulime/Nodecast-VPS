@@ -192,6 +192,8 @@ function handleThemeChange(t) {
 }
 
 const liveThemeStyle = computed(() => ({
+  '--vel-primary': currentTheme.value.primary,
+  '--vel-accent-glow': currentTheme.value.glow,
   '--live-theme-primary': currentTheme.value.primary,
   '--live-theme-glow': currentTheme.value.glow,
   '--live-theme-subtle': currentTheme.value.subtle || 'rgba(168, 85, 247, 0.15)',
@@ -290,11 +292,37 @@ watch(
   opacity: 1;
 }
 
-/* Dynamic Brand Theme effects for Channel Buttons */
+/* Base Rest State for Media Items in Live View with Theme Tint */
+:deep(.media-item),
+.media-item {
+  border: 1px solid var(--live-theme-border, rgba(168, 85, 247, 0.25)) !important;
+  background: linear-gradient(135deg, var(--live-theme-subtle, rgba(168, 85, 247, 0.08)), rgba(10, 8, 18, 0.8) 48%, rgba(18, 12, 28, 0.9)) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28), inset 0 1px rgba(255, 255, 255, 0.08) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  border-radius: 14px !important;
+}
+
+:deep(.media-item__thumb),
+.media-item__thumb {
+  border: 1px solid var(--live-theme-border, rgba(255, 255, 255, 0.12)) !important;
+  background: rgba(0, 0, 0, 0.5) !important;
+  border-radius: 10px !important;
+  transition: all 0.2s ease !important;
+}
+
+:deep(.media-info h4),
+.media-info h4 {
+  color: #f1ecff !important;
+  transition: color 0.2s ease, text-shadow 0.2s ease !important;
+}
+
+/* Hover State */
 :deep(.vel-media-item-row),
 .vel-media-item-row {
   position: relative;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   border-radius: 14px;
 }
 
@@ -306,36 +334,52 @@ watch(
 :deep(.vel-media-item-row:hover .media-item),
 .vel-media-item-row:hover .media-item {
   border-color: var(--live-theme-primary, #a855f7) !important;
-  background: linear-gradient(90deg, var(--live-theme-subtle, rgba(168, 85, 247, 0.18)) 0%, rgba(22, 14, 38, 0.95) 100%) !important;
-  box-shadow: 0 6px 20px var(--live-theme-subtle, rgba(168, 85, 247, 0.25)), inset 0 0 12px var(--live-theme-subtle, rgba(168, 85, 247, 0.1)) !important;
+  background: linear-gradient(135deg, var(--live-theme-subtle, rgba(168, 85, 247, 0.22)), rgba(14, 8, 20, 0.85) 48%, rgba(26, 14, 38, 0.95)) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 20px var(--live-theme-glow, rgba(168, 85, 247, 0.4)) !important;
 }
 
+:deep(.vel-media-item-row:hover .media-info h4),
+.vel-media-item-row:hover .media-info h4 {
+  color: #ffffff !important;
+  text-shadow: 0 0 10px var(--live-theme-glow, rgba(168, 85, 247, 0.5)) !important;
+}
+
+/* Active / Playing Channel State */
 :deep(.vel-media-item-row--active .media-item),
 .vel-media-item-row--active .media-item,
 :deep(.media-item.selected),
 .media-item.selected {
   border-color: var(--live-theme-primary, #a855f7) !important;
-  background: linear-gradient(90deg, var(--live-theme-subtle, rgba(168, 85, 247, 0.28)) 0%, rgba(32, 16, 56, 0.98) 100%) !important;
-  box-shadow: 0 0 25px var(--live-theme-glow, rgba(168, 85, 247, 0.5)), inset 0 0 15px var(--live-theme-subtle, rgba(168, 85, 247, 0.2)) !important;
+  background: linear-gradient(135deg, var(--live-theme-subtle, rgba(168, 85, 247, 0.35)), rgba(16, 8, 24, 0.9) 48%, rgba(30, 14, 46, 0.98)) !important;
+  box-shadow: inset 4px 0 var(--live-theme-primary, #a855f7), 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 28px var(--live-theme-glow, rgba(168, 85, 247, 0.6)) !important;
 }
 
 :deep(.vel-media-item-row--active .media-item__thumb),
 .vel-media-item-row--active .media-item__thumb {
   border-color: var(--live-theme-primary, #a855f7) !important;
-  box-shadow: 0 0 12px var(--live-theme-glow, rgba(168, 85, 247, 0.6)) !important;
+  box-shadow: 0 0 14px var(--live-theme-glow, rgba(168, 85, 247, 0.7)) !important;
+}
+
+:deep(.vel-media-item-row--active .media-info h4),
+.vel-media-item-row--active .media-info h4 {
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  text-shadow: 0 0 12px var(--live-theme-glow, rgba(168, 85, 247, 0.7)) !important;
 }
 
 :deep(.vel-channel-playing-badge),
 .vel-channel-playing-badge {
   background: var(--live-theme-primary, #a855f7) !important;
+  border: 1px solid rgba(255, 255, 255, 0.9) !important;
   color: #ffffff !important;
-  box-shadow: 0 0 12px var(--live-theme-glow, rgba(168, 85, 247, 0.7)) !important;
-  transition: background 0.35s ease, box-shadow 0.35s ease;
+  box-shadow: 0 0 14px var(--live-theme-glow, rgba(168, 85, 247, 0.8)) !important;
+  transition: background 0.35s ease, box-shadow 0.35s ease !important;
 }
 
 :deep(.vel-live-eq-bar),
 .vel-live-eq-bar {
   background: #ffffff !important;
+  box-shadow: 0 0 6px #ffffff !important;
 }
 
 :deep(.vel-favorite-heart.is-active),

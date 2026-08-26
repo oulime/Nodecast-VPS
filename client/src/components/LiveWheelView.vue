@@ -1,14 +1,11 @@
-<template>
+﻿<template>
   <div
     class="vel-casino-wheel-wrapper w-full max-w-4xl mx-auto select-none"
     ref="wheelWrapperRef"
     :style="themeStyle"
   >
-    <!-- 1. Main Wheel Stage -->
-    <div
-      class="vel-wheel-arena relative overflow-hidden p-3 md:p-5 flex flex-col items-center justify-center"
-      :class="activePackage && activePackage.is_parent && childPackages.length > 0 ? 'rounded-t-3xl rounded-b-xl' : 'rounded-3xl'"
-    >
+    <!-- Single Wheel Arena: Hosts BOTH the Main Wheel & Intersecting Sub-Wheel in the EXACT SAME space -->
+    <div class="vel-wheel-arena relative overflow-hidden rounded-3xl p-2 md:p-3 flex flex-col items-center justify-center">
       <!-- Dynamic Brand Ambient Lighting -->
       <div class="vel-wheel-ambient-glow" aria-hidden="true"></div>
       <div class="vel-wheel-radial-track" aria-hidden="true"></div>
@@ -18,9 +15,10 @@
         <div class="vel-wheel-pointer__triangle"></div>
       </div>
 
-      <!-- 3D Circular Arc Track -->
+      <!-- 1. Main 3D Circular Arc Track -->
       <div
         class="vel-coverflow-stage"
+        :class="{ 'has-sub-tier': activePackage && activePackage.is_parent && childPackages.length > 0 }"
         @mousedown="startDrag"
         @touchstart.passive="startTouch"
         @wheel.prevent="handleWheelScroll"
@@ -47,7 +45,7 @@
                 class="vel-coverflow-card__logo"
                 @error="pkg._imgError = true"
               />
-              <span v-else class="text-2xl">📺</span>
+              <span v-else class="text-xl">📺</span>
             </div>
 
             <!-- Title -->
@@ -57,57 +55,50 @@
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- 2. Sub-Wheel Area: Connected Directly Under Active Parent Item -->
-    <Transition name="vel-sub-pop" mode="out-in">
-      <div
-        v-if="activePackage && activePackage.is_parent && childPackages.length > 0"
-        :key="'sub-wheel-' + activePackage.id"
-        class="vel-sub-wheel-attached-tray relative overflow-hidden rounded-b-3xl rounded-t-lg px-2 pt-2.5 pb-1 flex flex-col items-center justify-center"
-      >
-        <!-- Center Connection Notch from Active Parent Card -->
-        <div class="vel-sub-connector-notch" aria-hidden="true"></div>
-
-        <!-- Sub-Wheel Ambient Glow -->
-        <div class="vel-sub-ambient-glow" aria-hidden="true"></div>
-
-        <!-- Sub 3D Arc Track -->
+      <!-- 2. Intersecting Sub-Wheel: Directly Inside the Same Arena at the Bottom Arc -->
+      <Transition name="vel-sub-intersect" mode="out-in">
         <div
-          class="vel-sub-stage"
-          @mousedown="startSubDrag"
-          @touchstart.passive="startSubTouch"
-          @wheel.prevent="handleSubWheelScroll"
+          v-if="activePackage && activePackage.is_parent && childPackages.length > 0"
+          :key="'sub-intersect-' + activePackage.id"
+          class="vel-sub-intersect-tier absolute bottom-2 left-0 right-0 z-30 flex items-center justify-center pointer-events-none"
         >
           <div
-            v-for="child in visibleSubCards"
-            :key="child.id"
-            @click="selectSubCard(child._origIndex)"
-            :class="[
-              'vel-sub-card-3d',
-              child._isCenter ? 'is-sub-center' : ''
-            ]"
-            :style="child._style"
+            class="vel-sub-stage-intersect pointer-events-auto"
+            @mousedown="startSubDrag"
+            @touchstart.passive="startSubTouch"
+            @wheel.prevent="handleSubWheelScroll"
           >
-            <div class="vel-sub-card-3d__inner">
-              <div class="vel-sub-card-3d__logo-wrap">
-                <img
-                  v-if="child.cover_url"
-                  :src="resolveImageUrl(child.cover_url)"
-                  alt=""
-                  loading="lazy"
-                  class="vel-sub-card-3d__logo"
-                />
-                <span v-else class="text-sm">📺</span>
+            <div
+              v-for="child in visibleSubCards"
+              :key="child.id"
+              @click="selectSubCard(child._origIndex)"
+              :class="[
+                'vel-sub-card-3d',
+                child._isCenter ? 'is-sub-center' : ''
+              ]"
+              :style="child._style"
+            >
+              <div class="vel-sub-card-3d__inner">
+                <div class="vel-sub-card-3d__logo-wrap">
+                  <img
+                    v-if="child.cover_url"
+                    :src="resolveImageUrl(child.cover_url)"
+                    alt=""
+                    loading="lazy"
+                    class="vel-sub-card-3d__logo"
+                  />
+                  <span v-else class="text-xs">📺</span>
+                </div>
+                <span class="vel-sub-card-3d__title">
+                  {{ child.display_name || child.name }}
+                </span>
               </div>
-              <span class="vel-sub-card-3d__title">
-                {{ child.display_name || child.name }}
-              </span>
             </div>
           </div>
         </div>
-      </div>
-    </Transition>
+      </Transition>
+    </div>
   </div>
 </template>
 
@@ -185,7 +176,7 @@ const currentSelectedPackage = computed(() => {
   return activePackage.value;
 });
 
-// Dynamic Brand Theming (Netflix Red, Prime Blue, Disney Cyan, Max Purple, Canal Gold, etc.)
+// Dynamic Brand Adaptive Theming
 const extractedColor = ref(null);
 const colorCache = new Map();
 
@@ -195,6 +186,7 @@ function getBrandThemeByName(name = '') {
     return {
       primary: '#E50914',
       glow: 'rgba(229, 9, 20, 0.55)',
+      subtle: 'rgba(229, 9, 20, 0.16)',
       border: 'rgba(229, 9, 20, 0.45)',
       arenaBg: 'radial-gradient(circle at 50% 35%, rgba(160, 10, 20, 0.48) 0%, rgba(14, 5, 8, 0.98) 75%)'
     };
@@ -203,6 +195,7 @@ function getBrandThemeByName(name = '') {
     return {
       primary: '#00A8E1',
       glow: 'rgba(0, 168, 225, 0.55)',
+      subtle: 'rgba(0, 168, 225, 0.16)',
       border: 'rgba(0, 168, 225, 0.45)',
       arenaBg: 'radial-gradient(circle at 50% 35%, rgba(0, 110, 180, 0.45) 0%, rgba(4, 10, 22, 0.98) 75%)'
     };
@@ -211,6 +204,7 @@ function getBrandThemeByName(name = '') {
     return {
       primary: '#00D6FE',
       glow: 'rgba(0, 214, 254, 0.55)',
+      subtle: 'rgba(0, 214, 254, 0.16)',
       border: 'rgba(0, 214, 254, 0.45)',
       arenaBg: 'radial-gradient(circle at 50% 35%, rgba(10, 60, 180, 0.45) 0%, rgba(4, 8, 24, 0.98) 75%)'
     };
@@ -219,6 +213,7 @@ function getBrandThemeByName(name = '') {
     return {
       primary: '#9d4edd',
       glow: 'rgba(157, 78, 221, 0.55)',
+      subtle: 'rgba(157, 78, 221, 0.16)',
       border: 'rgba(157, 78, 221, 0.45)',
       arenaBg: 'radial-gradient(circle at 50% 35%, rgba(90, 25, 140, 0.48) 0%, rgba(14, 6, 26, 0.98) 75%)'
     };
@@ -227,6 +222,7 @@ function getBrandThemeByName(name = '') {
     return {
       primary: '#FFE600',
       glow: 'rgba(255, 230, 0, 0.45)',
+      subtle: 'rgba(255, 230, 0, 0.14)',
       border: 'rgba(255, 230, 0, 0.35)',
       arenaBg: 'radial-gradient(circle at 50% 35%, rgba(120, 100, 10, 0.42) 0%, rgba(12, 10, 6, 0.98) 75%)'
     };
@@ -235,6 +231,7 @@ function getBrandThemeByName(name = '') {
     return {
       primary: '#38bdf8',
       glow: 'rgba(56, 189, 248, 0.5)',
+      subtle: 'rgba(56, 189, 248, 0.15)',
       border: 'rgba(56, 189, 248, 0.4)',
       arenaBg: 'radial-gradient(circle at 50% 35%, rgba(30, 70, 100, 0.45) 0%, rgba(8, 12, 18, 0.98) 75%)'
     };
@@ -243,6 +240,7 @@ function getBrandThemeByName(name = '') {
     return {
       primary: '#0064FF',
       glow: 'rgba(0, 100, 255, 0.55)',
+      subtle: 'rgba(0, 100, 255, 0.16)',
       border: 'rgba(0, 100, 255, 0.45)',
       arenaBg: 'radial-gradient(circle at 50% 35%, rgba(0, 60, 160, 0.45) 0%, rgba(4, 8, 22, 0.98) 75%)'
     };
@@ -251,6 +249,7 @@ function getBrandThemeByName(name = '') {
     return {
       primary: '#c026d3',
       glow: 'rgba(192, 38, 211, 0.55)',
+      subtle: 'rgba(192, 38, 211, 0.16)',
       border: 'rgba(192, 38, 211, 0.45)',
       arenaBg: 'radial-gradient(circle at 50% 35%, rgba(100, 15, 120, 0.48) 0%, rgba(18, 6, 22, 0.98) 75%)'
     };
@@ -259,6 +258,7 @@ function getBrandThemeByName(name = '') {
     return {
       primary: '#E2FF00',
       glow: 'rgba(226, 255, 0, 0.5)',
+      subtle: 'rgba(226, 255, 0, 0.14)',
       border: 'rgba(226, 255, 0, 0.35)',
       arenaBg: 'radial-gradient(circle at 50% 35%, rgba(90, 100, 10, 0.4) 0%, rgba(10, 12, 6, 0.98) 75%)'
     };
@@ -267,6 +267,7 @@ function getBrandThemeByName(name = '') {
     return {
       primary: '#0284c7',
       glow: 'rgba(2, 132, 199, 0.55)',
+      subtle: 'rgba(2, 132, 199, 0.15)',
       border: 'rgba(2, 132, 199, 0.45)',
       arenaBg: 'radial-gradient(circle at 50% 35%, rgba(10, 60, 120, 0.45) 0%, rgba(6, 10, 20, 0.98) 75%)'
     };
@@ -274,7 +275,6 @@ function getBrandThemeByName(name = '') {
   return null;
 }
 
-// Extract dominant color from image via canvas
 function extractColorFromImage(imageUrl) {
   if (!imageUrl) return;
   if (colorCache.has(imageUrl)) {
@@ -302,7 +302,6 @@ function extractColorFromImage(imageUrl) {
         const r = data[i], g = data[i + 1], b = data[i + 2];
         const max = Math.max(r, g, b);
         const min = Math.min(r, g, b);
-        // Exclude near-black, near-white, or completely unsaturated grey
         if (max - min > 24 && max > 45 && max < 240) {
           rSum += r;
           gSum += g;
@@ -319,15 +318,14 @@ function extractColorFromImage(imageUrl) {
         const theme = {
           primary: hex,
           glow: `rgba(${r}, ${g}, ${b}, 0.55)`,
+          subtle: `rgba(${r}, ${g}, ${b}, 0.15)`,
           border: `rgba(${r}, ${g}, ${b}, 0.45)`,
           arenaBg: `radial-gradient(circle at 50% 35%, rgba(${Math.round(r * 0.5)}, ${Math.round(g * 0.5)}, ${Math.round(b * 0.5)}, 0.45) 0%, rgba(10, 8, 22, 0.98) 75%)`
         };
         colorCache.set(imageUrl, theme);
         extractedColor.value = theme;
       }
-    } catch {
-      // Ignore canvas CORS if protected
-    }
+    } catch {}
   };
 }
 
@@ -375,15 +373,15 @@ watch(activePackage, (pkg) => {
   }
 }, { immediate: true });
 
-// Main Wheel 3D Arc (Prominent Main Wheel)
+// Main Wheel 3D Arc
 const visibleCards = computed(() => {
   const total = totalItems.value;
   if (total === 0) return [];
 
   const current = animatedIndex.value;
   const result = [];
-  const radius = window.innerWidth < 640 ? 250 : 310;
-  const angleStep = window.innerWidth < 640 ? 19 : 16.5;
+  const radius = window.innerWidth < 640 ? 240 : 300;
+  const angleStep = window.innerWidth < 640 ? 19.5 : 17;
 
   for (let i = 0; i < total; i++) {
     let diff = (i - current) % total;
@@ -420,7 +418,7 @@ const visibleCards = computed(() => {
   return result;
 });
 
-// Sub-Wheel 3D Arc (Miniature Attached Sub-Deck)
+// Intersecting Sub-Wheel 3D Arc (Concentric Lower Arc)
 const visibleSubCards = computed(() => {
   const list = childPackages.value;
   const total = list.length;
@@ -428,8 +426,8 @@ const visibleSubCards = computed(() => {
 
   const current = subAnimatedIndex.value;
   const result = [];
-  const radius = window.innerWidth < 640 ? 170 : 210;
-  const angleStep = window.innerWidth < 640 ? 24 : 21;
+  const radius = window.innerWidth < 640 ? 180 : 230;
+  const angleStep = window.innerWidth < 640 ? 21 : 18;
 
   for (let i = 0; i < total; i++) {
     let diff = (i - current) % total;
@@ -447,7 +445,7 @@ const visibleSubCards = computed(() => {
     const rotY = -angleDeg;
 
     const opacity = Math.max(0, 1 - absDist * 0.3);
-    const zIndex = Math.round(100 - absDist * 10);
+    const zIndex = Math.round(150 - absDist * 10);
     const isCenter = absDist < 0.45;
 
     result.push({
@@ -742,13 +740,13 @@ watch(activePackage, () => {
   perspective: 1200px;
 }
 
-/* 1. Main Wheel Arena (Prominent Primary Deck with Dynamic Theme) */
+/* Single Arena: Fixed constant height for entire wheel area */
 .vel-wheel-arena {
-  height: 155px;
+  height: 165px;
   background: var(--theme-arena-bg, radial-gradient(circle at 50% 35%, rgba(55, 25, 95, 0.55) 0%, rgba(10, 8, 22, 0.98) 75%));
   border: 1.5px solid var(--theme-border, rgba(168, 85, 247, 0.35));
   box-shadow: inset 0 0 40px var(--theme-glow, rgba(138, 43, 226, 0.16)), 0 12px 35px rgba(0, 0, 0, 0.65);
-  transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease, border-radius 0.25s ease;
+  transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
 .vel-wheel-ambient-glow {
@@ -803,17 +801,18 @@ watch(activePackage, () => {
   transition: border-top-color 0.4s ease;
 }
 
-/* 3D Arc Stage */
+/* Main 3D Arc Stage */
 .vel-coverflow-stage {
   position: relative;
   width: 100%;
-  height: 135px;
+  height: 100%;
   perspective: 1000px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: grab;
   touch-action: pan-y;
+  transition: all 0.3s ease;
 }
 
 .vel-coverflow-stage:active {
@@ -825,29 +824,34 @@ watch(activePackage, () => {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 98px;
-  height: 114px;
-  border-radius: 16px;
+  width: 92px;
+  height: 106px;
+  border-radius: 15px;
   cursor: pointer;
   will-change: transform, opacity;
-  transition: box-shadow 0.22s ease, border-color 0.22s ease;
+  transition: box-shadow 0.22s ease, border-color 0.22s ease, top 0.3s ease;
+}
+
+/* When sub-wheel intersects, main cards gently elevate to make room for intersecting sub-cards */
+.vel-coverflow-stage.has-sub-tier .vel-coverflow-card {
+  top: 40%;
 }
 
 .vel-coverflow-card__inner {
   position: relative;
   width: 100%;
   height: 100%;
-  padding: 6px 4px;
+  padding: 5px 3px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 4px;
   text-align: center;
   background: linear-gradient(145deg, rgba(30, 18, 56, 0.94), rgba(12, 10, 24, 0.96));
   border: 1.5px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+  border-radius: 15px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(8px);
   transition: border-color 0.35s ease, box-shadow 0.35s ease;
 }
@@ -859,9 +863,9 @@ watch(activePackage, () => {
 }
 
 .vel-coverflow-card__logo-wrap {
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
+  width: 46px;
+  height: 46px;
+  border-radius: 11px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
@@ -880,7 +884,7 @@ watch(activePackage, () => {
 
 .vel-coverflow-card__title {
   color: #ffffff;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 850;
   line-height: 1.1;
   display: -webkit-box;
@@ -891,48 +895,16 @@ watch(activePackage, () => {
   padding: 0 2px;
 }
 
-/* 2. Sub-Wheel Attached Tray (Visibly Attached Extension of Parent Card) */
-.vel-sub-wheel-attached-tray {
-  height: 98px;
-  background: linear-gradient(180deg, rgba(24, 12, 44, 0.95) 0%, rgba(10, 8, 20, 0.98) 100%);
-  border: 1.5px solid var(--theme-border, rgba(192, 132, 252, 0.35));
-  border-top: none;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.65), inset 0 6px 20px var(--theme-glow, rgba(168, 85, 247, 0.12));
-  transition: border-color 0.4s ease, box-shadow 0.4s ease;
+/* 2. Intersecting Sub-Wheel Tier: Occupies bottom arc of SAME arena */
+.vel-sub-intersect-tier {
+  width: 100%;
+  height: 58px;
 }
 
-.vel-sub-connector-notch {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 44px;
-  height: 4px;
-  border-radius: 0 0 6px 6px;
-  background: var(--theme-primary, #c084fc);
-  box-shadow: 0 0 10px var(--theme-primary, #c084fc);
-  z-index: 30;
-  transition: background 0.4s ease, box-shadow 0.4s ease;
-}
-
-.vel-sub-ambient-glow {
-  position: absolute;
-  top: 10%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 180px;
-  height: 60px;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--theme-glow, rgba(168, 85, 247, 0.2)) 0%, transparent 70%);
-  filter: blur(18px);
-  pointer-events: none;
-  transition: background 0.4s ease;
-}
-
-.vel-sub-stage {
+.vel-sub-stage-intersect {
   position: relative;
   width: 100%;
-  height: 82px;
+  height: 58px;
   perspective: 750px;
   display: flex;
   align-items: center;
@@ -941,18 +913,18 @@ watch(activePackage, () => {
   touch-action: pan-y;
 }
 
-.vel-sub-stage:active {
+.vel-sub-stage-intersect:active {
   cursor: grabbing;
 }
 
-/* Miniature Sub-Cards */
+/* Intersecting Sub-Cards */
 .vel-sub-card-3d {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 68px;
-  height: 72px;
-  border-radius: 10px;
+  width: 76px;
+  height: 48px;
+  border-radius: 12px;
   cursor: pointer;
   will-change: transform, opacity;
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
@@ -962,32 +934,33 @@ watch(activePackage, () => {
   position: relative;
   width: 100%;
   height: 100%;
-  padding: 3px 2px;
+  padding: 3px 6px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  text-align: center;
-  background: linear-gradient(145deg, rgba(26, 16, 48, 0.92), rgba(10, 8, 20, 0.95));
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(6px);
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  gap: 5px;
+  text-align: left;
+  background: linear-gradient(135deg, rgba(22, 12, 38, 0.94), rgba(10, 8, 20, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
 }
 
 .vel-sub-card-3d.is-sub-center .vel-sub-card-3d__inner {
   border-color: var(--theme-primary, #c084fc);
-  background: linear-gradient(145deg, rgba(40, 18, 70, 0.96), rgba(14, 10, 26, 0.98));
-  box-shadow: 0 0 14px var(--theme-glow, rgba(168, 85, 247, 0.5)), 0 4px 12px rgba(0, 0, 0, 0.55);
+  background: linear-gradient(135deg, rgba(46, 18, 76, 0.98), rgba(16, 10, 30, 0.98));
+  box-shadow: 0 0 16px var(--theme-glow, rgba(168, 85, 247, 0.65)), 0 4px 12px rgba(0, 0, 0, 0.7);
+  transform: scale(1.06);
 }
 
 .vel-sub-card-3d__logo-wrap {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.05);
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -999,54 +972,64 @@ watch(activePackage, () => {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 2px;
+  padding: 1.5px;
 }
 
 .vel-sub-card-3d__title {
   color: #ffffff;
   font-size: 0.58rem;
   font-weight: 800;
-  line-height: 1.05;
+  line-height: 1.1;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-  padding: 0 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+/* Intersect Transition */
+.vel-sub-intersect-enter-active,
+.vel-sub-intersect-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vel-sub-intersect-enter-from,
+.vel-sub-intersect-leave-to {
+  opacity: 0;
+  transform: translateY(12px) scale(0.95);
 }
 
 @media (max-width: 640px) {
   .vel-wheel-arena {
-    height: 140px;
-  }
-  .vel-coverflow-stage {
-    height: 120px;
+    height: 152px;
   }
   .vel-coverflow-card {
-    width: 86px;
-    height: 100px;
+    width: 82px;
+    height: 94px;
   }
   .vel-coverflow-card__logo-wrap {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
   }
   .vel-coverflow-card__title {
-    font-size: 0.65rem;
+    font-size: 0.64rem;
   }
 
-  .vel-sub-wheel-attached-tray {
-    height: 88px;
+  .vel-sub-intersect-tier {
+    height: 52px;
   }
-  .vel-sub-stage {
-    height: 74px;
+  .vel-sub-stage-intersect {
+    height: 52px;
   }
   .vel-sub-card-3d {
-    width: 60px;
-    height: 66px;
+    width: 68px;
+    height: 42px;
   }
   .vel-sub-card-3d__logo-wrap {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
   }
   .vel-sub-card-3d__title {
     font-size: 0.52rem;

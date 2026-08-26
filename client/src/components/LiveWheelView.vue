@@ -1008,15 +1008,17 @@ watch(activePackage, () => {
 }
 
 .vel-sub-card-3d__title {
-  color: #ffffff;
-  font-size: 0.54rem;
-  font-weight: 800;
-  line-height: 1.05;
+  color: rgba(255, 255, 255, 0.95);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.62rem;
+  font-weight: 550;
+  letter-spacing: 0.015em;
+  line-height: 1.15;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
   min-width: 0;
   flex: 1;
 }
@@ -1064,7 +1066,8 @@ watch(activePackage, () => {
     height: 18px;
   }
   .vel-sub-card-3d__title {
-    font-size: 0.5rem;
+    font-size: 0.55rem;
+    font-weight: 550;
   }
 }
 </style>

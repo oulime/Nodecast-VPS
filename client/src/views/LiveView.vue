@@ -34,29 +34,6 @@
 
     <!-- Channels List of the Selected Package (Directly Below the Picked Package) -->
     <div v-if="catalog.activePackage" class="vel-channels-section mt-4" id="content-view">
-      <!-- Section Header Bar -->
-      <div class="flex items-center justify-between gap-3 mb-3 px-2 py-2 rounded-2xl bg-purple-950/40 border border-purple-800/30">
-        <div class="flex items-center gap-2">
-          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/80 animate-pulse"></span>
-          <h3 class="text-xs md:text-sm font-extrabold text-purple-200 uppercase tracking-wider">
-            Chaînes • {{ catalog.activePackage.display_name || catalog.activePackage.name }}
-          </h3>
-          <span v-if="!catalog.loadingChannels" class="text-xs text-purple-300/70 font-bold hidden sm:inline">
-            ({{ filteredChannels.length }})
-          </span>
-        </div>
-
-        <!-- Filter / Search input -->
-        <div v-if="catalog.channels.length > 6" class="relative">
-          <input
-            v-model="channelSearch"
-            type="text"
-            placeholder="Filtrer une chaîne..."
-            class="bg-purple-900/40 border border-purple-700/40 rounded-xl px-3 py-1 text-xs text-white placeholder-purple-300/50 focus:outline-none focus:border-purple-400 transition-colors w-40 sm:w-56"
-          />
-        </div>
-      </div>
-
       <!-- Channels List Container -->
       <div class="item-list item-list--media-ready" id="dynamic-list" data-show-more-ready="true">
         <!-- Live Channels Loading Animation -->
@@ -99,12 +76,13 @@
         <!-- Channels List Rows -->
         <template v-else-if="filteredChannels.length > 0">
           <div
-            v-for="ch in filteredChannels"
+            v-for="(ch, chIdx) in filteredChannels"
             :key="ch.stream_id || ch.id"
             :class="[
-              'vel-media-item-row',
+              'vel-media-item-row vel-channel-card-enter',
               player.currentStream?.stream_id === (ch.stream_id || ch.id) ? 'vel-media-item-row--active' : ''
             ]"
+            :style="{ animationDelay: `${Math.min(chIdx * 0.02, 0.35)}s` }"
             :data-stream-id="ch.stream_id || ch.id"
             data-favorite-decorated="true"
           >
@@ -121,12 +99,16 @@
                 <img
                   v-if="ch.stream_icon || ch.logo"
                   alt=""
-                  class="vel-image-loaded"
+                  :class="[
+                    'vel-image-loaded vel-image-fade',
+                    loadedLogos.has(ch.stream_id || ch.id) ? 'is-ready' : ''
+                  ]"
                   loading="lazy"
                   decoding="async"
                   referrerpolicy="no-referrer"
                   crossorigin="anonymous"
                   :src="resolveImageUrl(ch.stream_icon || ch.logo)"
+                  @load="loadedLogos.add(ch.stream_id || ch.id)"
                 />
                 <span v-else class="text-sm">📺</span>
               </div>
@@ -176,7 +158,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { useCatalogStore } from '../stores/catalogStore.js';
 import { usePlayerStore } from '../stores/playerStore.js';
 import { useFavoritesStore } from '../stores/favoritesStore.js';
@@ -193,6 +175,7 @@ function openCountryPicker() {
 const player = usePlayerStore();
 const favs = useFavoritesStore();
 const channelSearch = ref('');
+const loadedLogos = reactive(new Set());
 
 onMounted(async () => {
   if (catalog.allPackages.length === 0) {
@@ -208,6 +191,9 @@ const filteredChannels = computed(() => {
 
 async function handlePackageClick(pkg) {
   if (!pkg) return;
+  if (catalog.activePackage && String(catalog.activePackage.id) === String(pkg.id)) {
+    return;
+  }
   channelSearch.value = '';
   await catalog.openPackage(pkg);
 }
@@ -235,3 +221,46 @@ watch(
   { immediate: true }
 );
 </script>
+
+<style scoped>
+.vel-channels-section {
+  animation: vel-section-reveal 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.vel-channel-card-enter {
+  opacity: 0;
+  animation: vel-channel-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+
+@keyframes vel-section-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes vel-channel-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.vel-image-fade {
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.vel-image-fade.is-ready {
+  opacity: 1;
+}
+</style>

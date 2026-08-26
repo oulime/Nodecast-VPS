@@ -1,7 +1,10 @@
-﻿<template>
+<template>
   <div class="vel-casino-wheel-wrapper w-full max-w-4xl mx-auto select-none" ref="wheelWrapperRef">
     <!-- 1. Main Wheel Stage -->
-    <div class="vel-wheel-arena relative overflow-hidden rounded-3xl p-3 md:p-5 flex flex-col items-center justify-center">
+    <div
+      class="vel-wheel-arena relative overflow-hidden p-3 md:p-5 flex flex-col items-center justify-center"
+      :class="activePackage && activePackage.is_parent && childPackages.length > 0 ? 'rounded-t-3xl rounded-b-xl' : 'rounded-3xl'"
+    >
       <!-- Ambient Radial Lighting -->
       <div class="vel-wheel-ambient-glow" aria-hidden="true"></div>
       <div class="vel-wheel-radial-track" aria-hidden="true"></div>
@@ -40,7 +43,7 @@
                 class="vel-coverflow-card__logo"
                 @error="pkg._imgError = true"
               />
-              <span v-else class="text-3xl">📺</span>
+              <span v-else class="text-2xl">📺</span>
             </div>
 
             <!-- Title -->
@@ -52,76 +55,55 @@
       </div>
     </div>
 
-    <!-- 2. Sub-Packages Area: Smaller Round Wheel for Parent Packages OR Play Button for Direct -->
-    <div class="vel-action-deck mt-3">
-      <Transition name="vel-sub-pop" mode="out-in">
-        <!-- SUB-WHEEL FOR PARENT PACKAGES -->
+    <!-- 2. Sub-Wheel Area: Visibly Connected & Attached Directly Under the Main Parent Item -->
+    <Transition name="vel-sub-pop" mode="out-in">
+      <div
+        v-if="activePackage && activePackage.is_parent && childPackages.length > 0"
+        :key="'sub-wheel-' + activePackage.id"
+        class="vel-sub-wheel-attached-tray relative overflow-hidden rounded-b-3xl rounded-t-lg px-2 pt-2.5 pb-1 flex flex-col items-center justify-center"
+      >
+        <!-- Center Connection Notch from Active Parent Card -->
+        <div class="vel-sub-connector-notch" aria-hidden="true"></div>
+
+        <!-- Sub-Wheel Ambient Glow -->
+        <div class="vel-sub-ambient-glow" aria-hidden="true"></div>
+
+        <!-- Sub 3D Arc Track -->
         <div
-          v-if="activePackage && activePackage.is_parent && childPackages.length > 0"
-          :key="'sub-wheel-' + activePackage.id"
-          class="vel-sub-wheel-arena relative overflow-hidden rounded-2xl p-2.5 flex flex-col items-center justify-center"
+          class="vel-sub-stage"
+          @mousedown="startSubDrag"
+          @touchstart.passive="startSubTouch"
+          @wheel.prevent="handleSubWheelScroll"
         >
-          <!-- Sub-Wheel Ambient Glow -->
-          <div class="vel-sub-ambient-glow" aria-hidden="true"></div>
-
-          <!-- Sub Pointer -->
-          <div class="vel-sub-pointer" aria-hidden="true">
-            <div class="vel-sub-pointer__needle"></div>
-          </div>
-
-          <!-- Sub 3D Arc Track -->
           <div
-            class="vel-sub-stage"
-            @mousedown="startSubDrag"
-            @touchstart.passive="startSubTouch"
-            @wheel.prevent="handleSubWheelScroll"
+            v-for="child in visibleSubCards"
+            :key="child.id"
+            @click="selectSubCard(child._origIndex)"
+            :class="[
+              'vel-sub-card-3d',
+              child._isCenter ? 'is-sub-center' : ''
+            ]"
+            :style="child._style"
           >
-            <div
-              v-for="child in visibleSubCards"
-              :key="child.id"
-              @click="handleSubCardClick(child)"
-              :class="[
-                'vel-sub-card-3d',
-                child._isCenter ? 'is-sub-center' : ''
-              ]"
-              :style="child._style"
-            >
-              <div class="vel-sub-card-3d__inner">
-                <div class="vel-sub-card-3d__logo-wrap">
-                  <img
-                    v-if="child.cover_url"
-                    :src="resolveImageUrl(child.cover_url)"
-                    alt=""
-                    loading="lazy"
-                    class="vel-sub-card-3d__logo"
-                  />
-                  <span v-else class="text-xl">📺</span>
-                </div>
-                <span class="vel-sub-card-3d__title">
-                  {{ child.display_name || child.name }}
-                </span>
+            <div class="vel-sub-card-3d__inner">
+              <div class="vel-sub-card-3d__logo-wrap">
+                <img
+                  v-if="child.cover_url"
+                  :src="resolveImageUrl(child.cover_url)"
+                  alt=""
+                  loading="lazy"
+                  class="vel-sub-card-3d__logo"
+                />
+                <span v-else class="text-sm">📺</span>
               </div>
+              <span class="vel-sub-card-3d__title">
+                {{ child.display_name || child.name }}
+              </span>
             </div>
           </div>
         </div>
-
-        <!-- DIRECT SINGLE PACKAGE: CLEAN PLAY BUTTON -->
-        <div
-          v-else-if="activePackage"
-          :key="'single-' + activePackage.id"
-          class="flex justify-center py-1"
-        >
-          <button
-            @click="$emit('select-package', activePackage)"
-            type="button"
-            class="vel-btn-open-package cursor-pointer active:scale-95"
-          >
-            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            <span>Regarder {{ activePackage.display_name || activePackage.name }}</span>
-          </button>
-        </div>
-      </Transition>
-    </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -185,15 +167,38 @@ const childPackages = computed(() => {
 
 const totalSubItems = computed(() => Math.max(1, childPackages.value.length));
 
-// Main Wheel 3D Arc
+const activeSubPackage = computed(() => {
+  if (!activePackage.value || !activePackage.value.is_parent || childPackages.value.length === 0) return null;
+  const subIdx = ((Math.round(subAnimatedIndex.value) % totalSubItems.value) + totalSubItems.value) % totalSubItems.value;
+  return childPackages.value[subIdx] || childPackages.value[0];
+});
+
+const currentSelectedPackage = computed(() => {
+  if (!activePackage.value) return null;
+  if (activePackage.value.is_parent) {
+    return activeSubPackage.value;
+  }
+  return activePackage.value;
+});
+
+let notifyTimer = null;
+watch(currentSelectedPackage, (pkg) => {
+  if (!pkg) return;
+  if (notifyTimer) clearTimeout(notifyTimer);
+  notifyTimer = setTimeout(() => {
+    emit('select-package', pkg);
+  }, 120);
+}, { immediate: true });
+
+// Main Wheel 3D Arc (Prominent Main Wheel)
 const visibleCards = computed(() => {
   const total = totalItems.value;
   if (total === 0) return [];
 
   const current = animatedIndex.value;
   const result = [];
-  const radius = window.innerWidth < 640 ? 300 : 360;
-  const angleStep = window.innerWidth < 640 ? 17.5 : 15.5;
+  const radius = window.innerWidth < 640 ? 250 : 310;
+  const angleStep = window.innerWidth < 640 ? 19 : 16.5;
 
   for (let i = 0; i < total; i++) {
     let diff = (i - current) % total;
@@ -230,7 +235,7 @@ const visibleCards = computed(() => {
   return result;
 });
 
-// Sub-Wheel 3D Arc (Smaller Round Wheel)
+// Sub-Wheel 3D Arc (Miniature Attached Sub-Deck)
 const visibleSubCards = computed(() => {
   const list = childPackages.value;
   const total = list.length;
@@ -238,8 +243,8 @@ const visibleSubCards = computed(() => {
 
   const current = subAnimatedIndex.value;
   const result = [];
-  const radius = window.innerWidth < 640 ? 220 : 260;
-  const angleStep = window.innerWidth < 640 ? 21 : 18.5;
+  const radius = window.innerWidth < 640 ? 170 : 210;
+  const angleStep = window.innerWidth < 640 ? 24 : 21;
 
   for (let i = 0; i < total; i++) {
     let diff = (i - current) % total;
@@ -328,7 +333,7 @@ function selectCard(idx) {
 }
 
 // Sub-Wheel Animation & Drag Handlers
-function smoothAnimateSubToIndex(targetIdx, duration = 280) {
+function smoothAnimateSubToIndex(targetIdx, duration = 300) {
   if (subAnimFrameId) cancelAnimationFrame(subAnimFrameId);
 
   const startVal = subAnimatedIndex.value;
@@ -345,6 +350,7 @@ function smoothAnimateSubToIndex(targetIdx, duration = 280) {
 
   const targetVal = startVal + diff;
   const startTime = performance.now();
+  let lastRounded = Math.round(startVal);
 
   function loop(now) {
     const elapsed = now - startTime;
@@ -352,6 +358,12 @@ function smoothAnimateSubToIndex(targetIdx, duration = 280) {
     const eased = 1 - Math.pow(1 - progress, 3);
 
     subAnimatedIndex.value = startVal + diff * eased;
+
+    const currentRounded = Math.round(subAnimatedIndex.value);
+    if (currentRounded !== lastRounded) {
+      lastRounded = currentRounded;
+      triggerTick();
+    }
 
     if (progress < 1) {
       subAnimFrameId = requestAnimationFrame(loop);
@@ -364,8 +376,8 @@ function smoothAnimateSubToIndex(targetIdx, duration = 280) {
   subAnimFrameId = requestAnimationFrame(loop);
 }
 
-function handleSubCardClick(child) {
-  emit('select-package', child);
+function selectSubCard(idx) {
+  smoothAnimateSubToIndex(idx, 300);
 }
 
 function startSubDrag(e) {
@@ -545,12 +557,13 @@ watch(activePackage, () => {
   perspective: 1200px;
 }
 
-/* 1. Main Wheel Arena */
+/* 1. Main Wheel Arena (Prominent Primary Deck) */
 .vel-wheel-arena {
-  height: 200px;
-  background: radial-gradient(circle at 50% 35%, rgba(55, 25, 95, 0.5) 0%, rgba(10, 8, 22, 0.98) 75%);
-  border: 1.5px solid rgba(168, 85, 247, 0.3);
-  box-shadow: inset 0 0 45px rgba(138, 43, 226, 0.16), 0 14px 40px rgba(0, 0, 0, 0.7);
+  height: 155px;
+  background: radial-gradient(circle at 50% 35%, rgba(55, 25, 95, 0.55) 0%, rgba(10, 8, 22, 0.98) 75%);
+  border: 1.5px solid rgba(168, 85, 247, 0.35);
+  box-shadow: inset 0 0 40px rgba(138, 43, 226, 0.16), 0 12px 35px rgba(0, 0, 0, 0.65);
+  transition: border-radius 0.25s ease;
 }
 
 .vel-wheel-ambient-glow {
@@ -558,56 +571,56 @@ watch(activePackage, () => {
   top: 10%;
   left: 50%;
   transform: translateX(-50%);
-  width: 320px;
-  height: 140px;
+  width: 300px;
+  height: 110px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(168, 85, 247, 0.3) 0%, transparent 70%);
-  filter: blur(30px);
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.28) 0%, transparent 70%);
+  filter: blur(25px);
   pointer-events: none;
 }
 
 .vel-wheel-radial-track {
   position: absolute;
-  bottom: -45px;
+  bottom: -35px;
   left: 50%;
   transform: translateX(-50%);
   width: 90%;
-  height: 110px;
+  height: 85px;
   border-radius: 50%;
-  border: 2px solid rgba(168, 85, 247, 0.3);
-  box-shadow: 0 0 25px rgba(168, 85, 247, 0.2), inset 0 0 25px rgba(168, 85, 247, 0.1);
+  border: 1.5px solid rgba(168, 85, 247, 0.25);
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.15), inset 0 0 20px rgba(168, 85, 247, 0.1);
   pointer-events: none;
 }
 
 /* Center Pointer Ticker */
 .vel-wheel-pointer {
   position: absolute;
-  top: 6px;
+  top: 3px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 40;
-  filter: drop-shadow(0 2px 8px rgba(192, 132, 252, 0.9));
+  filter: drop-shadow(0 2px 6px rgba(192, 132, 252, 0.9));
   transition: transform 0.08s cubic-bezier(0.18, 0.89, 0.32, 1.28);
 }
 
 .vel-wheel-pointer.is-ticking {
-  transform: translateX(-50%) translateY(-3px) scale(1.15);
+  transform: translateX(-50%) translateY(-2px) scale(1.12);
 }
 
 .vel-wheel-pointer__triangle {
   width: 0;
   height: 0;
-  border-left: 10px solid transparent;
-  border-right: 10px solid transparent;
-  border-top: 15px solid #c084fc;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 11px solid #c084fc;
 }
 
 /* 3D Arc Stage */
 .vel-coverflow-stage {
   position: relative;
   width: 100%;
-  height: 170px;
-  perspective: 1100px;
+  height: 135px;
+  perspective: 1000px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -624,9 +637,9 @@ watch(activePackage, () => {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 112px;
-  height: 142px;
-  border-radius: 18px;
+  width: 98px;
+  height: 114px;
+  border-radius: 16px;
   cursor: pointer;
   will-change: transform, opacity;
   transition: box-shadow 0.22s ease, border-color 0.22s ease;
@@ -636,30 +649,30 @@ watch(activePackage, () => {
   position: relative;
   width: 100%;
   height: 100%;
-  padding: 8px 6px;
+  padding: 6px 4px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
   text-align: center;
   background: linear-gradient(145deg, rgba(30, 18, 56, 0.94), rgba(12, 10, 24, 0.96));
   border: 1.5px solid rgba(168, 85, 247, 0.3);
-  border-radius: 18px;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
+  border-radius: 16px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(8px);
 }
 
 .vel-coverflow-card.is-center-card .vel-coverflow-card__inner {
   border-color: #c084fc;
   background: linear-gradient(145deg, rgba(60, 22, 105, 0.98), rgba(20, 12, 40, 0.98));
-  box-shadow: 0 0 28px rgba(168, 85, 247, 0.55), 0 10px 25px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 0 24px rgba(168, 85, 247, 0.6), 0 8px 22px rgba(0, 0, 0, 0.7);
 }
 
 .vel-coverflow-card__logo-wrap {
-  width: 64px;
-  height: 64px;
-  border-radius: 14px;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
@@ -673,28 +686,42 @@ watch(activePackage, () => {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 4px;
+  padding: 3px;
 }
 
 .vel-coverflow-card__title {
   color: #ffffff;
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 850;
-  line-height: 1.15;
+  line-height: 1.1;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
   padding: 0 2px;
 }
 
-/* 2. Sub-Wheel Arena (Smaller Round 3D Wheel for Parent Packages) */
-.vel-sub-wheel-arena {
-  height: 155px;
-  background: radial-gradient(circle at 50% 35%, rgba(45, 18, 75, 0.4) 0%, rgba(8, 6, 18, 0.95) 80%);
-  border: 1px solid rgba(168, 85, 247, 0.25);
-  box-shadow: inset 0 0 30px rgba(138, 43, 226, 0.1), 0 8px 24px rgba(0, 0, 0, 0.5);
+/* 2. Sub-Wheel Attached Tray (Visibly Attached Extension of Parent Card) */
+.vel-sub-wheel-attached-tray {
+  height: 98px;
+  background: linear-gradient(180deg, rgba(32, 14, 56, 0.95) 0%, rgba(10, 8, 20, 0.98) 100%);
+  border: 1.5px solid rgba(192, 132, 252, 0.35);
+  border-top: none;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.65), inset 0 6px 20px rgba(168, 85, 247, 0.12);
+}
+
+.vel-sub-connector-notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 4px;
+  border-radius: 0 0 6px 6px;
+  background: #c084fc;
+  box-shadow: 0 0 10px #c084fc;
+  z-index: 30;
 }
 
 .vel-sub-ambient-glow {
@@ -702,37 +729,19 @@ watch(activePackage, () => {
   top: 10%;
   left: 50%;
   transform: translateX(-50%);
-  width: 240px;
-  height: 90px;
+  width: 180px;
+  height: 60px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, transparent 70%);
-  filter: blur(25px);
+  filter: blur(18px);
   pointer-events: none;
-}
-
-.vel-sub-pointer {
-  position: absolute;
-  top: 5px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 40;
-  pointer-events: none;
-}
-
-.vel-sub-pointer__needle {
-  width: 0;
-  height: 0;
-  border-left: 7px solid transparent;
-  border-right: 7px solid transparent;
-  border-top: 10px solid #a855f7;
-  filter: drop-shadow(0 1px 4px rgba(168, 85, 247, 0.9));
 }
 
 .vel-sub-stage {
   position: relative;
   width: 100%;
-  height: 130px;
-  perspective: 900px;
+  height: 82px;
+  perspective: 750px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -744,14 +753,14 @@ watch(activePackage, () => {
   cursor: grabbing;
 }
 
-/* Sub-Cards */
+/* Miniature Sub-Cards */
 .vel-sub-card-3d {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 92px;
-  height: 118px;
-  border-radius: 14px;
+  width: 68px;
+  height: 72px;
+  border-radius: 10px;
   cursor: pointer;
   will-change: transform, opacity;
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
@@ -761,30 +770,30 @@ watch(activePackage, () => {
   position: relative;
   width: 100%;
   height: 100%;
-  padding: 6px 4px;
+  padding: 3px 2px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 2px;
   text-align: center;
   background: linear-gradient(145deg, rgba(26, 16, 48, 0.92), rgba(10, 8, 20, 0.95));
   border: 1px solid rgba(168, 85, 247, 0.25);
-  border-radius: 14px;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(6px);
 }
 
 .vel-sub-card-3d.is-sub-center .vel-sub-card-3d__inner {
   border-color: #c084fc;
   background: linear-gradient(145deg, rgba(55, 20, 95, 0.96), rgba(18, 10, 36, 0.98));
-  box-shadow: 0 0 20px rgba(168, 85, 247, 0.5), 0 8px 18px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.5), 0 4px 12px rgba(0, 0, 0, 0.55);
 }
 
 .vel-sub-card-3d__logo-wrap {
-  width: 48px;
-  height: 48px;
-  border-radius: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
   background: rgba(255, 255, 255, 0.05);
   display: flex;
   align-items: center;
@@ -797,72 +806,57 @@ watch(activePackage, () => {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 3px;
+  padding: 2px;
 }
 
 .vel-sub-card-3d__title {
   color: #ffffff;
-  font-size: 0.7rem;
+  font-size: 0.58rem;
   font-weight: 800;
-  line-height: 1.15;
+  line-height: 1.05;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
-  padding: 0 2px;
-}
-
-/* Direct Play Button */
-.vel-btn-open-package {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0.65rem 1.4rem;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #9333ea, #a855f7);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: #fff;
-  font-size: 0.88rem;
-  font-weight: 850;
-  box-shadow: 0 6px 20px rgba(147, 51, 234, 0.45);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.vel-btn-open-package:hover {
-  transform: translateY(-2px) scale(1.03);
-  box-shadow: 0 10px 25px rgba(147, 51, 234, 0.65);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  padding: 0 1px;
 }
 
 @media (max-width: 640px) {
   .vel-wheel-arena {
-    height: 180px;
-  }
-  .vel-coverflow-stage {
-    height: 155px;
-  }
-  .vel-coverflow-card {
-    width: 100px;
-    height: 130px;
-  }
-  .vel-coverflow-card__logo-wrap {
-    width: 56px;
-    height: 56px;
-  }
-
-  .vel-sub-wheel-arena {
     height: 140px;
   }
+  .vel-coverflow-stage {
+    height: 120px;
+  }
+  .vel-coverflow-card {
+    width: 86px;
+    height: 100px;
+  }
+  .vel-coverflow-card__logo-wrap {
+    width: 44px;
+    height: 44px;
+  }
+  .vel-coverflow-card__title {
+    font-size: 0.65rem;
+  }
+
+  .vel-sub-wheel-attached-tray {
+    height: 88px;
+  }
   .vel-sub-stage {
-    height: 118px;
+    height: 74px;
   }
   .vel-sub-card-3d {
-    width: 82px;
-    height: 105px;
+    width: 60px;
+    height: 66px;
   }
   .vel-sub-card-3d__logo-wrap {
-    width: 40px;
-    height: 40px;
+    width: 24px;
+    height: 24px;
+  }
+  .vel-sub-card-3d__title {
+    font-size: 0.52rem;
   }
 }
 </style>

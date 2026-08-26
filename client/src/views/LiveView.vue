@@ -1,5 +1,8 @@
-<template>
-  <div class="vel-live-container max-w-[1720px] w-full mx-auto px-3 py-2 md:px-6 xl:px-10 space-y-5">
+﻿<template>
+  <div
+    class="vel-live-container max-w-[1720px] w-full mx-auto px-3 py-2 md:px-6 xl:px-10 space-y-5"
+    :style="liveThemeStyle"
+  >
     <!-- Video Player (If Stream Playing) -->
     <VideoPlayer v-if="player.currentStream" />
 
@@ -20,6 +23,7 @@
       v-else-if="catalog.visibleLivePackages.length > 0"
       :packages="catalog.visibleLivePackages"
       @select-package="handlePackageClick"
+      @theme-change="handleThemeChange"
     />
 
     <!-- Modern HTML5 Empty State for Live Packages -->
@@ -46,17 +50,13 @@
                 <span class="vel-channel-loader__bar"></span>
                 <span class="vel-channel-loader__bar"></span>
                 <span class="vel-channel-loader__bar"></span>
-                <span class="vel-channel-loader__bar"></span>
-                <span class="vel-channel-loader__bar"></span>
               </div>
             </div>
-            <div class="vel-channel-loader__text-wrap">
-              <span class="vel-channel-loader__pill">
-                <span class="vel-channel-loader__pulse-dot"></span>
-                <span>Synchronisation</span>
-              </span>
-              <span class="vel-channel-loader__label">
-                <span>Chargement des chaînes</span>
+            <div class="vel-channel-loader__copy">
+              <span class="vel-channel-loader__eyebrow">Direct TV</span>
+              <strong class="vel-channel-loader__title">Chargement des flux</strong>
+              <span class="vel-channel-loader__meta">
+                Synchronisation de la grille
                 <span class="vel-channel-loader__dots"><i></i><i></i><i></i></span>
               </span>
             </div>
@@ -177,6 +177,28 @@ const favs = useFavoritesStore();
 const channelSearch = ref('');
 const loadedLogos = reactive(new Set());
 
+// Dynamic Brand Adaptive Theme
+const currentTheme = ref({
+  primary: '#c084fc',
+  glow: 'rgba(168, 85, 247, 0.55)',
+  subtle: 'rgba(168, 85, 247, 0.15)',
+  border: 'rgba(168, 85, 247, 0.35)',
+  arenaBg: 'radial-gradient(circle at 50% 35%, rgba(55, 25, 95, 0.55) 0%, rgba(10, 8, 22, 0.98) 75%)'
+});
+
+function handleThemeChange(t) {
+  if (!t) return;
+  currentTheme.value = t;
+}
+
+const liveThemeStyle = computed(() => ({
+  '--live-theme-primary': currentTheme.value.primary,
+  '--live-theme-glow': currentTheme.value.glow,
+  '--live-theme-subtle': currentTheme.value.subtle || 'rgba(168, 85, 247, 0.15)',
+  '--live-theme-border': currentTheme.value.border,
+  '--live-theme-arena-bg': currentTheme.value.arenaBg
+}));
+
 onMounted(async () => {
   if (catalog.allPackages.length === 0) {
     await catalog.loadCatalog();
@@ -223,6 +245,10 @@ watch(
 </script>
 
 <style scoped>
+.vel-live-container {
+  transition: all 0.35s ease;
+}
+
 .vel-channels-section {
   animation: vel-section-reveal 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -262,5 +288,59 @@ watch(
 
 .vel-image-fade.is-ready {
   opacity: 1;
+}
+
+/* Dynamic Brand Theme effects for Channel Buttons */
+:deep(.vel-media-item-row),
+.vel-media-item-row {
+  position: relative;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+  border-radius: 14px;
+}
+
+:deep(.vel-media-item-row:hover),
+.vel-media-item-row:hover {
+  transform: translateX(4px) scale(1.008);
+}
+
+:deep(.vel-media-item-row:hover .media-item),
+.vel-media-item-row:hover .media-item {
+  border-color: var(--live-theme-primary, #a855f7) !important;
+  background: linear-gradient(90deg, var(--live-theme-subtle, rgba(168, 85, 247, 0.18)) 0%, rgba(22, 14, 38, 0.95) 100%) !important;
+  box-shadow: 0 6px 20px var(--live-theme-subtle, rgba(168, 85, 247, 0.25)), inset 0 0 12px var(--live-theme-subtle, rgba(168, 85, 247, 0.1)) !important;
+}
+
+:deep(.vel-media-item-row--active .media-item),
+.vel-media-item-row--active .media-item,
+:deep(.media-item.selected),
+.media-item.selected {
+  border-color: var(--live-theme-primary, #a855f7) !important;
+  background: linear-gradient(90deg, var(--live-theme-subtle, rgba(168, 85, 247, 0.28)) 0%, rgba(32, 16, 56, 0.98) 100%) !important;
+  box-shadow: 0 0 25px var(--live-theme-glow, rgba(168, 85, 247, 0.5)), inset 0 0 15px var(--live-theme-subtle, rgba(168, 85, 247, 0.2)) !important;
+}
+
+:deep(.vel-media-item-row--active .media-item__thumb),
+.vel-media-item-row--active .media-item__thumb {
+  border-color: var(--live-theme-primary, #a855f7) !important;
+  box-shadow: 0 0 12px var(--live-theme-glow, rgba(168, 85, 247, 0.6)) !important;
+}
+
+:deep(.vel-channel-playing-badge),
+.vel-channel-playing-badge {
+  background: var(--live-theme-primary, #a855f7) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 12px var(--live-theme-glow, rgba(168, 85, 247, 0.7)) !important;
+  transition: background 0.35s ease, box-shadow 0.35s ease;
+}
+
+:deep(.vel-live-eq-bar),
+.vel-live-eq-bar {
+  background: #ffffff !important;
+}
+
+:deep(.vel-favorite-heart.is-active),
+.vel-favorite-heart.is-active {
+  color: var(--live-theme-primary, #ec4899) !important;
+  filter: drop-shadow(0 0 6px var(--live-theme-glow, rgba(236, 72, 153, 0.8))) !important;
 }
 </style>

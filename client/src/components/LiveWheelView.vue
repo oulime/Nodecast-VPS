@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div
     class="vel-casino-wheel-wrapper w-full max-w-4xl mx-auto select-none"
     ref="wheelWrapperRef"
@@ -123,7 +123,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['select-package']);
+const emit = defineEmits(['select-package', 'theme-change']);
 const catalog = useCatalogStore();
 
 // Main Wheel State
@@ -331,18 +331,22 @@ function extractColorFromImage(imageUrl) {
   };
 }
 
-const themeStyle = computed(() => {
+const rawTheme = computed(() => {
   const pkg = activePackage.value;
   const name = pkg ? (pkg.display_name || pkg.name || '') : '';
   const brand = getBrandThemeByName(name);
 
-  const theme = brand || extractedColor.value || {
+  return brand || extractedColor.value || {
     primary: '#c084fc',
     glow: 'rgba(168, 85, 247, 0.55)',
+    subtle: 'rgba(168, 85, 247, 0.15)',
     border: 'rgba(168, 85, 247, 0.35)',
     arenaBg: 'radial-gradient(circle at 50% 35%, rgba(55, 25, 95, 0.55) 0%, rgba(10, 8, 22, 0.98) 75%)'
   };
+});
 
+const themeStyle = computed(() => {
+  const theme = rawTheme.value;
   return {
     '--theme-primary': theme.primary,
     '--theme-glow': theme.glow,
@@ -350,6 +354,10 @@ const themeStyle = computed(() => {
     '--theme-arena-bg': theme.arenaBg
   };
 });
+
+watch(rawTheme, (t) => {
+  emit('theme-change', t);
+}, { immediate: true });
 
 let notifyTimer = null;
 watch(currentSelectedPackage, (pkg) => {

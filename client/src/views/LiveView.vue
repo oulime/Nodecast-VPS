@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div
     class="vel-live-container max-w-[1720px] w-full mx-auto px-3 py-2 md:px-6 xl:px-10 space-y-5"
     :style="liveThemeStyle"
@@ -38,8 +38,31 @@
 
     <!-- Channels List of the Selected Package (Directly Below the Picked Package) -->
     <div v-if="catalog.activePackage" class="vel-channels-section mt-4" id="content-view">
+      <button type="button" id="btn-back-home" class="vel-vod-detail-back hidden" aria-label="Précédent" title="Précédent" data-tv-focusable="true" data-analytics-playback-end-bound="1">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M14.7 5.3a1 1 0 0 1 0 1.4L10.41 11H20a1 1 0 1 1 0 2h-9.59l4.3 4.3a1 1 0 0 1-1.42 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.42 0Z"></path>
+        </svg>
+      </button>
+      <div id="cat-pills-wrap" class="cat-pills-wrap vel-cat-pills-wrap hidden">
+        <div id="cat-pills" class="vel-pills" role="tablist" aria-label="Filtres"></div>
+      </div>
+
       <!-- Channels List Container -->
-      <div class="item-list item-list--media-ready" id="dynamic-list" data-show-more-ready="true">
+      <div
+        class="item-list item-list--media-ready"
+        :class="{ 'item-list--media-loading-live': catalog.loadingChannels }"
+        id="dynamic-list"
+        data-show-more-ready="true"
+      >
+        <!-- Category Heading with Accent Line -->
+        <header
+          v-if="!catalog.loadingChannels && filteredChannels.length > 0"
+          class="vel-category-heading vel-category-heading--sport vel-category-heading--live-accent"
+        >
+          <h2 class="vel-category-heading__title">{{ activePackageDisplayName }}</h2>
+          <span class="vel-category-heading__accent-line" aria-hidden="true"></span>
+        </header>
+
         <!-- Live Channels Loading Animation -->
         <div v-if="catalog.loadingChannels" class="item-list item-list--media-loading item-list--media-loading-live col-span-full">
           <div class="vel-channel-loader">
@@ -103,8 +126,9 @@
                     'vel-image-loaded vel-image-fade',
                     loadedLogos.has(ch.stream_id || ch.id) ? 'is-ready' : ''
                   ]"
-                  loading="lazy"
+                  :loading="chIdx < 8 ? 'eager' : 'lazy'"
                   decoding="async"
+                  :fetchpriority="chIdx < 4 ? 'high' : 'auto'"
                   referrerpolicy="no-referrer"
                   crossorigin="anonymous"
                   :src="resolveImageUrl(ch.stream_icon || ch.logo)"
@@ -137,9 +161,10 @@
                 'vel-favorite-heart',
                 favs.isFavorite(ch, 'channel') ? 'is-active' : ''
               ]"
+              :data-favorite-key="(ch.stream_id || ch.id) + 'channel'"
               :aria-pressed="favs.isFavorite(ch, 'channel')"
-              :aria-label="favs.isFavorite(ch, 'channel') ? 'Retirer des favoris' : 'Ajouter aux favoris'"
-              :title="favs.isFavorite(ch, 'channel') ? 'Retirer des favoris' : 'Ajouter aux favoris'"
+              :aria-label="favs.isFavorite(ch, 'channel') ? 'Dans vos favoris (cliquer pour retirer)' : 'Ajouter aux favoris'"
+              :title="favs.isFavorite(ch, 'channel') ? 'Dans vos favoris (cliquer pour retirer)' : 'Ajouter aux favoris'"
               @click.stop="favs.toggleFavorite(ch, 'channel')"
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -159,7 +184,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue';
-import { useCatalogStore } from '../stores/catalogStore.js';
+import { useCatalogStore, cleanItemName } from '../stores/catalogStore.js';
 import { usePlayerStore } from '../stores/playerStore.js';
 import { useFavoritesStore } from '../stores/favoritesStore.js';
 import VideoPlayer from '../components/VideoPlayer.vue';
@@ -168,6 +193,11 @@ import EmptyState from '../components/EmptyState.vue';
 import { resolveImageUrl } from '../utils/image.js';
 
 const catalog = useCatalogStore();
+
+const activePackageDisplayName = computed(() => {
+  if (!catalog.activePackage) return '';
+  return catalog.activePackage.display_name || cleanItemName(catalog.activePackage.name, catalog.channelPrefixes);
+});
 
 function openCountryPicker() {
   document.getElementById('btn-header-country')?.click();

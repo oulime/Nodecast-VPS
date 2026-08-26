@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div id="player-container" class="player-container relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-2xl group select-none">
     <div class="video-wrapper w-full h-full relative">
       <!-- Video Element -->
@@ -327,8 +327,8 @@ onBeforeUnmount(() => {
 }
 
 .live-ctl-status__dot {
-  background-color: var(--live-theme-primary, #f43f5e);
-  transition: background-color 0.4s ease;
+  background-color: #ef4444 !important;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.9) !important;
 }
 
 .live-ctl-format-btn {

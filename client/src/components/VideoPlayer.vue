@@ -120,13 +120,10 @@
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
 import Hls from 'hls.js';
 import { usePlayerStore } from '../stores/playerStore.js';
-import { useHistoryStore } from '../stores/historyStore.js';
 
 const player = usePlayerStore();
-const history = useHistoryStore();
 const videoRef = ref(null);
 let hls = null;
-let lastProgressSave = 0;
 
 function loadStream(url) {
   if (!url || !videoRef.value) return;
@@ -219,12 +216,6 @@ function onTimeUpdate() {
   const duration = videoRef.value.duration || 0;
   player.progress = current;
   player.duration = duration;
-
-  const now = Date.now();
-  if (now - lastProgressSave > 5000 && duration > 0) {
-    lastProgressSave = now;
-    history.saveProgress(player.currentStream, current, duration);
-  }
 }
 
 function onError(e) {

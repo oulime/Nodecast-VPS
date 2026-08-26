@@ -22,11 +22,12 @@ export const usePlayerStore = defineStore('player', {
     isStretched: false,
     error: null,
     // Series Episodes Queue
+    currentSeries: null,
     playlist: [],
     currentIndex: -1
   }),
   getters: {
-    isSeries: (state) => !!(state.currentStream?.season_number || state.currentStream?.seasonNumber || state.currentStream?.type === 'series'),
+    isSeries: (state) => !!(state.currentStream?.season_number || state.currentStream?.seasonNumber || state.currentStream?.type === 'series' || state.currentStream?.series_id),
     hasNextEpisode: (state) => state.currentIndex >= 0 && state.currentIndex < state.playlist.length - 1,
     hasPrevEpisode: (state) => state.currentIndex > 0
   },
@@ -190,24 +191,45 @@ export const usePlayerStore = defineStore('player', {
       }
     },
     playSeriesEpisode(episode, episodeList = [], seriesObj = {}) {
-      this.playlist = episodeList || [];
-      this.currentIndex = this.playlist.findIndex(e => String(e.id || e.stream_id) === String(episode.id || episode.stream_id));
+      this.playlist = Array.isArray(episodeList) ? episodeList : [];
+      const epId = String(episode.id || episode.stream_id || '');
+      this.currentIndex = this.playlist.findIndex(e => String(e.id || e.stream_id) === epId);
+      
+      const seriesTitle = seriesObj.clean_name || seriesObj.name || seriesObj.title || seriesObj.series_name || (this.currentSeries?.clean_name) || 'Série';
+      const cleanSeriesTitle = String(seriesTitle).split('—')[0].split(' - S0')[0].split(' S0')[0].trim();
       
       let durSecs = 0;
       if (episode.info?.duration_secs) durSecs = Number(episode.info.duration_secs);
       else if (episode.info?.duration) durSecs = Number(episode.info.duration) * 60;
+      else if (episode.duration_secs) durSecs = Number(episode.duration_secs);
+      else if (episode.duration) durSecs = Number(episode.duration);
+
+      const sNum = episode.season_number || episode.seasonNumber || 1;
+      const epNum = episode.episode_num || episode.episodeNum || (this.currentIndex >= 0 ? this.currentIndex + 1 : 1);
+      const epTitle = episode.title ? ` : ${episode.title}` : '';
 
       const payload = {
         ...episode,
         stream_id: episode.id || episode.stream_id,
-        source_id: seriesObj.source_id || 10,
+        source_id: seriesObj.source_id || episode.source_id || this.currentSeries?.source_id || 10,
         container_extension: episode.container_extension || 'mkv',
-        clean_name: `${seriesObj.clean_name || seriesObj.name} — S${episode.season_number || episode.seasonNumber || 1}E${episode.episode_num || episode.episodeNum}`,
-        season_number: episode.season_number || episode.seasonNumber || 1,
-        episode_number: episode.episode_num || episode.episodeNum,
+        clean_name: `${cleanSeriesTitle} — S${sNum}E${epNum}${epTitle}`,
+        series_name: cleanSeriesTitle,
+        season_number: sNum,
+        episode_number: epNum,
+        episode_title: episode.title || '',
         type: 'series',
-        series_id: seriesObj.stream_id || seriesObj.id,
-        stream_icon: seriesObj.stream_icon
+        series_id: seriesObj.series_id || seriesObj.stream_id || seriesObj.id || this.currentSeries?.series_id,
+        stream_icon: seriesObj.stream_icon || seriesObj.cover || seriesObj.thumb_url || this.currentSeries?.stream_icon || episode.stream_icon || episode.info?.movie_image
+      };
+
+      this.currentSeries = {
+        series_id: payload.series_id,
+        stream_id: payload.series_id,
+        clean_name: cleanSeriesTitle,
+        name: cleanSeriesTitle,
+        source_id: payload.source_id,
+        stream_icon: payload.stream_icon
       };
 
       this.playStream(payload, { durationSeconds: durSecs });
@@ -216,7 +238,7 @@ export const usePlayerStore = defineStore('player', {
       if (this.hasNextEpisode) {
         const next = this.playlist[this.currentIndex + 1];
         if (next) {
-          this.playSeriesEpisode(next, this.playlist, this.currentStream);
+          this.playSeriesEpisode(next, this.playlist, this.currentSeries || this.currentStream);
         }
       }
     },
@@ -224,7 +246,7 @@ export const usePlayerStore = defineStore('player', {
       if (this.hasPrevEpisode) {
         const prev = this.playlist[this.currentIndex - 1];
         if (prev) {
-          this.playSeriesEpisode(prev, this.playlist, this.currentStream);
+          this.playSeriesEpisode(prev, this.playlist, this.currentSeries || this.currentStream);
         }
       }
     },
@@ -243,6 +265,7 @@ export const usePlayerStore = defineStore('player', {
       this.isPlaying = false;
       this.isBuffering = false;
       this.error = null;
+      this.currentSeries = null;
       this.playlist = [];
       this.currentIndex = -1;
     }

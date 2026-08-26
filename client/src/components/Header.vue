@@ -117,15 +117,24 @@ const showBack = computed(() => {
 });
 
 const contextTitle = computed(() => {
-  if (vod.selectedMovie) return vod.selectedMovie.clean_name || vod.selectedMovie.name;
-  if (vod.selectedSeries) return vod.selectedSeries.clean_name || vod.selectedSeries.name;
-  if (player.currentStream) return player.currentStream.name;
-  if (catalog.activePackage) return catalog.activePackage.name;
-  if (catalog.activeParentPackage) return catalog.activeParentPackage.name;
-  if (nav.activeTab === 'favorites') return 'MES FAVORIS';
-  if (nav.activeTab === 'live') return 'TV EN DIRECT';
-  if (nav.activeTab === 'movies') return 'FILMS';
-  if (nav.activeTab === 'series') return 'SÉRIES';
+  if (nav.activeTab === 'movies') {
+    if (vod.selectedMovie) return vod.selectedMovie.clean_name || vod.selectedMovie.name;
+    return 'Films';
+  }
+  if (nav.activeTab === 'series') {
+    if (vod.selectedSeries) return vod.selectedSeries.clean_name || vod.selectedSeries.name;
+    return 'Séries';
+  }
+  if (nav.activeTab === 'live') {
+    if (player.currentStream && (player.currentStream.type === 'channel' || player.currentStream.type === 'live' || !player.isSeries)) {
+      return player.currentStream.clean_name || player.currentStream.name;
+    }
+    if (catalog.activePackage) return catalog.activePackage.display_name || catalog.activePackage.name;
+    if (catalog.activeParentPackage) return catalog.activeParentPackage.display_name || catalog.activeParentPackage.name;
+    return 'Chaînes TV';
+  }
+  if (nav.activeTab === 'favorites') return 'Mes Favoris';
+  if (nav.activeTab === 'profile') return 'Mon Compte';
   return '';
 });
 

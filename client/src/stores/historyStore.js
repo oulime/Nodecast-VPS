@@ -32,6 +32,9 @@ export const useHistoryStore = defineStore('history', {
           const rows = await res.json();
           if (Array.isArray(rows)) {
             for (const r of rows) {
+              const itemType = r.item_type || r.type;
+              if (itemType !== 'movie' && itemType !== 'series') continue;
+
               const d = r.data || {};
               const progress = Number(r.progress || 0);
               const duration = Number(r.duration || 0);
@@ -42,7 +45,7 @@ export const useHistoryStore = defineStore('history', {
                 id: String(r.item_id || r.id),
                 stream_id: String(r.item_id || r.id),
                 item_id: String(r.item_id || r.id),
-                type: r.item_type || (d.seasonNumber ? 'series' : 'movie'),
+                type: itemType || (d.seasonNumber ? 'series' : 'movie'),
                 name: d.name || d.title || 'Titre inconnu',
                 title: d.title || d.name,
                 thumb_url: imgUrl,
@@ -67,12 +70,22 @@ export const useHistoryStore = defineStore('history', {
 
       // 2. Scan LocalStorage for any local cached entries
       try {
+        const keysToRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
           if (key && (key.startsWith('velora_resume_') || key.startsWith('velora_watch_history_'))) {
             try {
               const val = JSON.parse(localStorage.getItem(key));
               if (val && (val.stream_id || val.id)) {
+                const streamType = String(val.type || val.stream_type || val.kind || '').toLowerCase();
+                const isSeries = !!(val.season_number || val.seasonNumber || streamType === 'series' || val.series_id);
+                const isMovie = streamType === 'movie' || streamType === 'vod' || (!isSeries && Boolean(val.container_extension));
+
+                if (!isSeries && !isMovie) {
+                  keysToRemove.push(key);
+                  continue;
+                }
+
                 const streamId = String(val.stream_id || val.id);
                 if (!rawList.some(x => String(x.stream_id) === streamId)) {
                   const progress = Number(val.last_position || val.progress || 0);
@@ -84,7 +97,7 @@ export const useHistoryStore = defineStore('history', {
                     id: streamId,
                     stream_id: streamId,
                     item_id: streamId,
-                    type: val.type || (val.season_number ? 'series' : 'movie'),
+                    type: isSeries ? 'series' : 'movie',
                     name: val.name || val.title || 'Titre',
                     thumb_url: imgUrl,
                     cover: imgUrl,
@@ -104,6 +117,9 @@ export const useHistoryStore = defineStore('history', {
             } catch (e) {}
           }
         }
+        for (const k of keysToRemove) {
+          localStorage.removeItem(k);
+        }
       } catch (e) {}
 
       // 3. Deduplicate multiple episodes from the same series (Keep only the latest episode watched!)
@@ -120,12 +136,12 @@ export const useHistoryStore = defineStore('history', {
             seriesMap.set(seriesKey, true);
             dedupedList.push(item);
           }
-        } else {
+        } else if (item.type === 'movie') {
           dedupedList.push(item);
         }
       }
 
-      this.resumeItems = dedupedList;
+      this.resumeItems = dedupedList.filter(item => item.type === 'movie' || item.type === 'series' || item.series_id);
       this.loading = false;
 
       // 4. Proactively enrich any missing posters in the background
@@ -173,7 +189,19 @@ export const useHistoryStore = defineStore('history', {
       const rawId = String(stream.stream_id || stream.item_id || stream.id || '');
       if (!rawId) return;
 
-      const isSeries = !!(stream.season_number || stream.seasonNumber || stream.type === 'series');
+      // Strictly ignore live TV channels / live streams
+      const streamType = String(stream.type || stream.stream_type || stream.kind || '').toLowerCase();
+      if (streamType === 'channel' || streamType === 'live' || stream.stream_type === 'live' || stream.kind === 'live') {
+        return;
+      }
+
+      const isSeries = !!(stream.season_number || stream.seasonNumber || streamType === 'series' || stream.series_id);
+      const isMovie = streamType === 'movie' || streamType === 'vod' || stream.kind === 'vod' || stream.kind === 'movies' || (!isSeries && Boolean(stream.container_extension));
+
+      if (!isSeries && !isMovie) {
+        return;
+      }
+
       const itemType = isSeries ? 'series' : 'movie';
       const sourceId = stream.source_id || 10;
       const parentId = stream.series_id || (isSeries ? stream.parent_id : null);

@@ -7865,6 +7865,10 @@
             document.addEventListener("keydown", function (event) {
               var isBackKey = event.key === "Escape" || event.key === "Backspace" || event.key === "BrowserBack" || event.key === "GoBack" || event.keyCode === 8 || event.keyCode === 27 || event.keyCode === 461 || event.keyCode === 10009;
               if (!isBackKey) return;
+              var target = event.target;
+              if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+                if (event.key === "Backspace" || event.keyCode === 8) return;
+              }
               if (document.body.classList.contains("vel-favorites-open")) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -11039,7 +11043,13 @@ if (target.closest(".trial-offer-button")) {
             });
           }
 
+          var searchDebounceTimer = null;
+
           function runSearch() {
+            if (searchDebounceTimer) {
+              window.clearTimeout(searchDebounceTimer);
+              searchDebounceTimer = null;
+            }
             var query = input.value.trim();
             runId += 1;
             var thisRun = runId;
@@ -11048,7 +11058,7 @@ if (target.closest(".trial-offer-button")) {
               lastSearchPayload = null;
               lastSearchQuery = "";
               expandedSections.clear();
-              setStatus("");
+              setStatus(query ? "Tapez au moins 2 caractères..." : "");
               setSearchLoading(false);
               clearResults("");
               return;
@@ -11059,7 +11069,7 @@ if (target.closest(".trial-offer-button")) {
               clearResults("");
               return;
             }
-            setStatus("Recherche...");
+            setStatus("Recherche en cours...");
             setSearchLoading(true);
 
             function applyPayload(payload, loading) {
@@ -11109,16 +11119,43 @@ if (target.closest(".trial-offer-button")) {
             });
           }
 
-          function resetSearchForTyping() {
-            runId += 1;
-            renderedQuery = "";
-            lastSearchPayload = null;
-            lastSearchQuery = "";
-            expandedSections.clear();
-            deferredSearchUpdate = null;
-            setSearchLoading(false);
-            setStatus(input.value.trim() ? "Appuyez sur la loupe ou Entrée pour rechercher." : "");
-            clearResults("");
+          function handleSearchInput() {
+            if (searchDebounceTimer) {
+              window.clearTimeout(searchDebounceTimer);
+              searchDebounceTimer = null;
+            }
+            var query = input.value.trim();
+            if (!query) {
+              runId += 1;
+              renderedQuery = "";
+              lastSearchPayload = null;
+              lastSearchQuery = "";
+              expandedSections.clear();
+              deferredSearchUpdate = null;
+              setSearchLoading(false);
+              setStatus("");
+              clearResults("");
+              return;
+            }
+            if (query.length < 2) {
+              runId += 1;
+              renderedQuery = "";
+              lastSearchPayload = null;
+              lastSearchQuery = "";
+              expandedSections.clear();
+              deferredSearchUpdate = null;
+              setSearchLoading(false);
+              setStatus("Tapez au moins 2 caractères...");
+              clearResults("");
+              return;
+            }
+
+            setSearchLoading(true);
+            setStatus("Recherche...");
+            searchDebounceTimer = window.setTimeout(function () {
+              searchDebounceTimer = null;
+              runSearch();
+            }, 250);
           }
 
           var suppressTouchSearchCloseUntil = 0;
@@ -11149,6 +11186,10 @@ if (target.closest(".trial-offer-button")) {
           }
 
           function closeSearch() {
+            if (searchDebounceTimer) {
+              window.clearTimeout(searchDebounceTimer);
+              searchDebounceTimer = null;
+            }
             runId += 1;
             deferredSearchUpdate = null;
             dialog.classList.add("hidden");
@@ -11176,7 +11217,7 @@ if (target.closest(".trial-offer-button")) {
             closeSearch();
           });
 
-          input.addEventListener("input", resetSearchForTyping);
+          input.addEventListener("input", handleSearchInput);
           input.addEventListener("keydown", function (event) {
             if (event.key !== "Enter") return;
             event.preventDefault();
@@ -11305,6 +11346,7 @@ if (target.closest(".trial-offer-button")) {
 
           var selector = [
             "#btn-header-search",
+            "#vel-floating-search",
             "#btn-header-home",
             "#btn-logo-home",
             "#btn-header-back",
@@ -11328,7 +11370,7 @@ if (target.closest(".trial-offer-button")) {
             event.stopPropagation();
             event.stopImmediatePropagation();
 
-            if (control.id === "btn-header-search") {
+            if (control.id === "btn-header-search" || control.id === "vel-floating-search" || control.classList.contains("vel-header-search-btn")) {
               document.dispatchEvent(new CustomEvent("velora-open-search", {
                 detail: { touch: true }
               }));
@@ -12286,6 +12328,8 @@ if (target.closest(".trial-offer-button")) {
         -webkit-tap-highlight-color: transparent;
       }
 
+      body.vel-home-choice-picked[data-vel-active-tab="home"] .vel-floating-search,
+      body.vel-home-empty-active .vel-floating-search,
       body.vel-home-choice-picked:not(.vel-home-empty-active)[data-vel-active-tab="live"] .vel-floating-search,
       body.vel-home-choice-picked:not(.vel-home-empty-active)[data-vel-active-tab="movies"] .vel-floating-search,
       body.vel-home-choice-picked:not(.vel-home-empty-active)[data-vel-active-tab="series"] .vel-floating-search {
@@ -12773,7 +12817,8 @@ if (target.closest(".trial-offer-button")) {
         display: none !important;
       }
 
-      body.vel-home-choice-picked:not(.vel-home-empty-active) .main--velora .vel-header__right,
+      body.vel-home-choice-picked .main--velora .vel-header__right,
+      body.vel-home-empty-active .main--velora .vel-header__right,
       body .main--velora:has(#content-view:not(.hidden)) .vel-header__right,
       body .main--velora:has(#player-container:not(.hidden)) .vel-header__right,
       body .main--velora:has(#vod-player-container:not(.hidden)) .vel-header__right {
@@ -12782,14 +12827,16 @@ if (target.closest(".trial-offer-button")) {
         max-width: none;
       }
 
-      body.vel-home-choice-picked:not(.vel-home-empty-active) .main--velora .vel-header__right > *,
+      body.vel-home-choice-picked .main--velora .vel-header__right > *,
+      body.vel-home-empty-active .main--velora .vel-header__right > *,
       body .main--velora:has(#content-view:not(.hidden)) .vel-header__right > *,
       body .main--velora:has(#player-container:not(.hidden)) .vel-header__right > *,
       body .main--velora:has(#vod-player-container:not(.hidden)) .vel-header__right > * {
         display: none !important;
       }
 
-      body.vel-home-choice-picked:not(.vel-home-empty-active) .main--velora #btn-header-search,
+      body.vel-home-choice-picked .main--velora #btn-header-search,
+      body.vel-home-empty-active .main--velora #btn-header-search,
       body .main--velora:has(#content-view:not(.hidden)) #btn-header-search,
       body .main--velora:has(#player-container:not(.hidden)) #btn-header-search,
       body .main--velora:has(#vod-player-container:not(.hidden)) #btn-header-search {

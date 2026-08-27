@@ -32,8 +32,36 @@ function normalizeText(value) {
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
+}
+
+function getQueryTokens(normalizedQuery) {
+    return String(normalizedQuery || '').split(/\s+/).filter(token => token.length > 0);
+}
+
+function matchQueryTokens(normalizedName, normalizedQuery, tokens) {
+    if (!normalizedName) return false;
+    if (normalizedName.includes(normalizedQuery)) return true;
+    if (tokens.length > 1) {
+        return tokens.every(token => normalizedName.includes(token));
+    }
+    return false;
+}
+
+function calculateScore(normalizedName, normalizedQuery, tokens, priority) {
+    let score = Number(priority ? 1000 : 0);
+    if (normalizedName === normalizedQuery) {
+        score += 500;
+    } else if (normalizedName.startsWith(normalizedQuery)) {
+        score += 350;
+    } else if (normalizedName.includes(normalizedQuery)) {
+        score += 250;
+    } else if (tokens.length > 1 && tokens.every(t => normalizedName.includes(t))) {
+        score += 150;
+    }
+    return score;
 }
 
 function normalizeCategories(input) {
@@ -302,6 +330,7 @@ async function searchSnapshot(categories, type, normalizedQuery, limit, allowedI
     }
 
     const action = getSnapshotAction(type);
+    const tokens = getQueryTokens(normalizedQuery);
     const indexedCategories = await Promise.all(
         categories.map(category => category.categoryId === '*'
             ? countryScope
@@ -323,11 +352,13 @@ async function searchSnapshot(categories, type, normalizedQuery, limit, allowedI
                     ? countryAssignment
                     : isAllowedWildcardItem(allowedItems, item.sourceId, item.itemId, type))
             )) continue;
-            if (!item.normalizedName.includes(normalizedQuery)) continue;
+            if (!matchQueryTokens(item.normalizedName, normalizedQuery, tokens)) continue;
             const itemKey = `${item.sourceId}\u001f${item.itemId}`;
             if (seenItems.has(itemKey)) continue;
             seenItems.add(itemKey);
             const globalStreamId = encodeGlobalId(item.sourceId, item.itemId);
+            const priority = countryAssignment?.priority ?? category.priority;
+            const score = calculateScore(item.normalizedName, normalizedQuery, tokens, priority);
             results.push({
                 id: `cache:${type}:${globalStreamId}`,
                 sourceId: item.sourceId,
@@ -339,11 +370,13 @@ async function searchSnapshot(categories, type, normalizedQuery, limit, allowedI
                 categoryId: item.categoryId,
                 packageId: countryAssignment?.packageId || category.packageId,
                 packageName: countryAssignment?.packageName || category.packageName,
-                priority: countryAssignment?.priority ?? category.priority
+                priority,
+                score
             });
         }
     }
     results.sort((left, right) =>
+        (right.score - left.score) ||
         Number(right.priority) - Number(left.priority) ||
         left.name.localeCompare(right.name, 'fr')
     );
@@ -367,12 +400,14 @@ async function searchSource(sourceId, type, categoryMap, normalizedQuery, allowe
 
     if (!Array.isArray(items)) return [];
 
+    const tokens = getQueryTokens(normalizedQuery);
     const results = [];
     for (const item of items) {
         const itemId = getItemId(item, type);
         if (itemId === undefined || itemId === null) continue;
         const name = cleanText(item.name || item.title || item.series_name, 500);
-        if (!name || !normalizeText(name).includes(normalizedQuery)) continue;
+        const normName = normalizeText(name);
+        if (!name || !matchQueryTokens(normName, normalizedQuery, tokens)) continue;
 
         let category = resolveSearchCategory(item, categoryMap, sourceId, type, allowedItems);
         const countryAssignment = getCountryItemAssignment(countryScope, sourceId, itemId);
@@ -382,6 +417,8 @@ async function searchSource(sourceId, type, categoryMap, normalizedQuery, allowe
         if (!category) continue;
 
         const globalStreamId = encodeGlobalId(sourceId, itemId);
+        const priority = category.priority;
+        const score = calculateScore(normName, normalizedQuery, tokens, priority);
         results.push({
             id: `api:${type}:${globalStreamId}`,
             sourceId,
@@ -393,7 +430,8 @@ async function searchSource(sourceId, type, categoryMap, normalizedQuery, allowe
             categoryId: String(item.category_id ?? category.categoryId),
             packageId: category.packageId,
             packageName: category.packageName,
-            priority: category.priority
+            priority,
+            score
         });
     }
     return results;
@@ -517,6 +555,7 @@ router.post('/', async (req, res) => {
             .filter(result => result.status === 'fulfilled')
             .flatMap(result => result.value)
             .sort((left, right) =>
+                (right.score - left.score) ||
                 Number(right.priority) - Number(left.priority) ||
                 left.name.localeCompare(right.name, 'fr')
             )
@@ -555,6 +594,10 @@ router.post('/', async (req, res) => {
 
 module.exports = router;
 module.exports._test = {
+    normalizeText,
+    getQueryTokens,
+    matchQueryTokens,
+    calculateScore,
     normalizeCategories,
     normalizeAllowedItems,
     getCountrySearchScope,

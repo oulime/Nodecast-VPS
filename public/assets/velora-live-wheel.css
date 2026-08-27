@@ -324,7 +324,7 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active):not(.vel-favorites-o
 body[data-vel-active-tab="live"] #dynamic-list,
 body[data-vel-top-level="live"] #dynamic-list {
   padding-top: 0.5rem !important;
-  padding-bottom: 7rem !important;
+  padding-bottom: 1.25rem !important;
 }
 
 @media (max-width: 640px) {
@@ -356,7 +356,7 @@ body[data-vel-top-level="live"] #dynamic-list {
   justify-content: center;
   align-items: center;
   width: 100%;
-  padding: 1.25rem 0.5rem 3rem;
+  padding: 0.75rem 0.5rem 0.75rem;
   box-sizing: border-box;
 }
 

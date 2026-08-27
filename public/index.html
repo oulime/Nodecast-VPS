@@ -6128,6 +6128,18 @@
                 <div class="vel-home-header__actions">
                   <button
                     type="button"
+                    id="vel-home-search-trigger"
+                    class="vel-home-profile-trigger vel-home-search-trigger"
+                    aria-label="Recherche"
+                    title="Rechercher"
+                  >
+                    <svg class="vel-home-profile-trigger__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+                      <circle cx="11" cy="11" r="8"></circle>
+                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
                     id="vel-home-profile-trigger"
                     class="vel-home-profile-trigger"
                     aria-label="Profil"
@@ -11043,13 +11055,7 @@ if (target.closest(".trial-offer-button")) {
             });
           }
 
-          var searchDebounceTimer = null;
-
           function runSearch() {
-            if (searchDebounceTimer) {
-              window.clearTimeout(searchDebounceTimer);
-              searchDebounceTimer = null;
-            }
             var query = input.value.trim();
             runId += 1;
             var thisRun = runId;
@@ -11120,10 +11126,6 @@ if (target.closest(".trial-offer-button")) {
           }
 
           function handleSearchInput() {
-            if (searchDebounceTimer) {
-              window.clearTimeout(searchDebounceTimer);
-              searchDebounceTimer = null;
-            }
             var query = input.value.trim();
             if (!query) {
               runId += 1;
@@ -11135,27 +11137,7 @@ if (target.closest(".trial-offer-button")) {
               setSearchLoading(false);
               setStatus("");
               clearResults("");
-              return;
             }
-            if (query.length < 2) {
-              runId += 1;
-              renderedQuery = "";
-              lastSearchPayload = null;
-              lastSearchQuery = "";
-              expandedSections.clear();
-              deferredSearchUpdate = null;
-              setSearchLoading(false);
-              setStatus("Tapez au moins 2 caractères...");
-              clearResults("");
-              return;
-            }
-
-            setSearchLoading(true);
-            setStatus("Recherche...");
-            searchDebounceTimer = window.setTimeout(function () {
-              searchDebounceTimer = null;
-              runSearch();
-            }, 250);
           }
 
           var suppressTouchSearchCloseUntil = 0;
@@ -11186,10 +11168,6 @@ if (target.closest(".trial-offer-button")) {
           }
 
           function closeSearch() {
-            if (searchDebounceTimer) {
-              window.clearTimeout(searchDebounceTimer);
-              searchDebounceTimer = null;
-            }
             runId += 1;
             deferredSearchUpdate = null;
             dialog.classList.add("hidden");
@@ -11199,12 +11177,27 @@ if (target.closest(".trial-offer-button")) {
           }
 
           updateSearchPlaceholder();
-          if (window.PointerEvent) {
-            trigger.addEventListener("pointerup", openSearchOnFirstTouch, { passive: false });
-          } else {
-            trigger.addEventListener("touchend", openSearchOnFirstTouch, { passive: false });
-          }
-          trigger.addEventListener("click", openSearch);
+          var allTriggers = [
+            document.getElementById("btn-header-search"),
+            document.getElementById("vel-home-search-trigger"),
+            document.getElementById("vel-floating-search")
+          ].filter(Boolean);
+
+          allTriggers.forEach(function (trig) {
+            if (window.PointerEvent) {
+              trig.addEventListener("pointerup", openSearchOnFirstTouch, { passive: false });
+            } else {
+              trig.addEventListener("touchend", openSearchOnFirstTouch, { passive: false });
+            }
+            trig.addEventListener("click", openSearch);
+          });
+
+          document.addEventListener("click", function (event) {
+            if (event.target && event.target.closest("#btn-header-search, #vel-home-search-trigger, #vel-floating-search, .vel-header-search-btn, .vel-home-search-trigger")) {
+              openSearch(event);
+            }
+          });
+
           document.addEventListener("velora-open-search", openSearch);
 
           close.addEventListener("click", function (event) {
@@ -11227,6 +11220,13 @@ if (target.closest(".trial-offer-button")) {
             event.preventDefault();
             runSearch();
           });
+          var submitBtn = form.querySelector(".vel-global-search__submit");
+          if (submitBtn) {
+            submitBtn.addEventListener("click", function (event) {
+              event.preventDefault();
+              runSearch();
+            });
+          }
           dialog.addEventListener("click", function (event) {
             if (event.target === dialog) closeSearch();
           });
@@ -11266,12 +11266,32 @@ if (target.closest(".trial-offer-button")) {
                 var closeLivePlayer = document.getElementById("btn-close-player");
                 if (closeLivePlayer) closeLivePlayer.click();
               }
+
+              // Deactivate Accueil empty state so media content can display
+              delete document.body.dataset.velTopLevel;
+              document.body.dataset.veloraReturnHome = "true";
+              delete document.body.dataset.veloraReturnFavorites;
+              document.body.classList.remove("vel-home-empty-active");
+              document.body.classList.add("vel-home-choice-picked");
+              var homePage = document.getElementById("vel-home-empty-page");
+              if (homePage) {
+                homePage.classList.add("hidden");
+                homePage.setAttribute("aria-hidden", "true");
+              }
+
               var directType = button.dataset.searchResultType || "";
-              var targetTab = (directType === "series" || id.startsWith("series")) ? "series" : (directType === "movie" || id.startsWith("movies")) ? "movies" : "live";
+              var targetTab = (directType === "series" || id.startsWith("series") || id.includes(":series:")) ? "series" : (directType === "movie" || id.startsWith("movies") || id.includes(":movie:")) ? "movies" : "live";
               document.body.dataset.velActiveTab = targetTab;
               document.querySelectorAll(".vel-bottom-nav__button").forEach(function (b) {
                 b.classList.toggle("is-active", b.dataset.bottomNav === targetTab);
               });
+
+              var itemTitle = button.querySelector(".vel-global-search__title")?.textContent || "";
+              try {
+                document.dispatchEvent(new CustomEvent("velora-home-media-open", {
+                  detail: { title: itemTitle, contentType: targetTab }
+                }));
+              } catch (e) {}
 
               var directMatch = id.match(/^(?:cache|api):(movie|series):([^:]+)$/);
               if (
@@ -11300,7 +11320,7 @@ if (target.closest(".trial-offer-button")) {
                         sourceId: sourceId,
                         itemId: streamId,
                         itemType: contentType === "series" ? "series" : "movie",
-                        name: button.querySelector(".vel-global-search__title")?.textContent || "",
+                        name: itemTitle,
                         thumbUrl: resultImage ? resultImage.src : "",
                         packageId: "search:" + id,
                         globalStreamId: globalStreamId,
@@ -11315,9 +11335,10 @@ if (target.closest(".trial-offer-button")) {
                     }, {
                       id: id,
                       streamId: streamId,
+                      seriesId: contentType === "series" ? streamId : void 0,
                       sourceId: sourceId,
                       globalStreamId: globalStreamId,
-                      name: button.querySelector(".vel-global-search__title")?.textContent || "",
+                      name: itemTitle,
                       thumbUrl: resultImage ? resultImage.src : "",
                       containerExtension: containerExtension,
                       contentType: contentType
@@ -12527,7 +12548,14 @@ if (target.closest(".trial-offer-button")) {
         padding: 0;
       }
 
-      .vel-home-profile-trigger {
+      .vel-home-header__actions {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+      }
+
+      .vel-home-profile-trigger,
+      .vel-home-search-trigger {
         display: inline-flex;
         align-items: center;
         justify-content: center;

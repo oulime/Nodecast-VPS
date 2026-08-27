@@ -779,13 +779,20 @@
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape" && state.open) closePage(true);
     });
-    document.getElementById("vel-bottom-nav")?.addEventListener("click", function (event) {
+    function handleBottomNavAction(event) {
       var target = event.target.closest("[data-bottom-nav]");
       if (!target) return;
       var action = target.getAttribute("data-bottom-nav");
       if (action === "country" || action === "profile" || action === "favorites") return;
-      if (state.open) closePage(false);
-    }, true);
+      delete document.body.dataset.veloraReturnFavorites;
+      delete window._veloraFavoriteReturnTab;
+      delete document.body.dataset.veloraSearchMediaOpen;
+      state.currentDetailDescriptor = null;
+      document.body.classList.remove("vel-favorites-open", "vel-favorites-player-active");
+      closePage(false);
+    }
+    document.getElementById("vel-bottom-nav")?.addEventListener("pointerdown", handleBottomNavAction, true);
+    document.getElementById("vel-bottom-nav")?.addEventListener("click", handleBottomNavAction, true);
     document.addEventListener("velora-return-favorites", function (event) {
       var tab = event.detail && event.detail.tab ? event.detail.tab : state.activeType || "channel";
       stopAndReturnFavorites(tab);

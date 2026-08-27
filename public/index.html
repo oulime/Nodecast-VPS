@@ -13188,6 +13188,13 @@ if (target.closest(".trial-offer-button")) {
           closeBottomCountryMenu();
           closeProfileMenu();
           delete document.body.dataset.veloraReturnHome;
+          delete document.body.dataset.veloraReturnFavorites;
+          delete window._veloraFavoriteReturnTab;
+          delete document.body.dataset.veloraSearchMediaOpen;
+          document.body.classList.remove("vel-favorites-open", "vel-favorites-player-active");
+          if (typeof window.veloraCloseFavoritesPage === "function") {
+            try { window.veloraCloseFavoritesPage(false); } catch (_) {}
+          }
           document.body.dataset.velTopLevel = tab;
           document.body.dataset.velActiveTab = tab;
           document.body.classList.remove("vel-home-empty-active", "vel-home-choice-loading");
@@ -13247,6 +13254,13 @@ if (target.closest(".trial-offer-button")) {
           closeBottomCountryMenu();
           closeProfileMenu();
           delete document.body.dataset.velTopLevel;
+          delete document.body.dataset.veloraReturnFavorites;
+          delete window._veloraFavoriteReturnTab;
+          delete document.body.dataset.veloraSearchMediaOpen;
+          document.body.classList.remove("vel-favorites-open", "vel-favorites-player-active");
+          if (typeof window.veloraCloseFavoritesPage === "function") {
+            try { window.veloraCloseFavoritesPage(false); } catch (_) {}
+          }
           var homePage = document.getElementById("vel-home-empty-page");
           if (homePage) {
             homePage.classList.remove("hidden");

@@ -379,19 +379,45 @@
         <div class="vel-wheel-arena">
           <div class="vel-wheel-ambient-glow" aria-hidden="true"></div>
           <div class="vel-wheel-pointer" aria-hidden="true">
-            <div class="vel-wheel-pointer__triangle"></div>
+            <div class="vel-wheel-pointer__pivot"></div>
+            <div class="vel-wheel-pointer__needle">
+              <svg class="vel-wheel-pointer__svg" viewBox="0 0 16 22" fill="none">
+                <path d="M8 21.5L1.5 8.5C0.5 6.2 2 3.5 4.5 3.5H11.5C14 3.5 15.5 6.2 14.5 8.5L8 21.5Z" fill="url(#needleGrad)" stroke="var(--theme-primary, #c084fc)" stroke-width="1.2"/>
+                <circle cx="8" cy="7" r="2.2" fill="var(--theme-primary, #c084fc)"/>
+                <defs>
+                  <linearGradient id="needleGrad" x1="8" y1="3.5" x2="8" y2="21.5" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#ffffff"/>
+                    <stop offset="0.6" stop-color="var(--theme-primary, #c084fc)"/>
+                    <stop offset="1" stop-color="var(--theme-primary, #c084fc)"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
           </div>
           <div class="vel-coverflow-stage" tabindex="0" role="region" aria-label="Carrousel bouquets TV"></div>
+          <div class="vel-wheel-selected-badge" id="vel-wheel-selected-badge">
+            <span class="vel-wheel-selected-badge__spark">✦</span>
+            <span class="vel-wheel-selected-badge__title" id="vel-wheel-selected-title"></span>
+          </div>
         </div>
       `;
 
       this.wrapper = root;
       this.stage = root.querySelector(".vel-coverflow-stage");
       this.pointer = root.querySelector(".vel-wheel-pointer");
+      this.searchBarWrap = null;
+      this.searchInput = null;
+      this.searchClearBtn = null;
+      this.searchCountEl = null;
 
-      const packagesView = document.getElementById("packages-view");
-      if (packagesView && packagesView.parentNode) {
-        packagesView.parentNode.insertBefore(root, packagesView);
+      const stickyTop = document.querySelector(".vel-sticky-top");
+      if (stickyTop) {
+        stickyTop.appendChild(root);
+      } else {
+        const packagesView = document.getElementById("packages-view");
+        if (packagesView && packagesView.parentNode) {
+          packagesView.parentNode.insertBefore(root, packagesView);
+        }
       }
     }
 
@@ -401,6 +427,16 @@
       this.stage.addEventListener("pointermove", (e) => this.onPointerMove(e));
       this.stage.addEventListener("pointerup", (e) => this.onPointerUp(e));
       this.stage.addEventListener("pointercancel", (e) => this.onPointerCancel(e));
+
+      // Click card to select
+      this.stage.addEventListener("click", (e) => {
+        const card = e.target.closest(".vel-coverflow-card[data-index]");
+        if (!card) return;
+        const idx = parseInt(card.dataset.index, 10);
+        if (!isNaN(idx) && idx !== this.currentIndex && !this.isDragging) {
+          this.smoothAnimateToIndex(idx, 320);
+        }
+      });
 
       // Mouse Wheel Scroll
       this.stage.addEventListener("wheel", (e) => {
@@ -452,17 +488,39 @@
     }
 
     setupInfiniteScroll() {
-      window.addEventListener("scroll", () => {
+      const handleScroll = (target) => {
         if (!this.isLiveActive() || this.isLoadingChannels) return;
         if (this.renderedCount >= this.filteredChannels.length) return;
 
-        const scrollPosition = window.innerHeight + window.scrollY;
-        const threshold = document.documentElement.scrollHeight - 550;
+        let scrollPosition, threshold;
+        if (target === window) {
+          scrollPosition = window.innerHeight + window.scrollY;
+          threshold = document.documentElement.scrollHeight - 550;
+        } else if (target) {
+          scrollPosition = target.scrollTop + target.clientHeight;
+          threshold = target.scrollHeight - 450;
+        }
 
         if (scrollPosition >= threshold) {
           this.renderNextBatch();
         }
-      }, { passive: true });
+      };
+
+      window.addEventListener("scroll", () => handleScroll(window), { passive: true });
+      
+      const attachBodyScroll = () => {
+        const velBody = document.querySelector(".vel-body");
+        if (velBody) {
+          velBody.addEventListener("scroll", () => handleScroll(velBody), { passive: true });
+        }
+        const contentView = document.getElementById("content-view");
+        if (contentView) {
+          contentView.addEventListener("scroll", () => handleScroll(contentView), { passive: true });
+        }
+      };
+
+      attachBodyScroll();
+      document.addEventListener("DOMContentLoaded", attachBodyScroll);
     }
 
     isLiveActive() {
@@ -514,7 +572,7 @@
       });
       bodyObserver.observe(document.body, {
         attributes: true,
-        attributeFilter: ["data-vel-active-tab", "data-vel-top-level", "class"]
+        attributeFilter: ["data-vel-active-tab", "data-vel-top-level", "data-velora-return-favorites", "class"]
       });
 
       // Observe packages view
@@ -646,12 +704,16 @@
       }
     }
 
-    triggerTick() {
+    triggerTick(direction = 1) {
       if (!this.pointer) return;
-      this.pointer.classList.add("is-ticking");
-      window.setTimeout(() => {
-        if (this.pointer) this.pointer.classList.remove("is-ticking");
-      }, 75);
+      const angle = direction >= 0 ? 18 : -18;
+      this.pointer.style.transform = `translateX(-50%) rotate(${angle}deg) scale(1.15)`;
+      if (this.tickTimeout) clearTimeout(this.tickTimeout);
+      this.tickTimeout = setTimeout(() => {
+        if (this.pointer) {
+          this.pointer.style.transform = "translateX(-50%) rotate(0deg) scale(1)";
+        }
+      }, 90);
     }
 
     getPackageTheme(pkg) {
@@ -753,6 +815,24 @@
 
     async onPackageSettled(pkg, options = {}) {
       if (!pkg || !this.isLiveActive()) return;
+
+      const badgeEl = document.getElementById("vel-wheel-selected-badge");
+      const titleEl = document.getElementById("vel-wheel-selected-title");
+      if (titleEl) {
+        titleEl.textContent = pkg.display_name || pkg.name || "";
+      }
+
+      if (badgeEl) {
+        badgeEl.classList.remove("is-shimmering", "is-animating");
+        void badgeEl.offsetWidth; // trigger reflow
+        badgeEl.classList.add("is-shimmering", "is-animating");
+      }
+
+      if (this.pointer) {
+        this.pointer.classList.remove("is-settled-flare");
+        void this.pointer.offsetWidth;
+        this.pointer.classList.add("is-settled-flare");
+      }
 
       // Extract color / apply theme with fluid HTML5 transition
       const brandTheme = this.getPackageTheme(pkg);
@@ -1144,7 +1224,6 @@
               <div class="vel-coverflow-card__logo-wrap">
                 ${logoHtml}
               </div>
-              <span class="vel-coverflow-card__title">${pkg.display_name}</span>
             </div>
           </div>
         `;
@@ -1194,8 +1273,9 @@
 
         const currentRounded = Math.round(this.animatedIndex);
         if (currentRounded !== lastRounded) {
+          const dir = currentRounded - lastRounded;
           lastRounded = currentRounded;
-          this.triggerTick();
+          this.triggerTick(dir >= 0 ? 1 : -1);
         }
 
         this.renderMainCards();
@@ -1248,7 +1328,12 @@
 
       if (this.hasDragMoved) {
         const sensitivity = window.innerWidth < 640 ? 0.008 : 0.006;
+        const prevRounded = Math.round(this.animatedIndex);
         this.animatedIndex = this.dragStartIndex - dx * sensitivity;
+        const curRounded = Math.round(this.animatedIndex);
+        if (curRounded !== prevRounded) {
+          this.triggerTick(curRounded > prevRounded ? 1 : -1);
+        }
         this.renderMainCards();
       }
     }

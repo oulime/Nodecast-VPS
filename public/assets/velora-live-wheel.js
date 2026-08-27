@@ -883,6 +883,63 @@
       await this.loadPackageChannels(pkg, options);
     }
 
+    async ensurePackageLogoFromChannels(pkg, channels) {
+      if (!pkg || !Array.isArray(channels) || channels.length === 0) return;
+
+      const currentCover = String(pkg.cover_url || window.__veloraCustomPackageLogos?.[pkg.id] || "").trim();
+      if (!currentCover) {
+        const firstWithLogo = channels.find(ch => String(ch.stream_icon || ch.logo || ch.cover || "").trim());
+        if (firstWithLogo) {
+          const rawLogo = String(firstWithLogo.stream_icon || firstWithLogo.logo || firstWithLogo.cover || "").trim();
+          const proxiedLogo = toProxiedImageUrl(rawLogo);
+          pkg.cover_url = proxiedLogo;
+
+          window.__veloraCustomPackageLogos = window.__veloraCustomPackageLogos || {};
+          window.__veloraCustomPackageLogos[pkg.id] = rawLogo;
+
+          // 1. Report to server auto-backfill API so it persists across all users & sessions
+          if (typeof window.veloraReportPackageCover === "function") {
+            window.veloraReportPackageCover(pkg.id, rawLogo);
+          } else {
+            try {
+              fetch("/api/package-covers/auto-backfill", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ packageId: String(pkg.id), coverUrl: rawLogo })
+              }).catch(() => {});
+            } catch (_) {}
+          }
+
+          // 2. Persist to admin_packages database table if sb is available
+          try {
+            if (typeof sb === "function") {
+              sb("admin_packages", `?id=eq.${encodeURIComponent(pkg.id)}`, {
+                method: "PATCH",
+                headers: { Prefer: "return=minimal" },
+                body: JSON.stringify({ cover_url: rawLogo })
+              }).catch(() => {});
+            }
+          } catch (_) {}
+
+          // 3. Extract colors & update theme
+          extractColorFromImage(proxiedLogo, (extractedTheme) => {
+            pkg._cachedTheme = extractedTheme;
+            if (this.getSettledPackage()?.id === pkg.id) {
+              this.transitionToTheme(extractedTheme, 360);
+            }
+          });
+
+          // 4. Update the wheel cards immediately so the squircle card shows the logo
+          if (this.packages.length > 1) {
+            this.renderMainCards();
+          }
+
+          // 5. Notify all listeners
+          window.dispatchEvent(new CustomEvent("velora-package-covers-updated"));
+        }
+      }
+    }
+
     async loadPackageChannels(pkg, options = {}) {
       if (!this.isLiveActive() || !pkg) return;
 
@@ -903,6 +960,7 @@
       // Fast path: Instant cached channels for buttery fluidity
       if (Array.isArray(pkg._cachedChannels) && pkg._cachedChannels.length > 0) {
         this.allChannels = pkg._cachedChannels;
+        this.ensurePackageLogoFromChannels(pkg, pkg._cachedChannels);
         this.filterAndRenderChannels(options);
         return;
       }
@@ -953,6 +1011,7 @@
 
         pkg._cachedChannels = filtered;
         this.allChannels = filtered;
+        this.ensurePackageLogoFromChannels(pkg, filtered);
         this.filterAndRenderChannels(options);
       } catch (err) {
         console.error("Failed to load package channels", err);
@@ -1278,8 +1337,10 @@
         const isCenter = absDist < 0.45;
 
         const pkg = this.packages[i];
-        const logoHtml = pkg.cover_url
-          ? `<img src="${pkg.cover_url}" alt="" loading="lazy" draggable="false" class="vel-coverflow-card__logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" /><span style="display:none;" class="text-xl">📺</span>`
+        const rawCover = pkg.cover_url || window.__veloraCustomPackageLogos?.[pkg.id] || "";
+        const cover = toProxiedImageUrl(rawCover);
+        const logoHtml = cover
+          ? `<img src="${cover}" alt="" loading="lazy" draggable="false" class="vel-coverflow-card__logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" /><span style="display:none;" class="text-xl">📺</span>`
           : `<span class="text-xl">📺</span>`;
 
         html += `

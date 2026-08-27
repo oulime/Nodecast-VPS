@@ -287,4 +287,10 @@
   if (document.readyState !== "loading") {
     loadAllCovers();
   }
+
+  window.addEventListener("velora-package-covers-updated", () => {
+    loadAllCovers().then(() => {
+      applyCoversToDOM();
+    });
+  });
 })();

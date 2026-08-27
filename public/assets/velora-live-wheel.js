@@ -326,7 +326,7 @@
       this.allChannels = [];
       this.filteredChannels = [];
       this.renderedCount = 0;
-      this.pageSize = 500;
+      this.pageSize = 15;
       this.currentPlayingStreamId = null;
       this.isLoadingChannels = false;
       this.hasLoadedInitialLiveChannel = false;
@@ -478,8 +478,16 @@
 
       document.addEventListener("velora-top-level-tab", () => this.checkVisibility());
       document.addEventListener("velora-show-home", () => this.checkVisibility());
-      document.addEventListener("velora-home-country-rendered", () => this.checkVisibility());
+      document.addEventListener("velora-home-country-rendered", () => {
+        this.hasLoadedInitialLiveChannel = false;
+        this.settledPackageIndex = -1;
+        this.checkVisibility();
+      });
       document.addEventListener("velora-country-changed", async () => {
+        this.hasLoadedInitialLiveChannel = false;
+        this.settledPackageIndex = -1;
+        this.currentIndex = 0;
+        this.animatedIndex = 0;
         await this.loadCatalogCache();
         this.checkVisibility();
         this.refreshPackages();
@@ -487,40 +495,50 @@
       window.addEventListener("popstate", () => this.checkVisibility());
     }
 
+    autoScrollUp() {
+      const contentView = document.getElementById("content-view");
+      if (contentView) {
+        try {
+          contentView.scrollTo({ top: 0, behavior: "smooth" });
+        } catch (_) {
+          contentView.scrollTop = 0;
+        }
+      }
+      const dynamicList = document.getElementById("dynamic-list");
+      if (dynamicList) {
+        try {
+          dynamicList.scrollTo({ top: 0, behavior: "smooth" });
+        } catch (_) {
+          dynamicList.scrollTop = 0;
+        }
+      }
+      const mainVelora = document.querySelector(".main--velora");
+      if (mainVelora) {
+        try {
+          mainVelora.scrollTo({ top: 0, behavior: "smooth" });
+        } catch (_) {
+          mainVelora.scrollTop = 0;
+        }
+      }
+      const velBody = document.querySelector(".vel-body");
+      if (velBody) {
+        try {
+          velBody.scrollTo({ top: 0, behavior: "smooth" });
+        } catch (_) {
+          velBody.scrollTop = 0;
+        }
+      }
+      try {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } catch (_) {
+        window.scrollTo(0, 0);
+      }
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
+
     setupInfiniteScroll() {
-      const handleScroll = (target) => {
-        if (!this.isLiveActive() || this.isLoadingChannels) return;
-        if (this.renderedCount >= this.filteredChannels.length) return;
-
-        let scrollPosition, threshold;
-        if (target === window) {
-          scrollPosition = window.innerHeight + window.scrollY;
-          threshold = document.documentElement.scrollHeight - 550;
-        } else if (target) {
-          scrollPosition = target.scrollTop + target.clientHeight;
-          threshold = target.scrollHeight - 450;
-        }
-
-        if (scrollPosition >= threshold) {
-          this.renderNextBatch();
-        }
-      };
-
-      window.addEventListener("scroll", () => handleScroll(window), { passive: true });
-      
-      const attachBodyScroll = () => {
-        const velBody = document.querySelector(".vel-body");
-        if (velBody) {
-          velBody.addEventListener("scroll", () => handleScroll(velBody), { passive: true });
-        }
-        const contentView = document.getElementById("content-view");
-        if (contentView) {
-          contentView.addEventListener("scroll", () => handleScroll(contentView), { passive: true });
-        }
-      };
-
-      attachBodyScroll();
-      document.addEventListener("DOMContentLoaded", attachBodyScroll);
+      // Manual pagination with "Afficher plus" button is used for Live channels as requested
     }
 
     isLiveActive() {
@@ -548,8 +566,9 @@
       if (!isLive) {
         this.hasLoadedInitialLiveChannel = false;
       }
+      const showWheel = isLive && this.packages.length > 1;
       if (this.wrapper) {
-        this.wrapper.style.display = isLive ? "block" : "none";
+        this.wrapper.style.display = showWheel ? "block" : "none";
       }
 
       // Keep player visible when on Live TV or playing favorite live channel
@@ -668,6 +687,12 @@
       this.packages = list;
       this.childPackagesMap = childMap;
 
+      const isLive = this.isLiveActive();
+      const showWheel = isLive && this.packages.length > 1;
+      if (this.wrapper) {
+        this.wrapper.style.display = showWheel ? "block" : "none";
+      }
+
       // Pre-extract colors in background for instant fluid transitions
       this.packages.forEach(pkg => {
         if (pkg.cover_url && !pkg._cachedTheme) {
@@ -696,11 +721,17 @@
         const isListEmpty = !dynamicList || dynamicList.children.length === 0;
 
         const isFirstOpen = !this.hasLoadedInitialLiveChannel;
-        if (isFirstOpen || this.allChannels.length === 0 || isListEmpty) {
+        if (isFirstOpen || this.allChannels.length === 0 || isListEmpty || this.packages.length === 1) {
           this.hasLoadedInitialLiveChannel = true;
           this.onPackageSettled(this.packages[targetIdx], { isInitialLoad: isFirstOpen });
         }
-        this.renderMainCards();
+        if (this.packages.length > 1) {
+          this.renderMainCards();
+        }
+      } else {
+        if (this.wrapper) {
+          this.wrapper.style.display = "none";
+        }
       }
     }
 
@@ -815,6 +846,8 @@
 
     async onPackageSettled(pkg, options = {}) {
       if (!pkg || !this.isLiveActive()) return;
+
+      this.autoScrollUp();
 
       const badgeEl = document.getElementById("vel-wheel-selected-badge");
       const titleEl = document.getElementById("vel-wheel-selected-title");
@@ -958,6 +991,7 @@
     }
 
     filterAndRenderChannels(options = {}) {
+      this.autoScrollUp();
       this.filteredChannels = this.allChannels;
       this.renderedCount = 0;
       const dynamicList = document.getElementById("dynamic-list");
@@ -991,6 +1025,10 @@
         dynamicList.innerHTML = `<div class="col-span-full text-center py-10 text-xs text-slate-400">Aucune chaîne trouvée dans ce bouquet.</div>`;
         return;
       }
+
+      // Remove existing "Afficher plus" button if already rendered
+      const existingLoadMore = document.getElementById("vel-live-load-more-wrap");
+      if (existingLoadMore) existingLoadMore.remove();
 
       const start = this.renderedCount;
       const nextBatch = this.filteredChannels.slice(start, start + this.pageSize);
@@ -1103,6 +1141,36 @@
 
       dynamicList.appendChild(fragment);
       this.renderedCount += nextBatch.length;
+
+      // If more channels exist, show "Afficher plus" button
+      if (this.renderedCount < this.filteredChannels.length) {
+        const loadMoreWrap = document.createElement("div");
+        loadMoreWrap.id = "vel-live-load-more-wrap";
+        loadMoreWrap.className = "vel-load-more-container col-span-full";
+
+        const loadMoreBtn = document.createElement("button");
+        loadMoreBtn.type = "button";
+        loadMoreBtn.id = "vel-live-load-more-btn";
+        loadMoreBtn.className = "vel-load-more-btn";
+        loadMoreBtn.setAttribute("aria-label", "Afficher plus de chaînes");
+        loadMoreBtn.innerHTML = `
+          <span class="vel-load-more-btn__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 9l6 6 6-6"/>
+            </svg>
+          </span>
+          <span class="vel-load-more-btn__text">Afficher plus</span>
+          <span class="vel-load-more-btn__count">${this.renderedCount} / ${this.filteredChannels.length}</span>
+        `;
+
+        loadMoreBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          this.renderNextBatch();
+        });
+
+        loadMoreWrap.appendChild(loadMoreBtn);
+        dynamicList.appendChild(loadMoreWrap);
+      }
     }
 
     async playChannel(ch) {

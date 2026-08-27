@@ -7,6 +7,15 @@
   "use strict";
 
   window.__veloraCustomPackageLogos = window.__veloraCustomPackageLogos || {};
+
+  // Instant zero-delay hydration from localStorage on startup/reload
+  try {
+    const localCached = JSON.parse(localStorage.getItem("velora_package_covers") || "{}");
+    if (localCached && typeof localCached === "object") {
+      Object.assign(window.__veloraCustomPackageLogos, localCached);
+    }
+  } catch (_) {}
+
   const backfillQueue = new Set();
   let flushTimer = null;
   let currentActivePackageId = "";
@@ -14,9 +23,20 @@
 
   function safeUrl(url) {
     if (!url || typeof url !== "string") return "";
-    const trimmed = url.trim();
-    if (!/^https?:\/\//i.test(trimmed) && !trimmed.startsWith("/uploads/")) return "";
-    return trimmed;
+    let trimmed = url.trim();
+    if (!trimmed) return "";
+    try {
+      if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+        const u = new URL(trimmed);
+        if (u.pathname.startsWith("/proxy") || u.pathname.startsWith("/api/proxy") || u.pathname.startsWith("/uploads/") || u.pathname.startsWith("/images/") || u.pathname.startsWith("/logos/")) {
+          trimmed = u.pathname + u.search;
+        }
+      }
+    } catch (_) {}
+    if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith("/uploads/") || trimmed.startsWith("/proxy") || trimmed.startsWith("/api/proxy") || trimmed.startsWith("/images/") || trimmed.startsWith("/logos/")) {
+      return trimmed;
+    }
+    return "";
   }
 
   /**
@@ -24,12 +44,16 @@
    */
   async function loadAllCovers() {
     try {
-      const response = await fetch("/api/package-covers/all", { cache: "default" });
+      const response = await fetch("/api/package-covers/all", { cache: "no-cache" });
       if (!response.ok) return;
       const data = await response.json();
       if (data && data.covers) {
         Object.assign(window.__veloraCustomPackageLogos, data.covers);
+        try {
+          localStorage.setItem("velora_package_covers", JSON.stringify(window.__veloraCustomPackageLogos));
+        } catch (_) {}
         applyCoversToDOM();
+        window.dispatchEvent(new CustomEvent("velora-package-covers-updated", { detail: { covers: window.__veloraCustomPackageLogos } }));
       }
     } catch (_) {}
   }
@@ -102,7 +126,12 @@
     if (window.__veloraCustomPackageLogos[cleanId] === cleanUrl) return;
 
     window.__veloraCustomPackageLogos[cleanId] = cleanUrl;
+    try {
+      localStorage.setItem("velora_package_covers", JSON.stringify(window.__veloraCustomPackageLogos));
+    } catch (_) {}
+
     applyCoversToDOM();
+    window.dispatchEvent(new CustomEvent("velora-package-covers-updated", { detail: { covers: window.__veloraCustomPackageLogos } }));
 
     backfillQueue.add(JSON.stringify({ packageId: cleanId, coverUrl: cleanUrl }));
 

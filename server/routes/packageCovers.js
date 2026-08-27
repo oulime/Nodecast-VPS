@@ -282,7 +282,7 @@ router.get('/package-covers/all', async (_req, res) => {
             }
         } catch (_) {}
 
-        res.set('Cache-Control', 'public, max-age=60');
+        res.set('Cache-Control', 'no-cache');
         return res.json({ ok: true, covers, count: Object.keys(covers).length });
     } catch (err) {
         console.error('[package-cover] get all covers failed:', err);
@@ -312,10 +312,23 @@ router.post('/package-covers/auto-backfill', express.json(), async (req, res) =>
 
         for (const item of items) {
             const packageId = String(item.packageId || '').trim();
-            const coverUrl = String(item.coverUrl || '').trim();
+            let coverUrl = String(item.coverUrl || '').trim();
 
             if (!packageId || !coverUrl) continue;
-            if (!/^https?:\/\//i.test(coverUrl) && !coverUrl.startsWith('/uploads/')) continue;
+
+            // Strip localhost / loopback / origin prefix to keep URL portable
+            try {
+                if (coverUrl.startsWith('http://') || coverUrl.startsWith('https://')) {
+                    const u = new URL(coverUrl);
+                    if (u.pathname.startsWith('/proxy') || u.pathname.startsWith('/api/proxy') || u.pathname.startsWith('/uploads/') || u.pathname.startsWith('/images/') || u.pathname.startsWith('/logos/')) {
+                        coverUrl = u.pathname + u.search;
+                    }
+                }
+            } catch (_) {}
+
+            if (!/^https?:\/\//i.test(coverUrl) && !coverUrl.startsWith('/uploads/') && !coverUrl.startsWith('/proxy') && !coverUrl.startsWith('/api/proxy') && !coverUrl.startsWith('/images/') && !coverUrl.startsWith('/logos/')) {
+                continue;
+            }
 
             const existing = map[packageId];
             const currentUrl = typeof existing === 'string' ? existing : existing?.coverUrl;

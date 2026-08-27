@@ -493,6 +493,30 @@
         this.refreshPackages();
       });
       window.addEventListener("popstate", () => this.checkVisibility());
+      window.addEventListener("velora-package-covers-updated", () => {
+        this.refreshPackageCovers();
+      });
+    }
+
+    refreshPackageCovers() {
+      const logos = window.__veloraCustomPackageLogos || (function () {
+        try { return JSON.parse(localStorage.getItem("velora_package_covers") || "{}"); } catch (_) { return {}; }
+      })();
+      let updated = false;
+      for (const pkg of this.packages) {
+        const cover = logos[pkg.id];
+        if (cover && !pkg.cover_url) {
+          pkg.cover_url = toProxiedImageUrl(cover);
+          updated = true;
+          if (!pkg._cachedTheme) {
+            extractColorFromImage(pkg.cover_url, (t) => { pkg._cachedTheme = t; });
+          }
+        }
+      }
+      if (updated) {
+        this.renderMainCards();
+        this.updateCenterDetails();
+      }
     }
 
     autoScrollUp() {
@@ -641,11 +665,13 @@
         const id = String(card.dataset.packageId || "");
         const titleEl = card.querySelector(".vel-package-card__title");
         const title = titleEl ? titleEl.textContent.trim() : card.getAttribute("aria-label") || `Bouquet ${i+1}`;
-        const imgEl = card.querySelector(":scope > img, .vel-package-card__live-logo");
-        const rawCover = imgEl ? (imgEl.getAttribute("src") || "") : (window.__veloraCustomPackageLogos?.[id] || "");
-        const cover_url = toProxiedImageUrl(rawCover);
-        
         const apiPkg = this.cachedApiPackages.find(p => String(p.id) === id);
+        const savedLogo = window.__veloraCustomPackageLogos?.[id] || (function () {
+          try { return JSON.parse(localStorage.getItem("velora_package_covers") || "{}")[id] || ""; } catch (_) { return ""; }
+        })();
+        const imgEl = card.querySelector(":scope > img, .vel-package-card__live-logo");
+        const rawCover = imgEl ? (imgEl.getAttribute("src") || "") : (apiPkg?.cover_url || savedLogo || "");
+        const cover_url = toProxiedImageUrl(rawCover);
         const is_parent = card.classList.contains("vel-package-card--parent") || Boolean(apiPkg?.is_parent) || (Array.isArray(apiPkg?.child_package_ids) && apiPkg.child_package_ids.length > 0);
         const childIds = apiPkg?.child_package_ids || [];
 
@@ -896,6 +922,9 @@
 
           window.__veloraCustomPackageLogos = window.__veloraCustomPackageLogos || {};
           window.__veloraCustomPackageLogos[pkg.id] = rawLogo;
+          try {
+            localStorage.setItem("velora_package_covers", JSON.stringify(window.__veloraCustomPackageLogos));
+          } catch (_) {}
 
           // 1. Report to server auto-backfill API so it persists across all users & sessions
           if (typeof window.veloraReportPackageCover === "function") {
@@ -935,7 +964,7 @@
           }
 
           // 5. Notify all listeners
-          window.dispatchEvent(new CustomEvent("velora-package-covers-updated"));
+          window.dispatchEvent(new CustomEvent("velora-package-covers-updated", { detail: { packageId: pkg.id, coverUrl: rawLogo, covers: window.__veloraCustomPackageLogos } }));
         }
       }
     }

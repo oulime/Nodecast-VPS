@@ -140,13 +140,20 @@ const VPS_DATA_API_PATHS = [
     '/api/admin/paid-users',
     '/api/sources',
     '/api/proxy',
+    '/api/velora-proxy',
+    '/proxy',
     '/api/channels',
     '/api/favorites',
     '/api/settings',
     '/api/history',
     '/api/search',
     '/api/velora/catalog',
-    '/api/velora-db'
+    '/api/velora-db',
+    '/api/package-covers',
+    '/api/country-logos',
+    '/api/r2-package-cover',
+    '/api/analytics',
+    '/uploads'
 ];
 
 function isVpsDataApiRequest(requestPath) {

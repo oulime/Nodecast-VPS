@@ -39,10 +39,16 @@
     return "";
   }
 
+  let isLoadingCovers = false;
+  let coversLoadedOnce = false;
+
   /**
    * Fetch all server-persisted covers on startup
    */
-  async function loadAllCovers() {
+  async function loadAllCovers(force = false) {
+    if (isLoadingCovers) return;
+    if (coversLoadedOnce && !force) return;
+    isLoadingCovers = true;
     try {
       const response = await fetch("/api/package-covers/all", { cache: "no-cache" });
       if (!response.ok) return;
@@ -52,10 +58,14 @@
         try {
           localStorage.setItem("velora_package_covers", JSON.stringify(window.__veloraCustomPackageLogos));
         } catch (_) {}
+        coversLoadedOnce = true;
         applyCoversToDOM();
         window.dispatchEvent(new CustomEvent("velora-package-covers-updated", { detail: { covers: window.__veloraCustomPackageLogos } }));
       }
-    } catch (_) {}
+    } catch (_) {
+    } finally {
+      isLoadingCovers = false;
+    }
   }
 
   /**
@@ -291,8 +301,10 @@
     }
   }, true);
 
-  // Global helper
+  // Global helpers
   window.veloraReportPackageCover = reportDiscoveredCover;
+  window.veloraReloadPackageCovers = (force = true) => loadAllCovers(force);
+  window.veloraApplyPackageCoversToDOM = applyCoversToDOM;
 
   // Initialize
   document.addEventListener("DOMContentLoaded", () => {
@@ -318,8 +330,6 @@
   }
 
   window.addEventListener("velora-package-covers-updated", () => {
-    loadAllCovers().then(() => {
-      applyCoversToDOM();
-    });
+    applyCoversToDOM();
   });
 })();

@@ -547,15 +547,19 @@
     if (!media) {
       var activeEp = document.querySelector(".vel-vod-detail__episode--playing, .vel-vod-detail__episode[aria-current='true']");
       var seriesTitle = document.querySelector(".vel-vod-detail__title");
+      var detailEl = document.querySelector(".vel-vod-detail");
+      var sId = detailEl ? (detailEl.dataset.seriesId || detailEl.dataset.streamId || "") : "";
       if (activeEp) {
         var badge = activeEp.querySelector(".vel-vod-detail__episode-badge");
         var epTitle = activeEp.querySelector(".vel-vod-detail__episode-title");
         var parsed = parseSeasonEpisode(badge ? badge.textContent : "", epTitle ? epTitle.textContent : "");
+        var epStreamId = activeEp.dataset.episodeStreamId || activeEp.dataset.streamId || "";
         media = {
-          id: "series:" + (activeEp.dataset.episodeStreamId || "ep"),
+          id: "series:" + (sId || "series") + ":ep:" + (epStreamId || "ep"),
           type: "series",
-          streamId: activeEp.dataset.episodeStreamId,
-          episodeStreamId: activeEp.dataset.episodeStreamId,
+          streamId: epStreamId,
+          seriesId: sId || null,
+          episodeStreamId: epStreamId,
           name: seriesTitle ? seriesTitle.textContent.trim() : "Série",
           episodeTitle: epTitle ? epTitle.textContent.trim() : "",
           seasonNumber: parsed ? parsed.season : 1,
@@ -662,31 +666,40 @@
     }, 30);
   }
 
-  function findHistoryForEpisodeRow(row, history, currentSeriesName) {
-    var epId = String(row.dataset.episodeStreamId || "");
+  function findHistoryForEpisodeRow(row, history, currentSeriesName, currentSeriesId) {
+    if (!row) return null;
+    var epId = String(row.dataset.episodeStreamId || row.dataset.streamId || "").trim();
     var badge = row.querySelector(".vel-vod-detail__episode-badge");
     var title = row.querySelector(".vel-vod-detail__episode-title");
     var parsed = parseSeasonEpisode(badge ? badge.textContent : "", title ? title.textContent : "");
 
     var normCurrent = normalizeTitle(currentSeriesName);
+    var curSeriesId = currentSeriesId ? String(currentSeriesId).trim() : "";
 
     for (var i = 0; i < history.length; i++) {
       var it = history[i];
-      if (it.type !== "series") continue;
+      if (!it || it.type !== "series") continue;
 
       // 1. Direct Episode Stream ID match
-      if (epId && (String(it.episodeStreamId) === epId || String(it.streamId) === epId)) {
+      if (epId && (String(it.episodeStreamId || "") === epId || String(it.streamId || "") === epId)) {
+        if (curSeriesId && it.seriesId && String(it.seriesId) !== curSeriesId) continue;
         return it;
       }
 
-      // 2. Match by Series Name + Season + Episode
-      if (parsed && it.seasonNumber != null && it.episodeNumber != null) {
+      // 2. Match strictly by same Series (by seriesId or normalized series name) + Season + Episode
+      var isSameSeries = false;
+      if (curSeriesId && it.seriesId && String(it.seriesId) === curSeriesId) {
+        isSameSeries = true;
+      } else if (normCurrent && it.name && normCurrent.length >= 2) {
+        var normHist = normalizeTitle(it.name);
+        if (normCurrent === normHist) {
+          isSameSeries = true;
+        }
+      }
+
+      if (isSameSeries && parsed && it.seasonNumber != null && it.episodeNumber != null) {
         if (Number(it.seasonNumber) === Number(parsed.season) && Number(it.episodeNumber) === Number(parsed.episode)) {
-          if (!normCurrent || !it.name) return it;
-          var normHist = normalizeTitle(it.name);
-          if (normCurrent === normHist || normCurrent.includes(normHist) || normHist.includes(normCurrent)) {
-            return it;
-          }
+          return it;
         }
       }
     }
@@ -699,9 +712,9 @@
     var normN = name ? normalizeTitle(name) : "";
     var history = getLocalHistory();
     var item = history.find(function (it) {
-      if (it.type === "series") return false;
-      if (sId && String(it.streamId) === sId) return true;
-      if (normN && it.name && normalizeTitle(it.name) === normN) return true;
+      if (!it || it.type === "series") return false;
+      if (sId && String(it.streamId || "") === sId) return true;
+      if (normN && normN.length >= 2 && it.name && normalizeTitle(it.name) === normN) return true;
       return false;
     });
     return !!(item && item.currentTime > 3 && !item.isFinished && (item.progressPercent == null || item.progressPercent < FINISHED_WATCH_PERCENT));
@@ -737,9 +750,11 @@
 
       var seriesTitleEl = document.querySelector(".vel-vod-detail__title");
       var currentSeriesName = seriesTitleEl ? seriesTitleEl.textContent.trim() : "";
+      var detailEl = document.querySelector(".vel-vod-detail");
+      var currentSeriesId = detailEl ? (detailEl.dataset.seriesId || detailEl.dataset.streamId || "") : "";
 
       episodeRows.forEach(function (row) {
-        var item = findHistoryForEpisodeRow(row, history, currentSeriesName);
+        var item = findHistoryForEpisodeRow(row, history, currentSeriesName, currentSeriesId);
         var body = row.querySelector(".vel-vod-detail__episode-body");
         if (!body) return;
 
@@ -819,6 +834,7 @@
 
     var target = pending.targetSeconds;
     pending.applied = true;
+    window.__veloraPendingResumeSeek = null;
 
     if (typeof window.veloraSeekToSeconds === "function") {
       console.info("[Watch History] Calling window.veloraSeekToSeconds to resume at", target, "seconds");
@@ -1103,11 +1119,15 @@
       var history = getLocalHistory();
       var seriesTitleEl = document.querySelector(".vel-vod-detail__title");
       var sName = seriesTitleEl ? seriesTitleEl.textContent.trim() : "";
-      var saved = findHistoryForEpisodeRow(epBtn, history, sName);
+      var detailEl = epBtn.closest(".vel-vod-detail") || document.querySelector(".vel-vod-detail");
+      var sId = detailEl ? (detailEl.dataset.seriesId || detailEl.dataset.streamId || "") : "";
+      var saved = findHistoryForEpisodeRow(epBtn, history, sName, sId);
 
       if (saved && saved.currentTime > 3 && !saved.isFinished && (saved.progressPercent == null || saved.progressPercent < FINISHED_WATCH_PERCENT)) {
         window.__veloraPendingResumeSeek = { targetSeconds: saved.currentTime, applied: false, timestamp: Date.now() };
         console.info("[Watch History] Clicked episode resume armed at", saved.currentTime, "seconds.");
+      } else {
+        window.__veloraPendingResumeSeek = null;
       }
       return;
     }
@@ -1118,11 +1138,13 @@
       if (activeCard && activeCard.dataset.streamId) {
         var historyM = getLocalHistory();
         var mSaved = historyM.find(function (it) {
-          return it.type !== "series" && String(it.streamId) === String(activeCard.dataset.streamId);
+          return it && it.type !== "series" && String(it.streamId) === String(activeCard.dataset.streamId);
         });
         if (mSaved && mSaved.currentTime > 3 && !mSaved.isFinished && (mSaved.progressPercent == null || mSaved.progressPercent < FINISHED_WATCH_PERCENT)) {
           window.__veloraPendingResumeSeek = { targetSeconds: mSaved.currentTime, applied: false, timestamp: Date.now() };
           console.info("[Watch History] Clicked movie resume armed at", mSaved.currentTime, "seconds.");
+        } else {
+          window.__veloraPendingResumeSeek = null;
         }
       }
     }
@@ -1138,21 +1160,46 @@
     var savedProgress = null;
 
     if (isSeries) {
-      var epId = String(d.episodeStreamId || d.streamId || "");
+      var epId = String(d.episodeStreamId || d.streamId || "").trim();
+      var sId = d.seriesId ? String(d.seriesId).trim() : "";
+      var currentSeriesNorm = normalizeTitle(d.seriesName || d.name || "");
+
       savedProgress = history.find(function (it) {
-        if (it.type !== "series") return false;
-        if (epId && (String(it.episodeStreamId) === epId || String(it.streamId) === epId)) return true;
-        if (d.seasonNumber != null && d.episodeNumber != null &&
-            Number(it.seasonNumber) === Number(d.seasonNumber) &&
-            Number(it.episodeNumber) === Number(d.episodeNumber)) {
+        if (!it || it.type !== "series") return false;
+
+        // 1. Direct episode ID match
+        if (epId && (String(it.episodeStreamId || "") === epId || String(it.streamId || "") === epId)) {
+          if (sId && it.seriesId && String(it.seriesId) !== sId) return false;
           return true;
         }
+
+        // 2. Fallback: match strictly by same Series (ID or exact title) + same Season + same Episode
+        var isSameSeries = false;
+        if (sId && it.seriesId && String(it.seriesId) === sId) {
+          isSameSeries = true;
+        } else if (currentSeriesNorm && it.name && currentSeriesNorm.length >= 2) {
+          var histNorm = normalizeTitle(it.name);
+          if (currentSeriesNorm === histNorm) {
+            isSameSeries = true;
+          }
+        }
+
+        if (isSameSeries && d.seasonNumber != null && d.episodeNumber != null && it.seasonNumber != null && it.episodeNumber != null) {
+          if (Number(it.seasonNumber) === Number(d.seasonNumber) && Number(it.episodeNumber) === Number(d.episodeNumber)) {
+            return true;
+          }
+        }
+
         return false;
       });
     } else {
-      var sId = String(d.streamId || "");
+      var sId = String(d.streamId || "").trim();
+      var mNorm = normalizeTitle(d.name || "");
       savedProgress = history.find(function (it) {
-        return it.type !== "series" && String(it.streamId) === sId;
+        if (!it || it.type === "series") return false;
+        if (sId && String(it.streamId || "") === sId) return true;
+        if (mNorm && it.name && mNorm.length >= 2 && normalizeTitle(it.name) === mNorm) return true;
+        return false;
       });
     }
 
@@ -1160,7 +1207,9 @@
     if (savedProgress && savedProgress.currentTime > 3 && !savedProgress.isFinished && (savedProgress.progressPercent == null || savedProgress.progressPercent < FINISHED_WATCH_PERCENT)) {
       initialSeekTime = savedProgress.currentTime;
       window.__veloraPendingResumeSeek = { targetSeconds: initialSeekTime, applied: false, timestamp: Date.now() };
-      console.info("[Watch History] Auto-resuming at", initialSeekTime, "seconds for", d.name || d.episodeTitle);
+      console.info("[Watch History] Auto-resuming at", initialSeekTime, "seconds for", d.name || d.episodeTitle || d.seriesName);
+    } else {
+      window.__veloraPendingResumeSeek = null;
     }
 
     state.currentPlaying = {
@@ -1171,7 +1220,8 @@
       episodeStreamId: d.episodeStreamId || null,
       seasonNumber: d.seasonNumber || null,
       episodeNumber: d.episodeNumber || null,
-      name: d.name || d.seriesName,
+      name: d.seriesName || d.name,
+      seriesName: d.seriesName || d.name,
       episodeTitle: d.episodeTitle || null,
       thumbUrl: cleanCoverUrl(d.poster || ""),
       packageId: d.packageId || "",

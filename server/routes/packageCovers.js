@@ -263,10 +263,12 @@ router.get('/package-covers/all', async (_req, res) => {
         const discovered = await loadDiscoveredCovers();
         const covers = {};
 
-        // 1. Add auto-discovered covers
+        // 1. Add auto-discovered covers (never return TMDB movie posters for package covers)
         for (const [id, item] of Object.entries(discovered)) {
             const url = typeof item === 'string' ? item : item?.coverUrl;
-            if (url) covers[id] = url;
+            if (url && !url.includes('tmdb.org') && !url.includes('image.tmdb') && !url.includes('/w600_and_h900_bestv2/')) {
+                covers[id] = url;
+            }
         }
 
         // 2. Add or override with admin explicit covers from SQLite DB
@@ -276,7 +278,7 @@ router.get('/package-covers/all', async (_req, res) => {
             for (const row of adminCovers) {
                 const id = String(row.package_id || '');
                 const url = String(row.cover_url || '').trim();
-                if (id && url && !row.deleted) {
+                if (id && url && !row.deleted && !url.includes('tmdb.org') && !url.includes('image.tmdb')) {
                     covers[id] = url;
                 }
             }
@@ -314,7 +316,26 @@ router.post('/package-covers/auto-backfill', express.json(), async (req, res) =>
             const packageId = String(item.packageId || '').trim();
             let coverUrl = String(item.coverUrl || '').trim();
 
-            if (!packageId || !coverUrl) continue;
+            // Unwrap nested /proxy?target=
+            while (coverUrl.includes('/proxy?target=') || coverUrl.includes('/api/proxy?target=')) {
+                try {
+                    const idx = coverUrl.indexOf('target=');
+                    if (idx !== -1) {
+                        const rawTarget = coverUrl.slice(idx + 7).split('&')[0];
+                        const decoded = decodeURIComponent(rawTarget);
+                        if (decoded && (decoded.startsWith('http://') || decoded.startsWith('https://') || decoded.startsWith('/'))) {
+                            coverUrl = decoded;
+                            continue;
+                        }
+                    }
+                } catch (_) {}
+                break;
+            }
+
+            // Reject TMDB movie poster URLs from being saved as package covers
+            if (coverUrl.includes('image.tmdb.org') || coverUrl.includes('tmdb.org') || coverUrl.includes('/w600_and_h900_bestv2/') || coverUrl.includes('/w500/') || coverUrl.includes('/w300/')) {
+                continue;
+            }
 
             // Strip localhost / loopback / origin prefix to keep URL portable
             try {

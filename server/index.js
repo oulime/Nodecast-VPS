@@ -233,6 +233,20 @@ if (USE_VPS_DATA_API) {
             });
             res.setHeader('X-Nodecast-Data-Source', VPS_DATA_API_BASE);
 
+            if (upstream.ok && req.path === '/api/package-covers/all' && contentType.includes('application/json')) {
+                const data = await upstream.json().catch(() => null);
+                if (data && data.covers) {
+                    const filteredCovers = {};
+                    for (const [k, v] of Object.entries(data.covers)) {
+                        const url = typeof v === 'string' ? v : v?.coverUrl || '';
+                        if (url && !url.includes('image.tmdb.org') && !url.includes('/t/p/') && !url.includes('/w600_and_h900_bestv2/')) {
+                            filteredCovers[k] = url;
+                        }
+                    }
+                    return res.json({ ok: true, covers: filteredCovers, count: Object.keys(filteredCovers).length });
+                }
+            }
+
             const vodRoute = req.path.match(/^\/api\/proxy\/xtream\/([^/]+)\/vod_streams$/i);
             const contentType = String(upstream.headers.get('content-type') || '').toLowerCase();
 
@@ -257,6 +271,10 @@ if (USE_VPS_DATA_API) {
             }
             console.error('[VPS data API] Request failed:', err);
             if (!res.headersSent) {
+                if (req.path.startsWith('/api/package-covers')) {
+                    clearRequest();
+                    return next();
+                }
                 res.status(controller.signal.aborted ? 504 : 502).json({
                     error: controller.signal.aborted ? 'VPS data API timed out' : 'VPS data API unavailable'
                 });

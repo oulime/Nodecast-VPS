@@ -54,8 +54,25 @@
   // Mixed-content safe HTTPS Image Proxy Helper for Mobile & Desktop
   function toProxiedImageUrl(url) {
     if (!url) return "";
-    const clean = String(url).trim().replace(/^url\(["']?/, "").replace(/["']?\)$/, "");
+    let clean = String(url).trim().replace(/^url\(["']?/, "").replace(/["']?\)$/, "");
     if (!clean) return "";
+
+    // Unwrap nested /proxy?target=
+    while (clean.includes("/proxy?target=") || clean.includes("/api/proxy?target=")) {
+      try {
+        const idx = clean.indexOf("target=");
+        if (idx !== -1) {
+          const rawTarget = clean.slice(idx + 7).split("&")[0];
+          const decoded = decodeURIComponent(rawTarget);
+          if (decoded && (decoded.startsWith("http://") || decoded.startsWith("https://") || decoded.startsWith("/"))) {
+            clean = decoded;
+            continue;
+          }
+        }
+      } catch (_) {}
+      break;
+    }
+
     if (clean.startsWith("/proxy") || clean.startsWith("/api/proxy") || clean.startsWith("data:")) return clean;
     if (/^https?:\/\//i.test(clean)) {
       try {
@@ -912,9 +929,17 @@
     async ensurePackageLogoFromChannels(pkg, channels) {
       if (!pkg || !Array.isArray(channels) || channels.length === 0) return;
 
-      const currentCover = String(pkg.cover_url || window.__veloraCustomPackageLogos?.[pkg.id] || "").trim();
+      let currentCover = String(pkg.cover_url || window.__veloraCustomPackageLogos?.[pkg.id] || "").trim();
+      // If current cover is a movie poster (TMDB), reject/override it!
+      if (currentCover.includes("image.tmdb.org") || currentCover.includes("tmdb.org") || currentCover.includes("/w600_and_h900_bestv2/")) {
+        currentCover = "";
+      }
+
       if (!currentCover) {
-        const firstWithLogo = channels.find(ch => String(ch.stream_icon || ch.logo || ch.cover || "").trim());
+        const firstWithLogo = channels.find(ch => {
+          const icon = String(ch.stream_icon || ch.logo || ch.cover || "").trim();
+          return icon && !icon.includes("tmdb.org") && !icon.includes("image.tmdb");
+        });
         if (firstWithLogo) {
           const rawLogo = String(firstWithLogo.stream_icon || firstWithLogo.logo || firstWithLogo.cover || "").trim();
           const proxiedLogo = toProxiedImageUrl(rawLogo);

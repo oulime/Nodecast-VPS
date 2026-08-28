@@ -1404,7 +1404,7 @@
         const rawCover = pkg.cover_url || window.__veloraCustomPackageLogos?.[pkg.id] || "";
         const cover = toProxiedImageUrl(rawCover);
         const logoHtml = cover
-          ? `<img src="${cover}" alt="" loading="lazy" draggable="false" class="vel-coverflow-card__logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" /><span style="display:none;" class="text-xl">📺</span>`
+          ? `<img src="${cover}" alt="" loading="eager" decoding="async" draggable="false" class="vel-coverflow-card__logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" /><span style="display:none;" class="text-xl">📺</span>`
           : `<span class="text-xl">📺</span>`;
 
         html += `

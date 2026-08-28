@@ -196,7 +196,7 @@ function publicUrl(req, fileName) {
     return `${req.protocol}://${req.get('host')}${PUBLIC_UPLOAD_PATH}/${encodeURIComponent(fileName)}`;
 }
 
-function convertToWebp(ffmpegPath, inputPath, outputPath) {
+function convertToWebp(ffmpegPath, inputPath, outputPath, isPng = false) {
     if (!ffmpegPath) return Promise.resolve(false);
 
     return new Promise(resolve => {
@@ -205,8 +205,9 @@ function convertToWebp(ffmpegPath, inputPath, outputPath) {
             '-i', inputPath,
             '-frames:v', '1',
             '-c:v', 'libwebp',
-            '-q:v', '82',
-            '-compression_level', '6',
+            ...(isPng
+                ? ['-lossless', '1', '-compression_level', '4']
+                : ['-q:v', '96', '-preset', 'drawing', '-compression_level', '4']),
             outputPath
         ];
         const child = spawn(ffmpegPath, args, { windowsHide: true, stdio: 'ignore' });
@@ -443,7 +444,8 @@ router.post('/r2-package-cover', async (req, res) => {
         await fsp.writeFile(inputPath, file.data, { flag: 'wx' });
 
         const ffmpegPath = req.app && req.app.locals ? req.app.locals.ffmpegPath : null;
-        const converted = detected.ext !== 'webp' && await convertToWebp(ffmpegPath, inputPath, webpPath);
+        const isPng = detected.ext === 'png';
+        const converted = detected.ext !== 'webp' && await convertToWebp(ffmpegPath, inputPath, webpPath, isPng);
         const useWebp = converted && await fileExistsWithContent(webpPath);
         const finalExt = useWebp ? 'webp' : detected.ext;
         const finalName = `${baseName}.${finalExt}`;

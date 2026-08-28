@@ -345,6 +345,7 @@
       this.renderedCount = 0;
       this.pageSize = 15;
       this.currentPlayingStreamId = null;
+      this.currentLoadedPkgId = "";
       this.isLoadingChannels = false;
       this.hasLoadedInitialLiveChannel = false;
 
@@ -607,7 +608,7 @@
       if (!isLive) {
         this.hasLoadedInitialLiveChannel = false;
       }
-      const showWheel = isLive && this.packages.length > 1;
+      const showWheel = isLive && this.packages.length >= 1;
       if (this.wrapper) {
         this.wrapper.style.display = showWheel ? "block" : "none";
       }
@@ -731,7 +732,7 @@
       this.childPackagesMap = childMap;
 
       const isLive = this.isLiveActive();
-      const showWheel = isLive && this.packages.length > 1;
+      const showWheel = isLive && this.packages.length >= 1;
       if (this.wrapper) {
         this.wrapper.style.display = showWheel ? "block" : "none";
       }
@@ -764,11 +765,14 @@
         const isListEmpty = !dynamicList || dynamicList.children.length === 0;
 
         const isFirstOpen = !this.hasLoadedInitialLiveChannel;
-        if (isFirstOpen || this.allChannels.length === 0 || isListEmpty || this.packages.length === 1) {
+        const currentPkg = this.packages[targetIdx];
+        const needsLoad = isFirstOpen || this.allChannels.length === 0 || isListEmpty || (currentPkg && this.currentLoadedPkgId !== currentPkg.id);
+        if (needsLoad) {
           this.hasLoadedInitialLiveChannel = true;
-          this.onPackageSettled(this.packages[targetIdx], { isInitialLoad: isFirstOpen });
+          this.currentLoadedPkgId = currentPkg ? currentPkg.id : "";
+          this.onPackageSettled(currentPkg, { isInitialLoad: isFirstOpen });
         }
-        if (this.packages.length > 1) {
+        if (this.packages.length >= 1) {
           this.renderMainCards();
         }
       } else {
@@ -890,7 +894,9 @@
     async onPackageSettled(pkg, options = {}) {
       if (!pkg || !this.isLiveActive()) return;
 
-      this.autoScrollUp();
+      if (!options.skipScroll && !options.isInitialLoad) {
+        this.autoScrollUp();
+      }
 
       const badgeEl = document.getElementById("vel-wheel-selected-badge");
       const titleEl = document.getElementById("vel-wheel-selected-title");
@@ -984,7 +990,7 @@
           });
 
           // 4. Update the wheel cards immediately so the squircle card shows the logo
-          if (this.packages.length > 1) {
+          if (this.packages.length >= 1) {
             this.renderMainCards();
           }
 
@@ -1109,7 +1115,6 @@
     }
 
     filterAndRenderChannels(options = {}) {
-      this.autoScrollUp();
       this.filteredChannels = this.allChannels;
       this.renderedCount = 0;
       const dynamicList = document.getElementById("dynamic-list");

@@ -7,12 +7,16 @@
   "use strict";
 
   window.__veloraCustomPackageLogos = window.__veloraCustomPackageLogos || {};
+  const sentCovers = new Set();
 
   // Instant zero-delay hydration from localStorage on startup/reload
   try {
     const localCached = JSON.parse(localStorage.getItem("velora_package_covers") || "{}");
     if (localCached && typeof localCached === "object") {
       Object.assign(window.__veloraCustomPackageLogos, localCached);
+      for (const [id, url] of Object.entries(localCached)) {
+        if (id && url) sentCovers.add(`${id}:${url}`);
+      }
     }
   } catch (_) {}
 
@@ -55,6 +59,9 @@
       const data = await response.json();
       if (data && data.covers) {
         Object.assign(window.__veloraCustomPackageLogos, data.covers);
+        for (const [id, url] of Object.entries(data.covers)) {
+          if (id && url) sentCovers.add(`${id}:${url}`);
+        }
         try {
           localStorage.setItem("velora_package_covers", JSON.stringify(window.__veloraCustomPackageLogos));
         } catch (_) {}
@@ -132,9 +139,6 @@
     const cleanUrl = safeUrl(coverUrl);
     if (!cleanId || !cleanUrl) return;
 
-    // If we already know this cover, skip network call
-    if (window.__veloraCustomPackageLogos[cleanId] === cleanUrl) return;
-
     window.__veloraCustomPackageLogos[cleanId] = cleanUrl;
     try {
       localStorage.setItem("velora_package_covers", JSON.stringify(window.__veloraCustomPackageLogos));
@@ -143,10 +147,21 @@
     applyCoversToDOM();
     window.dispatchEvent(new CustomEvent("velora-package-covers-updated", { detail: { covers: window.__veloraCustomPackageLogos } }));
 
-    backfillQueue.add(JSON.stringify({ packageId: cleanId, coverUrl: cleanUrl }));
+    const cacheKey = `${cleanId}:${cleanUrl}`;
+    if (sentCovers.has(cacheKey)) return;
+    sentCovers.add(cacheKey);
 
-    if (!flushTimer) {
-      flushTimer = window.setTimeout(flushBackfillQueue, 600);
+    // Send immediately to server (only once per unique cover)
+    try {
+      fetch("/api/package-covers/auto-backfill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packageId: cleanId, coverUrl: cleanUrl })
+      }).catch(() => {
+        sentCovers.delete(cacheKey);
+      });
+    } catch (_) {
+      sentCovers.delete(cacheKey);
     }
   }
 
@@ -169,7 +184,7 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items })
-      });
+      }).catch(() => {});
     } catch (_) {}
   }
 

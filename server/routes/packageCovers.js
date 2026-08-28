@@ -341,7 +341,7 @@ router.post('/package-covers/auto-backfill', express.json(), async (req, res) =>
                 };
                 changed = true;
 
-                // Also sync into SQLite admin_package_covers if available
+                // Also sync into SQLite admin_package_covers and admin_packages if available
                 if (veloraData && typeof veloraData.saveRow === 'function') {
                     try {
                         const dbRows = veloraData.allRows('admin_package_covers') || [];
@@ -352,7 +352,17 @@ router.post('/package-covers/auto-backfill', express.json(), async (req, res) =>
                                 package_id: packageId,
                                 cover_url: coverUrl,
                                 auto_discovered: 1
-                            });
+                            }, req);
+                        }
+
+                        // Also update admin_packages row so cover_url is part of package metadata
+                        const pkgRows = veloraData.allRows('admin_packages') || [];
+                        const targetPkg = pkgRows.find(r => String(r.id) === packageId);
+                        if (targetPkg && !targetPkg.cover_url) {
+                            veloraData.saveRow('admin_packages', {
+                                ...targetPkg,
+                                cover_url: coverUrl
+                            }, req);
                         }
                     } catch (dbErr) {
                         console.warn('[package-cover] DB saveRow error:', dbErr.message);

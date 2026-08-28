@@ -794,7 +794,7 @@ function sortRows(rows, order) {
 }
 
 function conflictFields(table, req) {
-    const requested = String(req.query.on_conflict || '')
+    const requested = String(req?.query?.on_conflict || '')
         .split(',').map(value => value.trim()).filter(Boolean);
     return requested.length ? requested : (NATURAL_KEYS[table] || ['id']);
 }
@@ -806,10 +806,12 @@ function findConflict(table, row, fields) {
     ) || null;
 }
 
-function saveRow(table, input, req) {
+function saveRow(table, input, req = null) {
     const db = getDb();
     const row = { ...input };
-    const merge = String(req.get('Prefer') || '').includes('resolution=merge-duplicates');
+    const merge = req && typeof req.get === 'function'
+        ? String(req.get('Prefer') || '').includes('resolution=merge-duplicates')
+        : false;
     const conflict = findConflict(table, row, conflictFields(table, req));
     if (conflict && merge) Object.assign(row, conflict, input);
     const rowId = String(row.id || (conflict && conflict.id) || crypto.randomUUID());
@@ -1675,3 +1677,5 @@ module.exports.buildCountryPackageCache = buildCountryPackageCache;
 module.exports.invalidateCountryPackageCache = invalidateCountryPackageCache;
 module.exports.getCountryPackageCache = getCountryPackageCache;
 module.exports.expandMemberships = expandMemberships;
+module.exports.saveRow = saveRow;
+module.exports.allRows = allRows;

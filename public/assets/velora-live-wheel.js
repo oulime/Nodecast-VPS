@@ -1040,8 +1040,13 @@
 
         pkg._cachedChannels = filtered;
         this.allChannels = filtered;
-        this.ensurePackageLogoFromChannels(pkg, filtered);
+        // 1. Render and display channels + start playback immediately for zero user perceived delay
         this.filterAndRenderChannels(options);
+
+        // 2. Process package logo detection and background sync without blocking UI rendering
+        setTimeout(() => {
+          this.ensurePackageLogoFromChannels(pkg, filtered);
+        }, 0);
       } catch (err) {
         console.error("Failed to load package channels", err);
       } finally {

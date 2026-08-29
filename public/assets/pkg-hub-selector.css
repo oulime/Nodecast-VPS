@@ -1,14 +1,16 @@
 ﻿/* ==========================================================================
-   Scoped Package Hub Selector - Cold Neon Hub & Premium SVG Arrows (Films & Series)
+   Scoped Package Hub Selector - Bulletproof CSS-First Visibility (Films & Series)
    ========================================================================== */
 
-/* Top Demi-Rond Hub pinned directly to screen ceiling */
-.pkg-hub-wrapper {
+/* 1. Force hide the hub everywhere by default */
+.pkg-hub-wrapper,
+#pkgHubWrapper,
+#pkg-hub-root {
+  display: none !important;
   position: fixed !important;
   top: 0 !important;
   left: 50% !important;
   transform: translateX(-50%) !important;
-  display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -20,7 +22,39 @@
   -webkit-user-select: none;
 }
 
-/* 1. The "Cold Neon" Demi-Rond Top Hub */
+/* 2. ONLY show the hub on Movies and Series tabs */
+body[data-vel-active-tab="movies"] .pkg-hub-wrapper,
+body[data-vel-active-tab="series"] .pkg-hub-wrapper,
+body[data-vel-active-tab="movies"] #pkgHubWrapper,
+body[data-vel-active-tab="series"] #pkgHubWrapper,
+body[data-vel-active-tab="movies"] #pkg-hub-root,
+body[data-vel-active-tab="series"] #pkg-hub-root {
+  display: flex !important;
+}
+
+/* 3. Absolute override: NEVER show on Home, Live, Loading, or Favorites screens */
+body[data-vel-active-tab="home"] .pkg-hub-wrapper,
+body[data-vel-active-tab="live"] .pkg-hub-wrapper,
+body[data-vel-active-tab="home"] #pkgHubWrapper,
+body[data-vel-active-tab="live"] #pkgHubWrapper,
+body[data-vel-active-tab="home"] #pkg-hub-root,
+body[data-vel-active-tab="live"] #pkg-hub-root,
+body.vel-home-empty-active .pkg-hub-wrapper,
+body.vel-home-choice-loading .pkg-hub-wrapper,
+body.vel-home-choice-catalog-pending .pkg-hub-wrapper,
+body.vel-favorites-open .pkg-hub-wrapper,
+body.vel-home-empty-active #pkgHubWrapper,
+body.vel-home-choice-loading #pkgHubWrapper,
+body.vel-home-choice-catalog-pending #pkgHubWrapper,
+body.vel-favorites-open #pkgHubWrapper,
+body.vel-home-empty-active #pkg-hub-root,
+body.vel-home-choice-loading #pkg-hub-root,
+body.vel-home-choice-catalog-pending #pkg-hub-root,
+body.vel-favorites-open #pkg-hub-root {
+  display: none !important;
+}
+
+/* 4. The "Cold Neon" Demi-Rond Top Hub */
 .pkg-hub-trigger {
   pointer-events: auto !important;
   position: relative;
@@ -101,7 +135,7 @@
   letter-spacing: 0.07em;
 }
 
-/* 2. Relocated Colored Indicator Dots (Hanging outside below bottom rim) */
+/* 5. Relocated Colored Indicator Dots (Hanging outside below bottom rim) */
 .pkg-hub-dots {
   position: absolute;
   bottom: -10px;
@@ -127,7 +161,7 @@
 .pkg-dot-yellow { background-color: #ffcc00; color: #ffcc00; }
 .pkg-dot-pink   { background-color: #f91880; color: #f91880; }
 
-/* 3. Infinite 'Tapping Hand' Onboarding Animation */
+/* 6. Infinite 'Tapping Hand' Onboarding Animation */
 .pkg-hub-hint-hand {
   position: absolute;
   bottom: -12px;
@@ -146,7 +180,7 @@
     transform: translateY(0) scale(1);
   }
   30% {
-    transform: translateY(-8px) scale(0.85); /* The tap */
+    transform: translateY(-8px) scale(0.85);
   }
   50% {
     transform: translateY(2px) scale(1.02);
@@ -167,7 +201,7 @@
   animation: none !important;
 }
 
-/* 4. Floating Dropdown Container (Widened for Legibility) */
+/* 7. Floating Dropdown Container (Widened for Legibility) */
 .pkg-hub-dropdown {
   position: absolute;
   top: 60px;
@@ -201,7 +235,7 @@
   pointer-events: auto !important;
 }
 
-/* 5. Package Cards with Clean Word-Break & Balanced Text */
+/* 8. Package Cards with Clean Word-Break & Balanced Text */
 .pkg-card {
   position: absolute;
   width: 116px;
@@ -274,7 +308,7 @@
   z-index: 2147483630 !important;
 }
 
-/* 6. Premium Frosted-Glass Navigation Arrows with Crisp SVGs */
+/* 9. Premium Frosted-Glass Navigation Arrows with Crisp SVGs */
 .pkg-hub-arrow {
   pointer-events: auto !important;
   width: 42px;
@@ -321,7 +355,7 @@
   transform: scale(0.95);
 }
 
-/* 7. Mobile & Tablet Responsiveness */
+/* 10. Mobile & Tablet Responsiveness */
 @media (max-width: 640px) {
   .pkg-hub-trigger {
     width: 196px;

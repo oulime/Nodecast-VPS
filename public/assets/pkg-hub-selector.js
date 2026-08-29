@@ -1,5 +1,5 @@
 ﻿/**
- * Scoped Package Hub Selector - Cold Neon 3D Text, SVG Navigation & Smart UX (Films & Series)
+ * Scoped Package Hub Selector - Pure CSS Visibility, Cold Neon 3D Text & SVG Navigation
  */
 (() => {
   "use strict";
@@ -77,10 +77,7 @@
       }
 
       if (!this.isMediaTab()) {
-        // Not on Movies or Series: hide hub, restore native elements
-        if (this.hubWrapper) {
-          this.hubWrapper.style.setProperty("display", "none", "important");
-        }
+        // Restore native picker when leaving media tabs
         const nativePicker = document.getElementById("vel-media-package-picker");
         if (nativePicker) {
           nativePicker.style.removeProperty("display");
@@ -220,7 +217,7 @@
         }
       }
 
-      // Keep native picker hidden
+      // Keep native picker hidden on media tabs
       const nativePicker = document.getElementById("vel-media-package-picker");
       if (nativePicker && nativePicker.style.display !== "none") {
         nativePicker.style.setProperty("display", "none", "important");
@@ -284,14 +281,12 @@
         this.bindEvents();
       }
 
-      // Append directly to document.body so fixed positioning is completely unconstrained
+      // Append directly to document.body (visibility is 100% governed by CSS rules on body[data-vel-active-tab])
       if (this.hubWrapper.parentElement !== document.body) {
         document.body.appendChild(this.hubWrapper);
       }
 
-      this.hubWrapper.style.setProperty("display", "flex", "important");
       this.updateTitleText(this.selectedPackage.name);
-
       this.renderCards();
     }
 

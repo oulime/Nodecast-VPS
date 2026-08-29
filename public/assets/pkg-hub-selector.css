@@ -1,0 +1,404 @@
+﻿/* ==========================================================================
+   Scoped Package Hub Selector - Cold Neon Hub & Premium SVG Arrows (Films & Series)
+   ========================================================================== */
+
+/* Top Demi-Rond Hub pinned directly to screen ceiling */
+.pkg-hub-wrapper {
+  position: fixed !important;
+  top: 0 !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  z-index: 2147483647 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: none !important;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 1. The "Cold Neon" Demi-Rond Top Hub */
+.pkg-hub-trigger {
+  pointer-events: auto !important;
+  position: relative;
+  width: 228px;
+  height: 52px;
+  background: #0c081a;
+  border-radius: 0 0 114px 114px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #ffffff;
+  border: 1.5px solid rgba(34, 211, 238, 0.4);
+  border-top: none;
+  transition: transform 0.2s ease, background 0.2s ease;
+  animation: pkgColdNeonPulse 2.8s infinite ease-in-out;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  padding: 0 16px;
+  box-sizing: border-box;
+}
+
+.pkg-hub-trigger:hover {
+  background: #150f28;
+  transform: translateY(1px);
+}
+
+.pkg-hub-trigger:active {
+  transform: scale(0.98);
+}
+
+/* Cold Neon Breathing Glow (Cyan & Deep Purple) */
+@keyframes pkgColdNeonPulse {
+  0% {
+    box-shadow: 0 5px 20px rgba(34, 211, 238, 0.4), 0 0 10px rgba(168, 85, 247, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.25);
+    border-color: rgba(34, 211, 238, 0.4);
+  }
+  50% {
+    box-shadow: 0 7px 28px rgba(34, 211, 238, 0.65), 0 0 22px rgba(168, 85, 247, 0.6), inset 0 1px 2px rgba(255, 255, 255, 0.45);
+    border-color: rgba(168, 85, 247, 0.6);
+  }
+  100% {
+    box-shadow: 0 5px 20px rgba(34, 211, 238, 0.4), 0 0 10px rgba(168, 85, 247, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.25);
+    border-color: rgba(34, 211, 238, 0.4);
+  }
+}
+
+/* HTML5 3D Extruded Responsive Package Title */
+.pkg-hub-title {
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #ffffff;
+  text-align: center;
+  /* Multi-layered 3D Extruded Text Shadow */
+  text-shadow:
+    0 1px 0 #b0b5be,
+    0 2px 0 #8e95a2,
+    0 3px 0 #6e7684,
+    0 4px 0 #525a67,
+    0 5px 0 #3a414d,
+    0 6px 2px rgba(0, 0, 0, 0.45),
+    0 0 10px rgba(34, 211, 238, 0.75),
+    0 8px 14px rgba(0, 0, 0, 0.95);
+  max-width: 195px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  transition: font-size 0.2s ease;
+}
+
+/* Bumper font size for single word category names */
+.pkg-hub-title.single-word-title {
+  font-size: 19px !important;
+  letter-spacing: 0.07em;
+}
+
+/* 2. Relocated Colored Indicator Dots (Hanging outside below bottom rim) */
+.pkg-hub-dots {
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  pointer-events: none;
+  z-index: 2147483648 !important;
+}
+
+.pkg-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  box-shadow: 0 0 8px currentColor, 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.pkg-dot-blue   { background-color: #1d9bf0; color: #1d9bf0; }
+.pkg-dot-orange { background-color: #ff6a00; color: #ff6a00; }
+.pkg-dot-yellow { background-color: #ffcc00; color: #ffcc00; }
+.pkg-dot-pink   { background-color: #f91880; color: #f91880; }
+
+/* 3. Infinite 'Tapping Hand' Onboarding Animation */
+.pkg-hub-hint-hand {
+  position: absolute;
+  bottom: -12px;
+  right: 12px;
+  font-size: 24px;
+  line-height: 1;
+  pointer-events: none !important;
+  z-index: 2147483648 !important;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 10px rgba(34, 211, 238, 0.8));
+  animation: pkgHandTapInfinite 1.15s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes pkgHandTapInfinite {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  30% {
+    transform: translateY(-8px) scale(0.85); /* The tap */
+  }
+  50% {
+    transform: translateY(2px) scale(1.02);
+  }
+  70% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Instant and permanent removal once user interacts */
+.user-interacted .pkg-hub-hint-hand,
+.pkg-hub-wrapper.user-interacted .pkg-hub-hint-hand,
+.pkg-hint-dismissed {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  animation: none !important;
+}
+
+/* 4. Floating Dropdown Container (Widened for Legibility) */
+.pkg-hub-dropdown {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-12px) scale(0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: 440px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1), transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 2147483647 !important;
+}
+
+.pkg-hub-dropdown.active {
+  opacity: 1;
+  pointer-events: auto !important;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+
+.pkg-hub-fan-container {
+  position: relative;
+  width: 450px;
+  height: 180px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2147483647 !important;
+  pointer-events: auto !important;
+}
+
+/* 5. Package Cards with Clean Word-Break & Balanced Text */
+.pkg-card {
+  position: absolute;
+  width: 116px;
+  height: 142px;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-weight: 850;
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  overflow: hidden;
+  padding: 10px 7px;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: all 0.45s cubic-bezier(0.25, 0.8, 0.25, 1);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.92), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  pointer-events: auto !important;
+  z-index: 2147483647 !important;
+}
+
+.pkg-card:hover {
+  filter: brightness(1.15);
+}
+
+/* Solid Background Color Variations */
+.bg-blue   { background: linear-gradient(145deg, #1d9bf0, #0c7abf); color: #ffffff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
+.bg-orange { background: linear-gradient(145deg, #ff6a00, #cc5500); color: #ffffff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
+.bg-yellow { background: linear-gradient(145deg, #ffcc00, #e6b800); color: #111118; font-weight: 900; }
+.bg-pink   { background: linear-gradient(145deg, #f91880, #c71366); color: #ffffff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
+.bg-purple { background: linear-gradient(145deg, #8c52ff, #6b28e0); color: #ffffff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
+
+/* Widened Arc Math (No overlapping - All 4 titles legible) */
+.pos-1 {
+  transform: translate(-155px, 6px) rotate(-14deg);
+  z-index: 2147483641 !important;
+  opacity: 0.96;
+}
+
+.pos-2 {
+  transform: translate(-52px, 20px) rotate(-5deg);
+  z-index: 2147483643 !important;
+  opacity: 1;
+}
+
+.pos-3 {
+  transform: translate(52px, 20px) rotate(5deg);
+  z-index: 2147483643 !important;
+  opacity: 1;
+}
+
+.pos-4 {
+  transform: translate(155px, 6px) rotate(14deg);
+  z-index: 2147483641 !important;
+  opacity: 0.96;
+}
+
+.pos-hidden {
+  opacity: 0;
+  transform: scale(0.65) translateY(-25px);
+  pointer-events: none !important;
+  z-index: 2147483630 !important;
+}
+
+/* 6. Premium Frosted-Glass Navigation Arrows with Crisp SVGs */
+.pkg-hub-arrow {
+  pointer-events: auto !important;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(15, 10, 25, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.8), 0 0 12px rgba(168, 85, 247, 0.25);
+  color: #ffffff;
+  cursor: pointer;
+  z-index: 2147483647 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.pkg-hub-arrow svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+  stroke: #ffffff;
+  transition: stroke 0.2s ease;
+}
+
+.pkg-hub-arrow:hover {
+  border-color: rgba(34, 211, 238, 0.8);
+  box-shadow: 0 0 15px rgba(34, 211, 238, 0.5), 0 6px 18px rgba(0, 0, 0, 0.9);
+  transform: scale(1.1);
+  background: rgba(25, 18, 42, 0.92);
+}
+
+.pkg-hub-arrow:hover svg {
+  stroke: #22d3ee;
+}
+
+.pkg-hub-arrow:active {
+  transform: scale(0.95);
+}
+
+/* 7. Mobile & Tablet Responsiveness */
+@media (max-width: 640px) {
+  .pkg-hub-trigger {
+    width: 196px;
+    height: 48px;
+    border-radius: 0 0 98px 98px;
+    padding: 0 12px;
+  }
+  .pkg-hub-title {
+    font-size: 12.5px;
+    max-width: 165px;
+  }
+  .pkg-hub-title.single-word-title {
+    font-size: 16.5px !important;
+  }
+  .pkg-hub-dropdown {
+    top: 54px;
+    min-width: 320px;
+  }
+  .pkg-hub-fan-container {
+    width: 340px;
+    height: 155px;
+  }
+  .pkg-card {
+    width: 98px;
+    height: 125px;
+    border-radius: 13px;
+    font-size: 9.5px;
+    padding: 8px 5px;
+  }
+  .pos-1 {
+    transform: translate(-118px, 4px) rotate(-13deg);
+  }
+  .pos-2 {
+    transform: translate(-38px, 15px) rotate(-4deg);
+  }
+  .pos-3 {
+    transform: translate(38px, 15px) rotate(4deg);
+  }
+  .pos-4 {
+    transform: translate(118px, 4px) rotate(13deg);
+  }
+  .pkg-hub-arrow {
+    width: 36px;
+    height: 36px;
+  }
+  .pkg-hub-arrow svg {
+    width: 18px;
+    height: 18px;
+  }
+  .pkg-hub-hint-hand {
+    font-size: 20px;
+    right: 8px;
+    bottom: -10px;
+  }
+}
+
+@media (max-width: 380px) {
+  .pkg-hub-fan-container {
+    width: 290px;
+    height: 140px;
+  }
+  .pkg-card {
+    width: 86px;
+    height: 115px;
+    font-size: 8.5px;
+    padding: 6px 4px;
+  }
+  .pos-1 {
+    transform: translate(-98px, 3px) rotate(-12deg);
+  }
+  .pos-2 {
+    transform: translate(-32px, 12px) rotate(-3.5deg);
+  }
+  .pos-3 {
+    transform: translate(32px, 12px) rotate(3.5deg);
+  }
+  .pos-4 {
+    transform: translate(98px, 3px) rotate(12deg);
+  }
+}

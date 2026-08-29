@@ -438,6 +438,8 @@
     target.card.click();
   }
 
+  window.veloraActivateMediaPackage = activateMediaPackage;
+
   function ensurePicker() {
     let picker = document.getElementById("vel-media-package-picker");
     if (picker) return picker;

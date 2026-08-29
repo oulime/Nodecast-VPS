@@ -11,3 +11,4 @@ release/
 .vscode
 transcode-cache/
 public/uploads/package-covers/
+*.zip

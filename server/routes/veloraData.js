@@ -1466,12 +1466,10 @@ function extractYear(text) {
 
 function cleanItemName(text) {
     return String(text || '')
-        .replace(/^([A-Za-z0-9+_.-]+)\s*[-:|]\s*/i, '')
-        .replace(/^([A-Za-z0-9+_.-]+)\s*[-:|]\s*/i, '')
+        .replace(/^(4K-?|UHD-?|FHD-?|HD-?)?([A-Za-z0-9]{1,6}(?:-[A-Za-z0-9]{1,6})?)\s*[-:|]\s*/i, '')
         .replace(/\[[^\]]+\]/g, '')
         .replace(/\b(4K|UHD|FHD|HD|HEVC|H265|1080p|720p|CAM|TS|DVD|BLURAY|TELESYNC|VOSTFR|VF|MULTI)\b/gi, '')
         .replace(/\(\d{4}\)/g, '')
-        .replace(/[-:|]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
 }
@@ -1546,24 +1544,47 @@ router.get('/hero-slider', (req, res) => {
 
 router.get('/hero-slider/search-catalog', (req, res) => {
     try {
-        const query = String(req.query.q || '').trim();
+        const rawQuery = String(req.query.q || '').trim();
         const typeFilter = String(req.query.type || '').trim().toLowerCase();
-        if (!query) return res.json([]);
+        if (!rawQuery) return res.json([]);
+
+        const normalized = String(rawQuery)
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        let tokens = normalized.split(/\s+/).filter(Boolean);
+        if (!tokens.length) tokens = [rawQuery.toLowerCase()];
 
         const db = getDb();
         let typeClause = '';
-        const params = [`%${query}%`];
         if (typeFilter === 'movie' || typeFilter === 'vod') {
             typeClause = ' AND p.type = "movie"';
         } else if (typeFilter === 'series') {
             typeClause = ' AND p.type = "series"';
         }
 
+        const tokenClauses = [];
+        const params = [];
+
+        tokens.forEach(t => {
+            if (t === 'spiderman') {
+                tokenClauses.push(`(p.name LIKE ? OR (p.name LIKE ? AND p.name LIKE ?))`);
+                params.push(`%spiderman%`, `%spider%`, `%man%`);
+            } else {
+                tokenClauses.push(`p.name LIKE ?`);
+                params.push(`%${t}%`);
+            }
+        });
+
         const rows = db.prepare(`
             SELECT p.source_id, p.item_id, p.type, p.name, p.stream_icon, p.container_extension, p.rating, p.year, p.data, c.name as cat_name
             FROM playlist_items p
             LEFT JOIN categories c ON p.source_id = c.source_id AND p.category_id = c.category_id
-            WHERE p.name LIKE ? AND p.is_hidden = 0${typeClause}
+            WHERE (${tokenClauses.join(' AND ')}) AND p.is_hidden = 0${typeClause}
             LIMIT 150
         `).all(...params);
 

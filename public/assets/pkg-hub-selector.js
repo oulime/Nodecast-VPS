@@ -152,18 +152,32 @@
     }
 
     init() {
-      const observer = new MutationObserver((mutations) => {
-        for (const mut of mutations) {
-          if (mut.type === "attributes" && mut.attributeName === "data-vel-active-tab") {
-            this.handleTabChange();
-            break;
-          }
-        }
+      const observer = new MutationObserver(() => {
+        this.handleTabChange();
       });
 
       observer.observe(document.body, {
         attributes: true,
-        attributeFilter: ["data-vel-active-tab"]
+        attributeFilter: ["data-vel-active-tab", "class"]
+      });
+
+      const contentView = document.getElementById("content-view");
+      if (contentView) {
+        observer.observe(contentView, {
+          attributes: true,
+          attributeFilter: ["class"]
+        });
+      }
+
+      // Re-evaluate on global UI events
+      document.addEventListener("velora-search-open", () => this.handleTabChange());
+      document.addEventListener("velora-search-close", () => this.handleTabChange());
+      document.addEventListener("velora-search-opened", () => this.handleTabChange());
+      document.addEventListener("velora-search-closed", () => this.handleTabChange());
+      document.addEventListener("click", (e) => {
+        if (e.target && e.target.closest("#btn-header-search, .vel-header-search-btn, #btn-header-back, .vel-header-back-btn, .vel-search-close")) {
+          setTimeout(() => this.handleTabChange(), 40);
+        }
       });
 
       if (document.readyState === "loading") {
@@ -186,16 +200,63 @@
 
     isMediaTab() {
       const tab = document.body.dataset.velActiveTab || "";
-      return tab === "movies" || tab === "series";
+      if (tab !== "movies" && tab !== "series") return false;
+
+      // Never display when search overlay/modal is open
+      if (document.body.classList.contains("vel-search-open") || 
+          document.querySelector(".vel-global-search:not(.hidden)") ||
+          document.querySelector(".vel-global-search--open") ||
+          document.querySelector(".vel-search-dialog[open]")) {
+        return false;
+      }
+
+      // Never display when in detail view (movie/series synopsis & episode list)
+      const contentView = document.getElementById("content-view");
+      if (contentView && (contentView.classList.contains("content-view--vod-film-detail") || contentView.classList.contains("hidden"))) {
+        return false;
+      }
+      if (document.body.classList.contains("vel-vod-detail-active") || document.querySelector(".vel-vod-detail:not(.hidden)")) {
+        return false;
+      }
+
+      // Never display over favorites, profile, empty states, or open dialogs
+      if (document.body.classList.contains("vel-favorites-open") || 
+          document.body.classList.contains("vel-profile-open") ||
+          document.body.classList.contains("vel-home-empty-active") ||
+          document.body.classList.contains("vel-home-choice-loading") ||
+          document.body.classList.contains("vel-home-choice-catalog-pending") ||
+          document.querySelector("dialog[open]")) {
+        return false;
+      }
+
+      // Never display during active video playback
+      const player = document.querySelector("#player-container:not(.hidden), #vod-player-container:not(.hidden)");
+      if (player) return false;
+
+      return true;
     }
 
     handleTabChange() {
       if (!this.isMediaTab()) {
+        if (this.isOpen) {
+          this.close();
+        }
+        if (this.hubWrapper) {
+          this.hubWrapper.style.setProperty("display", "none", "important");
+          this.hubWrapper.hidden = true;
+          this.hubWrapper.setAttribute("aria-hidden", "true");
+        }
         const nativePicker = document.getElementById("vel-media-package-picker");
         if (nativePicker) {
           nativePicker.style.removeProperty("display");
         }
         return;
+      }
+
+      if (this.hubWrapper) {
+        this.hubWrapper.style.removeProperty("display");
+        this.hubWrapper.hidden = false;
+        this.hubWrapper.removeAttribute("aria-hidden");
       }
       this.syncAndMount();
     }

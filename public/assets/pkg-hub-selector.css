@@ -16,12 +16,20 @@
   height: 100% !important;
   height: 100dvh !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  z-index: 2147483647 !important;
+  z-index: 25 !important;
   margin: 0 !important;
   padding: 0 !important;
   pointer-events: none !important;
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* When the 3D roller modal is open, bring wrapper to front */
+body.pkg-wheel-modal-open .pkg-hub-wrapper,
+body.pkg-wheel-modal-open #pkgHubWrapper,
+body.pkg-wheel-modal-open #pkg-hub-root,
+.pkg-hub-wrapper:has(.pkg-hub-dropdown.active) {
+  z-index: 2500 !important;
 }
 
 body[data-vel-active-tab="movies"] .pkg-hub-wrapper,
@@ -33,25 +41,66 @@ body[data-vel-active-tab="series"] #pkg-hub-root {
   display: block !important;
 }
 
-/* Hard override: never show on home/live/loading/favorites */
+/* Hard override: never show on non-media tabs, search, modals, detail views, or player */
+body:not([data-vel-active-tab="movies"]):not([data-vel-active-tab="series"]) .pkg-hub-wrapper,
+body:not([data-vel-active-tab="movies"]):not([data-vel-active-tab="series"]) #pkgHubWrapper,
+body:not([data-vel-active-tab="movies"]):not([data-vel-active-tab="series"]) #pkg-hub-root,
 body[data-vel-active-tab="home"] .pkg-hub-wrapper,
 body[data-vel-active-tab="live"] .pkg-hub-wrapper,
 body[data-vel-active-tab="home"] #pkgHubWrapper,
 body[data-vel-active-tab="live"] #pkgHubWrapper,
 body[data-vel-active-tab="home"] #pkg-hub-root,
 body[data-vel-active-tab="live"] #pkg-hub-root,
+body[data-vel-active-tab="favorites"] .pkg-hub-wrapper,
+body[data-vel-active-tab="profile"] .pkg-hub-wrapper,
 body.vel-home-empty-active .pkg-hub-wrapper,
 body.vel-home-choice-loading .pkg-hub-wrapper,
 body.vel-home-choice-catalog-pending .pkg-hub-wrapper,
 body.vel-favorites-open .pkg-hub-wrapper,
+body.vel-search-open .pkg-hub-wrapper,
+body.vel-vod-detail-active .pkg-hub-wrapper,
+body:has(#search-modal:not(.hidden)) .pkg-hub-wrapper,
+body:has(.vel-global-search:not(.hidden)) .pkg-hub-wrapper,
+body:has(.vel-global-search--open) .pkg-hub-wrapper,
+body:has(dialog[open]) .pkg-hub-wrapper,
+body:has(#content-view.content-view--vod-film-detail) .pkg-hub-wrapper,
+body:has(.content-view--vod-film-detail:not(.hidden)) .pkg-hub-wrapper,
+body:has(#player-container:not(.hidden)) .pkg-hub-wrapper,
+body:has(#vod-player-container:not(.hidden)) .pkg-hub-wrapper,
+body:has(#profile-account-page:not([hidden])) .pkg-hub-wrapper,
+body:has(#vel-favorites-page:not([hidden])) .pkg-hub-wrapper,
 body.vel-home-empty-active #pkgHubWrapper,
 body.vel-home-choice-loading #pkgHubWrapper,
 body.vel-home-choice-catalog-pending #pkgHubWrapper,
 body.vel-favorites-open #pkgHubWrapper,
+body.vel-search-open #pkgHubWrapper,
+body.vel-vod-detail-active #pkgHubWrapper,
+body:has(#search-modal:not(.hidden)) #pkgHubWrapper,
+body:has(.vel-global-search:not(.hidden)) #pkgHubWrapper,
+body:has(.vel-global-search--open) #pkgHubWrapper,
+body:has(dialog[open]) #pkgHubWrapper,
+body:has(#content-view.content-view--vod-film-detail) #pkgHubWrapper,
+body:has(.content-view--vod-film-detail:not(.hidden)) #pkgHubWrapper,
+body:has(#player-container:not(.hidden)) #pkgHubWrapper,
+body:has(#vod-player-container:not(.hidden)) #pkgHubWrapper,
+body:has(#profile-account-page:not([hidden])) #pkgHubWrapper,
+body:has(#vel-favorites-page:not([hidden])) #pkgHubWrapper,
 body.vel-home-empty-active #pkg-hub-root,
 body.vel-home-choice-loading #pkg-hub-root,
 body.vel-home-choice-catalog-pending #pkg-hub-root,
-body.vel-favorites-open #pkg-hub-root {
+body.vel-favorites-open #pkg-hub-root,
+body.vel-search-open #pkg-hub-root,
+body.vel-vod-detail-active #pkg-hub-root,
+body:has(#search-modal:not(.hidden)) #pkg-hub-root,
+body:has(.vel-global-search:not(.hidden)) #pkg-hub-root,
+body:has(.vel-global-search--open) #pkg-hub-root,
+body:has(dialog[open]) #pkg-hub-root,
+body:has(#content-view.content-view--vod-film-detail) #pkg-hub-root,
+body:has(.content-view--vod-film-detail:not(.hidden)) #pkg-hub-root,
+body:has(#player-container:not(.hidden)) #pkg-hub-root,
+body:has(#vod-player-container:not(.hidden)) #pkg-hub-root,
+body:has(#profile-account-page:not([hidden])) #pkg-hub-root,
+body:has(#vel-favorites-page:not([hidden])) #pkg-hub-root {
   display: none !important;
 }
 

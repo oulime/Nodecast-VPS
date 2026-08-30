@@ -201,7 +201,23 @@ body.vel-favorites-open #pkg-hub-root {
   visibility: visible !important;
   opacity: 1 !important;
   pointer-events: auto !important;
-  transform: translateX(-50%) translateY(0) scale(1) !important;
+  transform: translateX(-50%) translateY(0) scale(1) translateZ(0) !important;
+  isolation: isolate;
+  will-change: transform, opacity;
+  contain: layout style paint;
+}
+
+/* Background catalog optimization while 3D wheel modal is open */
+body.pkg-wheel-modal-open #dynamic-list,
+body.pkg-wheel-modal-open .item-list--vod-vertical {
+  contain: strict !important;
+  pointer-events: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+body.pkg-wheel-modal-open #dynamic-list * {
+  animation-play-state: paused !important;
 }
 
 /* Modal Header Bar */
@@ -266,6 +282,9 @@ body.vel-favorites-open #pkg-hub-root {
   touch-action: none;
   cursor: grab;
   margin: 4px 0 8px;
+  contain: layout style paint;
+  will-change: transform;
+  transform: translateZ(0);
   /* Top & Bottom Depth Vignette Mask */
   -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.5) 8%, black 22%, black 78%, rgba(0, 0, 0, 0.5) 92%, transparent 100%);
   mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.5) 8%, black 22%, black 78%, rgba(0, 0, 0, 0.5) 92%, transparent 100%);
@@ -353,6 +372,8 @@ body.vel-favorites-open #pkg-hub-root {
   transform-style: preserve-3d;
   -webkit-transform-style: preserve-3d;
   will-change: transform;
+  transform: translateZ(0);
+  contain: layout style paint;
   pointer-events: none;
   z-index: 4;
 }

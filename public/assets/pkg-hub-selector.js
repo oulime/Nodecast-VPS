@@ -631,6 +631,7 @@
 
     open() {
       this.isOpen = true;
+      document.body.classList.add("pkg-wheel-modal-open");
       this.syncCurrentState();
       if (this.dropdown) {
         this.dropdown.hidden = false;
@@ -652,6 +653,7 @@
 
     close() {
       this.isOpen = false;
+      document.body.classList.remove("pkg-wheel-modal-open");
       if (this.dropdown) {
         this.dropdown.classList.remove("active");
         this.dropdown.hidden = true;

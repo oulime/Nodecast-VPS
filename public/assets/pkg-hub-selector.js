@@ -424,89 +424,128 @@
     renderItems() {
       if (!this.track) return;
       this.track.innerHTML = "";
+      const total = this.packages.length;
+      if (total === 0) {
+        this.slots = [];
+        return;
+      }
+
+      // Fixed virtual pool of 9 DOM slots (offsets -4 to +4)
+      // Guarantees constant 120fps/60fps regardless of list size (even 1,000+ packages)
+      this.slotPoolSize = 9;
+      this.slots = [];
+
+      for (let i = 0; i < this.slotPoolSize; i++) {
+        const slot = document.createElement("div");
+        slot.className = "pkg-wheel-item";
+        slot.setAttribute("role", "option");
+        slot.setAttribute("tabindex", "0");
+        slot.innerHTML = `
+          <div class="pkg-item-label">
+            <span class="pkg-active-pip" style="display:none">✓</span>
+            <span class="pkg-name-text"></span>
+          </div>
+          <div class="pkg-center-sub"></div>
+          <div class="pkg-center-badge" style="display:none">✓ PACK ACTIF</div>
+        `;
+        slot._pipEl = slot.querySelector(".pkg-active-pip");
+        slot._nameEl = slot.querySelector(".pkg-name-text");
+        slot._subEl = slot.querySelector(".pkg-center-sub");
+        slot._badgeEl = slot.querySelector(".pkg-center-badge");
+        slot._renderedPkgIndex = -1;
+        slot._renderedActive = false;
+
+        this.track.appendChild(slot);
+        this.slots.push(slot);
+      }
+
+      this.update3D(true);
+    }
+
+    /**
+     * Ultra-fast Virtualized 3D Cylinder Update (O(1) complexity, only 9 elements)
+     */
+    update3D(forceRefresh = false) {
+      const total = this.packages.length;
+      if (total === 0 || !this.slots || this.slots.length === 0) return;
+
       const selectedId = String(this.selectedPackage?.id || "");
       const selectedName = String(this.selectedPackage?.name || "").trim().toUpperCase();
 
-      this.items = this.packages.map((pkg, index) => {
-        const meta = getPackageMetadata(pkg.name);
+      const radius = 175;
+      const anglePerItem = 21; // degrees per item
+      const halfPool = 4; // offsets -4 to +4
+
+      const baseIndex = Math.round(this.currentIndex);
+
+      for (let k = -halfPool; k <= halfPool; k++) {
+        const slotIndex = k + halfPool;
+        const slot = this.slots[slotIndex];
+        if (!slot) continue;
+
+        // True cyclic package index
+        const pkgIndex = ((baseIndex + k) % total + total) % total;
+        const pkg = this.packages[pkgIndex];
+        if (!pkg) {
+          slot.style.display = "none";
+          continue;
+        }
+
+        // Fractional distance relative to exact continuous center
+        const delta = (baseIndex + k) - this.currentIndex;
+        const absDelta = Math.abs(delta);
+
+        // Check active state
         const isCurrentActive = Boolean(
           (selectedId && pkg.id && String(pkg.id) === selectedId) ||
           (!selectedId && selectedName && pkg.name && String(pkg.name).trim().toUpperCase() === selectedName)
         );
-        const item = document.createElement("div");
-        item.className = "pkg-wheel-item" + (isCurrentActive ? " is-active-pkg" : "");
-        item.dataset.pkgIndex = String(index);
-        item.dataset.pkgId = String(pkg.id || "");
-        item.setAttribute("role", "option");
-        item.setAttribute("tabindex", "0");
-        item.innerHTML = `
-          <div class="pkg-item-label">
-            ${isCurrentActive ? `<span class="pkg-active-pip">✓</span>` : ""}
-            <span class="pkg-name-text">${pkg.name}</span>
-          </div>
-          <div class="pkg-center-sub">${meta.sub}</div>
-          ${isCurrentActive ? `<div class="pkg-center-badge">✓ PACK ACTIF</div>` : ""}
-        `;
-        this.track.appendChild(item);
-        return item;
-      });
-      this.update3D();
-    }
 
-    /**
-     * Ultra-fast transform update without synchronous layout reflows
-     * Uses clear non-overlapping vertical separation
-     */
-    update3D() {
-      const total = this.packages.length;
-      if (total === 0 || !this.items || this.items.length === 0) return;
-      const centerY = this.centerY;
-      const cur = this.currentIndex;
+        // Fast slot content sync only when package index or active state changes
+        if (forceRefresh || slot._renderedPkgIndex !== pkgIndex || slot._renderedActive !== isCurrentActive) {
+          slot._renderedPkgIndex = pkgIndex;
+          slot._renderedActive = isCurrentActive;
+          slot.dataset.pkgIndex = String(pkgIndex);
+          slot.dataset.pkgId = String(pkg.id || "");
 
-      for (let i = 0; i < total; i++) {
-        const item = this.items[i];
-        if (!item) continue;
-        let delta = i - cur;
-        if (total > 4) {
-          if (delta > total / 2) delta -= total;
-          if (delta < -total / 2) delta += total;
-        }
-        const absDelta = Math.abs(delta);
-        if (absDelta > 3.6) {
-          item.style.opacity = "0";
-          item.style.pointerEvents = "none";
-          item.setAttribute("aria-hidden", "true");
-          continue;
-        }
-        item.style.pointerEvents = "auto";
-        item.removeAttribute("aria-hidden");
+          slot._nameEl.textContent = pkg.name || "";
+          const meta = getPackageMetadata(pkg.name || "");
+          slot._subEl.textContent = meta.sub || "";
 
-        // Non-overlapping vertical spacing:
-        // Center card is 114px high (half = 57px)
-        // Pills are 44px high (half = 22px)
-        // Clearance distance at delta=1 is 93px (57 + 14 + 22) -> zero overlap
-        let y;
-        if (absDelta <= 1) {
-          y = delta * 93;
-        } else {
-          y = Math.sign(delta) * (93 + (absDelta - 1) * 48);
+          if (isCurrentActive) {
+            slot.classList.add("is-active-pkg");
+            slot._pipEl.style.display = "inline-flex";
+            slot._badgeEl.style.display = "inline-flex";
+          } else {
+            slot.classList.remove("is-active-pkg");
+            slot._pipEl.style.display = "none";
+            slot._badgeEl.style.display = "none";
+          }
         }
 
-        const angle = Math.max(-60, Math.min(60, delta * 15));
-        const scale = Math.max(0.72, 1 - absDelta * 0.08);
-        const opacity = Math.max(0.18, Math.pow(Math.max(0, 1 - absDelta * 0.23), 1.2));
-        const z = -absDelta * 20;
+        slot.style.display = "flex";
+        slot.style.pointerEvents = "auto";
 
-        item.style.transform = `translate3d(-50%, calc(-50% + ${y}px), ${z}px) rotateX(${-angle}deg) scale(${scale})`;
-        item.style.opacity = String(opacity);
+        const thetaDeg = delta * anglePerItem;
+        const thetaRad = (thetaDeg * Math.PI) / 180;
 
-        const isCenter = absDelta < 0.45;
-        if (isCenter && !item._isCenterState) {
-          item._isCenterState = true;
-          item.classList.add("is-center");
-        } else if (!isCenter && item._isCenterState) {
-          item._isCenterState = false;
-          item.classList.remove("is-center");
+        const y = Math.sin(thetaRad) * radius;
+        const z = (Math.cos(thetaRad) - 1) * radius;
+        const rotateX = -thetaDeg;
+
+        const scale = Math.max(0.68, Math.cos(thetaRad) * 0.94 + 0.06);
+        const opacity = Math.max(0.12, Math.pow(Math.max(0, Math.cos(thetaRad)), 1.8));
+
+        slot.style.transform = `translate3d(-50%, calc(-50% + ${y.toFixed(1)}px), ${z.toFixed(1)}px) rotateX(${rotateX.toFixed(1)}deg) scale(${scale.toFixed(3)})`;
+        slot.style.opacity = opacity.toFixed(2);
+
+        const isCenter = absDelta < 0.42;
+        if (isCenter && !slot._isCenterState) {
+          slot._isCenterState = true;
+          slot.classList.add("is-center");
+        } else if (!isCenter && slot._isCenterState) {
+          slot._isCenterState = false;
+          slot.classList.remove("is-center");
         }
       }
     }
@@ -517,21 +556,31 @@
       this.lastFrameTime = performance.now();
       const total = this.packages.length;
       if (total === 0) return;
-      const friction = 0.92, springK = 0.12, damping = 0.38;
+
+      const friction = 0.89; // Quick, responsive deceleration (no slow trailing creep)
+      const springK = 0.24;  // Punchy, tight spring pull
+      const damping = 0.26;  // Precise micro-rebound (tactile notch shake)
+
       const loop = (now) => {
         const dt = Math.min(32, Math.max(1, now - this.lastFrameTime));
         this.lastFrameTime = now;
         const dtRatio = dt / 16.67;
+
         if (snapTarget === null) {
+          // Fast momentum spin
           this.currentIndex += this.velocity * dtRatio;
           this.velocity *= Math.pow(friction, dtRatio);
           this.currentIndex = ((this.currentIndex % total) + total) % total;
           this.update3D();
-          if (Math.abs(this.velocity) < 0.003) {
-            this.startPhysics(0, (Math.round(this.currentIndex) + total) % total);
+
+          // Immediately grab nearest slot as soon as momentum wanes (no sluggish crawl)
+          if (Math.abs(this.velocity) < 0.032) {
+            const nearest = ((Math.round(this.currentIndex) % total) + total) % total;
+            this.startPhysics(this.velocity * 0.4, nearest);
             return;
           }
         } else {
+          // Snappy magnetic lock with mechanical notch shake
           let diff = snapTarget - this.currentIndex;
           if (total > 4) {
             if (diff > total / 2) diff -= total;
@@ -542,7 +591,8 @@
           this.currentIndex += this.velocity * dtRatio;
           this.currentIndex = ((this.currentIndex % total) + total) % total;
           this.update3D();
-          if (Math.abs(diff) < 0.005 && Math.abs(this.velocity) < 0.003) {
+
+          if (Math.abs(diff) < 0.002 && Math.abs(this.velocity) < 0.002) {
             this.currentIndex = snapTarget;
             this.update3D();
             this.animFrame = null;
@@ -557,7 +607,7 @@
     scrollToIndex(idx, smooth = true) {
       const total = this.packages.length;
       if (total === 0) return;
-      const normalized = (idx % total + total) % total;
+      const normalized = ((idx % total) + total) % total;
       this.targetIndex = normalized;
       if (!smooth) {
         if (this.animFrame) cancelAnimationFrame(this.animFrame);
@@ -646,7 +696,12 @@
       this.hubBtn.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this.toggle(); } });
       this.closeBtn?.addEventListener("click", (e) => { e.stopPropagation(); this.close(); });
       this.reviewBtn?.addEventListener("click", (e) => { e.stopPropagation(); this.confirmCurrentPackage(); });
+
+      let wasDragging = false;
+      let totalDragDist = 0;
+
       this.track.addEventListener("click", (e) => {
+        if (wasDragging || totalDragDist > 7) return;
         const item = e.target.closest(".pkg-wheel-item");
         if (!item) return;
         const index = Number(item.dataset.pkgIndex);
@@ -654,40 +709,84 @@
           this.markUserInteracted();
           const selected = this.packages[index];
           this.scrollToIndex(index, true);
-          setTimeout(() => this.selectPackage(selected), 180);
+          setTimeout(() => this.selectPackage(selected), 200);
         }
       });
+
+      let pointerSamples = [];
+      let lastPointerY = 0;
+      let lastPointerTime = 0;
+
       const onPointerDown = (e) => {
         this.isDragging = true;
+        wasDragging = false;
+        totalDragDist = 0;
         this.activePointerId = e.pointerId;
+        try { window.getSelection()?.removeAllRanges(); } catch (_) {}
         this.viewport.setPointerCapture?.(e.pointerId);
         if (this.animFrame) { cancelAnimationFrame(this.animFrame); this.animFrame = null; }
-        this.dragStartY = e.clientY;
-        this.dragStartIndex = this.currentIndex;
-        this.pointerHistory = [{ y: e.clientY, time: performance.now() }];
+        
+        lastPointerY = e.clientY;
+        lastPointerTime = performance.now();
+        pointerSamples = [{ y: e.clientY, time: lastPointerTime }];
       };
+
       const onPointerMove = (e) => {
         if (!this.isDragging || (this.activePointerId !== null && e.pointerId !== this.activePointerId)) return;
-        const deltaY = e.clientY - this.dragStartY;
+        const now = performance.now();
+        const currentY = e.clientY;
+        const dy = currentY - lastPointerY;
+        lastPointerY = currentY;
+
+        totalDragDist += Math.abs(dy);
+        if (totalDragDist > 7) wasDragging = true;
+
         const total = this.packages.length;
-        let nextIndex = this.dragStartIndex - deltaY / 82;
-        this.currentIndex = ((nextIndex % total) + total) % total;
-        this.update3D();
-        this.pointerHistory.push({ y: e.clientY, time: performance.now() });
-        if (this.pointerHistory.length > 5) this.pointerHistory.shift();
+        if (total > 0) {
+          // Direct 1:1 finger tracking (56px per slot is optimal for mobile touch)
+          this.currentIndex -= dy / 56;
+          this.currentIndex = ((this.currentIndex % total) + total) % total;
+          this.update3D();
+        }
+
+        pointerSamples.push({ y: currentY, time: now });
+        if (pointerSamples.length > 6) pointerSamples.shift();
       };
+
       const onPointerUp = (e) => {
         if (!this.isDragging || (this.activePointerId !== null && e.pointerId !== this.activePointerId)) return;
         this.isDragging = false;
         this.activePointerId = null;
         try { this.viewport.releasePointerCapture?.(e.pointerId); } catch (_) {}
-        const oldest = this.pointerHistory[0];
-        const newest = this.pointerHistory[this.pointerHistory.length - 1];
-        const dt = Math.max(1, newest.time - oldest.time);
-        let velocity = -((newest.y - oldest.y) / dt) / 82;
-        velocity = Math.max(-0.06, Math.min(0.06, velocity));
-        if (Math.abs(velocity) > 0.003) this.startPhysics(velocity, null);
-        else this.startPhysics(0, (Math.round(this.currentIndex) + this.packages.length) % this.packages.length);
+
+        const total = this.packages.length;
+        if (total === 0) return;
+
+        const now = performance.now();
+        // Compute flick velocity over the most recent 90ms
+        const recent = pointerSamples.filter(s => now - s.time < 90);
+        let velocity = 0;
+
+        if (recent.length >= 2) {
+          const first = recent[0];
+          const last = recent[recent.length - 1];
+          const dt = Math.max(1, last.time - first.time);
+          velocity = -((last.y - first.y) / dt) / 56 * 16.67; // slots per 60fps frame
+          velocity = Math.max(-0.65, Math.min(0.65, velocity));
+        }
+
+        if (Math.abs(velocity) > 0.015) {
+          this.startPhysics(velocity, null);
+        } else {
+          const nearest = ((Math.round(this.currentIndex) % total) + total) % total;
+          this.startPhysics(0, nearest);
+        }
+
+        // Prevent click selection from misfiring right after dragging
+        setTimeout(() => {
+          wasDragging = false;
+          totalDragDist = 0;
+        }, 120);
       };
       this.viewport.addEventListener("pointerdown", onPointerDown);
       this.viewport.addEventListener("pointermove", onPointerMove);

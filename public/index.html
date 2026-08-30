@@ -1534,11 +1534,15 @@
     <script defer src="/assets/country-switch-loader.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/paid-users-admin.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=instant-nav-v20260821-54"></script>
+    <script defer src="/assets/velora-hero-slider.js?v=20260830-hero-v1"></script>
+    <script defer src="/assets/velora-hero-slider-admin.js?v=20260830-hero-v1"></script>
     <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=instant-nav-v20260821-112">
     <link rel="stylesheet" href="/assets/manual-pays.css?v=instant-nav-v20260821-149">
     <link rel="stylesheet" href="/assets/manual-pays-logo-contain.css?v=instant-nav-v20260821-54">
     <link rel="stylesheet" href="/assets/parent-packages.css?v=instant-nav-v20260821-102">
     <link rel="stylesheet" href="/assets/direct-media-packages.css?v=20260830-roller-v34">
+    <link rel="stylesheet" href="/assets/velora-hero-slider.css?v=20260830-hero-v1">
+    <link rel="stylesheet" href="/assets/velora-hero-slider-admin.css?v=20260830-hero-v1">
     <style>
       .manual-pays__pagination{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding:.7rem;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:rgba(14,11,20,.96);color:#aaa4b5;font-size:.75rem}
       .manual-pays__pagination button{border:1px solid rgba(167,139,250,.45);border-radius:8px;background:rgba(124,58,237,.2);color:#fff;padding:.45rem .7rem;cursor:pointer}
@@ -5255,6 +5259,10 @@
               data-settings-tab="home" aria-selected="false" aria-controls="settings-tab-home" tabindex="-1">
               Accueil
             </button>
+            <button type="button" role="tab" id="settings-tab-btn-slider" class="settings-tabs__tab"
+              data-settings-tab="slider" aria-selected="false" aria-controls="settings-tab-slider" tabindex="-1">
+              Hero Slider
+            </button>
             <button
               type="button"
               role="tab"
@@ -5330,6 +5338,100 @@
           </div>
 
           <div class="settings-tab-panels">
+          <section id="settings-tab-slider" class="settings-tab-panel panel countries-admin-form hidden"
+            role="tabpanel" aria-labelledby="settings-tab-btn-slider" data-settings-tab="slider" hidden>
+            <h2>Top Trending — Hero Slider</h2>
+            <p class="countries-admin-intro" style="margin-top: 0">
+              Gérez les films, séries et animés affichés dans le slider en haut de la page d'accueil.
+              Chaque pays affiche sa propre version locale avec fallback automatique sur la version USA.
+            </p>
+            <p id="slider-admin-status" class="status" aria-live="polite"></p>
+
+            <div class="vel-slider-admin-wrap">
+              <!-- Multi-country availability scanner -->
+              <div class="vel-slider-admin-card">
+                <h3>🔍 Scanner & Ajout Automatique Multi-Pays</h3>
+                <p class="hint">Recherchez un titre dans les catalogues. Le scanner détectera automatiquement la version de chaque pays (langue, doublage) et affectera le fallback USA aux pays qui ne l'ont pas.</p>
+                
+                <div class="vel-slider-search-bar">
+                  <input type="text" id="slider-scan-query" class="vel-slider-search-input" placeholder="Ex. Spider-Man, Toy Story, Ted Lasso..." />
+                  <select id="slider-scan-type" class="vel-slider-search-select">
+                    <option value="">Tous les types</option>
+                    <option value="movie">Films (Cinéma / VOD)</option>
+                    <option value="series">Séries</option>
+                    <option value="anime">Animés</option>
+                  </select>
+                  <select id="slider-scan-target-country" class="vel-slider-search-select">
+                    <option value="all">🌍 Tous les pays (avec fallback USA)</option>
+                  </select>
+                  <button type="button" id="slider-scan-btn" class="primary">Scanner la disponibilité</button>
+                </div>
+
+                <div id="slider-scan-results" hidden></div>
+              </div>
+
+              <!-- Manual Add / Edit Form -->
+              <div class="vel-slider-admin-card">
+                <h3 id="slider-form-heading">✏️ Ajouter / Modifier un élément du slider</h3>
+                <form id="slider-admin-form">
+                  <div class="field row">
+                    <div>
+                      <label for="slider-form-country">Pays ciblé</label>
+                      <select id="slider-form-country" class="admin-add-package-dialog__select">
+                        <option value="all">🌍 Tous les pays (Global)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label for="slider-form-title">Titre du Film / Série / Animé</label>
+                      <input id="slider-form-title" type="text" placeholder="Ex. Spider-Man: Brand New Day" required />
+                    </div>
+                    <div>
+                      <label for="slider-form-category">Catégorie</label>
+                      <select id="slider-form-category" class="admin-add-package-dialog__select">
+                        <option value="movie">Film</option>
+                        <option value="series">Série</option>
+                        <option value="anime">Animé</option>
+                        <option value="special">Spécial / Documentaire</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label for="slider-form-badge">Badge visible</label>
+                      <select id="slider-form-badge" class="admin-add-package-dialog__select">
+                        <option value="Cinéma">Cinéma</option>
+                        <option value="Streaming">Streaming</option>
+                        <option value="Animé">Animé</option>
+                        <option value="Top Trending">Top Trending</option>
+                        <option value="Exclusivité">Exclusivité</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="field">
+                    <label for="slider-form-image">URL de l'image (Affiche / Fond Haute Résolution)</label>
+                    <input id="slider-form-image" type="url" placeholder="https://image.tmdb.org/... ou /img/..." />
+                  </div>
+
+                  <div class="field">
+                    <label for="slider-form-desc">Synopsis / Description (Court résumé)</label>
+                    <textarea id="slider-form-desc" style="width:100%;box-sizing:border-box;border-radius:12px;border:1px solid rgba(255,255,255,0.14);background:rgba(9,8,19,0.8);color:#fff;padding:0.7rem;font-family:inherit;min-height:65px;"></textarea>
+                  </div>
+
+                  <div class="actions" style="margin-top:0.85rem;">
+                    <button type="submit" id="slider-form-submit" class="primary">Ajouter manuellement au slider</button>
+                    <button type="button" id="slider-form-cancel" class="countries-admin-cancel" hidden>Annuler la modification</button>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Slider items list -->
+              <div class="vel-slider-admin-card">
+                <h3>📋 Éléments actuellement configurés dans le Slider</h3>
+                <p class="hint">Ordre d'affichage des slides sur la page d'accueil. Utilisez les boutons pour monter/descendre, masquer ou supprimer.</p>
+                <div id="slider-admin-items-list" class="vel-slider-items-list"></div>
+              </div>
+            </div>
+          </section>
+
           <section id="settings-tab-home" class="settings-tab-panel panel countries-admin-form hidden"
             role="tabpanel" aria-labelledby="settings-tab-btn-home" data-settings-tab="home" hidden>
             <h2>Sections de la page Accueil</h2>
@@ -6158,6 +6260,7 @@
                   </button>
                 </div>
               </div>
+              <div id="vel-home-hero-slider" class="vel-hero-slider-wrap"></div>
               <div id="vel-home-sections" class="vel-home-sections" aria-live="polite"></div>
               <div class="vel-home-empty-page__canvas" hidden aria-hidden="true"></div>
             </section>

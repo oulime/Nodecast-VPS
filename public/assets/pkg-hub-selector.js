@@ -365,15 +365,6 @@
           </div>
 
           <div class="pkg-hub-dropdown" id="pkgHubDropdown" role="listbox" aria-label="Sélecteur de packs">
-            <div class="pkg-wheel-header">
-              <div class="pkg-wheel-header-title">
-                SÉLECTION DES PACKS
-              </div>
-              <div class="pkg-wheel-header-actions">
-                <button type="button" class="pkg-wheel-close-btn" id="pkgWheelCloseBtn" aria-label="Fermer">✕</button>
-              </div>
-            </div>
-
             <div class="pkg-wheel-viewport" id="pkgWheelViewport">
               <div class="pkg-barrel-rails">
                 <div class="pkg-barrel-rail-left"></div>
@@ -398,13 +389,11 @@
         this.hubWrapper = wrapper;
         this.hubBtn = wrapper.querySelector("#pkgHubBtn");
         this.hubTitle = wrapper.querySelector("#pkgHubTitle");
-        this.hintHand = wrapper.querySelector("#pkgHubHintHand");
         this.dropdown = wrapper.querySelector("#pkgHubDropdown");
         this.viewport = wrapper.querySelector("#pkgWheelViewport");
         this.track = wrapper.querySelector("#pkgWheelTrack");
         this.centerPill = wrapper.querySelector("#pkgWheelCenterPill");
         this.reviewBtn = wrapper.querySelector("#pkgWheelReviewBtn");
-        this.closeBtn = wrapper.querySelector("#pkgWheelCloseBtn");
 
         if (this.dropdown) {
           this.dropdown.hidden = true;
@@ -524,7 +513,7 @@
         }
 
         slot.style.display = "flex";
-        slot.style.pointerEvents = "auto";
+        slot.style.pointerEvents = "none";
 
         const thetaDeg = delta * anglePerItem;
         const thetaRad = (thetaDeg * Math.PI) / 180;
@@ -696,24 +685,7 @@
     bindEvents() {
       this.hubBtn.addEventListener("click", (e) => { e.stopPropagation(); this.toggle(); });
       this.hubBtn.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this.toggle(); } });
-      this.closeBtn?.addEventListener("click", (e) => { e.stopPropagation(); this.close(); });
       this.reviewBtn?.addEventListener("click", (e) => { e.stopPropagation(); this.confirmCurrentPackage(); });
-
-      let wasDragging = false;
-      let totalDragDist = 0;
-
-      this.track.addEventListener("click", (e) => {
-        if (wasDragging || totalDragDist > 7) return;
-        const item = e.target.closest(".pkg-wheel-item");
-        if (!item) return;
-        const index = Number(item.dataset.pkgIndex);
-        if (Number.isFinite(index) && this.packages[index]) {
-          this.markUserInteracted();
-          const selected = this.packages[index];
-          this.scrollToIndex(index, true);
-          setTimeout(() => this.selectPackage(selected), 200);
-        }
-      });
 
       let pointerSamples = [];
       let lastPointerY = 0;
@@ -721,8 +693,6 @@
 
       const onPointerDown = (e) => {
         this.isDragging = true;
-        wasDragging = false;
-        totalDragDist = 0;
         this.activePointerId = e.pointerId;
         try { window.getSelection()?.removeAllRanges(); } catch (_) {}
         this.viewport.setPointerCapture?.(e.pointerId);
@@ -739,9 +709,6 @@
         const currentY = e.clientY;
         const dy = currentY - lastPointerY;
         lastPointerY = currentY;
-
-        totalDragDist += Math.abs(dy);
-        if (totalDragDist > 7) wasDragging = true;
 
         const total = this.packages.length;
         if (total > 0) {
@@ -783,12 +750,6 @@
           const nearest = ((Math.round(this.currentIndex) % total) + total) % total;
           this.startPhysics(0, nearest);
         }
-
-        // Prevent click selection from misfiring right after dragging
-        setTimeout(() => {
-          wasDragging = false;
-          totalDragDist = 0;
-        }, 120);
       };
       this.viewport.addEventListener("pointerdown", onPointerDown);
       this.viewport.addEventListener("pointermove", onPointerMove);

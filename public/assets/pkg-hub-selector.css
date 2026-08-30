@@ -160,7 +160,7 @@ body.vel-favorites-open #pkg-hub-root {
 
 .pkg-hub-dropdown {
   position: absolute;
-  top: 54px;
+  top: 48px;
   left: 50%;
   transform: translateX(-50%) translateY(-14px) scale(0.96);
   display: none !important;
@@ -170,12 +170,15 @@ body.vel-favorites-open #pkg-hub-root {
   flex-direction: column;
   align-items: center;
   width: min(94vw, 420px);
-  height: calc(100dvh - 128px);
+  height: calc(100dvh - 120px);
   max-height: 680px;
   min-height: 480px;
   border-radius: 30px;
-  background: radial-gradient(circle at 50% 50%, rgba(20, 25, 45, 0.94), rgba(6, 7, 14, 0.98) 75%);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(0, 240, 255, 0.16) 0%, rgba(168, 85, 247, 0.1) 28%, transparent 65%),
+    radial-gradient(circle at 50% 50%, rgba(20, 25, 45, 0.94), rgba(6, 7, 14, 0.98) 75%);
   border: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
   box-shadow:
     0 32px 90px rgba(0, 0, 0, 0.95),
     0 0 60px rgba(0, 240, 255, 0.18),
@@ -183,10 +186,13 @@ body.vel-favorites-open #pkg-hub-root {
     inset 0 1px rgba(255, 255, 255, 0.25);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
   backdrop-filter: blur(32px) saturate(200%);
+  /* Seamless top fade-away dissolving directly into the header title pill */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0px, rgba(0, 0, 0, 0.2) 6px, rgba(0, 0, 0, 0.7) 16px, black 32px, black 100%);
+  mask-image: linear-gradient(to bottom, transparent 0px, rgba(0, 0, 0, 0.2) 6px, rgba(0, 0, 0, 0.7) 16px, black 32px, black 100%);
   transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 2147483647 !important;
   overflow: hidden;
-  padding: 14px 16px 16px;
+  padding: 10px 16px 16px;
   box-sizing: border-box;
 }
 
@@ -218,56 +224,6 @@ body.pkg-wheel-modal-open .item-list--vod-vertical {
 
 body.pkg-wheel-modal-open #dynamic-list * {
   animation-play-state: paused !important;
-}
-
-/* Modal Header Bar */
-.pkg-wheel-header {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2px 4px 10px;
-  flex-shrink: 0;
-}
-
-.pkg-wheel-header-title {
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #e2e8f0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.pkg-wheel-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.pkg-wheel-close-btn {
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: #cbd5e1;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 0;
-  font-size: 13px;
-  font-weight: 700;
-  transition: all 0.2s ease;
-}
-
-.pkg-wheel-close-btn:hover {
-  background: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-  transform: scale(1.08);
 }
 
 /* 3D Viewport with Barrel Rails & Ambient Center Halo */

@@ -70,13 +70,98 @@
   outline: none;
 }
 
+/* Candidate Search Result Cards */
+.vel-slider-candidates-box {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 14px;
+  background: rgba(139, 92, 246, 0.05);
+}
+
+.vel-slider-candidates-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.85rem;
+  margin-top: 0.75rem;
+}
+
+.vel-slider-candidate-card {
+  display: flex;
+  gap: 0.85rem;
+  align-items: center;
+  padding: 0.75rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: all 0.2s ease;
+}
+
+.vel-slider-candidate-card:hover {
+  background: rgba(139, 92, 246, 0.15);
+  border-color: rgba(168, 85, 247, 0.5);
+  transform: translateY(-2px);
+}
+
+.vel-slider-candidate-thumb {
+  width: 55px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #090819;
+  flex: 0 0 auto;
+}
+
+.vel-slider-candidate-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.vel-slider-candidate-title {
+  font-weight: 850;
+  font-size: 0.92rem;
+  color: #fff;
+  line-height: 1.25;
+}
+
+.vel-slider-candidate-meta {
+  font-size: 0.75rem;
+  color: #c4b5fd;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.vel-slider-candidate-btn {
+  background: linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%);
+  color: #fff;
+  border: 0;
+  padding: 0.45rem 0.85rem;
+  border-radius: 9px;
+  font-size: 0.78rem;
+  font-weight: 850;
+  cursor: pointer;
+  margin-top: 0.35rem;
+  align-self: flex-start;
+  transition: filter 0.2s, transform 0.2s;
+}
+
+.vel-slider-candidate-btn:hover {
+  filter: brightness(1.15);
+  transform: scale(1.03);
+}
+
 /* Scanner Results Box */
 .vel-slider-scan-result {
   margin-top: 1rem;
   padding: 1.1rem;
-  border: 1px solid rgba(168, 85, 247, 0.25);
+  border: 1px solid rgba(168, 85, 247, 0.35);
   border-radius: 14px;
-  background: rgba(139, 92, 246, 0.06);
+  background: rgba(139, 92, 246, 0.08);
 }
 
 .vel-slider-scan-header {

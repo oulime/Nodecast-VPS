@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Scoped Package Hub Selector - Pure CSS Visibility, Cold Neon 3D Text & SVG Navigation
  */
 (() => {
@@ -15,6 +15,85 @@
     { id: "sci-fi", name: "SCIENCE-FICTION", color: "bg-blue" },
     { id: "doc", name: "DOCUMENTAIRES", color: "bg-purple" }
   ];
+
+  function formatCardTextHtml(rawText) {
+    const clean = String(rawText || "").trim().toUpperCase();
+    if (!clean) return "";
+    const words = clean.split(/\s+/).filter(Boolean);
+    return words.map(w => `<span class="pkg-card-word">${w}</span>`).join(" ");
+  }
+
+  let _sharedMeasurer = null;
+  function getSharedMeasurer() {
+    if (!_sharedMeasurer && typeof document !== "undefined") {
+      _sharedMeasurer = document.createElement("div");
+      _sharedMeasurer.style.cssText =
+        "position:fixed!important;visibility:hidden!important;left:-9999px!important;top:-9999px!important;" +
+        "padding:0!important;margin:0!important;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif!important;" +
+        "font-weight:900!important;line-height:1.1!important;letter-spacing:0.01em!important;" +
+        "text-transform:uppercase!important;box-sizing:border-box!important;text-align:center!important;pointer-events:none!important;";
+      document.body.appendChild(_sharedMeasurer);
+    }
+    return _sharedMeasurer;
+  }
+
+  function fitCardText(card) {
+    if (!card) return;
+    const textEl = card.querySelector(".pkg-card-text") || card;
+    const rawText = textEl.textContent ? textEl.textContent.trim() : "";
+    if (!rawText) return;
+
+    if (!textEl.querySelector(".pkg-card-word")) {
+      textEl.innerHTML = formatCardTextHtml(rawText);
+    }
+
+    const isSmallMobile = window.innerWidth <= 380;
+    const isMobile = window.innerWidth <= 640;
+    const maxFont = isSmallMobile ? 22 : (isMobile ? 24 : 28);
+    const minFont = 8.5;
+
+    const padH = isSmallMobile ? 8 : (isMobile ? 10 : 16);
+    const padV = isSmallMobile ? 8 : (isMobile ? 10 : 12);
+    const targetW = Math.max(50, (card.offsetWidth || (isSmallMobile ? 86 : (isMobile ? 98 : 116))) - padH);
+    const targetH = Math.max(50, (card.offsetHeight || (isSmallMobile ? 115 : (isMobile ? 125 : 142))) - padV);
+
+    const measurer = getSharedMeasurer();
+    if (!measurer) return;
+    measurer.style.width = targetW + "px";
+    measurer.style.maxWidth = targetW + "px";
+    measurer.innerHTML = textEl.innerHTML;
+
+    // Fast binary search (only 4 checks max per card, computed once)
+    let low = minFont;
+    let high = maxFont;
+    let optimal = minFont;
+
+    while (low <= high) {
+      const mid = Math.round(((low + high) / 2) * 2) / 2;
+      measurer.style.fontSize = mid + "px";
+
+      const fitsBox = measurer.scrollHeight <= targetH && measurer.scrollWidth <= targetW + 0.5;
+      let allWordsFit = fitsBox;
+      if (fitsBox) {
+        const wordSpans = measurer.querySelectorAll(".pkg-card-word");
+        for (let i = 0; i < wordSpans.length; i++) {
+          if (wordSpans[i].offsetWidth > targetW + 0.5) {
+            allWordsFit = false;
+            break;
+          }
+        }
+      }
+
+      if (allWordsFit) {
+        optimal = mid;
+        low = mid + 0.5;
+      } else {
+        high = mid - 0.5;
+      }
+    }
+
+    textEl.style.fontSize = optimal + "px";
+  }
 
   class PkgHubBridge {
     constructor() {
@@ -295,16 +374,27 @@
       this.cards = this.packages.map((pkg, index) => {
         const card = document.createElement("div");
         card.className = `pkg-card ${pkg.color} pos-hidden`;
-        card.textContent = pkg.name;
         card.dataset.pkgIndex = String(index);
         card.dataset.pkgId = String(pkg.id || "");
         card.setAttribute("role", "option");
         card.setAttribute("tabindex", "0");
+
+        const textSpan = document.createElement("span");
+        textSpan.className = "pkg-card-text";
+        textSpan.innerHTML = formatCardTextHtml(pkg.name);
+        card.appendChild(textSpan);
+
         this.fanContainer.appendChild(card);
         return card;
       });
 
       this.updateFanPositions();
+      this.fitAllCards();
+    }
+
+    fitAllCards() {
+      if (!this.cards) return;
+      this.cards.forEach((card) => fitCardText(card));
     }
 
     updateFanPositions() {
@@ -480,6 +570,21 @@
           this.close();
           this.hubBtn?.focus();
         }
+      });
+
+      // Window resize & orientation change: re-fit text dynamically
+      let resizeTimer = null;
+      window.addEventListener("resize", () => {
+        if (resizeTimer) clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          if (this.isOpen || this.isMediaTab()) {
+            this.fitAllCards();
+          }
+        }, 100);
+      });
+
+      window.addEventListener("orientationchange", () => {
+        setTimeout(() => this.fitAllCards(), 200);
       });
     }
   }

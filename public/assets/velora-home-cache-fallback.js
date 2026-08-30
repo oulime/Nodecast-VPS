@@ -249,7 +249,16 @@
     var isHorizontal = (section && section.card_orientation === "horizontal") || (entry && entry.card_orientation === "horizontal");
     card.type = "button";
     card.className = "vel-home-section__card vel-home-section__card--" + section.content_type + (isHorizontal ? " vel-home-section__card--horizontal" : "");
-    card.setAttribute("aria-label", entry.name || "");
+    var cleanTitle = String(entry.name || "").trim();
+    for (var p = 0; p < 5; p += 1) {
+      var next = cleanTitle.replace(/^[\[\(]?[A-Z0-9\+\-\s]{1,12}[\]\)]\s*[-:]?\s*/i, "")
+                           .replace(/^([0-9]+K|[0-9]+D|HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|EN|ES|DE|MULTI|TRUEFRENCH|FRENCH)\s*[-:]?\s*/i, "")
+                           .replace(/^[A-Z0-9]{1,8}-[A-Z0-9]{1,8}\s*[-:]?\s*/i, "")
+                           .trim();
+      if (next === cleanTitle) break;
+      cleanTitle = next;
+    }
+    card.setAttribute("aria-label", cleanTitle || entry.name || "");
     card.dataset.packageId = String(section.package_id || entry.packageId || "");
     card.dataset.contentType = String(section.content_type || entry.contentType || "");
     var media, imgUrl = isHorizontal ? (entry.backdropUrl || entry.backdrop || entry.thumbUrl) : (entry.thumbUrl || entry.backdropUrl || entry.backdrop);
@@ -282,7 +291,7 @@
     media.classList.add("vel-home-section__media");
     var name = document.createElement("span");
     name.className = "vel-home-section__name";
-    name.textContent = entry.name || "";
+    name.textContent = cleanTitle || entry.name || "";
     card.append(media, name);
     if (isHorizontal && (section.content_type === "movies" || section.content_type === "series")) {
       veloraEnsureCardBackdrop(card, media, section, entry);

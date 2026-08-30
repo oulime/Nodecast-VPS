@@ -219,13 +219,23 @@ function isHomeChannelHidden(rawName, hiddenFilters) {
 function stripHomeChannelPrefixes(rawName, prefixes) {
     const original = String(rawName || '').trim();
     let name = original;
+    const allPrefixes = Array.isArray(prefixes) ? prefixes : [];
     for (let pass = 0; pass < 64; pass += 1) {
-        const prefix = prefixes.find(candidate =>
+        const prefix = allPrefixes.find(candidate =>
             candidate.length <= name.length
             && name.slice(0, candidate.length).toLowerCase() === candidate.toLowerCase()
         );
         if (!prefix) break;
         name = name.slice(prefix.length).trim();
+    }
+    for (let p = 0; p < 5; p += 1) {
+        const next = name
+            .replace(/^[\[\(]?[A-Z0-9\+\-\s]{1,12}[\]\)]\s*[-:]?\s*/i, '')
+            .replace(/^([0-9]+K|[0-9]+D|HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|EN|ES|DE|MULTI|TRUEFRENCH|FRENCH)\s*[-:]?\s*/i, '')
+            .replace(/^[A-Z0-9]{1,8}-[A-Z0-9]{1,8}\s*[-:]?\s*/i, '')
+            .trim();
+        if (next === name) break;
+        name = next;
     }
     return name || original;
 }
@@ -1516,7 +1526,7 @@ function buildHomeCache() {
             const finalThumb = (isHorizontal && backdropUrl) ? backdropUrl : (standardThumb || backdropUrl);
             return {
                 id: `home-cache:${section.id}:${rawId}`,
-                name: type === 'live' ? stripHomeChannelPrefixes(rawName, channelRules.prefixes) : rawName,
+                name: stripHomeChannelPrefixes(rawName, channelRules.prefixes),
                 thumbUrl: finalThumb,
                 backdropUrl: backdropUrl || (isHorizontal ? '' : standardThumb),
                 streamId: rawId,

@@ -342,7 +342,7 @@
       const isSmallMobile = window.innerWidth <= 380;
       const isMobile = window.innerWidth <= 640;
       this.itemHeight = isSmallMobile ? 42 : (isMobile ? 44 : 46);
-      this.viewportHeight = this.viewport ? (this.viewport.offsetHeight || 360) : 360;
+      this.viewportHeight = this.viewport ? (this.viewport.offsetHeight || 380) : 380;
       this.centerY = (this.viewportHeight - this.itemHeight) / 2;
     }
 
@@ -804,7 +804,11 @@
         else if (e.key === "ArrowDown") { e.preventDefault(); this.step(1); }
         else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this.confirmCurrentPackage(); }
       });
-      document.addEventListener("click", (e) => { if (this.isOpen && this.hubWrapper && !this.hubWrapper.contains(e.target)) this.close(); });
+      document.addEventListener("click", (e) => {
+        if (this.isOpen && this.dropdown && !this.dropdown.contains(e.target) && !this.hubBtn?.contains(e.target)) {
+          this.close();
+        }
+      });
       let resizeTimer = null;
       window.addEventListener("resize", () => {
         if (resizeTimer) clearTimeout(resizeTimer);

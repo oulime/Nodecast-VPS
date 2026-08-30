@@ -525,173 +525,134 @@ body.vel-media-package-sweeping.vel-media-package-sweeping-leaving::after,
 }
 
 /* ==========================================================================
-   VOD Movie & Series Card: Fluid Purple Theme Light Frame & Loading Effects
+   VOD Movie & Series Card: Simple, Clean Standard Design
    ========================================================================== */
 
-/* 1. Fluid Light Frame (Pure Purple Theme - Elegant, Non-Harsh Ambient) */
 .vel-vod-movie-card {
   position: relative;
-  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), filter 0.28s ease !important;
+  display: flex;
+  flex-direction: column;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  transition: opacity 0.18s ease, transform 0.18s ease !important;
+  animation: vel-vod-card-appear 0.25s ease-out both;
+}
+
+@keyframes vel-vod-card-appear {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .vel-vod-movie-card:hover {
-  transform: translateY(-5px) !important;
+  opacity: 0.92;
+  transform: translateY(-2px) !important;
 }
 
 .vel-vod-movie-card__media {
   position: relative;
-  border-radius: 15px !important;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: 10px !important;
   overflow: hidden !important;
-  border: 1.2px solid rgba(168, 85, 247, 0.22) !important;
-  background: linear-gradient(165deg, #181326, #0e0b17 55%, #07050d) !important;
-  box-shadow:
-    0 4px 18px rgba(0, 0, 0, 0.6),
-    0 0 14px rgba(138, 43, 226, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1) !important;
+  background: #15151e !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
 }
 
-/* Subtle continuous ambient fluid glow contour */
-.vel-vod-movie-card__media::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1.2px;
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.4), rgba(124, 58, 237, 0.15), rgba(168, 85, 247, 0.35));
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-  opacity: 0.6;
-  z-index: 2;
-  transition: opacity 0.3s ease;
+.vel-vod-movie-card__media::before,
+.vel-vod-movie-card__media::after {
+  display: none !important;
 }
 
-/* Hover & Focus state: Refined fluid purple lighting */
 .vel-vod-movie-card:hover .vel-vod-movie-card__media,
 .vel-vod-movie-card:focus-visible .vel-vod-movie-card__media,
 .vel-vod-movie-card.vel-vod-movie-card--active .vel-vod-movie-card__media {
-  border-color: rgba(168, 85, 247, 0.65) !important;
-  box-shadow:
-    0 12px 32px rgba(0, 0, 0, 0.75),
-    0 0 24px rgba(168, 85, 247, 0.32),
-    0 0 8px rgba(138, 43, 226, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6) !important;
 }
 
-.vel-vod-movie-card:hover .vel-vod-movie-card__media::before {
-  opacity: 1;
-}
-
-/* 2. Premium Poster Image Loading Shimmer & Smooth Reveal */
 .vel-vod-movie-card__poster {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 50% 40%, #1c1530 0%, #0d0a17 80%) !important;
+  width: 100%;
+  height: 100%;
+  background: #15151e !important;
   overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
 }
 
-/* Fluid Purple Loading Shimmer (active while image is loading) */
 .vel-vod-movie-card__poster::before,
-.vel-image-loading-host::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    115deg,
-    transparent 0%,
-    rgba(168, 85, 247, 0.04) 25%,
-    rgba(192, 132, 252, 0.16) 48%,
-    rgba(168, 85, 247, 0.22) 52%,
-    rgba(168, 85, 247, 0.06) 75%,
-    transparent 100%
-  );
-  background-size: 220% 100%;
-  animation: vel-vod-poster-shimmer 1.4s ease-in-out infinite;
-  pointer-events: none;
-  z-index: 1;
-  opacity: 1;
-  transition: opacity 0.6s cubic-bezier(0.25, 1, 0.5, 1) !important;
-}
-
-/* Soft pulsating film icon placeholder while image loads */
 .vel-vod-movie-card__poster::after,
-.vel-image-loading-host::after {
-  content: "🎬";
-  font-size: 24px;
-  opacity: 0.22;
-  filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.6));
-  animation: vel-vod-placeholder-pulse 1.6s ease-in-out infinite alternate;
-  pointer-events: none;
-  z-index: 1;
-  transition: opacity 0.55s cubic-bezier(0.25, 1, 0.5, 1) !important;
-}
-
-/* Loaded state: Seamless velvety cross-fade */
-.vel-vod-movie-card__poster.vel-image-loaded-host::before,
-.vel-vod-movie-card__poster.vel-image-loaded-host::after,
+.vel-image-loading-host::before,
+.vel-image-loading-host::after,
 .vel-image-loaded-host::before,
 .vel-image-loaded-host::after {
-  opacity: 0 !important;
-  pointer-events: none !important;
+  display: none !important;
+  content: none !important;
 }
 
 .vel-vod-movie-card__poster img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center top;
+  object-position: center center;
   display: block;
+  opacity: 0;
+  will-change: opacity;
+  transform: none !important;
+  transition: opacity 0.32s cubic-bezier(0.25, 1, 0.5, 1) !important;
+}
+
+.vel-vod-movie-card__poster img.vel-image-loading {
   opacity: 0 !important;
-  transform: scale(1.05);
-  will-change: opacity, transform;
-  transition: opacity 0.65s cubic-bezier(0.25, 1, 0.5, 1), transform 0.65s cubic-bezier(0.25, 1, 0.5, 1) !important;
 }
 
 .vel-vod-movie-card__poster img.vel-image-loaded,
 .vel-vod-movie-card__poster.vel-image-loaded-host img,
 .vel-image-loaded-host img {
   opacity: 1 !important;
-  transform: scale(1) !important;
-  animation: vel-vod-poster-reveal 0.65s cubic-bezier(0.22, 1, 0.36, 1) both !important;
+  transform: none !important;
 }
 
 .vel-vod-movie-card:hover .vel-vod-movie-card__poster img {
-  transform: scale(1.04) !important;
+  transform: none !important;
 }
 
-/* Animation Keyframes */
-@keyframes vel-vod-poster-shimmer {
-  0% {
-    background-position: 120% 0;
-  }
-  100% {
-    background-position: -120% 0;
-  }
+/* Rating badge & heart button only appear when image is ready */
+.vel-vod-movie-card__rating-badge {
+  opacity: 0 !important;
+  transition: opacity 0.3s cubic-bezier(0.25, 1, 0.5, 1) !important;
+  pointer-events: none;
 }
 
-@keyframes vel-vod-placeholder-pulse {
-  0% {
-    transform: scale(0.92);
-    opacity: 0.15;
-  }
-  100% {
-    transform: scale(1.08);
-    opacity: 0.38;
-  }
+.vel-vod-movie-card__poster.vel-image-loaded-host ~ .vel-vod-movie-card__rating-badge,
+.vel-vod-movie-card:has(.vel-image-loaded) .vel-vod-movie-card__rating-badge,
+.vel-vod-movie-card:has(.vel-image-loaded-host) .vel-vod-movie-card__rating-badge {
+  opacity: 1 !important;
 }
 
-@keyframes vel-vod-poster-reveal {
-  0% {
-    opacity: 0;
-    transform: scale(1.05);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
+.vel-vod-movie-card .vel-favorite-heart {
+  opacity: 0 !important;
+  transition: opacity 0.3s cubic-bezier(0.25, 1, 0.5, 1), transform 0.16s ease, background 0.16s ease !important;
 }
+
+.vel-vod-movie-card:has(.vel-image-loaded) .vel-favorite-heart,
+.vel-vod-movie-card:has(.vel-image-loaded-host) .vel-favorite-heart {
+  opacity: 0.62 !important;
+}
+
+.vel-vod-movie-card:hover:has(.vel-image-loaded) .vel-favorite-heart,
+.vel-vod-movie-card:hover:has(.vel-image-loaded-host) .vel-favorite-heart {
+  opacity: 1 !important;
+}
+

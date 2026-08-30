@@ -373,15 +373,19 @@
 
               <div class="pkg-wheel-center-pill" id="pkgWheelCenterPill"></div>
               <div class="pkg-wheel-track" id="pkgWheelTrack"></div>
-            </div>
 
-            <div class="pkg-wheel-bottom">
-              <div class="pkg-wheel-swipe-hint">
-                Glissez vers le haut ou le bas pour explorer les packs.
+              <div class="pkg-wheel-nav-side" id="pkgWheelNavSide">
+                <button type="button" class="pkg-wheel-nav-btn pkg-wheel-nav-btn--up" id="pkgWheelNavUp" aria-label="Pack précédent" title="Pack précédent">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="18 15 12 9 6 15"></polyline>
+                  </svg>
+                </button>
+                <button type="button" class="pkg-wheel-nav-btn pkg-wheel-nav-btn--down" id="pkgWheelNavDown" aria-label="Pack suivant" title="Pack suivant">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
               </div>
-              <button type="button" class="pkg-wheel-action-btn" id="pkgWheelReviewBtn">
-                SÉLECTIONNER CE PACK
-              </button>
             </div>
           </div>
         `;
@@ -393,7 +397,8 @@
         this.viewport = wrapper.querySelector("#pkgWheelViewport");
         this.track = wrapper.querySelector("#pkgWheelTrack");
         this.centerPill = wrapper.querySelector("#pkgWheelCenterPill");
-        this.reviewBtn = wrapper.querySelector("#pkgWheelReviewBtn");
+        this.navUpBtn = wrapper.querySelector("#pkgWheelNavUp");
+        this.navDownBtn = wrapper.querySelector("#pkgWheelNavDown");
 
         if (this.dropdown) {
           this.dropdown.hidden = true;
@@ -434,12 +439,10 @@
             <span class="pkg-active-pip" style="display:none">✓</span>
             <span class="pkg-name-text"></span>
           </div>
-          <div class="pkg-center-sub"></div>
           <div class="pkg-center-badge" style="display:none">✓ PACK ACTIF</div>
         `;
         slot._pipEl = slot.querySelector(".pkg-active-pip");
         slot._nameEl = slot.querySelector(".pkg-name-text");
-        slot._subEl = slot.querySelector(".pkg-center-sub");
         slot._badgeEl = slot.querySelector(".pkg-center-badge");
         slot._renderedPkgIndex = -1;
         slot._renderedActive = false;
@@ -498,8 +501,6 @@
           slot.dataset.pkgId = String(pkg.id || "");
 
           slot._nameEl.textContent = pkg.name || "";
-          const meta = getPackageMetadata(pkg.name || "");
-          slot._subEl.textContent = meta.sub || "";
 
           if (isCurrentActive) {
             slot.classList.add("is-active-pkg");
@@ -513,7 +514,7 @@
         }
 
         slot.style.display = "flex";
-        slot.style.pointerEvents = "none";
+        slot.style.pointerEvents = "auto";
 
         const thetaDeg = delta * anglePerItem;
         const thetaRad = (thetaDeg * Math.PI) / 180;
@@ -685,7 +686,37 @@
     bindEvents() {
       this.hubBtn.addEventListener("click", (e) => { e.stopPropagation(); this.toggle(); });
       this.hubBtn.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this.toggle(); } });
-      this.reviewBtn?.addEventListener("click", (e) => { e.stopPropagation(); this.confirmCurrentPackage(); });
+
+      this.navUpBtn?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        this.markUserInteracted();
+        this.step(-1);
+      });
+
+      this.navDownBtn?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        this.markUserInteracted();
+        this.step(1);
+      });
+
+      let wasDragging = false;
+      let totalDragDist = 0;
+
+      // Direct click / tap on any pack item in the 3D wheel selects it
+      this.viewport.addEventListener("click", (e) => {
+        if (wasDragging || totalDragDist > 8) return;
+        const item = e.target.closest(".pkg-wheel-item");
+        if (!item) return;
+        const index = Number(item.dataset.pkgIndex);
+        if (Number.isFinite(index) && this.packages[index]) {
+          this.markUserInteracted();
+          const selected = this.packages[index];
+          this.scrollToIndex(index, true);
+          setTimeout(() => this.selectPackage(selected), 140);
+        }
+      });
 
       let pointerSamples = [];
       let lastPointerY = 0;
@@ -693,6 +724,8 @@
 
       const onPointerDown = (e) => {
         this.isDragging = true;
+        wasDragging = false;
+        totalDragDist = 0;
         this.activePointerId = e.pointerId;
         try { window.getSelection()?.removeAllRanges(); } catch (_) {}
         this.viewport.setPointerCapture?.(e.pointerId);
@@ -709,6 +742,9 @@
         const currentY = e.clientY;
         const dy = currentY - lastPointerY;
         lastPointerY = currentY;
+
+        totalDragDist += Math.abs(dy);
+        if (totalDragDist > 8) wasDragging = true;
 
         const total = this.packages.length;
         if (total > 0) {
@@ -750,6 +786,11 @@
           const nearest = ((Math.round(this.currentIndex) % total) + total) % total;
           this.startPhysics(0, nearest);
         }
+
+        setTimeout(() => {
+          wasDragging = false;
+          totalDragDist = 0;
+        }, 100);
       };
       this.viewport.addEventListener("pointerdown", onPointerDown);
       this.viewport.addEventListener("pointermove", onPointerMove);

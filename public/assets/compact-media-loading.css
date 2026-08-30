@@ -596,7 +596,7 @@ body.vel-media-package-sweeping.vel-media-package-sweeping-leaving::after,
 }
 
 /* Fluid Purple Loading Shimmer (active while image is loading) */
-.vel-vod-movie-card__poster:not(.vel-image-loaded-host)::before,
+.vel-vod-movie-card__poster::before,
 .vel-image-loading-host::before {
   content: "";
   position: absolute;
@@ -614,10 +614,12 @@ body.vel-media-package-sweeping.vel-media-package-sweeping-leaving::after,
   animation: vel-vod-poster-shimmer 1.4s ease-in-out infinite;
   pointer-events: none;
   z-index: 1;
+  opacity: 1;
+  transition: opacity 0.6s cubic-bezier(0.25, 1, 0.5, 1) !important;
 }
 
 /* Soft pulsating film icon placeholder while image loads */
-.vel-vod-movie-card__poster:not(.vel-image-loaded-host)::after,
+.vel-vod-movie-card__poster::after,
 .vel-image-loading-host::after {
   content: "🎬";
   font-size: 24px;
@@ -626,12 +628,16 @@ body.vel-media-package-sweeping.vel-media-package-sweeping-leaving::after,
   animation: vel-vod-placeholder-pulse 1.6s ease-in-out infinite alternate;
   pointer-events: none;
   z-index: 1;
+  transition: opacity 0.55s cubic-bezier(0.25, 1, 0.5, 1) !important;
 }
 
-/* Loaded state: Smooth silky reveal transition */
+/* Loaded state: Seamless velvety cross-fade */
 .vel-vod-movie-card__poster.vel-image-loaded-host::before,
-.vel-vod-movie-card__poster.vel-image-loaded-host::after {
-  display: none !important;
+.vel-vod-movie-card__poster.vel-image-loaded-host::after,
+.vel-image-loaded-host::before,
+.vel-image-loaded-host::after {
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 .vel-vod-movie-card__poster img {
@@ -640,14 +646,18 @@ body.vel-media-package-sweeping.vel-media-package-sweeping-leaving::after,
   object-fit: cover;
   object-position: center top;
   display: block;
-  opacity: 0;
-  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.35s ease !important;
+  opacity: 0 !important;
+  transform: scale(1.05);
+  will-change: opacity, transform;
+  transition: opacity 0.65s cubic-bezier(0.25, 1, 0.5, 1), transform 0.65s cubic-bezier(0.25, 1, 0.5, 1) !important;
 }
 
 .vel-vod-movie-card__poster img.vel-image-loaded,
-.vel-vod-movie-card__poster.vel-image-loaded-host img {
+.vel-vod-movie-card__poster.vel-image-loaded-host img,
+.vel-image-loaded-host img {
   opacity: 1 !important;
-  animation: vel-vod-poster-reveal 0.38s cubic-bezier(0.16, 1, 0.3, 1) both !important;
+  transform: scale(1) !important;
+  animation: vel-vod-poster-reveal 0.65s cubic-bezier(0.22, 1, 0.36, 1) both !important;
 }
 
 .vel-vod-movie-card:hover .vel-vod-movie-card__poster img {
@@ -678,12 +688,10 @@ body.vel-media-package-sweeping.vel-media-package-sweeping-leaving::after,
 @keyframes vel-vod-poster-reveal {
   0% {
     opacity: 0;
-    transform: scale(1.03);
-    filter: blur(4px);
+    transform: scale(1.05);
   }
   100% {
     opacity: 1;
     transform: scale(1);
-    filter: blur(0px);
   }
 }

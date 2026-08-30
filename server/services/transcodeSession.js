@@ -35,14 +35,14 @@ function readPositiveIntegerEnv(name, fallback) {
 }
 
 // Session settings
-const SESSION_TIMEOUT_MS = readPositiveNumberEnv('TRANSCODE_SESSION_TIMEOUT_MINUTES', 30) * 60 * 1000;
+const SESSION_TIMEOUT_MS = readPositiveNumberEnv('TRANSCODE_SESSION_TIMEOUT_MINUTES', 3) * 60 * 1000;
 const SEGMENT_DURATION = readPositiveNumberEnv('TRANSCODE_HLS_SEGMENT_SECONDS', 2);
 const INITIAL_VOD_SEGMENTS = readPositiveIntegerEnv('TRANSCODE_INITIAL_VOD_SEGMENTS', 1);
 const INITIAL_LIVE_SEGMENTS = readPositiveIntegerEnv('TRANSCODE_INITIAL_LIVE_SEGMENTS', 2);
 const LIVE_PLAYLIST_READY_TIMEOUT_MS = readPositiveNumberEnv('TRANSCODE_LIVE_PLAYLIST_READY_TIMEOUT_MS', 15000);
 const SEGMENT_WAIT_TIMEOUT_MS = readPositiveNumberEnv('TRANSCODE_SEGMENT_WAIT_TIMEOUT_MS', 25000);
-const CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
-const ORPHAN_SESSION_MAX_AGE_MS = readPositiveNumberEnv('TRANSCODE_ORPHAN_MAX_AGE_MINUTES', 60) * 60 * 1000;
+const CLEANUP_INTERVAL_MS = 30 * 1000; // Check every 30 seconds
+const ORPHAN_SESSION_MAX_AGE_MS = readPositiveNumberEnv('TRANSCODE_ORPHAN_MAX_AGE_MINUTES', 10) * 60 * 1000;
 
 /**
  * Generate a unique session ID

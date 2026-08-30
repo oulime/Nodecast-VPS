@@ -19,6 +19,121 @@
 .vel-home-section__card--movies .vel-home-section__name,.vel-home-section__card--series .vel-home-section__name{display:none}
 @media(max-width:640px){.vel-home-sections{gap:.72rem}.vel-home-section__card--movies,.vel-home-section__card--series{flex-basis:clamp(7.65rem,36vw,9.4rem)}.vel-home-section__rail{gap:.55rem;padding-bottom:.5rem}}
 
+/* Horizontal Card Orientation (Prime Video Style 16:9 Packshot) */
+.vel-home-section--horizontal .vel-home-section__card,
+.vel-home-section__card--horizontal {
+  position: relative !important;
+  flex: 0 0 clamp(14.5rem, 38vw, 20.5rem) !important;
+  flex-basis: clamp(14.5rem, 38vw, 20.5rem) !important;
+  width: clamp(14.5rem, 38vw, 20.5rem) !important;
+  max-width: clamp(14.5rem, 38vw, 20.5rem) !important;
+  aspect-ratio: 16/9 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 10px !important;
+  background: #0c0b14 !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.52) !important;
+  display: block !important;
+  cursor: pointer !important;
+  transition: transform 220ms cubic-bezier(0.2, 0.9, 0.4, 1), border-color 220ms ease, box-shadow 220ms ease !important;
+}
+.vel-home-section--horizontal .vel-home-section__card:hover,
+.vel-home-section--horizontal .vel-home-section__card:focus-visible,
+.vel-home-section__card--horizontal:hover,
+.vel-home-section__card--horizontal:focus-visible {
+  transform: translateY(-4px) scale(1.035) !important;
+  border-color: rgba(255, 255, 255, 0.88) !important;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.88), 0 0 24px color-mix(in srgb, var(--vel-primary, #8b5cf6) 40%, transparent) !important;
+  outline: none !important;
+  z-index: 5 !important;
+}
+.vel-home-section--horizontal .vel-home-section__card::before,
+.vel-home-section__card--horizontal::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.05) 42%, rgba(4, 4, 10, 0.68) 72%, rgba(4, 4, 10, 0.94) 100%) !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+  transition: opacity 220ms ease !important;
+}
+.vel-home-section--horizontal .vel-home-section__media,
+.vel-home-section__card--horizontal .vel-home-section__media {
+  position: absolute !important;
+  inset: 0 !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  aspect-ratio: 16/9 !important;
+  border-radius: inherit !important;
+  object-fit: cover !important;
+  background: #090811 !important;
+  transition: transform 320ms cubic-bezier(0.2, 0.9, 0.4, 1) !important;
+}
+.vel-home-section--horizontal .vel-home-section__card:hover .vel-home-section__media,
+.vel-home-section--horizontal .vel-home-section__card:focus-visible .vel-home-section__media,
+.vel-home-section__card--horizontal:hover .vel-home-section__media,
+.vel-home-section__card--horizontal:focus-visible .vel-home-section__media {
+  transform: scale(1.055) !important;
+}
+.vel-home-section--horizontal .vel-home-section__card .vel-home-section__name,
+.vel-home-section__card--horizontal .vel-home-section__name {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  display: block !important;
+  padding: 0.65rem 0.8rem 0.55rem !important;
+  font-size: clamp(0.78rem, 1.8vw, 0.88rem) !important;
+  font-weight: 850 !important;
+  letter-spacing: -0.01em !important;
+  line-height: 1.25 !important;
+  color: #ffffff !important;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.92), 0 1px 3px rgba(0, 0, 0, 0.85) !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  min-height: unset !important;
+  box-sizing: border-box !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  text-align: left !important;
+  z-index: 2 !important;
+  pointer-events: none !important;
+  transition: transform 220ms ease, color 220ms ease !important;
+}
+.vel-home-section--horizontal .vel-home-section__skeleton,
+.vel-home-section__skeleton--horizontal {
+  flex: 0 0 clamp(14.5rem, 38vw, 20.5rem) !important;
+  flex-basis: clamp(14.5rem, 38vw, 20.5rem) !important;
+  width: clamp(14.5rem, 38vw, 20.5rem) !important;
+  aspect-ratio: 16/9 !important;
+  border-radius: 10px !important;
+}
+@media(max-width:640px) {
+  .vel-home-section--horizontal .vel-home-section__card,
+  .vel-home-section__card--horizontal {
+    flex: 0 0 clamp(12.5rem, 62vw, 17.5rem) !important;
+    flex-basis: clamp(12.5rem, 62vw, 17.5rem) !important;
+    width: clamp(12.5rem, 62vw, 17.5rem) !important;
+    max-width: clamp(12.5rem, 62vw, 17.5rem) !important;
+    border-radius: 9px !important;
+  }
+  .vel-home-section--horizontal .vel-home-section__skeleton,
+  .vel-home-section__skeleton--horizontal {
+    flex: 0 0 clamp(12.5rem, 62vw, 17.5rem) !important;
+    flex-basis: clamp(12.5rem, 62vw, 17.5rem) !important;
+    width: clamp(12.5rem, 62vw, 17.5rem) !important;
+    border-radius: 9px !important;
+  }
+  .vel-home-section--horizontal .vel-home-section__card .vel-home-section__name,
+  .vel-home-section__card--horizontal .vel-home-section__name {
+    font-size: 0.74rem !important;
+    padding: 0.45rem 0.6rem !important;
+  }
+}
+
 /* Stable, immediate Accueil first paint. */
 .vel-home-section__skeleton{position:relative;display:block;flex:0 0 clamp(8rem,25vw,10.75rem);aspect-ratio:2/3;overflow:hidden;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:#141321}
 .vel-home-section__skeleton--live{flex-basis:clamp(10.5rem,38vw,15rem);aspect-ratio:16/9}

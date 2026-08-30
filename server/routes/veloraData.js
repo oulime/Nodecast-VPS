@@ -14,6 +14,134 @@ const countryPackageCachePath = path.join(
     __dirname, '..', '..', 'data', 'velora-cache', 'country-packages.json'
 );
 const vodPosterCachePath = path.join(__dirname, '..', '..', 'data', 'vod-poster-cache.json');
+const vodBackdropCachePath = path.join(__dirname, '..', '..', 'data', 'vod-backdrop-cache.json');
+const https = require('https');
+
+function cleanMediaTitleForSearch(raw) {
+    let title = String(raw || '').trim();
+    for (let i = 0; i < 5; i++) {
+        title = title
+            .replace(/^[\[\(]?[A-Z0-9\+\-\s]+[\]\)]\s*[-:]?\s*/i, '')
+            .replace(/^([0-9]+K|[0-9]+D|HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|EN|ES|DE|MULTI|TRUEFRENCH|FRENCH|HEVC|HDR|DOLBY|ATMOS)\s*[-:]?\s*/i, '')
+            .replace(/^[A-Z0-9]{1,8}-[A-Z0-9]{1,8}\s*[-:]?\s*/i, '')
+            .trim();
+    }
+    const yearMatch = title.match(/\((\d{4})\)/);
+    const year = yearMatch ? yearMatch[1] : '';
+    title = title.replace(/\(\d{4}\).*$/, '').replace(/[-:]\s*$/, '').trim();
+    return { title, year };
+}
+
+function fetchTmdbBackdrop(name, isSeries = false) {
+    const { title, year } = cleanMediaTitleForSearch(name);
+    if (!title || title.length < 2) return Promise.resolve('');
+    const endpoint = isSeries ? 'search/tv' : 'search/movie';
+    const yearParam = year ? (isSeries ? `&first_air_date_year=${year}` : `&year=${year}`) : '';
+    const url = `https://api.themoviedb.org/3/${endpoint}?api_key=1cf50e6248dc270629e802686245c2c8&query=${encodeURIComponent(title)}${yearParam}&language=fr-FR`;
+    return new Promise((resolve) => {
+        const req = https.get(url, { timeout: 3500 }, (res) => {
+            if (res.statusCode !== 200) return resolve('');
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try {
+                    const json = JSON.parse(data);
+                    const item = json.results?.find(r => r.backdrop_path) || json.results?.[0];
+                    if (item?.backdrop_path) {
+                        return resolve(`https://image.tmdb.org/t/p/w780${item.backdrop_path}`);
+                    }
+                } catch (_) {}
+                resolve('');
+            });
+        });
+        req.on('error', () => resolve(''));
+        req.on('timeout', () => { req.destroy(); resolve(''); });
+    });
+}
+
+async function resolveBackdropForEntry(entry, sourceMap, apiMap, backdropCache) {
+    const sourceId = String(entry.sourceId || '');
+    const streamId = String(entry.streamId || '');
+    const key = `${sourceId}:${streamId}`;
+    const titleKey = normalizedPosterTitle(entry.name);
+    if (backdropCache[key]) return backdropCache[key];
+    if (backdropCache[titleKey]) return backdropCache[titleKey];
+
+    const isSeries = entry.contentType === 'series';
+    let backdrop = '';
+
+    const source = sourceId ? sourceMap.get(sourceId) : null;
+    if (source && source.type === 'xtream' && streamId) {
+        if (!apiMap.has(sourceId)) apiMap.set(sourceId, xtreamApi.createFromSource(source));
+        try {
+            const api = apiMap.get(sourceId);
+            const details = await Promise.race([
+                isSeries ? api.getSeriesInfo(streamId) : api.getVodInfo(streamId),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500))
+            ]);
+            let candidate = details?.info?.backdrop_path ?? details?.info?.backdrop ?? details?.movie_data?.backdrop_path ?? details?.series_info?.backdrop_path;
+            if (Array.isArray(candidate) && candidate.length > 0) candidate = candidate[0];
+            if (typeof candidate === 'string' && candidate.trim()) {
+                candidate = candidate.trim();
+                if (candidate.startsWith('/')) candidate = `https://image.tmdb.org/t/p/w780${candidate}`;
+                backdrop = candidate;
+            }
+        } catch (_) {}
+    }
+
+    if (!backdrop && entry.name) {
+        try {
+            backdrop = await fetchTmdbBackdrop(entry.name, isSeries);
+        } catch (_) {}
+    }
+
+    if (backdrop) {
+        if (key && key !== ':') backdropCache[key] = backdrop;
+        if (titleKey) backdropCache[titleKey] = backdrop;
+    }
+    return backdrop;
+}
+
+async function enrichHomeCacheBackdrops(payload) {
+    const horizontalSections = (payload.sections || []).filter(section =>
+        section?.card_orientation === 'horizontal' && (section.content_type === 'movies' || section.content_type === 'series')
+    );
+    if (!horizontalSections.length) return payload;
+
+    let backdropCache = {};
+    try { backdropCache = JSON.parse(fs.readFileSync(vodBackdropCachePath, 'utf8')) || {}; } catch (_) {}
+    let sourceRows = [];
+    try { sourceRows = await sources.getAll(); } catch (_) {}
+    const sourceMap = new Map(sourceRows.map(source => [String(source.id), source]));
+    const apiMap = new Map();
+    let changed = false;
+
+    const entries = horizontalSections.flatMap(section => Array.isArray(section.entries) ? section.entries : []);
+    let cursor = 0;
+
+    async function worker() {
+        while (cursor < entries.length) {
+            const entry = entries[cursor++];
+            if (!entry) continue;
+            const key = `${entry.sourceId || ''}:${entry.streamId || ''}`;
+            const titleKey = normalizedPosterTitle(entry.name);
+            let backdrop = backdropCache[key] || backdropCache[titleKey] || '';
+            if (!backdrop) {
+                backdrop = await resolveBackdropForEntry(entry, sourceMap, apiMap, backdropCache);
+            }
+            if (backdrop) {
+                entry.thumbUrl = backdrop;
+                entry.backdropUrl = backdrop;
+                changed = true;
+            }
+        }
+    }
+    await Promise.all(Array.from({ length: Math.min(16, entries.length || 1) }, worker));
+    if (changed) {
+        try { fs.writeFileSync(vodBackdropCachePath, JSON.stringify(backdropCache, null, 2)); } catch (_) {}
+    }
+    return payload;
+}
 const COUNTRY_PACKAGE_TABLES = new Set([
     'admin_countries',
     'canonical_countries',
@@ -1335,6 +1463,9 @@ function buildHomeCache() {
         movies: veloraCatalogCache.getSnapshot('vod_streams') || [],
         series: veloraCatalogCache.getSnapshot('series') || []
     };
+    let backdropCache = {};
+    try { backdropCache = JSON.parse(fs.readFileSync(vodBackdropCachePath, 'utf8')) || {}; } catch (_) {}
+
     const output = sections.map(section => {
         const type = ['live', 'movies', 'series'].includes(section.content_type)
             ? section.content_type : 'live';
@@ -1344,7 +1475,8 @@ function buildHomeCache() {
         const providerKind = String(packageRow.kind ?? '').trim();
         const expectedKind = type === 'movies' ? 'vod' : type;
         const membership = packageStreams.get(String(section.package_id)) || { keys: new Set(), sourceAware: false };
-        const providerBacked = providerSourceId && providerCategoryId && providerKind === expectedKind;
+        const orientation = String(section.card_orientation || 'vertical').toLowerCase() === 'horizontal' ? 'horizontal' : 'vertical';
+        const isHorizontal = orientation === 'horizontal';
         const entries = snapshots[type].filter(item => {
             const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
             const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
@@ -1365,10 +1497,28 @@ function buildHomeCache() {
             const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
             const rawName = String(item.name || item.title || item.series_name || '').trim();
             if (type === 'live' && isHomeChannelHidden(rawName, channelRules.hiddenFilters)) return null;
+            const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
+            const key = `${sourceId}:${String(rawId)}`;
+            const titleKey = normalizedPosterTitle(rawName);
+
+            let backdropCandidate = item.backdrop_path ?? item.backdrop ?? item.backdrop_url ?? '';
+            if (Array.isArray(backdropCandidate) && backdropCandidate.length > 0) backdropCandidate = backdropCandidate[0];
+            let backdropUrl = '';
+            if (typeof backdropCandidate === 'string' && backdropCandidate.trim()) {
+                let url = backdropCandidate.trim();
+                if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w1280${url}`;
+                backdropUrl = url;
+            }
+            if (!backdropUrl && isHorizontal) {
+                backdropUrl = backdropCache[key] || backdropCache[titleKey] || '';
+            }
+            const standardThumb = String(item.stream_icon || item.cover || '');
+            const finalThumb = (isHorizontal && backdropUrl) ? backdropUrl : (standardThumb || backdropUrl);
             return {
                 id: `home-cache:${section.id}:${rawId}`,
                 name: type === 'live' ? stripHomeChannelPrefixes(rawName, channelRules.prefixes) : rawName,
-                thumbUrl: String(item.stream_icon || item.cover || ''),
+                thumbUrl: finalThumb,
+                backdropUrl: backdropUrl || (isHorizontal ? '' : standardThumb),
                 streamId: rawId,
                 sourceId: item.source_id,
                 globalStreamId: item.global_stream_id || item.stream_id,
@@ -1377,7 +1527,7 @@ function buildHomeCache() {
                 packageId: section.package_id
             };
         }).filter(item => item?.name).slice(0, HOME_CACHE_ENTRIES_PER_PACKAGE);
-        return { ...section, content_type: type, entries };
+        return { ...section, content_type: type, card_orientation: orientation, entries };
     });
     const payload = { generatedAt: new Date().toISOString(), sections: output };
     writeJsonAtomic(homeCachePath, payload);
@@ -1418,13 +1568,64 @@ router.get('/home-cache', (req, res) => {
     }
 });
 
+router.get('/media-backdrop', async (req, res) => {
+    try {
+        const name = String(req.query.name || '').trim();
+        const type = String(req.query.type || 'movies').trim();
+        const streamId = String(req.query.stream_id || '').trim();
+        const sourceId = String(req.query.source_id || '').trim();
+        if (!name && !streamId) return res.status(400).json({ error: 'name or stream_id required' });
+
+        let backdropCache = {};
+        try { backdropCache = JSON.parse(fs.readFileSync(vodBackdropCachePath, 'utf8')) || {}; } catch (_) {}
+        const key = `${sourceId}:${streamId}`;
+        const titleKey = normalizedPosterTitle(name);
+        if (backdropCache[key]) return res.json({ ok: true, backdropUrl: backdropCache[key] });
+        if (backdropCache[titleKey]) return res.json({ ok: true, backdropUrl: backdropCache[titleKey] });
+
+        let sourceRows = [];
+        try { sourceRows = await sources.getAll(); } catch (_) {}
+        const sourceMap = new Map(sourceRows.map(source => [String(source.id), source]));
+        const apiMap = new Map();
+
+        const entry = { name, contentType: type, streamId, sourceId };
+        const backdrop = await resolveBackdropForEntry(entry, sourceMap, apiMap, backdropCache);
+        if (backdrop) {
+            try { fs.writeFileSync(vodBackdropCachePath, JSON.stringify(backdropCache, null, 2)); } catch (_) {}
+            return res.json({ ok: true, backdropUrl: backdrop });
+        }
+        return res.json({ ok: false, backdropUrl: '' });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 router.post('/home-cache/rebuild', async (req, res) => {
     try {
-        // Never trust browser-computed section entries here. Rebuild from the
-        // server-side effective memberships so each Home section contains only
-        // content that currently belongs to its configured country/package.
+        if (Array.isArray(req.body?.sections)) {
+            let backdropCache = {};
+            try { backdropCache = JSON.parse(fs.readFileSync(vodBackdropCachePath, 'utf8')) || {}; } catch (_) {}
+            let changed = false;
+            for (const sec of req.body.sections) {
+                if (sec?.card_orientation === 'horizontal' && Array.isArray(sec.entries)) {
+                    for (const entry of sec.entries) {
+                        const b = String(entry.backdropUrl || (entry.thumbUrl && entry.thumbUrl.includes('/w1280') ? entry.thumbUrl : '')).trim();
+                        if (b) {
+                            const key = `${entry.sourceId || ''}:${entry.streamId || ''}`;
+                            const titleKey = normalizedPosterTitle(entry.name);
+                            if (key && key !== ':') { backdropCache[key] = b; changed = true; }
+                            if (titleKey) { backdropCache[titleKey] = b; changed = true; }
+                        }
+                    }
+                }
+            }
+            if (changed) {
+                try { fs.writeFileSync(vodBackdropCachePath, JSON.stringify(backdropCache, null, 2)); } catch (_) {}
+            }
+        }
         const payload = buildHomeCache();
         await enrichHomeCacheMoviePosters(payload);
+        await enrichHomeCacheBackdrops(payload);
         writeJsonAtomic(homeCachePath, payload);
         return res.json({ ok: true, generatedAt: payload.generatedAt, sections: payload.sections.length,
             entries: payload.sections.reduce((total, section) => total + section.entries.length, 0) });

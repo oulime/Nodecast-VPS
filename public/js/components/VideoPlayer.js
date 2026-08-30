@@ -840,7 +840,7 @@ class VideoPlayer {
             console.log('[Player] Stopping transcode session:', this.currentSessionId);
             try {
                 // Fire and forget cleanup
-                fetch(`/api/transcode/${this.currentSessionId}`, { method: 'DELETE' });
+                fetch(`/api/transcode/${this.currentSessionId}`, { method: 'DELETE', keepalive: true });
             } catch (err) {
                 console.error('Failed to stop session:', err);
             }

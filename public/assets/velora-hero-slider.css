@@ -309,8 +309,9 @@
 
 @media (max-width: 600px) {
   .vel-hero-dots {
-    right: 50%;
-    transform: translateX(50%);
+    right: 1rem;
+    left: auto;
+    transform: none;
     bottom: 0.75rem;
     padding: 0.3rem 0.6rem;
     gap: 0.4rem;

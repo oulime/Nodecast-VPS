@@ -9,17 +9,25 @@
 
   function stopAllMedia() {
     try {
+      if (typeof window.veloraStopAllPlayback === "function") {
+        try { window.veloraStopAllPlayback(); } catch (_) {}
+      }
       document.querySelectorAll("video, audio").forEach(function (media) {
         try {
           media.pause();
           media.muted = true;
           if (media.hls && typeof media.hls.destroy === "function") {
             try { media.hls.destroy(); } catch (_) {}
+            media.hls = null;
           }
           media.removeAttribute("src");
           media.load();
         } catch (_) {}
       });
+      if (window.hls && typeof window.hls.destroy === "function") {
+        try { window.hls.destroy(); } catch (_) {}
+        window.hls = null;
+      }
     } catch (_) {}
   }
 

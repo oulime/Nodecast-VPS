@@ -377,7 +377,7 @@ class WatchPage {
         if (this.currentSessionId) {
             console.log('[WatchPage] Stopping transcode session:', this.currentSessionId);
             try {
-                await fetch(`/api/transcode/${this.currentSessionId}`, { method: 'DELETE' });
+                await fetch(`/api/transcode/${this.currentSessionId}`, { method: 'DELETE', keepalive: true });
             } catch (err) {
                 console.error('Failed to stop session:', err);
             }
@@ -1608,8 +1608,8 @@ class WatchPage {
     }
 
     hide() {
-        // Called when page becomes hidden
-        // Don't stop playback here - allow background playback
+        // Called when page becomes hidden - stop playback and cleanup transcode session
+        this.stop();
         this.cancelNextEpisode();
     }
     // ============================================================

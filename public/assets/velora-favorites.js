@@ -669,6 +669,10 @@
   }
 
   function closeActivePlayers() {
+    if (typeof window.veloraStopAllPlayback === "function") {
+      try { window.veloraStopAllPlayback(); } catch (_) {}
+    }
+
     document.querySelectorAll("video, audio").forEach(function (v) {
       try {
         v.pause();
@@ -676,6 +680,7 @@
         v.currentTime = 0;
         if (v.hls && typeof v.hls.destroy === "function") {
           try { v.hls.destroy(); } catch (_) {}
+          v.hls = null;
         }
         v.removeAttribute("src");
         v.load();
@@ -684,6 +689,7 @@
 
     if (window.hls && typeof window.hls.destroy === "function") {
       try { window.hls.destroy(); } catch (_) {}
+      window.hls = null;
     }
 
     try {

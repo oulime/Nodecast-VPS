@@ -71,25 +71,20 @@ body[data-vel-active-tab="live"]
   background: linear-gradient(180deg, transparent, rgba(4, 3, 12, 0.9)) !important;
 }
 
-.vel-media-package-picker {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  align-self: center;
-  width: 100%;
-  height: 2.5rem !important;
-  min-height: 2.5rem !important;
-  max-height: 2.5rem !important;
-  max-width: 34rem;
-  margin: 0 !important;
-  padding: 0 !important;
-  box-sizing: border-box !important;
-  line-height: normal;
-}
-
-.vel-media-package-picker[hidden] {
-  display: none;
+.vel-media-package-picker,
+#vel-media-package-picker,
+.vel-media-package-picker__trigger,
+#vel-media-package-trigger,
+.vel-media-package-picker__menu,
+#vel-media-package-menu {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  position: absolute !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
 }
 
 .vel-header-context-title--package-picker > #vel-header-context-title-text,

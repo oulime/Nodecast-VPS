@@ -460,21 +460,17 @@
       '<span class="vel-media-package-picker__menu-title">Choisir une catégorie</span>',
       "</div>"
     ].join("");
+    picker.hidden = true;
+    picker.style.setProperty("display", "none", "important");
     headerContext.appendChild(picker);
 
     const trigger = picker.querySelector("#vel-media-package-trigger");
     const menu = picker.querySelector("#vel-media-package-menu");
 
     trigger.addEventListener("click", () => {
-      const open = menu.hidden;
-      menu.hidden = !open;
-      trigger.setAttribute("aria-expanded", String(open));
-      picker.classList.toggle("is-open", open);
-      document.body.classList.toggle("vel-media-package-menu-open", open);
-      if (open) {
-        window.requestAnimationFrame(() => {
-          menu.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
-        });
+      if (window._pkgHubBridge && typeof window._pkgHubBridge.open === "function") {
+        window._pkgHubBridge.open();
+        return;
       }
     });
 
@@ -567,6 +563,9 @@
     if (kickerEl) kickerEl.textContent = "Genre :";
     if (nameEl) nameEl.textContent = selectedName;
     trigger.setAttribute("aria-label", `Genre : ${selectedName}`);
+    if (window._pkgHubBridge && typeof window._pkgHubBridge.updateTitleText === "function") {
+      window._pkgHubBridge.updateTitleText(selectedName);
+    }
     menu.querySelectorAll("[data-package-id]").forEach(option => {
       const active = option.dataset.packageId === selectedPackage.id;
       option.classList.toggle("is-selected", active);

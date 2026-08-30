@@ -743,7 +743,8 @@
             thumbUrl: c.match.thumbUrl || item.thumbUrl || "",
             containerExtension: c.match.containerExtension || "",
             contentType: c.match.contentType || category,
-            isFallback: c.isFallback
+            isFallback: c.isFallback,
+            tmdbId: item.tmdbId || ""
           };
         }
       });
@@ -755,6 +756,7 @@
         image: item.thumbUrl || scanData.usaFallback?.thumbUrl || "",
         backdrop: item.thumbUrl || scanData.usaFallback?.thumbUrl || "",
         query: item.cleanTitle,
+        tmdb_id: item.tmdbId || "",
         country_mappings: countryMappings
       };
 
@@ -791,7 +793,8 @@
           thumbUrl: streamToAssign.thumbUrl || item.thumbUrl || "",
           containerExtension: streamToAssign.containerExtension || "",
           contentType: streamToAssign.contentType || category,
-          isFallback: !countryMatch?.found
+          isFallback: !countryMatch?.found,
+          tmdbId: item.tmdbId || ""
         };
       }
 
@@ -802,6 +805,7 @@
         badge: category === "series" ? "Série" : "Cinéma",
         image: streamToAssign?.thumbUrl || item.thumbUrl || "",
         backdrop: streamToAssign?.thumbUrl || item.thumbUrl || "",
+        tmdb_id: item.tmdbId || "",
         sort_order: state.items.length + 1,
         published: true,
         country_mappings: countryMappings

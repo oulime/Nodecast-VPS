@@ -1667,12 +1667,10 @@ function extractYear(text) {
 
 function cleanItemName(text) {
     return String(text || '')
-        .replace(/^([A-Za-z0-9+_.-]+)\s*[-:|]\s*/i, '')
-        .replace(/^([A-Za-z0-9+_.-]+)\s*[-:|]\s*/i, '')
+        .replace(/^(4K-?|UHD-?|FHD-?|HD-?)?([A-Za-z0-9]{1,6}(?:-[A-Za-z0-9]{1,6})?)\s*[-:|]\s*/i, '')
         .replace(/\[[^\]]+\]/g, '')
         .replace(/\b(4K|UHD|FHD|HD|HEVC|H265|1080p|720p|CAM|TS|DVD|BLURAY|TELESYNC|VOSTFR|VF|MULTI)\b/gi, '')
         .replace(/\(\d{4}\)/g, '')
-        .replace(/[-:|]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
 }
@@ -1747,24 +1745,47 @@ router.get('/hero-slider', (req, res) => {
 
 router.get('/hero-slider/search-catalog', (req, res) => {
     try {
-        const query = String(req.query.q || '').trim();
+        const rawQuery = String(req.query.q || '').trim();
         const typeFilter = String(req.query.type || '').trim().toLowerCase();
-        if (!query) return res.json([]);
+        if (!rawQuery) return res.json([]);
+
+        const normalized = String(rawQuery)
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        let tokens = normalized.split(/\s+/).filter(Boolean);
+        if (!tokens.length) tokens = [rawQuery.toLowerCase()];
 
         const db = getDb();
         let typeClause = '';
-        const params = [`%${query}%`];
         if (typeFilter === 'movie' || typeFilter === 'vod') {
             typeClause = ' AND p.type = "movie"';
         } else if (typeFilter === 'series') {
             typeClause = ' AND p.type = "series"';
         }
 
+        const tokenClauses = [];
+        const params = [];
+
+        tokens.forEach(t => {
+            if (t === 'spiderman') {
+                tokenClauses.push(`(p.name LIKE ? OR (p.name LIKE ? AND p.name LIKE ?))`);
+                params.push(`%spiderman%`, `%spider%`, `%man%`);
+            } else {
+                tokenClauses.push(`p.name LIKE ?`);
+                params.push(`%${t}%`);
+            }
+        });
+
         const rows = db.prepare(`
-            SELECT p.source_id, p.item_id, p.type, p.name, p.stream_icon, p.container_extension, p.rating, p.year, c.name as cat_name
+            SELECT p.source_id, p.item_id, p.type, p.name, p.stream_icon, p.container_extension, p.rating, p.year, p.data, c.name as cat_name
             FROM playlist_items p
             LEFT JOIN categories c ON p.source_id = c.source_id AND p.category_id = c.category_id
-            WHERE p.name LIKE ? AND p.is_hidden = 0${typeClause}
+            WHERE (${tokenClauses.join(' AND ')}) AND p.is_hidden = 0${typeClause}
             LIMIT 150
         `).all(...params);
 
@@ -1772,9 +1793,17 @@ router.get('/hero-slider/search-catalog', (req, res) => {
         const seen = new Set();
 
         for (const r of rows) {
+            let tmdbId = '';
+            try {
+                if (r.data) {
+                    const parsed = JSON.parse(r.data);
+                    tmdbId = String(parsed.tmdb || parsed.tmdb_id || parsed.tmdbId || '').trim();
+                }
+            } catch (_) {}
+
             const year = r.year || extractYear(r.name) || extractYear(r.cat_name) || '';
             const clean = cleanItemName(r.name);
-            const key = `${clean.toLowerCase()}::${year}::${r.type}`;
+            const key = tmdbId ? `tmdb:${tmdbId}` : `${clean.toLowerCase()}::${year}::${r.type}`;
             if (!seen.has(key)) {
                 seen.add(key);
                 candidates.push({
@@ -1783,6 +1812,7 @@ router.get('/hero-slider/search-catalog', (req, res) => {
                     name: r.name,
                     cleanTitle: clean || r.name,
                     year: year,
+                    tmdbId: tmdbId,
                     type: r.type === 'movie' ? 'vod' : r.type,
                     thumbUrl: r.stream_icon || '',
                     containerExtension: r.container_extension || '',
@@ -1809,35 +1839,50 @@ router.get('/hero-slider/search-catalog', (req, res) => {
 router.post('/hero-slider/smart-match-countries', (req, res) => {
     try {
         const { selectedItem } = req.body || {};
-        if (!selectedItem || !selectedItem.cleanTitle) {
-            return res.status(400).json({ error: 'selectedItem with cleanTitle is required' });
+        if (!selectedItem || (!selectedItem.cleanTitle && !selectedItem.tmdbId)) {
+            return res.status(400).json({ error: 'selectedItem with cleanTitle or tmdbId is required' });
         }
 
         const db = getDb();
         const allCountries = allRows('admin_countries').sort((a, b) => String(a.name).localeCompare(String(b.name), 'fr'));
-        const cleanTitle = selectedItem.cleanTitle.trim();
+        const cleanTitle = (selectedItem.cleanTitle || selectedItem.name || '').trim();
+        const tmdbId = String(selectedItem.tmdbId || '').trim();
         const year = String(selectedItem.year || '').trim();
         const type = selectedItem.type === 'series' ? 'series' : 'movie';
 
-        const rows = db.prepare(`
-            SELECT p.source_id, p.item_id, p.type, p.name, p.stream_icon, p.container_extension, p.rating, p.year, c.name as cat_name
-            FROM playlist_items p
-            LEFT JOIN categories c ON p.source_id = c.source_id AND p.category_id = c.category_id
-            WHERE p.name LIKE ? AND p.type = ? AND p.is_hidden = 0
-            LIMIT 250
-        `).all(`%${cleanTitle}%`, type);
+        let rows = [];
+        if (tmdbId) {
+            // Precision TMDB ID search across ALL countries and all source catalogs!
+            rows = db.prepare(`
+                SELECT p.source_id, p.item_id, p.type, p.name, p.stream_icon, p.container_extension, p.rating, p.year, p.data, c.name as cat_name
+                FROM playlist_items p
+                LEFT JOIN categories c ON p.source_id = c.source_id AND p.category_id = c.category_id
+                WHERE (p.data LIKE ? OR p.data LIKE ?) AND p.is_hidden = 0
+                LIMIT 250
+            `).all(`%"tmdb":${tmdbId}%`, `%"tmdb":"${tmdbId}"%`);
+        }
 
-        // Filter rows by year if year was provided to guarantee exact match
-        const exactMatches = rows.filter(r => {
-            if (!year) return true;
-            const rYear = r.year || extractYear(r.name) || extractYear(r.cat_name);
-            return !rYear || rYear === year;
-        });
+        if (!rows.length && cleanTitle) {
+            // Fallback to strict clean title search
+            const nameRows = db.prepare(`
+                SELECT p.source_id, p.item_id, p.type, p.name, p.stream_icon, p.container_extension, p.rating, p.year, p.data, c.name as cat_name
+                FROM playlist_items p
+                LEFT JOIN categories c ON p.source_id = c.source_id AND p.category_id = c.category_id
+                WHERE p.name LIKE ? AND p.type = ? AND p.is_hidden = 0
+                LIMIT 250
+            `).all(`%${cleanTitle}%`, type);
 
-        const pool = exactMatches.length ? exactMatches : rows;
+            rows = nameRows.filter(r => {
+                if (!year) return true;
+                const rYear = r.year || extractYear(r.name) || extractYear(r.cat_name);
+                return !rYear || rYear === year;
+            });
+            if (!rows.length) rows = nameRows;
+        }
+
         const matchesByCountry = new Map();
 
-        for (const row of pool) {
+        for (const row of rows) {
             const detected = matchItemToCountry(row.cat_name, row.name);
             const streamObj = {
                 streamId: row.item_id,
@@ -1867,7 +1912,8 @@ router.post('/hero-slider/smart-match-countries', (req, res) => {
             containerExtension: selectedItem.containerExtension || '',
             contentType: type === 'series' ? 'series' : 'vod',
             rating: selectedItem.rating || '',
-            year: year
+            year: year,
+            tmdbId: tmdbId
         };
 
         const countryAvailability = allCountries.map(c => {

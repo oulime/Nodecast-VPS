@@ -1459,11 +1459,34 @@ function matchItemToCountry(catName, itemName) {
     return null;
 }
 
+function extractYear(text) {
+    const m = /\b(19\d{2}|20\d{2})\b/.exec(text);
+    return m ? m[1] : '';
+}
+
+function cleanItemName(text) {
+    return String(text || '')
+        .replace(/^([A-Za-z0-9+_.-]+)\s*[-:|]\s*/i, '')
+        .replace(/^([A-Za-z0-9+_.-]+)\s*[-:|]\s*/i, '')
+        .replace(/\[[^\]]+\]/g, '')
+        .replace(/\b(4K|UHD|FHD|HD|HEVC|H265|1080p|720p|CAM|TS|DVD|BLURAY|TELESYNC|VOSTFR|VF|MULTI)\b/gi, '')
+        .replace(/\(\d{4}\)/g, '')
+        .replace(/[-:|]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
 router.get('/hero-slider', (req, res) => {
     try {
         const countryId = String(req.query.country_id || '').trim();
         const rows = allRows('admin_hero_slider')
             .filter(row => row.published !== false && row.published !== 'false')
+            .filter(row => {
+                if (!countryId || countryId === 'default' || countryId === 'all') return true;
+                if (Array.isArray(row.excluded_countries) && row.excluded_countries.includes(countryId)) return false;
+                if (row.country_mappings && row.country_mappings[countryId] && row.country_mappings[countryId].hidden) return false;
+                return true;
+            })
             .sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
         
         const results = rows.map(item => {
@@ -1501,6 +1524,7 @@ router.get('/hero-slider', (req, res) => {
                 is_fallback: isFallback,
                 resolved_country_id: resolvedCountryId,
                 country_mappings: mappings,
+                excluded_countries: item.excluded_countries || [],
                 stream: selectedStream ? {
                     streamId: selectedStream.streamId || selectedStream.stream_id,
                     sourceId: selectedStream.sourceId || selectedStream.source_id,
@@ -1515,6 +1539,182 @@ router.get('/hero-slider', (req, res) => {
         });
 
         return res.json(results);
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+router.get('/hero-slider/search-catalog', (req, res) => {
+    try {
+        const query = String(req.query.q || '').trim();
+        const typeFilter = String(req.query.type || '').trim().toLowerCase();
+        if (!query) return res.json([]);
+
+        const db = getDb();
+        let typeClause = '';
+        const params = [`%${query}%`];
+        if (typeFilter === 'movie' || typeFilter === 'vod') {
+            typeClause = ' AND p.type = "movie"';
+        } else if (typeFilter === 'series') {
+            typeClause = ' AND p.type = "series"';
+        }
+
+        const rows = db.prepare(`
+            SELECT p.source_id, p.item_id, p.type, p.name, p.stream_icon, p.container_extension, p.rating, p.year, c.name as cat_name
+            FROM playlist_items p
+            LEFT JOIN categories c ON p.source_id = c.source_id AND p.category_id = c.category_id
+            WHERE p.name LIKE ? AND p.is_hidden = 0${typeClause}
+            LIMIT 150
+        `).all(...params);
+
+        const candidates = [];
+        const seen = new Set();
+
+        for (const r of rows) {
+            const year = r.year || extractYear(r.name) || extractYear(r.cat_name) || '';
+            const clean = cleanItemName(r.name);
+            const key = `${clean.toLowerCase()}::${year}::${r.type}`;
+            if (!seen.has(key)) {
+                seen.add(key);
+                candidates.push({
+                    streamId: r.item_id,
+                    sourceId: r.source_id,
+                    name: r.name,
+                    cleanTitle: clean || r.name,
+                    year: year,
+                    type: r.type === 'movie' ? 'vod' : r.type,
+                    thumbUrl: r.stream_icon || '',
+                    containerExtension: r.container_extension || '',
+                    categoryName: r.cat_name || '',
+                    rating: r.rating || ''
+                });
+            }
+        }
+
+        // Sort candidates: newer years first
+        candidates.sort((a, b) => {
+            const yearA = parseInt(a.year, 10) || 0;
+            const yearB = parseInt(b.year, 10) || 0;
+            if (yearB !== yearA) return yearB - yearA;
+            return a.cleanTitle.localeCompare(b.cleanTitle);
+        });
+
+        return res.json(candidates.slice(0, 30));
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/hero-slider/smart-match-countries', (req, res) => {
+    try {
+        const { selectedItem } = req.body || {};
+        if (!selectedItem || !selectedItem.cleanTitle) {
+            return res.status(400).json({ error: 'selectedItem with cleanTitle is required' });
+        }
+
+        const db = getDb();
+        const allCountries = allRows('admin_countries').sort((a, b) => String(a.name).localeCompare(String(b.name), 'fr'));
+        const cleanTitle = selectedItem.cleanTitle.trim();
+        const year = String(selectedItem.year || '').trim();
+        const type = selectedItem.type === 'series' ? 'series' : 'movie';
+
+        const rows = db.prepare(`
+            SELECT p.source_id, p.item_id, p.type, p.name, p.stream_icon, p.container_extension, p.rating, p.year, c.name as cat_name
+            FROM playlist_items p
+            LEFT JOIN categories c ON p.source_id = c.source_id AND p.category_id = c.category_id
+            WHERE p.name LIKE ? AND p.type = ? AND p.is_hidden = 0
+            LIMIT 250
+        `).all(`%${cleanTitle}%`, type);
+
+        // Filter rows by year if year was provided to guarantee exact match
+        const exactMatches = rows.filter(r => {
+            if (!year) return true;
+            const rYear = r.year || extractYear(r.name) || extractYear(r.cat_name);
+            return !rYear || rYear === year;
+        });
+
+        const pool = exactMatches.length ? exactMatches : rows;
+        const matchesByCountry = new Map();
+
+        for (const row of pool) {
+            const detected = matchItemToCountry(row.cat_name, row.name);
+            const streamObj = {
+                streamId: row.item_id,
+                sourceId: row.source_id,
+                globalStreamId: row.item_id,
+                name: row.name,
+                thumbUrl: row.stream_icon || selectedItem.thumbUrl || '',
+                containerExtension: row.container_extension || '',
+                contentType: row.type === 'movie' ? 'vod' : row.type,
+                rating: row.rating || selectedItem.rating || '',
+                year: row.year || year,
+                categoryName: row.cat_name || ''
+            };
+
+            if (detected) {
+                if (!matchesByCountry.has(detected.id)) matchesByCountry.set(detected.id, streamObj);
+                if (detected.altId && !matchesByCountry.has(detected.altId)) matchesByCountry.set(detected.altId, streamObj);
+            }
+        }
+
+        const usaFallback = {
+            streamId: selectedItem.streamId,
+            sourceId: selectedItem.sourceId,
+            globalStreamId: selectedItem.streamId,
+            name: selectedItem.name,
+            thumbUrl: selectedItem.thumbUrl || '',
+            containerExtension: selectedItem.containerExtension || '',
+            contentType: type === 'series' ? 'series' : 'vod',
+            rating: selectedItem.rating || '',
+            year: year
+        };
+
+        const countryAvailability = allCountries.map(c => {
+            const match = matchesByCountry.get(c.id) || null;
+            return {
+                countryId: c.id,
+                countryName: c.name,
+                found: !!match,
+                match: match || usaFallback,
+                isFallback: !match
+            };
+        });
+
+        return res.json({
+            selectedItem,
+            usaFallback,
+            countries: countryAvailability
+        });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+router.delete('/hero-slider/country-override', (req, res) => {
+    try {
+        const id = String(req.query.id || '').trim();
+        const countryId = String(req.query.country_id || '').trim();
+        if (!id || !countryId) return res.status(400).json({ error: 'id and country_id are required' });
+
+        const rows = allRows('admin_hero_slider');
+        const item = rows.find(r => r.id === id);
+        if (!item) return res.status(404).json({ error: 'Item not found' });
+
+        const excluded = Array.isArray(item.excluded_countries) ? item.excluded_countries.slice() : [];
+        if (!excluded.includes(countryId)) excluded.push(countryId);
+
+        const mappings = Object.assign({}, item.country_mappings || {});
+        if (mappings[countryId]) {
+            mappings[countryId] = Object.assign({}, mappings[countryId], { hidden: true });
+        }
+
+        const updated = Object.assign({}, item, {
+            excluded_countries: excluded,
+            country_mappings: mappings
+        });
+
+        saveRow('admin_hero_slider', updated, req);
+        return res.json({ ok: true, item: updated });
     } catch (error) {
         return res.status(500).json({ error: error.message });
     }

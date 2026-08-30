@@ -6,6 +6,9 @@
     countries: [],
     editingItemId: null,
     editingCountryId: "all",
+    listFilterCountryId: "all",
+    candidates: [],
+    selectedCandidate: null,
     scanResult: null
   };
 
@@ -50,6 +53,7 @@
   function populateCountryDropdowns() {
     var formCountry = document.getElementById("slider-form-country");
     var scanCountry = document.getElementById("slider-scan-target-country");
+    var filterCountry = document.getElementById("slider-admin-filter-country");
 
     if (formCountry) {
       var curVal = formCountry.value || "all";
@@ -74,6 +78,18 @@
       });
       if (curScanVal) scanCountry.value = curScanVal;
     }
+
+    if (filterCountry) {
+      var curFilterVal = filterCountry.value || "all";
+      filterCountry.innerHTML = '<option value="all">🌍 Tous les pays (Global)</option>';
+      state.countries.forEach(function(c) {
+        var opt = document.createElement("option");
+        opt.value = c.id;
+        opt.textContent = c.name;
+        filterCountry.appendChild(opt);
+      });
+      if (curFilterVal) filterCountry.value = curFilterVal;
+    }
   }
 
   async function loadSliderItems() {
@@ -92,12 +108,23 @@
     if (!list) return;
     list.innerHTML = "";
 
-    if (!state.items.length) {
-      list.innerHTML = '<div class="vel-home-sections-admin-empty">Aucun élément dans le Hero Slider. Ajoutez-en un ci-dessus ou via le scanner.</div>';
+    var selectedFilter = state.listFilterCountryId || "all";
+    var filteredItems = state.items.filter(function(item) {
+      if (selectedFilter === "all") return true;
+      if (Array.isArray(item.excluded_countries) && item.excluded_countries.includes(selectedFilter)) return false;
+      if (item.country_mappings && item.country_mappings[selectedFilter] && item.country_mappings[selectedFilter].hidden) return false;
+      return true;
+    });
+
+    if (!filteredItems.length) {
+      var emptyMsg = selectedFilter === "all" ? 
+        "Aucun élément dans le Hero Slider. Ajoutez-en un ci-dessus ou via la recherche." :
+        "Aucun élément n'est actuellement visible pour ce pays.";
+      list.innerHTML = '<div class="vel-home-sections-admin-empty">' + emptyMsg + '</div>';
       return;
     }
 
-    state.items.forEach(function(item, index) {
+    filteredItems.forEach(function(item, index) {
       var row = document.createElement("div");
       row.className = "vel-slider-admin-row" + (item.published === false ? " is-unpublished" : "") + (state.editingItemId === item.id ? " is-editing" : "");
 
@@ -109,9 +136,14 @@
       var meta = document.createElement("div");
       meta.className = "vel-slider-row-meta";
 
+      var displayTitle = item.title;
+      if (selectedFilter !== "all" && item.country_mappings && item.country_mappings[selectedFilter] && item.country_mappings[selectedFilter].name) {
+        displayTitle = item.country_mappings[selectedFilter].name;
+      }
+
       var title = document.createElement("div");
       title.className = "vel-slider-row-title";
-      title.textContent = (index + 1) + ". " + item.title;
+      title.textContent = (index + 1) + ". " + displayTitle;
 
       var sub = document.createElement("div");
       sub.className = "vel-slider-row-sub";
@@ -123,13 +155,21 @@
       var typeSpan = document.createElement("span");
       typeSpan.textContent = "Type: " + (item.category || "movie");
 
-      var mappingCount = item.country_mappings ? Object.keys(item.country_mappings).length : 0;
-      var countSpan = document.createElement("span");
-      countSpan.textContent = mappingCount ? (mappingCount + " pays configurés") : "Global";
-
       sub.appendChild(badgeSpan);
       sub.appendChild(typeSpan);
-      sub.appendChild(countSpan);
+
+      if (selectedFilter === "all") {
+        var mappingCount = item.country_mappings ? Object.keys(item.country_mappings).length : 0;
+        var countSpan = document.createElement("span");
+        countSpan.textContent = mappingCount ? (mappingCount + " pays configurés") : "Global";
+        sub.appendChild(countSpan);
+      } else {
+        var cMapping = item.country_mappings && item.country_mappings[selectedFilter];
+        var statusSpan = document.createElement("span");
+        statusSpan.className = "vel-slider-tag " + (cMapping && !cMapping.isFallback ? "vel-slider-tag--found" : "vel-slider-tag--fallback");
+        statusSpan.textContent = cMapping && !cMapping.isFallback ? "Version locale" : "Fallback US";
+        sub.appendChild(statusSpan);
+      }
 
       meta.appendChild(title);
       meta.appendChild(sub);
@@ -141,9 +181,9 @@
       var editBtn = document.createElement("button");
       editBtn.type = "button";
       editBtn.className = "countries-admin-cancel";
-      editBtn.textContent = "Modifier / Pays";
+      editBtn.textContent = selectedFilter === "all" ? "Modifier / Pays" : "Modifier";
       editBtn.addEventListener("click", function() {
-        startEditItem(item);
+        startEditItem(item, selectedFilter);
       });
 
       // Move Up
@@ -163,55 +203,85 @@
       downBtn.className = "countries-admin-cancel";
       downBtn.textContent = "↓";
       downBtn.title = "Descendre";
-      downBtn.disabled = index === state.items.length - 1;
+      downBtn.disabled = index === filteredItems.length - 1;
       downBtn.addEventListener("click", function() {
         moveItem(index, 1);
       });
 
-      // Toggle Publish
-      var pubBtn = document.createElement("button");
-      pubBtn.type = "button";
-      pubBtn.className = "countries-admin-cancel";
-      pubBtn.textContent = item.published !== false ? "Masquer" : "Publier";
-      pubBtn.addEventListener("click", async function() {
-        try {
-          await apiReq("/rest/v1/admin_hero_slider?id=eq." + encodeURIComponent(item.id), {
-            method: "PATCH",
-            body: JSON.stringify({ published: item.published === false })
-          });
-          await loadSliderItems();
-          notifySliderUpdate();
-        } catch(e) {
-          setStatus("Erreur: " + e.message, true);
-        }
-      });
+      if (selectedFilter === "all") {
+        // Toggle Publish
+        var pubBtn = document.createElement("button");
+        pubBtn.type = "button";
+        pubBtn.className = "countries-admin-cancel";
+        pubBtn.textContent = item.published !== false ? "Masquer" : "Publier";
+        pubBtn.addEventListener("click", async function() {
+          try {
+            await apiReq("/rest/v1/admin_hero_slider?id=eq." + encodeURIComponent(item.id), {
+              method: "PATCH",
+              body: JSON.stringify({ published: item.published === false })
+            });
+            await loadSliderItems();
+            notifySliderUpdate();
+          } catch(e) {
+            setStatus("Erreur: " + e.message, true);
+          }
+        });
 
-      // Delete Button
-      var delBtn = document.createElement("button");
-      delBtn.type = "button";
-      delBtn.className = "countries-admin-cancel";
-      delBtn.style.color = "#fca5a5";
-      delBtn.textContent = "Supprimer";
-      delBtn.addEventListener("click", async function() {
-        if (!confirm("Supprimer '" + item.title + "' du slider ?")) return;
-        try {
-          await apiReq("/rest/v1/admin_hero_slider?id=eq." + encodeURIComponent(item.id), {
-            method: "DELETE"
-          });
-          if (state.editingItemId === item.id) resetForm();
-          await loadSliderItems();
-          notifySliderUpdate();
-          setStatus("Élément supprimé.");
-        } catch (e) {
-          setStatus("Erreur suppression: " + e.message, true);
-        }
-      });
+        // Global Delete
+        var delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.className = "countries-admin-cancel";
+        delBtn.style.color = "#fca5a5";
+        delBtn.textContent = "Supprimer";
+        delBtn.addEventListener("click", async function() {
+          if (!confirm("Supprimer '" + item.title + "' du slider pour TOUS les pays ?")) return;
+          try {
+            await apiReq("/rest/v1/admin_hero_slider?id=eq." + encodeURIComponent(item.id), {
+              method: "DELETE"
+            });
+            if (state.editingItemId === item.id) resetForm();
+            await loadSliderItems();
+            notifySliderUpdate();
+            setStatus("Élément supprimé partout.");
+          } catch (e) {
+            setStatus("Erreur suppression: " + e.message, true);
+          }
+        });
 
-      actions.appendChild(editBtn);
-      actions.appendChild(upBtn);
-      actions.appendChild(downBtn);
-      actions.appendChild(pubBtn);
-      actions.appendChild(delBtn);
+        actions.appendChild(editBtn);
+        actions.appendChild(upBtn);
+        actions.appendChild(downBtn);
+        actions.appendChild(pubBtn);
+        actions.appendChild(delBtn);
+      } else {
+        // Specific Country: Remove only from this country
+        var cObj = state.countries.find(function(c) { return c.id === selectedFilter; });
+        var cName = cObj ? cObj.name : selectedFilter;
+
+        var removeCountryBtn = document.createElement("button");
+        removeCountryBtn.type = "button";
+        removeCountryBtn.className = "countries-admin-cancel";
+        removeCountryBtn.style.color = "#fca5a5";
+        removeCountryBtn.textContent = "Retirer de " + cName;
+        removeCountryBtn.addEventListener("click", async function() {
+          if (!confirm("Retirer '" + item.title + "' uniquement du slider de " + cName + " ?")) return;
+          try {
+            await apiReq("/hero-slider/country-override?id=" + encodeURIComponent(item.id) + "&country_id=" + encodeURIComponent(selectedFilter), {
+              method: "DELETE"
+            });
+            await loadSliderItems();
+            notifySliderUpdate();
+            setStatus("'" + item.title + "' retiré de " + cName + " avec succès !");
+          } catch (e) {
+            setStatus("Erreur: " + e.message, true);
+          }
+        });
+
+        actions.appendChild(editBtn);
+        actions.appendChild(upBtn);
+        actions.appendChild(downBtn);
+        actions.appendChild(removeCountryBtn);
+      }
 
       row.appendChild(thumb);
       row.appendChild(meta);
@@ -249,7 +319,7 @@
     }
   }
 
-  function startEditItem(item) {
+  function startEditItem(item, countryId) {
     state.editingItemId = item.id;
     var formCountry = document.getElementById("slider-form-country");
     var titleInp = document.getElementById("slider-form-title");
@@ -260,15 +330,25 @@
     var saveBtn = document.getElementById("slider-form-submit");
     var cancelBtn = document.getElementById("slider-form-cancel");
 
-    if (formCountry) formCountry.value = "all";
-    state.editingCountryId = "all";
+    var targetC = (countryId && countryId !== "all") ? countryId : "all";
+    if (formCountry) formCountry.value = targetC;
+    state.editingCountryId = targetC;
 
-    if (titleInp) titleInp.value = item.title || "";
+    if (targetC === "all") {
+      if (titleInp) titleInp.value = item.title || "";
+      if (imgInp) imgInp.value = item.backdrop || item.image || "";
+      if (saveBtn) saveBtn.textContent = "Enregistrer pour Tous les pays (Global)";
+    } else {
+      var cObj = state.countries.find(function(c) { return c.id === targetC; });
+      var mapped = item.country_mappings && item.country_mappings[targetC];
+      if (titleInp) titleInp.value = mapped?.name || item.title || "";
+      if (imgInp) imgInp.value = mapped?.thumbUrl || item.backdrop || item.image || "";
+      if (saveBtn) saveBtn.textContent = "Enregistrer uniquement pour " + (cObj ? cObj.name : targetC);
+    }
+
     if (catInp) catInp.value = item.category || "movie";
     if (badgeInp) badgeInp.value = item.badge || "Top Trending";
-    if (imgInp) imgInp.value = item.backdrop || item.image || "";
     if (descInp) descInp.value = item.overview || "";
-    if (saveBtn) saveBtn.textContent = "Enregistrer pour Tous les pays (Global)";
     if (cancelBtn) cancelBtn.hidden = false;
 
     renderSliderItems();
@@ -363,12 +443,15 @@
             name: title,
             thumbUrl: imgInp ? imgInp.value.trim() : (existingMapping.thumbUrl || currentItem.image),
             contentType: catInp ? catInp.value : (existingMapping.contentType || currentItem.category || "movie"),
-            isFallback: false
+            isFallback: false,
+            hidden: false
           });
+
+          var excluded = Array.isArray(currentItem.excluded_countries) ? currentItem.excluded_countries.filter(function(id) { return id !== targetCountry; }) : [];
 
           await apiReq("/rest/v1/admin_hero_slider?id=eq." + encodeURIComponent(state.editingItemId), {
             method: "PATCH",
-            body: JSON.stringify({ country_mappings: mappings })
+            body: JSON.stringify({ country_mappings: mappings, excluded_countries: excluded })
           });
 
           var cObj = state.countries.find(function(c) { return c.id === targetCountry; });
@@ -429,32 +512,118 @@
     }
   }
 
-  // Multi-country scanner
-  async function runCountryScan() {
+  // Step 1: Search Catalog Candidates
+  async function searchCatalogCandidates() {
     var searchInp = document.getElementById("slider-scan-query");
     var typeSel = document.getElementById("slider-scan-type");
     var resultsBox = document.getElementById("slider-scan-results");
     var query = searchInp ? searchInp.value.trim() : "";
 
     if (!query) {
-      setStatus("Saisissez un titre à scanner.", true);
+      setStatus("Saisissez un titre à rechercher.", true);
       return;
     }
 
-    setStatus("Scan de la disponibilité multi-pays en cours...");
+    setStatus("Recherche des titres correspondants...");
     if (resultsBox) {
-      resultsBox.innerHTML = '<div style="padding:1rem;color:#bfb3db;">Recherche dans les catalogues de tous les pays...</div>';
+      resultsBox.innerHTML = '<div style="padding:1rem;color:#bfb3db;">Recherche dans les catalogues...</div>';
       resultsBox.hidden = false;
     }
 
     try {
       var type = typeSel ? typeSel.value : "";
-      var data = await apiReq("/hero-slider/scan-availability?q=" + encodeURIComponent(query) + "&type=" + encodeURIComponent(type));
+      var candidates = await apiReq("/hero-slider/search-catalog?q=" + encodeURIComponent(query) + "&type=" + encodeURIComponent(type));
+      state.candidates = candidates;
+      renderCandidates(candidates, query);
+      setStatus(candidates.length + " résultat(s) trouvé(s) pour '" + query + "'. Choisissez celui que vous souhaitez ajouter.");
+    } catch(err) {
+      setStatus("Erreur recherche: " + err.message, true);
+      if (resultsBox) resultsBox.innerHTML = '<div style="color:#fca5a5;padding:1rem;">Erreur : ' + err.message + '</div>';
+    }
+  }
+
+  function renderCandidates(candidates, query) {
+    var resultsBox = document.getElementById("slider-scan-results");
+    if (!resultsBox) return;
+    resultsBox.hidden = false;
+    resultsBox.innerHTML = "";
+
+    var box = document.createElement("div");
+    box.className = "vel-slider-candidates-box";
+
+    var head = document.createElement("div");
+    head.style.cssText = "display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;";
+    head.innerHTML = '<strong style="color:#fff;font-size:0.95rem;">🎯 Étape 1 : Choisissez le film/série exact pour "' + query + '"</strong>';
+    box.appendChild(head);
+
+    if (!candidates || !candidates.length) {
+      box.innerHTML += '<div style="padding:1rem;color:#bfb3db;">Aucun résultat trouvé pour ce mot-clé. Essayez un autre terme.</div>';
+      resultsBox.appendChild(box);
+      return;
+    }
+
+    var list = document.createElement("div");
+    list.className = "vel-slider-candidates-list";
+
+    candidates.forEach(function(c) {
+      var card = document.createElement("div");
+      card.className = "vel-slider-candidate-card";
+
+      var thumb = document.createElement("img");
+      thumb.className = "vel-slider-candidate-thumb";
+      thumb.src = c.thumbUrl || "";
+      thumb.alt = c.name;
+
+      var info = document.createElement("div");
+      info.className = "vel-slider-candidate-info";
+
+      var title = document.createElement("div");
+      title.className = "vel-slider-candidate-title";
+      title.textContent = c.cleanTitle + (c.year ? " (" + c.year + ")" : "");
+
+      var meta = document.createElement("div");
+      meta.className = "vel-slider-candidate-meta";
+      meta.innerHTML = '<span>' + (c.type === "series" ? "Série" : "Film") + '</span>' + (c.year ? ' • <span>' + c.year + '</span>' : '') + ' • <span style="opacity:0.7;">' + c.name + '</span>';
+
+      var pickBtn = document.createElement("button");
+      pickBtn.type = "button";
+      pickBtn.className = "vel-slider-candidate-btn";
+      pickBtn.innerHTML = '👉 Choisir & Scanner les pays';
+      pickBtn.addEventListener("click", async function() {
+        await runSmartMatchForCandidate(c);
+      });
+
+      info.appendChild(title);
+      info.appendChild(meta);
+      info.appendChild(pickBtn);
+
+      card.appendChild(thumb);
+      card.appendChild(info);
+      list.appendChild(card);
+    });
+
+    box.appendChild(list);
+    resultsBox.appendChild(box);
+  }
+
+  // Step 2: Smart Match across countries for the exact picked candidate
+  async function runSmartMatchForCandidate(candidate) {
+    state.selectedCandidate = candidate;
+    var resultsBox = document.getElementById("slider-scan-results");
+    if (resultsBox) {
+      resultsBox.innerHTML = '<div style="padding:1.5rem;color:#bfb3db;text-align:center;">Recherche de <strong>' + candidate.cleanTitle + (candidate.year ? ' (' + candidate.year + ')' : '') + '</strong> dans tous les pays...</div>';
+    }
+
+    try {
+      var data = await apiReq("/hero-slider/smart-match-countries", {
+        method: "POST",
+        body: JSON.stringify({ selectedItem: candidate })
+      });
       state.scanResult = data;
       renderScanResults(data);
-      setStatus("Scan terminé : " + data.totalMatchesFound + " résultat(s) trouvés.");
+      setStatus("Disponibilité scannée avec succès pour : " + candidate.cleanTitle);
     } catch(err) {
-      setStatus("Erreur scan: " + err.message, true);
+      setStatus("Erreur lors du scan: " + err.message, true);
       if (resultsBox) resultsBox.innerHTML = '<div style="color:#fca5a5;padding:1rem;">Erreur : ' + err.message + '</div>';
     }
   }
@@ -474,7 +643,8 @@
     var title = document.createElement("div");
     title.className = "vel-slider-scan-title";
     var foundCount = (data.countries || []).filter(function(c) { return c.found; }).length;
-    title.innerHTML = 'Disponibilité pour "<strong>' + data.query + '</strong>" : <span style="color:#86efac">' + foundCount + ' pays avec version locale</span> / ' + (data.countries || []).length + ' pays au total';
+    var candName = data.selectedItem ? (data.selectedItem.cleanTitle + (data.selectedItem.year ? " (" + data.selectedItem.year + ")" : "")) : "";
+    title.innerHTML = 'Disponibilité pour "<strong>' + candName + '</strong>" : <span style="color:#86efac">' + foundCount + ' pays avec version exacte trouvée</span> / ' + (data.countries || []).length + ' pays';
 
     var targetSel = document.getElementById("slider-scan-target-country");
     var targetCountry = targetSel ? targetSel.value : "all";
@@ -552,31 +722,52 @@
   }
 
   async function executeBulkAssign(scanData) {
-    if (!scanData || !scanData.query) return;
+    if (!scanData || !scanData.selectedItem) return;
 
+    var item = scanData.selectedItem;
+    var title = item.cleanTitle + (item.year ? " (" + item.year + ")" : "");
     var targetSel = document.getElementById("slider-scan-target-country");
     var targetCountry = targetSel ? targetSel.value : "all";
-
-    var typeSel = document.getElementById("slider-scan-type");
-    var category = (typeSel && typeSel.value) ? typeSel.value : (scanData.usaFallback?.contentType === "series" ? "series" : "movie");
+    var category = item.type === "series" ? "series" : "movie";
 
     if (targetCountry === "all") {
-      setStatus("Ajout de '" + scanData.query + "' à tous les pays...");
+      setStatus("Ajout de '" + title + "' à tous les pays...");
+      var countryMappings = {};
+      (scanData.countries || []).forEach(function(c) {
+        if (c.match) {
+          countryMappings[c.countryId] = {
+            streamId: c.match.streamId,
+            sourceId: c.match.sourceId,
+            globalStreamId: c.match.globalStreamId || c.match.streamId,
+            name: c.match.name || title,
+            thumbUrl: c.match.thumbUrl || item.thumbUrl || "",
+            containerExtension: c.match.containerExtension || "",
+            contentType: c.match.contentType || category,
+            isFallback: c.isFallback
+          };
+        }
+      });
+
       var payload = {
-        title: scanData.query,
+        title: title,
         category: category,
-        badge: category === "series" ? "Série" : "Top Trending",
-        image: scanData.usaFallback?.thumbUrl || "",
-        backdrop: scanData.usaFallback?.thumbUrl || "",
-        query: scanData.query
+        badge: category === "series" ? "Série" : "Cinéma",
+        image: item.thumbUrl || scanData.usaFallback?.thumbUrl || "",
+        backdrop: item.thumbUrl || scanData.usaFallback?.thumbUrl || "",
+        query: item.cleanTitle,
+        country_mappings: countryMappings
       };
 
       try {
-        await apiReq("/hero-slider/bulk-assign", {
+        await apiReq("/rest/v1/admin_hero_slider", {
           method: "POST",
-          body: JSON.stringify(payload)
+          body: JSON.stringify(Object.assign({
+            id: "hero_slider_" + Date.now(),
+            sort_order: state.items.length + 1,
+            published: true
+          }, payload))
         });
-        setStatus("'" + scanData.query + "' a été ajouté avec succès à tous les pays !", false);
+        setStatus("'" + title + "' a été ajouté avec succès à tous les pays !", false);
         await loadSliderItems();
         notifySliderUpdate();
       } catch(e) {
@@ -585,19 +776,19 @@
     } else {
       var cObj = state.countries.find(function(c) { return c.id === targetCountry; });
       var cName = cObj ? cObj.name : targetCountry;
-      setStatus("Affectation de '" + scanData.query + "' uniquement pour " + cName + "...");
+      setStatus("Affectation de '" + title + "' uniquement pour " + cName + "...");
 
       var countryMatch = (scanData.countries || []).find(function(c) { return c.countryId === targetCountry; });
       var streamToAssign = (countryMatch && countryMatch.match) ? countryMatch.match : scanData.usaFallback;
 
-      var manualMappings = {};
+      var countryMappings = {};
       if (streamToAssign) {
-        manualMappings[targetCountry] = {
+        countryMappings[targetCountry] = {
           streamId: streamToAssign.streamId,
           sourceId: streamToAssign.sourceId,
           globalStreamId: streamToAssign.globalStreamId || streamToAssign.streamId,
-          name: streamToAssign.name || scanData.query,
-          thumbUrl: streamToAssign.thumbUrl || scanData.usaFallback?.thumbUrl || "",
+          name: streamToAssign.name || title,
+          thumbUrl: streamToAssign.thumbUrl || item.thumbUrl || "",
           containerExtension: streamToAssign.containerExtension || "",
           contentType: streamToAssign.contentType || category,
           isFallback: !countryMatch?.found
@@ -605,21 +796,23 @@
       }
 
       var payload = {
-        title: scanData.query,
+        id: "hero_slider_" + Date.now(),
+        title: title,
         category: category,
-        badge: category === "series" ? "Série" : "Top Trending",
-        image: streamToAssign?.thumbUrl || scanData.usaFallback?.thumbUrl || "",
-        backdrop: streamToAssign?.thumbUrl || scanData.usaFallback?.thumbUrl || "",
-        query: scanData.query,
-        manualMappings: manualMappings
+        badge: category === "series" ? "Série" : "Cinéma",
+        image: streamToAssign?.thumbUrl || item.thumbUrl || "",
+        backdrop: streamToAssign?.thumbUrl || item.thumbUrl || "",
+        sort_order: state.items.length + 1,
+        published: true,
+        country_mappings: countryMappings
       };
 
       try {
-        await apiReq("/hero-slider/bulk-assign", {
+        await apiReq("/rest/v1/admin_hero_slider", {
           method: "POST",
           body: JSON.stringify(payload)
         });
-        setStatus("'" + scanData.query + "' a été affecté avec succès à " + cName + " !", false);
+        setStatus("'" + title + "' a été affecté avec succès à " + cName + " !", false);
         await loadSliderItems();
         notifySliderUpdate();
       } catch(e) {
@@ -645,6 +838,14 @@
     var formCountry = document.getElementById("slider-form-country");
     if (formCountry) formCountry.addEventListener("change", handleCountryDropdownChange);
 
+    var filterCountry = document.getElementById("slider-admin-filter-country");
+    if (filterCountry) {
+      filterCountry.addEventListener("change", function() {
+        state.listFilterCountryId = filterCountry.value || "all";
+        renderSliderItems();
+      });
+    }
+
     var scanTargetCountry = document.getElementById("slider-scan-target-country");
     if (scanTargetCountry) {
       scanTargetCountry.addEventListener("change", function() {
@@ -653,14 +854,14 @@
     }
 
     var scanBtn = document.getElementById("slider-scan-btn");
-    if (scanBtn) scanBtn.addEventListener("click", runCountryScan);
+    if (scanBtn) scanBtn.addEventListener("click", searchCatalogCandidates);
 
     var scanInp = document.getElementById("slider-scan-query");
     if (scanInp) {
       scanInp.addEventListener("keydown", function(e) {
         if (e.key === "Enter") {
           e.preventDefault();
-          runCountryScan();
+          searchCatalogCandidates();
         }
       });
     }

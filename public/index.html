@@ -5350,11 +5350,11 @@
             <div class="vel-slider-admin-wrap">
               <!-- Multi-country availability scanner -->
               <div class="vel-slider-admin-card">
-                <h3>🔍 Scanner & Ajout Automatique Multi-Pays</h3>
-                <p class="hint">Recherchez un titre dans les catalogues. Le scanner détectera automatiquement la version de chaque pays (langue, doublage) et affectera le fallback USA aux pays qui ne l'ont pas.</p>
+                <h3>🔍 Recherche & Ajout Automatique Multi-Pays</h3>
+                <p class="hint">Recherchez un titre dans les catalogues. Choisissez le film/série exact parmi les résultats, puis lancez le scan multi-pays avec mapping automatique et fallback USA.</p>
                 
                 <div class="vel-slider-search-bar">
-                  <input type="text" id="slider-scan-query" class="vel-slider-search-input" placeholder="Ex. Spider-Man, Toy Story, Ted Lasso..." />
+                  <input type="text" id="slider-scan-query" class="vel-slider-search-input" placeholder="Ex. Spider-Man, Odyssey, Ted Lasso, Pikachu..." />
                   <select id="slider-scan-type" class="vel-slider-search-select">
                     <option value="">Tous les types</option>
                     <option value="movie">Films (Cinéma / VOD)</option>
@@ -5364,7 +5364,7 @@
                   <select id="slider-scan-target-country" class="vel-slider-search-select">
                     <option value="all">🌍 Tous les pays (avec fallback USA)</option>
                   </select>
-                  <button type="button" id="slider-scan-btn" class="primary">Scanner la disponibilité</button>
+                  <button type="button" id="slider-scan-btn" class="primary">🔍 Rechercher</button>
                 </div>
 
                 <div id="slider-scan-results" hidden></div>
@@ -5426,7 +5426,15 @@
               <!-- Slider items list -->
               <div class="vel-slider-admin-card">
                 <h3>📋 Éléments actuellement configurés dans le Slider</h3>
-                <p class="hint">Ordre d'affichage des slides sur la page d'accueil. Utilisez les boutons pour monter/descendre, masquer ou supprimer.</p>
+                <p class="hint">Ordre d'affichage des slides sur la page d'accueil. Sélectionnez un pays pour voir et personnaliser son slider spécifique ou retirer un film de ce pays.</p>
+                <div class="field row" style="max-width:480px;margin-bottom:1rem;">
+                  <div>
+                    <label for="slider-admin-filter-country">Afficher le slider pour le pays :</label>
+                    <select id="slider-admin-filter-country" class="admin-add-package-dialog__select">
+                      <option value="all">🌍 Tous les pays (Global)</option>
+                    </select>
+                  </div>
+                </div>
                 <div id="slider-admin-items-list" class="vel-slider-items-list"></div>
               </div>
             </div>

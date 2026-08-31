@@ -86,7 +86,7 @@
   bottom: 0;
   left: 0;
   width: min(720px, 92%);
-  padding: clamp(1rem, 3vw, 2.2rem);
+  padding: clamp(0.8rem, 2vw, 1.5rem) clamp(1rem, 3vw, 2.2rem) clamp(1.8rem, 4.2vw, 2.8rem);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -236,57 +236,55 @@
 }
 
 /* ==========================================================================
-   COLORED NEON PAGINATION DOTS
+   MINIMALIST SLEEK PAGINATION DOTS (PRIME VIDEO STYLE)
    ========================================================================== */
 
 .vel-hero-dots {
   position: absolute;
-  bottom: 1rem;
-  right: 1.5rem;
+  bottom: 0.45rem;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.35rem;
   z-index: 10;
-  padding: 0.4rem 0.75rem;
-  background: rgba(9, 8, 19, 0.55);
-  backdrop-filter: blur(12px);
+  padding: 0.22rem 0.55rem;
+  background: rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(8px);
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 @media (max-width: 600px) {
   .vel-hero-dots {
-    right: 1rem;
-    left: auto;
-    transform: none;
-    bottom: 0.75rem;
-    padding: 0.3rem 0.6rem;
-    gap: 0.4rem;
+    bottom: 0.35rem;
+    padding: 0.18rem 0.45rem;
+    gap: 0.3rem;
   }
 }
 
 .vel-hero-dot {
   position: relative;
-  width: 8px;
-  height: 8px;
+  width: 5px;
+  height: 5px;
   border-radius: 999px;
-  background: rgba(168, 85, 247, 0.35);
-  border: 1px solid rgba(216, 180, 254, 0.4);
+  background: rgba(255, 255, 255, 0.35);
+  border: 0;
   cursor: pointer;
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   padding: 0;
 }
 
 .vel-hero-dot:hover {
-  background: rgba(236, 72, 153, 0.6);
+  background: rgba(255, 255, 255, 0.7);
   transform: scale(1.2);
 }
 
 .vel-hero-dot.active {
-  width: 24px;
-  background: linear-gradient(90deg, #ec4899 0%, #8b5cf6 50%, #06b6d4 100%);
-  border-color: rgba(255, 255, 255, 0.8);
-  box-shadow: 0 0 14px rgba(236, 72, 153, 0.7), 0 0 6px rgba(6, 182, 212, 0.5);
+  width: 16px;
+  height: 5px;
+  background: linear-gradient(90deg, #ffd700 0%, #ffffff 100%);
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
 }
 
 /* Loading skeleton for Hero Slider */

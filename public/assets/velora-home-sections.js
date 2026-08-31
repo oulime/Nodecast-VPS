@@ -39,7 +39,230 @@ var activeContentSection=null,activeContentItems=[],activePackageCatalogItems=[]
 function velNormStr(s){return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim()}
 async function openSectionContentDialog(row){var dialog=document.getElementById("home-section-content-dialog");if(!dialog)return;activeContentSection=row;activeContentItems=[];activePackageCatalogItems=[];var titleEl=document.getElementById("home-section-content-title"),subtitleEl=document.getElementById("home-section-content-subtitle"),searchInput=document.getElementById("home-section-content-search-input"),searchResults=document.getElementById("home-section-content-search-results"),statusEl=document.getElementById("home-section-content-status");if(titleEl)titleEl.textContent=row.title||"Section Accueil";if(subtitleEl){var p=pkg(row.package_id);subtitleEl.textContent=(row.content_type==="series"?"S\u00e9ries":"Films")+" ("+(row.card_orientation==="horizontal"?"Horizontal":"Vertical")+") \u2014 Package : "+(p?p.name:row.package_id)}if(searchInput)searchInput.value="";if(searchResults){searchResults.replaceChildren();searchResults.hidden=true}if(statusEl)statusEl.textContent="Chargement des \u00e9l\u00e9ments...";dialog.showModal();try{var isHoriz=row.card_orientation==="horizontal";if(typeof window.veloraGetHomeSectionContent==="function"){window.veloraGetHomeSectionContent(row.content_type,row.package_id,isHoriz).then(function(catItems){if(Array.isArray(catItems))activePackageCatalogItems=catItems}).catch(function(e){})}if(Array.isArray(row.custom_entries)&&row.custom_entries.length>0){activeContentItems=JSON.parse(JSON.stringify(row.custom_entries))}else{var cachedSec=state.homeCache&&Array.isArray(state.homeCache.sections)?state.homeCache.sections.find(function(s){return String(s.id)===String(row.id)}):null;if(cachedSec&&Array.isArray(cachedSec.entries)&&cachedSec.entries.length>0){activeContentItems=JSON.parse(JSON.stringify(cachedSec.entries))}else if(typeof window.veloraGetHomeSectionContent==="function"){var entries=await window.veloraGetHomeSectionContent(row.content_type,row.package_id,isHoriz);activeContentItems=Array.isArray(entries)?JSON.parse(JSON.stringify(entries)):[];if(Array.isArray(entries))activePackageCatalogItems=entries}}if(statusEl)statusEl.textContent=""}catch(err){if(statusEl)statusEl.textContent="Erreur lors du chargement : "+err.message}renderContentDialogItems()}
 function renderContentDialogItems(){var grid=document.getElementById("home-section-content-items"),countEl=document.getElementById("home-section-content-count");if(!grid)return;grid.replaceChildren();if(countEl)countEl.textContent=activeContentItems.length+" \u00e9l\u00e9ment(s)";if(!activeContentItems.length){var empty=document.createElement("p");empty.className="vel-home-content-dialog__empty";empty.textContent="Cette section ne contient aucun \u00e9l\u00e9ment. Utilisez la recherche ci-dessus pour en ajouter.";grid.appendChild(empty);return}var isHoriz=activeContentSection&&activeContentSection.card_orientation==="horizontal";activeContentItems.forEach(function(item,idx){var card=document.createElement("div");card.className="vel-home-content-item-card"+(isHoriz?" vel-home-content-item-card--horizontal":"");var mediaWrap=document.createElement("div");mediaWrap.className="vel-home-content-item-card__media-wrap";var img=document.createElement("img"),imgSrc=(isHoriz?(item.backdropUrl||item.backdrop||item.thumbUrl):(item.thumbUrl||item.backdropUrl))||"";img.src=imgSrc;img.alt="";img.loading="lazy";img.onerror=function(){if(imgSrc!==item.thumbUrl&&item.thumbUrl)img.src=item.thumbUrl};var delBtn=document.createElement("button");delBtn.type="button";delBtn.className="vel-home-content-item-card__delete-btn";delBtn.title="Supprimer de la section";delBtn.textContent="\u2715";delBtn.addEventListener("click",function(e){e.stopPropagation();activeContentItems.splice(idx,1);renderContentDialogItems()});mediaWrap.append(img,delBtn);var body=document.createElement("div");body.className="vel-home-content-item-card__body";var title=document.createElement("div");title.className="vel-home-content-item-card__title";title.title=item.name||item.title||"";title.textContent=item.name||item.title||"Sans titre";var controls=document.createElement("div");controls.className="vel-home-content-item-card__controls";var moveLeft=document.createElement("button");moveLeft.type="button";moveLeft.className="vel-home-content-item-card__ctrl-btn";moveLeft.title="D\u00e9placer vers la gauche";moveLeft.textContent="\u2190";moveLeft.disabled=idx===0;moveLeft.addEventListener("click",function(e){e.stopPropagation();if(idx>0){var temp=activeContentItems[idx-1];activeContentItems[idx-1]=activeContentItems[idx];activeContentItems[idx]=temp;renderContentDialogItems()}});var moveRight=document.createElement("button");moveRight.type="button";moveRight.className="vel-home-content-item-card__ctrl-btn";moveRight.title="D\u00e9placer vers la droite";moveRight.textContent="\u2192";moveRight.disabled=idx===activeContentItems.length-1;moveRight.addEventListener("click",function(e){e.stopPropagation();if(idx<activeContentItems.length-1){var temp=activeContentItems[idx+1];activeContentItems[idx+1]=activeContentItems[idx];activeContentItems[idx]=temp;renderContentDialogItems()}});controls.append(moveLeft,moveRight);body.append(title,controls);card.append(mediaWrap,body);grid.appendChild(card)})}
-async function searchMediaForContentDialog(query){var searchResults=document.getElementById("home-section-content-search-results"),statusEl=document.getElementById("home-section-content-status");if(!searchResults||!activeContentSection)return;var cleanQ=String(query||"").trim();if(!cleanQ){searchResults.replaceChildren();searchResults.hidden=true;return}var normQ=velNormStr(cleanQ);if(normQ.length<2){searchResults.replaceChildren();searchResults.hidden=true;return}var targetKind=activeContentSection.content_type||"movies",isMovie=targetKind==="movies",isHoriz=activeContentSection.card_orientation==="horizontal",targetCountry=activeContentSection.country_id&&activeContentSection.country_id!=="default"?activeContentSection.country_id:"all";searchResults.hidden=false;searchResults.replaceChildren();var loadingItem=document.createElement("div");loadingItem.style.padding="0.75rem";loadingItem.style.textAlign="center";loadingItem.style.color="#94a3b8";loadingItem.textContent="\ud83d\udd0d Recherche de "+(isMovie?"films":"s\u00e9ries")+"...";searchResults.appendChild(loadingItem);try{var pool=[],seenKeys=new Set();function addCandidate(name,sId,sourceId,thumb,pkgId,catName,year,rating,containerExt,gId){var cleanName=String(name||"").trim();if(!cleanName)return;var rawId=String(sId||cleanName.toLowerCase());var key=targetKind+":"+rawId;if(seenKeys.has(key))return;seenKeys.add(key);pool.push({streamId:rawId,sourceId:sourceId||"",globalStreamId:gId||rawId,name:cleanName,cleanTitle:cleanName,year:year||"",type:isMovie?"vod":"series",thumbUrl:thumb||"",backdropUrl:thumb||"",containerExtension:containerExt||"",categoryName:catName||"",rating:rating||"",packageId:pkgId||activeContentSection.package_id})}if(typeof window.veloraSearchCountryContent==="function"){try{var frontRes=await window.veloraSearchCountryContent(cleanQ);if(frontRes){var list=isMovie?frontRes.movies:(frontRes.series||frontRes.results);if(Array.isArray(list)){list.forEach(function(m){var it=m.item||m;var itName=m.label||it.name||it.title||it.series_name;var sId=it.raw_series_id||it.raw_stream_id||it.series_id||it.stream_id||it.id||m.id;var sIcon=m.thumbUrl||it.stream_icon||it.cover||it.movie_image||it.series_image||"";var pkgId=m.packageId||it.package_id||activeContentSection.package_id;addCandidate(itName,sId,it.nodecast_source_id||it.source_id,sIcon,pkgId,m.packageName||it.category_name,it.year,it.rating||it.vod_rating,it.container_extension,it.nodecast_global_stream_id||it.global_stream_id)})}}}catch(errFront){console.warn("[Content search] Front search failed:",errFront)}}var appState=typeof window.veloraGetState==="function"?window.veloraGetState():null;if(appState){var streamsMap=isMovie?appState.vodStreamsByCat:appState.seriesStreamsByCat;if(streamsMap&&typeof streamsMap.forEach==="function"){streamsMap.forEach(function(catList,catId){if(Array.isArray(catList)){catList.forEach(function(it){var itName=String(it.name||it.title||it.series_name||"").trim();if(!itName||!velNormStr(itName).includes(normQ))return;var sId=it.raw_series_id||it.raw_stream_id||it.series_id||it.stream_id||it.id;var sIcon=it.stream_icon||it.cover||it.movie_image||it.series_image||"";addCandidate(itName,sId,it.nodecast_source_id||it.source_id,sIcon,catId,it.category_name,it.year,it.rating,it.container_extension,it.nodecast_global_stream_id)})}})}}if(activePackageCatalogItems&&activePackageCatalogItems.length>0){activePackageCatalogItems.forEach(function(it){var itName=String(it.name||it.title||it.series_name||"").trim();if(!itName||!velNormStr(itName).includes(normQ))return;var sId=it.raw_series_id||it.raw_stream_id||it.series_id||it.stream_id||it.id;var sIcon=it.thumbUrl||it.stream_icon||it.cover||"";addCandidate(itName,sId,it.sourceId||it.source_id,sIcon,it.packageId||activeContentSection.package_id,it.categoryName,it.year,it.rating,it.containerExtension,it.globalStreamId)})}if(pool.length<5&&typeof window.veloraGetHomeSectionContent==="function"&&Array.isArray(state.packages)){var relevantPkgs=state.packages.filter(function(p){var pkKind=String(p.kind||"").toLowerCase();if(isMovie&&pkKind!=="movies"&&pkKind!=="vod")return false;if(!isMovie&&pkKind!=="series")return false;return true;});var targetPkgs=relevantPkgs.filter(function(p){if(activeContentSection.country_id&&activeContentSection.country_id!=="default"){return p.country_id===activeContentSection.country_id}return true;}).slice(0,8);for(var i=0;i<targetPkgs.length;i++){try{var fetched=await window.veloraGetHomeSectionContent(targetKind,targetPkgs[i].id,isHoriz);if(Array.isArray(fetched)){fetched.forEach(function(it){var itName=String(it.name||it.title||it.series_name||"").trim();if(!itName||!velNormStr(itName).includes(normQ))return;addCandidate(itName,it.streamId||it.id,it.sourceId,it.thumbUrl||it.backdropUrl,targetPkgs[i].id,targetPkgs[i].name,it.year,it.rating,it.containerExtension,it.globalStreamId)})}}catch(eFetch){}}}try{var heroRes=await fetch("/api/velora-db/hero-slider/search-catalog?q="+encodeURIComponent(cleanQ)+"&type="+encodeURIComponent(isMovie?"movie":"series")+"&country_id="+encodeURIComponent(targetCountry),{cache:"no-store"});if(heroRes.ok){var candidates=await heroRes.json();if(Array.isArray(candidates)){candidates.forEach(function(c){addCandidate(c.cleanTitle||c.name,c.streamId||c.id,c.sourceId,c.thumbUrl,activeContentSection.package_id,c.categoryName,c.year,c.rating,c.containerExtension)})}}}catch(errHero){}searchResults.replaceChildren();if(!pool.length){var noRes=document.createElement("div");noRes.style.padding="0.75rem";noRes.style.textAlign="center";noRes.style.color="#94a3b8";noRes.textContent="Aucun "+(isMovie?"film":"s\u00e9rie")+" trouv\u00e9 pour \u00ab "+cleanQ+" \u00bb";searchResults.appendChild(noRes);return}pool.sort(function(a,b){var aExact=velNormStr(a.name)===normQ?0:(velNormStr(a.name).startsWith(normQ)?1:2),bExact=velNormStr(b.name)===normQ?0:(velNormStr(b.name).startsWith(normQ)?1:2);if(aExact!==bExact)return aExact-bExact;return a.name.localeCompare(b.name,"fr")});pool.slice(0,40).forEach(function(cand){var itemName=cand.cleanTitle||cand.name;var thumb=cand.thumbUrl||cand.backdropUrl||"";var rowEl=document.createElement("div");rowEl.className="vel-home-content-search-item";var img=document.createElement("img");img.src=thumb;img.alt="";img.onerror=function(){img.style.display="none"};var info=document.createElement("div");info.className="vel-home-content-search-item__info";var nameEl=document.createElement("div");nameEl.className="vel-home-content-search-item__name";nameEl.textContent=itemName+(cand.year?" ("+cand.year+")":"");var meta=document.createElement("div");meta.className="vel-home-content-search-item__meta";meta.textContent=(isMovie?"Film":"S\u00e9rie")+(cand.year?" \u2022 "+cand.year:"")+(cand.categoryName?" \u2022 "+cand.categoryName:"");info.append(nameEl,meta);var addBtn=document.createElement("button");addBtn.type="button";addBtn.className="primary";addBtn.style.padding="0.35rem 0.75rem";addBtn.style.fontSize="0.8rem";addBtn.style.whiteSpace="nowrap";addBtn.textContent="+ Ajouter";addBtn.addEventListener("click",function(e){e.stopPropagation();var rawId=cand.streamId||crypto.randomUUID(),finalThumb=thumb;var newEntry={id:"home-custom:"+activeContentSection.id+":"+rawId,name:itemName,thumbUrl:finalThumb,backdropUrl:finalThumb,section_logo_url:activeContentSection.logo_url||activeContentSection.badge_logo_url||"",streamId:rawId,sourceId:cand.sourceId,globalStreamId:cand.globalStreamId||rawId,containerExtension:cand.containerExtension||"",contentType:targetKind,packageId:cand.packageId||activeContentSection.package_id};var exists=activeContentItems.some(function(it){return String(it.streamId||it.id)===String(newEntry.streamId||newEntry.id)});if(exists){if(statusEl)statusEl.textContent="\u00ab "+itemName+" \u00bb est d\u00e9j\u00e0 dans cette section.";return}activeContentItems.unshift(newEntry);renderContentDialogItems();searchResults.hidden=true;if(statusEl)statusEl.textContent="\u00ab "+itemName+" \u00bb ajout\u00e9 avec succ\u00e8s !"});rowEl.append(img,info,addBtn);searchResults.appendChild(rowEl)})}catch(err){searchResults.replaceChildren();var errEl=document.createElement("div");errEl.style.padding="0.75rem";errEl.style.color="#ef4444";errEl.textContent="Erreur de recherche : "+err.message;searchResults.appendChild(errEl)}}
+async function searchMediaForContentDialog(query) {
+  var searchResults = document.getElementById("home-section-content-search-results"),
+      statusEl = document.getElementById("home-section-content-status");
+  if (!searchResults || !activeContentSection) return;
+  var cleanQ = String(query || "").trim();
+  if (!cleanQ) {
+    searchResults.replaceChildren();
+    searchResults.hidden = true;
+    return;
+  }
+  var normQ = velNormStr(cleanQ);
+  if (normQ.length < 2) {
+    searchResults.replaceChildren();
+    searchResults.hidden = true;
+    return;
+  }
+  var targetKind = activeContentSection.content_type || "movies",
+      isMovie = targetKind === "movies",
+      isHoriz = activeContentSection.card_orientation === "horizontal";
+
+  searchResults.hidden = false;
+  searchResults.replaceChildren();
+  var loadingItem = document.createElement("div");
+  loadingItem.style.padding = "0.75rem";
+  loadingItem.style.textAlign = "center";
+  loadingItem.style.color = "#94a3b8";
+  loadingItem.textContent = "\ud83d\udd0d Recherche de tous les " + (isMovie ? "films" : "s\u00e9ries") + " dans tout le catalogue...";
+  searchResults.appendChild(loadingItem);
+
+  try {
+    var pool = [], seenKeys = new Set();
+    function addCandidate(name, sId, sourceId, thumb, pkgId, catName, year, rating, containerExt, gId) {
+      var cleanName = String(name || "").trim();
+      if (!cleanName) return;
+      var rawId = String(sId || cleanName.toLowerCase());
+      var key = targetKind + ":" + (sourceId ? sourceId + ":" : "") + rawId + ":" + (pkgId || "");
+      if (seenKeys.has(key)) return;
+      seenKeys.add(key);
+      pool.push({
+        streamId: rawId,
+        sourceId: sourceId || "",
+        globalStreamId: gId || rawId,
+        name: cleanName,
+        cleanTitle: cleanName,
+        year: year || "",
+        type: isMovie ? "vod" : "series",
+        thumbUrl: thumb || "",
+        backdropUrl: thumb || "",
+        containerExtension: containerExt || "",
+        categoryName: catName || "",
+        rating: rating || "",
+        packageId: pkgId || activeContentSection.package_id
+      });
+    }
+
+    var appState = typeof window.veloraGetState === "function" ? window.veloraGetState() : null;
+    if (appState) {
+      var targetMap = isMovie ? appState.vodStreamsByCat : appState.seriesStreamsByCat;
+      if (targetMap && typeof targetMap.forEach === "function") {
+        targetMap.forEach(function(catList, catId) {
+          if (Array.isArray(catList)) {
+            var pkgRow = state.packages.find(function(p) { return String(p.id) === String(catId); });
+            var pkgName = pkgRow ? pkgRow.name : (catId || "");
+            catList.forEach(function(it) {
+              var itName = String(it.name || it.title || it.series_name || "").trim();
+              if (!itName || !velNormStr(itName).includes(normQ)) return;
+              var sId = it.raw_series_id || it.raw_stream_id || it.series_id || it.stream_id || it.id;
+              var sIcon = it.stream_icon || it.cover || it.movie_image || it.series_image || "";
+              addCandidate(itName, sId, it.nodecast_source_id || it.source_id, sIcon, catId, it.category_name || pkgName, it.year, it.rating, it.container_extension, it.nodecast_global_stream_id);
+            });
+          }
+        });
+      }
+    }
+
+    if (typeof window.veloraSearchCountryContent === "function") {
+      try {
+        var frontRes = await window.veloraSearchCountryContent(cleanQ);
+        if (frontRes) {
+          var list = isMovie ? frontRes.movies : (frontRes.series || frontRes.results);
+          if (Array.isArray(list)) {
+            list.forEach(function(m) {
+              var it = m.item || m;
+              var itName = m.label || it.name || it.title || it.series_name;
+              var sId = it.raw_series_id || it.raw_stream_id || it.series_id || it.stream_id || it.id || m.id;
+              var sIcon = m.thumbUrl || it.stream_icon || it.cover || it.movie_image || it.series_image || "";
+              var pkgId = m.packageId || it.package_id || activeContentSection.package_id;
+              addCandidate(itName, sId, it.nodecast_source_id || it.source_id, sIcon, pkgId, m.packageName || it.category_name, it.year, it.rating || it.vod_rating, it.container_extension, it.nodecast_global_stream_id || it.global_stream_id);
+            });
+          }
+        }
+      } catch (errFront) {}
+    }
+
+    if (activePackageCatalogItems && activePackageCatalogItems.length > 0) {
+      activePackageCatalogItems.forEach(function(it) {
+        var itName = String(it.name || it.title || it.series_name || "").trim();
+        if (!itName || !velNormStr(itName).includes(normQ)) return;
+        var sId = it.raw_series_id || it.raw_stream_id || it.series_id || it.stream_id || it.id;
+        var sIcon = it.thumbUrl || it.stream_icon || it.cover || "";
+        addCandidate(itName, sId, it.sourceId || it.source_id, sIcon, it.packageId || activeContentSection.package_id, it.categoryName, it.year, it.rating, it.containerExtension, it.globalStreamId);
+      });
+    }
+
+    if (typeof window.veloraGetHomeSectionContent === "function" && Array.isArray(state.packages)) {
+      var relevantPkgs = state.packages.filter(function(p) {
+        if (p.is_hidden === true || p.is_hidden === "true") return false;
+        var pkKind = String(p.kind || "").toLowerCase();
+        if (isMovie && pkKind && pkKind !== "movies" && pkKind !== "vod") return false;
+        if (!isMovie && pkKind && pkKind !== "series") return false;
+        return true;
+      });
+      for (var i = 0; i < relevantPkgs.length; i += 6) {
+        var batch = relevantPkgs.slice(i, i + 6);
+        await Promise.all(batch.map(async function(p) {
+          try {
+            var items = await window.veloraGetHomeSectionContent(targetKind, p.id, isHoriz);
+            if (Array.isArray(items)) {
+              items.forEach(function(it) {
+                var itName = String(it.name || it.title || it.series_name || "").trim();
+                if (!itName || !velNormStr(itName).includes(normQ)) return;
+                addCandidate(itName, it.streamId || it.id, it.sourceId, it.thumbUrl || it.backdropUrl, p.id, p.name, it.year, it.rating, it.containerExtension, it.globalStreamId);
+              });
+            }
+          } catch (errPkg) {}
+        }));
+      }
+    }
+
+    try {
+      var heroRes = await fetch("/api/velora-db/hero-slider/search-catalog?q=" + encodeURIComponent(cleanQ) + "&type=" + encodeURIComponent(isMovie ? "movie" : "series") + "&country_id=all", { cache: "no-store" });
+      if (heroRes.ok) {
+        var candidates = await heroRes.json();
+        if (Array.isArray(candidates)) {
+          candidates.forEach(function(c) {
+            addCandidate(c.cleanTitle || c.name, c.streamId || c.id, c.sourceId, c.thumbUrl, activeContentSection.package_id, c.categoryName, c.year, c.rating, c.containerExtension);
+          });
+        }
+      }
+    } catch (errHero) {}
+
+    searchResults.replaceChildren();
+    if (!pool.length) {
+      var noRes = document.createElement("div");
+      noRes.style.padding = "0.75rem";
+      noRes.style.textAlign = "center";
+      noRes.style.color = "#94a3b8";
+      noRes.textContent = "Aucun " + (isMovie ? "film" : "s\u00e9rie") + " trouv\u00e9 pour \u00ab " + cleanQ + " \u00bb dans le catalogue.";
+      searchResults.appendChild(noRes);
+      return;
+    }
+
+    pool.sort(function(a, b) {
+      var aExact = velNormStr(a.name) === normQ ? 0 : (velNormStr(a.name).startsWith(normQ) ? 1 : 2),
+          bExact = velNormStr(b.name) === normQ ? 0 : (velNormStr(b.name).startsWith(normQ) ? 1 : 2);
+      if (aExact !== bExact) return aExact - bExact;
+      return a.name.localeCompare(b.name, "fr");
+    });
+
+    pool.slice(0, 150).forEach(function(cand) {
+      var itemName = cand.cleanTitle || cand.name;
+      var thumb = cand.thumbUrl || cand.backdropUrl || "";
+      var rowEl = document.createElement("div");
+      rowEl.className = "vel-home-content-search-item";
+      var img = document.createElement("img");
+      img.src = thumb;
+      img.alt = "";
+      img.onerror = function() { img.style.display = "none"; };
+      var info = document.createElement("div");
+      info.className = "vel-home-content-search-item__info";
+      var nameEl = document.createElement("div");
+      nameEl.className = "vel-home-content-search-item__name";
+      nameEl.textContent = itemName + (cand.year ? " (" + cand.year + ")" : "");
+      var meta = document.createElement("div");
+      meta.className = "vel-home-content-search-item__meta";
+      meta.textContent = (isMovie ? "Film" : "S\u00e9rie") + (cand.categoryName ? " \u2022 " + cand.categoryName : "") + (cand.year ? " \u2022 " + cand.year : "");
+      info.append(nameEl, meta);
+      var addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.className = "primary";
+      addBtn.style.padding = "0.35rem 0.75rem";
+      addBtn.style.fontSize = "0.8rem";
+      addBtn.style.whiteSpace = "nowrap";
+      addBtn.textContent = "+ Ajouter";
+      addBtn.addEventListener("click", function(e) {
+        e.stopPropagation();
+        var rawId = cand.streamId || crypto.randomUUID(), finalThumb = thumb;
+        var newEntry = {
+          id: "home-custom:" + activeContentSection.id + ":" + rawId,
+          name: itemName,
+          thumbUrl: finalThumb,
+          backdropUrl: finalThumb,
+          section_logo_url: activeContentSection.logo_url || activeContentSection.badge_logo_url || "",
+          streamId: rawId,
+          sourceId: cand.sourceId,
+          globalStreamId: cand.globalStreamId || rawId,
+          containerExtension: cand.containerExtension || "",
+          contentType: targetKind,
+          packageId: cand.packageId || activeContentSection.package_id
+        };
+        var exists = activeContentItems.some(function(it) {
+          return String(it.streamId || it.id) === String(newEntry.streamId || newEntry.id) && String(it.packageId || "") === String(newEntry.packageId || "");
+        });
+        if (exists) {
+          if (statusEl) statusEl.textContent = "\u00ab " + itemName + " \u00bb est d\u00e9j\u00e0 dans cette section.";
+          return;
+        }
+        activeContentItems.unshift(newEntry);
+        renderContentDialogItems();
+        searchResults.hidden = true;
+        if (statusEl) statusEl.textContent = "\u00ab " + itemName + " \u00bb ajout\u00e9 avec succ\u00e8s !";
+      });
+      rowEl.append(img, info, addBtn);
+      searchResults.appendChild(rowEl);
+    });
+  } catch (err) {
+    searchResults.replaceChildren();
+    var errEl = document.createElement("div");
+    errEl.style.padding = "0.75rem";
+    errEl.style.color = "#ef4444";
+    errEl.textContent = "Erreur de recherche : " + err.message;
+    searchResults.appendChild(errEl);
+  }
+}
 var clientBackdropCache = new Map();
 function veloraEnsureCardBackdrop(card, media, section, entry) {
   var key = String(entry.sourceId || "") + ":" + String(entry.streamId || "") + ":" + String(entry.name || "");

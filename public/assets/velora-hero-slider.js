@@ -9,6 +9,19 @@
   var container = null;
   var AUTO_SLIDE_DELAY = 5500;
 
+  function formatCleanTitle(text) {
+    return String(text || '')
+      .replace(/^(4K-?|UHD-?|FHD-?|HD-?)?([A-Za-z0-9]{1,6}(?:-[A-Za-z0-9]{1,6})?)\s*[-:|]\s*/i, '')
+      .replace(/\[[^\]]+\]/g, '')
+      .replace(/\b(4K|UHD|FHD|HD|HEVC|H265|1080p|720p|CAM|TS|DVD|BLURAY|TELESYNC|VOSTFR|VF|MULTI)\b/gi, '')
+      .replace(/\(\d{4}(?:-\d{2}-\d{2})?\)/g, '')
+      .replace(/\(\d{4}\)/g, '')
+      .replace(/\b\d{4}-\d{2}-\d{2}\b/g, '')
+      .replace(/\((?:US|FR|DE|ES|IT|AR|UK|ZA|TR|PL|NL)\)/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   function getActiveCountry() {
     if (typeof window.veloraGetActiveCountry === "function") {
       var c = window.veloraGetActiveCountry();
@@ -170,7 +183,8 @@
 
       var img = document.createElement("img");
       img.className = "vel-hero-slide__bg";
-      img.alt = item.title;
+      var cleanTitle = formatCleanTitle(item.title);
+      img.alt = cleanTitle;
       img.loading = idx === 0 ? "eager" : "lazy";
       img.src = item.backdrop || item.image || "";
 
@@ -180,31 +194,10 @@
       var content = document.createElement("div");
       content.className = "vel-hero-slide__content";
 
-      var badges = document.createElement("div");
-      badges.className = "vel-hero-badges";
-
-      var badge = document.createElement("span");
-      badge.className = "vel-hero-badge " + getBadgeClass(item.badge, item.category);
-      badge.textContent = getBadgeLabel(item);
-      badges.appendChild(badge);
-
-      var qualityBadge = document.createElement("span");
-      qualityBadge.className = "vel-hero-badge vel-hero-badge--quality";
-      qualityBadge.textContent = "4K HDR";
-      badges.appendChild(qualityBadge);
-
-      if (item.is_fallback) {
-        var fallbackBadge = document.createElement("span");
-        fallbackBadge.className = "vel-hero-badge vel-hero-badge--fallback";
-        fallbackBadge.textContent = "Version Internationale / US";
-        badges.appendChild(fallbackBadge);
-      }
-
       var title = document.createElement("h2");
       title.className = "vel-hero-title";
-      title.textContent = item.title;
+      title.textContent = cleanTitle;
 
-      content.appendChild(badges);
       content.appendChild(title);
 
       if (item.overview) {
@@ -213,21 +206,6 @@
         overview.textContent = item.overview;
         content.appendChild(overview);
       }
-
-      var actions = document.createElement("div");
-      actions.className = "vel-hero-actions";
-
-      var playBtn = document.createElement("button");
-      playBtn.type = "button";
-      playBtn.className = "vel-hero-btn vel-hero-btn--play";
-      playBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Regarder';
-      playBtn.addEventListener("click", function(e) {
-        e.stopPropagation();
-        playSlideItem(item);
-      });
-
-      actions.appendChild(playBtn);
-      content.appendChild(actions);
 
       slide.appendChild(img);
       slide.appendChild(overlay);

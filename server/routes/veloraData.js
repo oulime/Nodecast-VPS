@@ -1529,6 +1529,7 @@ function buildHomeCache() {
                 name: stripHomeChannelPrefixes(rawName, channelRules.prefixes),
                 thumbUrl: finalThumb,
                 backdropUrl: backdropUrl || (isHorizontal ? '' : standardThumb),
+                section_logo_url: String(section.logo_url || section.badge_logo_url || '').trim(),
                 streamId: rawId,
                 sourceId: item.source_id,
                 globalStreamId: item.global_stream_id || item.stream_id,
@@ -1537,7 +1538,7 @@ function buildHomeCache() {
                 packageId: section.package_id
             };
         }).filter(item => item?.name).slice(0, HOME_CACHE_ENTRIES_PER_PACKAGE);
-        return { ...section, content_type: type, card_orientation: orientation, entries };
+        return { ...section, content_type: type, card_orientation: orientation, logo_url: String(section.logo_url || section.badge_logo_url || '').trim(), entries };
     });
     const payload = { generatedAt: new Date().toISOString(), sections: output };
     writeJsonAtomic(homeCachePath, payload);
@@ -1606,6 +1607,44 @@ router.get('/media-backdrop', async (req, res) => {
         }
         return res.json({ ok: false, backdropUrl: '' });
     } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+const SECTION_LOGO_UPLOAD_DIR = path.join(__dirname, '..', '..', 'public', 'uploads', 'section-logos');
+const SECTION_LOGO_PUBLIC_PATH = '/uploads/section-logos';
+
+function detectImageExt(buffer, defaultName) {
+    if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'png';
+    if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'jpg';
+    if (buffer.length >= 12 && buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP') return 'webp';
+    if (buffer.length >= 6 && ['GIF87a', 'GIF89a'].includes(buffer.subarray(0, 6).toString('ascii'))) return 'gif';
+    if (buffer.length >= 4 && buffer.subarray(0, 64).toString('utf8').toLowerCase().includes('<svg')) return 'svg';
+    const lower = String(defaultName || '').toLowerCase();
+    if (lower.endsWith('.png')) return 'png';
+    if (lower.endsWith('.webp')) return 'webp';
+    if (lower.endsWith('.svg')) return 'svg';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'jpg';
+    if (lower.endsWith('.gif')) return 'gif';
+    return 'png';
+}
+
+router.post('/upload-section-logo', async (req, res) => {
+    try {
+        const encoded = String(req.body?.dataBase64 || '').trim();
+        const rawFileName = String(req.body?.fileName || 'logo').trim();
+        if (!encoded) return res.status(400).json({ error: 'Image data required.' });
+        const buffer = Buffer.from(encoded.replace(/^data:[^;]+;base64,/, ''), 'base64');
+        if (!buffer.length || buffer.length > 5 * 1024 * 1024) return res.status(413).json({ error: 'Image must be 5 MB or smaller.' });
+        const ext = detectImageExt(buffer, rawFileName);
+        await fs.promises.mkdir(SECTION_LOGO_UPLOAD_DIR, { recursive: true });
+        const cleanBase = rawFileName.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40) || 'logo';
+        const fileName = `${cleanBase}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
+        await fs.promises.writeFile(path.join(SECTION_LOGO_UPLOAD_DIR, fileName), buffer);
+        const url = `${SECTION_LOGO_PUBLIC_PATH}/${fileName}`;
+        return res.json({ ok: true, url, path: url });
+    } catch (err) {
+        console.error('[veloraData] upload-section-logo failed:', err);
         return res.status(500).json({ error: err.message });
     }
 });

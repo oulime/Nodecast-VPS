@@ -293,6 +293,21 @@
     name.className = "vel-home-section__name";
     name.textContent = cleanTitle || entry.name || "";
     card.append(media, name);
+    var logoUrl = String(section && (section.logo_url || section.badge_logo_url) || entry && (entry.section_logo_url || entry.logo_url) || "").trim();
+    if (logoUrl) {
+      card.classList.add("vel-home-section__card--has-badge");
+      var logoEl = document.createElement("img");
+      logoEl.className = "vel-home-section__badge-logo";
+      logoEl.alt = "";
+      logoEl.loading = "lazy";
+      if (typeof window.veloraSetHomeImageSource === "function") {
+        window.veloraSetHomeImageSource(logoEl, logoUrl, function () { logoEl.remove(); });
+      } else {
+        logoEl.src = logoUrl;
+        logoEl.onerror = function () { logoEl.remove(); };
+      }
+      card.appendChild(logoEl);
+    }
     if (isHorizontal && (section.content_type === "movies" || section.content_type === "series")) {
       veloraEnsureCardBackdrop(card, media, section, entry);
     }

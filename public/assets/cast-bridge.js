@@ -6,6 +6,7 @@
   var CAST_SDK_SRC = "https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1";
 
   var state = {
+
     sdkReady: false,
     sdkLoading: false,
     castState: "NO_DEVICES_AVAILABLE",
@@ -204,7 +205,7 @@
     try {
       if (active) localStorage.setItem(SESSION_KEY, "1");
       else localStorage.removeItem(SESSION_KEY);
-    } catch (_) {}
+    } catch (_) { }
   }
 
   function hadSessionActive() {
@@ -536,7 +537,7 @@
           }
         });
       }
-    } catch (_) {}
+    } catch (_) { }
 
     var originalSetAttribute = HTMLMediaElement.prototype.setAttribute;
     if (typeof originalSetAttribute === "function") {

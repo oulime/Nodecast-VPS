@@ -1749,7 +1749,10 @@ function cleanItemName(text) {
         .replace(/^(4K-?|UHD-?|FHD-?|HD-?)?([A-Za-z0-9]{1,6}(?:-[A-Za-z0-9]{1,6})?)\s*[-:|]\s*/i, '')
         .replace(/\[[^\]]+\]/g, '')
         .replace(/\b(4K|UHD|FHD|HD|HEVC|H265|1080p|720p|CAM|TS|DVD|BLURAY|TELESYNC|VOSTFR|VF|MULTI)\b/gi, '')
+        .replace(/\(\d{4}(?:-\d{2}-\d{2})?\)/g, '')
         .replace(/\(\d{4}\)/g, '')
+        .replace(/\b\d{4}-\d{2}-\d{2}\b/g, '')
+        .replace(/\((?:US|FR|DE|ES|IT|AR|UK|ZA|TR|PL|NL)\)/gi, '')
         .replace(/\s+/g, ' ')
         .trim();
 }

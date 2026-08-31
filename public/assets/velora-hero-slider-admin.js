@@ -532,7 +532,9 @@
 
     try {
       var type = typeSel ? typeSel.value : "";
-      var candidates = await apiReq("/hero-slider/search-catalog?q=" + encodeURIComponent(query) + "&type=" + encodeURIComponent(type));
+      var scanTargetCountry = document.getElementById("slider-scan-target-country");
+      var countryId = (scanTargetCountry && scanTargetCountry.value && scanTargetCountry.value !== "all") ? scanTargetCountry.value : "country_etats_unis";
+      var candidates = await apiReq("/hero-slider/search-catalog?q=" + encodeURIComponent(query) + "&type=" + encodeURIComponent(type) + "&country_id=" + encodeURIComponent(countryId));
       state.candidates = candidates;
       renderCandidates(candidates, query);
       setStatus(candidates.length + " résultat(s) trouvé(s) pour '" + query + "'. Choisissez celui que vous souhaitez ajouter.");

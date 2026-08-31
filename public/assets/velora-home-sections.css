@@ -301,8 +301,8 @@
   position: absolute !important;
   right: 0.65rem !important;
   bottom: 0.55rem !important;
-  height: clamp(16px, 2.2vw, 24px) !important;
-  max-width: clamp(46px, 6vw, 76px) !important;
+  height: clamp(18px, 2.4vw, 26px) !important;
+  max-width: clamp(50px, 6.5vw, 80px) !important;
   object-fit: contain !important;
   object-position: right bottom !important;
   pointer-events: none !important;
@@ -316,34 +316,92 @@
   transform: scale(1.08) !important;
 }
 
+/* Larger badge logo on horizontal & live cards */
+.vel-home-section__card--horizontal .vel-home-section__badge-logo,
+.vel-home-section--horizontal .vel-home-section__badge-logo,
+.vel-home-section__card--live .vel-home-section__badge-logo {
+  right: 0.75rem !important;
+  bottom: 0.65rem !important;
+  height: clamp(22px, 3.2vw, 36px) !important;
+  max-width: clamp(65px, 9.5vw, 110px) !important;
+}
+
 .vel-home-section__card--has-badge.vel-home-section__card--horizontal .vel-home-section__name,
-.vel-home-section--horizontal .vel-home-section__card--has-badge .vel-home-section__name {
-  padding-right: clamp(4.2rem, 9vw, 5.8rem) !important;
+.vel-home-section--horizontal .vel-home-section__card--has-badge .vel-home-section__name,
+.vel-home-section__card--has-badge.vel-home-section__card--live .vel-home-section__name {
+  padding-right: clamp(5rem, 10vw, 7.2rem) !important;
 }
 
 .vel-home-sections-admin-logo-preview {
   display: inline-block;
-  height: 20px;
-  max-width: 55px;
+  height: 14px;
+  max-width: 36px;
   object-fit: contain;
-  margin-left: 0.5rem;
+  margin-left: 0.4rem;
   vertical-align: middle;
-  border-radius: 4px;
+  border-radius: 3px;
   background: rgba(0, 0, 0, 0.45);
-  padding: 2px 4px;
+  padding: 1px 3px;
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
+#home-section-logo-preview.vel-home-sections-admin-logo-preview {
+  height: 22px;
+  max-width: 55px;
+}
+
+.vel-home-checkbox-pill {
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.vel-home-checkbox-pill:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+}
+
+#home-section-country optgroup {
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: #94a3b8;
+  background: #181a20;
+  padding: 4px 0;
+}
+
+#home-section-country option {
+  font-weight: 500;
+  font-size: 0.85rem;
+  color: #f1f5f9;
+  background: #0f1117;
+  padding: 5px 8px;
+}
+
 @media(max-width:640px) {
+  #settings-tab-home .field.row {
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+  }
+  #settings-tab-home .field.row > div {
+    width: 100% !important;
+    flex: none !important;
+  }
   .vel-home-section__badge-logo {
     right: 0.45rem !important;
     bottom: 0.4rem !important;
     height: clamp(14px, 3.5vw, 18px) !important;
     max-width: clamp(38px, 10vw, 52px) !important;
   }
+  .vel-home-section__card--horizontal .vel-home-section__badge-logo,
+  .vel-home-section--horizontal .vel-home-section__badge-logo,
+  .vel-home-section__card--live .vel-home-section__badge-logo {
+    right: 0.5rem !important;
+    bottom: 0.45rem !important;
+    height: clamp(18px, 4.5vw, 26px) !important;
+    max-width: clamp(52px, 13vw, 78px) !important;
+  }
   .vel-home-section__card--has-badge.vel-home-section__card--horizontal .vel-home-section__name,
-  .vel-home-section--horizontal .vel-home-section__card--has-badge .vel-home-section__name {
-    padding-right: 3.6rem !important;
+  .vel-home-section--horizontal .vel-home-section__card--has-badge .vel-home-section__name,
+  .vel-home-section__card--has-badge.vel-home-section__card--live .vel-home-section__name {
+    padding-right: 4.6rem !important;
   }
 }
 

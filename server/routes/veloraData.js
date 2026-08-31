@@ -1487,57 +1487,78 @@ function buildHomeCache() {
         const membership = packageStreams.get(String(section.package_id)) || { keys: new Set(), sourceAware: false };
         const orientation = String(section.card_orientation || 'vertical').toLowerCase() === 'horizontal' ? 'horizontal' : 'vertical';
         const isHorizontal = orientation === 'horizontal';
-        const entries = snapshots[type].filter(item => {
-            const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
-            const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
-            // Effective memberships include both provider defaults and explicit
-            // moves. Prefer them whenever available so Home follows media moved
-            // into or out of provider-backed Movie and Series packages.
-            if (membership.keys.size) {
-                return membership.sourceAware
-                    ? membership.keys.has(`${sourceId}:${String(rawId)}`)
-                    : membership.keys.has(String(rawId));
-            }
-            if (providerBacked) {
-                return sourceId === providerSourceId
-                    && String(item.raw_category_id ?? '') === providerCategoryId;
-            }
-            return false;
-        }).map(item => {
-            const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
-            const rawName = String(item.name || item.title || item.series_name || '').trim();
-            if (type === 'live' && isHomeChannelHidden(rawName, channelRules.hiddenFilters)) return null;
-            const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
-            const key = `${sourceId}:${String(rawId)}`;
-            const titleKey = normalizedPosterTitle(rawName);
+        let entries = [];
+        if (Array.isArray(section.custom_entries) && section.custom_entries.length > 0) {
+            entries = section.custom_entries.map((item, a) => {
+                const rawName = String(item.name || item.title || '').trim();
+                const rawId = item.streamId ?? item.stream_id ?? item.raw_stream_id ?? a;
+                const standardThumb = String(item.thumbUrl || item.stream_icon || item.cover || '');
+                const backdropUrl = String(item.backdropUrl || item.backdrop || standardThumb || '');
+                const finalThumb = (isHorizontal && backdropUrl) ? backdropUrl : (standardThumb || backdropUrl);
+                return {
+                    id: item.id || `home-cache:${section.id}:${rawId}`,
+                    name: stripHomeChannelPrefixes(rawName, channelRules.prefixes),
+                    thumbUrl: finalThumb,
+                    backdropUrl: backdropUrl || (isHorizontal ? '' : standardThumb),
+                    section_logo_url: String(section.logo_url || section.badge_logo_url || item.section_logo_url || '').trim(),
+                    streamId: rawId,
+                    sourceId: item.sourceId ?? item.source_id,
+                    globalStreamId: item.globalStreamId ?? item.global_stream_id ?? rawId,
+                    containerExtension: item.containerExtension ?? item.container_extension ?? '',
+                    contentType: type,
+                    packageId: section.package_id
+                };
+            }).filter(item => item?.name).slice(0, HOME_CACHE_ENTRIES_PER_PACKAGE);
+        } else {
+            entries = snapshots[type].filter(item => {
+                const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
+                const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
+                if (membership.keys.size) {
+                    return membership.sourceAware
+                        ? membership.keys.has(`${sourceId}:${String(rawId)}`)
+                        : membership.keys.has(String(rawId));
+                }
+                if (providerBacked) {
+                    return sourceId === providerSourceId
+                        && String(item.raw_category_id ?? '') === providerCategoryId;
+                }
+                return false;
+            }).map(item => {
+                const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
+                const rawName = String(item.name || item.title || item.series_name || '').trim();
+                if (type === 'live' && isHomeChannelHidden(rawName, channelRules.hiddenFilters)) return null;
+                const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
+                const key = `${sourceId}:${String(rawId)}`;
+                const titleKey = normalizedPosterTitle(rawName);
 
-            let backdropCandidate = item.backdrop_path ?? item.backdrop ?? item.backdrop_url ?? '';
-            if (Array.isArray(backdropCandidate) && backdropCandidate.length > 0) backdropCandidate = backdropCandidate[0];
-            let backdropUrl = '';
-            if (typeof backdropCandidate === 'string' && backdropCandidate.trim()) {
-                let url = backdropCandidate.trim();
-                if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w1280${url}`;
-                backdropUrl = url;
-            }
-            if (!backdropUrl && isHorizontal) {
-                backdropUrl = backdropCache[key] || backdropCache[titleKey] || '';
-            }
-            const standardThumb = String(item.stream_icon || item.cover || '');
-            const finalThumb = (isHorizontal && backdropUrl) ? backdropUrl : (standardThumb || backdropUrl);
-            return {
-                id: `home-cache:${section.id}:${rawId}`,
-                name: stripHomeChannelPrefixes(rawName, channelRules.prefixes),
-                thumbUrl: finalThumb,
-                backdropUrl: backdropUrl || (isHorizontal ? '' : standardThumb),
-                section_logo_url: String(section.logo_url || section.badge_logo_url || '').trim(),
-                streamId: rawId,
-                sourceId: item.source_id,
-                globalStreamId: item.global_stream_id || item.stream_id,
-                containerExtension: item.container_extension || '',
-                contentType: type,
-                packageId: section.package_id
-            };
-        }).filter(item => item?.name).slice(0, HOME_CACHE_ENTRIES_PER_PACKAGE);
+                let backdropCandidate = item.backdrop_path ?? item.backdrop ?? item.backdrop_url ?? '';
+                if (Array.isArray(backdropCandidate) && backdropCandidate.length > 0) backdropCandidate = backdropCandidate[0];
+                let backdropUrl = '';
+                if (typeof backdropCandidate === 'string' && backdropCandidate.trim()) {
+                    let url = backdropCandidate.trim();
+                    if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w1280${url}`;
+                    backdropUrl = url;
+                }
+                if (!backdropUrl && isHorizontal) {
+                    backdropUrl = backdropCache[key] || backdropCache[titleKey] || '';
+                }
+                const standardThumb = String(item.stream_icon || item.cover || '');
+                const finalThumb = (isHorizontal && backdropUrl) ? backdropUrl : (standardThumb || backdropUrl);
+                return {
+                    id: `home-cache:${section.id}:${rawId}`,
+                    name: stripHomeChannelPrefixes(rawName, channelRules.prefixes),
+                    thumbUrl: finalThumb,
+                    backdropUrl: backdropUrl || (isHorizontal ? '' : standardThumb),
+                    section_logo_url: String(section.logo_url || section.badge_logo_url || '').trim(),
+                    streamId: rawId,
+                    sourceId: item.source_id,
+                    globalStreamId: item.global_stream_id || item.stream_id,
+                    containerExtension: item.container_extension || '',
+                    contentType: type,
+                    packageId: section.package_id
+                };
+            }).filter(item => item?.name).slice(0, HOME_CACHE_ENTRIES_PER_PACKAGE);
+        }
         return { ...section, content_type: type, card_orientation: orientation, logo_url: String(section.logo_url || section.badge_logo_url || '').trim(), entries };
     });
     const payload = { generatedAt: new Date().toISOString(), sections: output };
@@ -1810,13 +1831,6 @@ router.get('/hero-slider/search-catalog', (req, res) => {
         if (!tokens.length) tokens = [rawQuery.toLowerCase()];
 
         const db = getDb();
-        let typeClause = '';
-        if (typeFilter === 'movie' || typeFilter === 'vod') {
-            typeClause = ' AND p.type = "movie"';
-        } else if (typeFilter === 'series') {
-            typeClause = ' AND p.type = "series"';
-        }
-
         const tokenClauses = [];
         const params = [];
 
@@ -1830,26 +1844,80 @@ router.get('/hero-slider/search-catalog', (req, res) => {
             }
         });
 
-        const rows = db.prepare(`
-            SELECT p.source_id, p.item_id, p.type, p.name, p.stream_icon, p.container_extension, p.rating, p.year, p.data, c.name as cat_name
-            FROM playlist_items p
-            LEFT JOIN categories c ON p.source_id = c.source_id AND p.category_id = c.category_id
-            WHERE (${tokenClauses.join(' AND ')}) AND p.is_hidden = 0${typeClause}
-            LIMIT 150
-        `).all(...params);
+        let typeClause = '';
+        if (typeFilter === 'movie' || typeFilter === 'vod') {
+            typeClause = ' AND p.type = ?';
+            params.push('movie');
+        } else if (typeFilter === 'series') {
+            typeClause = ' AND p.type = ?';
+            params.push('series');
+        }
 
-        const countryId = String(req.query.country_id || 'country_etats_unis').trim();
-        const matcher = HERO_COUNTRY_MATCHERS.find(m => m.id === countryId || m.altId === countryId) ||
-            HERO_COUNTRY_MATCHERS.find(m => m.code === 'US');
+        let rows = [];
+        try {
+            rows = db.prepare(`
+                SELECT p.source_id, p.item_id, p.type, p.name, p.stream_icon, p.container_extension, p.rating, p.year, p.data, c.name as cat_name
+                FROM playlist_items p
+                LEFT JOIN categories c ON p.source_id = c.source_id AND p.category_id = c.category_id
+                WHERE (${tokenClauses.join(' AND ')}) AND p.is_hidden = 0${typeClause}
+                LIMIT 150
+            `).all(...params);
+        } catch (_) {
+            rows = [];
+        }
 
-        // Prioritize rows matching selected country (USA by default) BEFORE deduplication
-        rows.sort((a, b) => {
-            const matchA = matcher ? matcher.patterns.some(p => p.test(`${a.cat_name || ''} ${a.name || ''}`)) : false;
-            const matchB = matcher ? matcher.patterns.some(p => p.test(`${b.cat_name || ''} ${b.name || ''}`)) : false;
-            if (matchA && !matchB) return -1;
-            if (!matchA && matchB) return 1;
-            return 0;
-        });
+        // Also scan home-sections.json and country-packages if available
+        if (fs.existsSync(homeCachePath)) {
+            try {
+                const homeData = JSON.parse(fs.readFileSync(homeCachePath, 'utf8'));
+                if (Array.isArray(homeData.sections)) {
+                    homeData.sections.forEach(sec => {
+                        const secType = sec.content_type === 'series' ? 'series' : 'movie';
+                        if (typeFilter && typeFilter !== 'all') {
+                            if ((typeFilter === 'movie' || typeFilter === 'vod') && secType !== 'movie') return;
+                            if (typeFilter === 'series' && secType !== 'series') return;
+                        }
+                        if (Array.isArray(sec.entries)) {
+                            sec.entries.forEach(entry => {
+                                const entryName = String(entry.name || entry.title || '').trim();
+                                const normEntry = entryName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+                                if (tokens.every(tok => normEntry.includes(tok))) {
+                                    rows.push({
+                                        source_id: entry.sourceId || entry.source_id || 1,
+                                        item_id: entry.streamId || entry.stream_id || entry.id,
+                                        type: secType,
+                                        name: entryName,
+                                        stream_icon: entry.thumbUrl || entry.stream_icon || entry.cover || '',
+                                        container_extension: entry.containerExtension || entry.container_extension || '',
+                                        rating: entry.rating || '',
+                                        year: entry.year || '',
+                                        data: JSON.stringify(entry),
+                                        cat_name: sec.title || ''
+                                    });
+                                }
+                            });
+                        }
+                    });
+                }
+            } catch (_) {}
+        }
+
+        const countryId = String(req.query.country_id || 'all').trim();
+        const matcher = (countryId && countryId !== 'all' && countryId !== 'default')
+            ? (HERO_COUNTRY_MATCHERS.find(m => m.id === countryId || m.altId === countryId) ||
+               HERO_COUNTRY_MATCHERS.find(m => m.code === 'US'))
+            : null;
+
+        // Prioritize rows matching selected country (if specific country is selected) BEFORE deduplication
+        if (matcher) {
+            rows.sort((a, b) => {
+                const matchA = matcher.patterns.some(p => p.test(`${a.cat_name || ''} ${a.name || ''}`));
+                const matchB = matcher.patterns.some(p => p.test(`${b.cat_name || ''} ${b.name || ''}`));
+                if (matchA && !matchB) return -1;
+                if (!matchA && matchB) return 1;
+                return 0;
+            });
+        }
 
         const candidates = [];
         const seen = new Set();
@@ -1858,7 +1926,7 @@ router.get('/hero-slider/search-catalog', (req, res) => {
             let tmdbId = '';
             try {
                 if (r.data) {
-                    const parsed = JSON.parse(r.data);
+                    const parsed = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
                     tmdbId = String(parsed.tmdb || parsed.tmdb_id || parsed.tmdbId || '').trim();
                 }
             } catch (_) {}

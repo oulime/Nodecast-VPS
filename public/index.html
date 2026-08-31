@@ -1513,7 +1513,7 @@
       rel="stylesheet"
     />
     <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-54"></script>
-    <script defer src="/assets/velora-home-sections.js?v=package-search-v20260831-3"></script>
+    <script defer src="/assets/velora-home-sections.js?v=section-hero-search-v20260831-7"></script>
     <script defer src="/assets/velora-home-cache-fallback.js?v=instant-nav-v20260821-132"></script>
     <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=instant-nav-v20260821-147"></script>
     <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-54"></script>
@@ -1578,7 +1578,7 @@
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css?v=vod-contrast-shimmer-v5-20260830">
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=large-package-virtualization-v1-20260810">
     <link rel="stylesheet" href="/assets/live-package-text-cards.css?v=tv-package-flat-inner-v1-20260814">
-    <link rel="stylesheet" href="/assets/velora-home-sections.css?v=section-badge-logo-v20260831-5">
+    <link rel="stylesheet" href="/assets/velora-home-sections.css?v=section-three-dots-v20260831-1">
     <link rel="stylesheet" href="/assets/velora-live-wheel.css?v=instant-nav-v20260821-150">
     <link rel="stylesheet" href="/assets/pkg-hub-selector.css?v=20260830-visibility-fix-v43">
     <style>
@@ -5514,6 +5514,42 @@
               <div class="actions"><button type="button" id="home-cache-rebuild" class="countries-admin-cancel">Reconstruire le cache Accueil</button></div>
               <p id="home-cache-status" class="status" aria-live="polite" style="margin-top: 0.5rem;"></p>
             </div>
+
+            <dialog id="home-section-content-dialog" class="vel-home-content-dialog">
+              <div class="vel-home-content-dialog__content">
+                <header class="vel-home-content-dialog__header">
+                  <div>
+                    <h3 id="home-section-content-title" class="vel-home-content-dialog__title">Contenu de la section</h3>
+                    <p id="home-section-content-subtitle" class="vel-home-content-dialog__subtitle">Visualisez, organisez ou ajoutez des éléments à cette rangée.</p>
+                  </div>
+                  <button type="button" id="home-section-content-close" class="vel-home-content-dialog__close" aria-label="Fermer">✕</button>
+                </header>
+
+                <div class="vel-home-content-dialog__search-wrap">
+                  <div class="vel-home-content-dialog__search-bar">
+                    <input id="home-section-content-search-input" type="search" placeholder="🔍 Rechercher un film ou une série à ajouter..." autocomplete="off" />
+                    <button type="button" id="home-section-content-search-btn" class="primary" style="white-space: nowrap;">Rechercher</button>
+                  </div>
+                  <div id="home-section-content-search-results" class="vel-home-content-dialog__search-results" hidden></div>
+                </div>
+
+                <div class="vel-home-content-dialog__body">
+                  <div class="vel-home-content-dialog__list-header">
+                    <strong id="home-section-content-count">0 élément(s)</strong>
+                    <span id="home-section-content-hint" class="vel-home-content-dialog__hint">Utilisez les boutons fléchés pour réorganiser l'ordre</span>
+                  </div>
+                  <div id="home-section-content-items" class="vel-home-content-dialog__grid"></div>
+                </div>
+
+                <footer class="vel-home-content-dialog__footer">
+                  <span id="home-section-content-status" class="status" style="margin: 0; flex: 1;" aria-live="polite"></span>
+                  <div style="display: flex; gap: 0.5rem;">
+                    <button type="button" id="home-section-content-cancel-btn" class="countries-admin-cancel">Fermer</button>
+                    <button type="button" id="home-section-content-save-btn" class="primary">Enregistrer le contenu</button>
+                  </div>
+                </footer>
+              </div>
+            </dialog>
           </section>
           <section
             id="settings-tab-prefixes"

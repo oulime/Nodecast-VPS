@@ -1869,7 +1869,7 @@ router.get('/hero-slider/search-catalog', (req, res) => {
                 FROM playlist_items p
                 LEFT JOIN categories c ON p.source_id = c.source_id AND p.category_id = c.category_id
                 WHERE (${tokenClauses.join(' AND ')}) AND p.is_hidden = 0${typeClause}
-                LIMIT 150
+                LIMIT 500
             `).all(...params);
         } catch (_) {
             rows = [];
@@ -1942,7 +1942,7 @@ router.get('/hero-slider/search-catalog', (req, res) => {
 
             const year = r.year || extractYear(r.name) || extractYear(r.cat_name) || '';
             const clean = cleanItemName(r.name);
-            const key = tmdbId ? `tmdb:${tmdbId}` : `${clean.toLowerCase()}::${year}::${r.type}`;
+            const key = `${r.source_id}:${r.item_id}`;
             if (!seen.has(key)) {
                 seen.add(key);
                 candidates.push({
@@ -1969,7 +1969,7 @@ router.get('/hero-slider/search-catalog', (req, res) => {
             return a.cleanTitle.localeCompare(b.cleanTitle, 'fr');
         });
 
-        return res.json(candidates.slice(0, 30));
+        return res.json(candidates.slice(0, 200));
     } catch (error) {
         return res.status(500).json({ error: error.message });
     }

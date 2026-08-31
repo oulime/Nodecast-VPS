@@ -174,7 +174,7 @@ async function searchMediaForContentDialog(query) {
         var candidates = await heroRes.json();
         if (Array.isArray(candidates)) {
           candidates.forEach(function(c) {
-            addCandidate(c.cleanTitle || c.name, c.streamId || c.id, c.sourceId, c.thumbUrl, activeContentSection.package_id, c.categoryName, c.year, c.rating, c.containerExtension);
+            addCandidate(c.name || c.cleanTitle, c.streamId || c.id, c.sourceId, c.thumbUrl, activeContentSection.package_id, c.categoryName, c.year, c.rating, c.containerExtension);
           });
         }
       }

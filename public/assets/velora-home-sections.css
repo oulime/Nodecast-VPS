@@ -774,5 +774,116 @@
   color: #ef4444 !important;
 }
 
+.vel-home-countries-picker {
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.vel-home-countries-picker__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.vel-home-countries-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 0.35rem 0.6rem;
+  max-height: 175px;
+  overflow-y: auto;
+  padding: 0.45rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+#settings-tab-home .vel-home-country-checkbox-item,
+.vel-home-country-checkbox-item {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  flex-wrap: nowrap !important;
+  gap: 0.5rem !important;
+  font-size: 0.82rem !important;
+  color: #e2e8f0 !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  padding: 0.25rem 0.45rem !important;
+  border-radius: 4px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  line-height: 1 !important;
+}
+
+#settings-tab-home .vel-home-country-checkbox-item:hover,
+.vel-home-country-checkbox-item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+#settings-tab-home .vel-home-country-checkbox-item input[type="checkbox"],
+#settings-tab-home .vel-home-country-checkbox-item input,
+.vel-home-country-checkbox-item input[type="checkbox"],
+.vel-home-country-checkbox-item input {
+  display: inline-block !important;
+  width: 1.05rem !important;
+  height: 1.05rem !important;
+  min-width: 1.05rem !important;
+  min-height: 1.05rem !important;
+  max-width: 1.05rem !important;
+  max-height: 1.05rem !important;
+  cursor: pointer !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  accent-color: #7c3aed !important;
+  flex: 0 0 auto !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.vel-home-country-flag {
+  display: inline-block !important;
+  width: 22px !important;
+  height: 15px !important;
+  min-width: 22px !important;
+  max-width: 22px !important;
+  min-height: 15px !important;
+  max-height: 15px !important;
+  object-fit: cover !important;
+  border-radius: 3px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+  flex: 0 0 auto !important;
+  margin: 0 !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  vertical-align: middle !important;
+}
+
+#settings-tab-home .vel-home-country-checkbox-item span,
+.vel-home-country-checkbox-item span {
+  display: inline-block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  color: inherit !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  flex: 1 1 auto !important;
+}
+
 
 

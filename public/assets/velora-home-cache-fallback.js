@@ -1,6 +1,6 @@
 (function () {
   "use strict";
-  var storageKey = "velora.home-cache.first-paint.v1";
+  var storageKey = "velora.home-cache.first-paint.v2";
   var cachePayload = null;
   var cacheRequests = new Map();
   var cachePayloads = new Map();
@@ -85,7 +85,7 @@
     var countryId = activeCountryId();
     var countryPayload = cachePayloads.get(countryId);
     var countryUpdatedAt = cacheUpdatedAtByCountry.get(countryId) || 0;
-    if (countryPayload && (!force || Date.now() - countryUpdatedAt < 60000)) {
+    if (!force && countryPayload && Date.now() - countryUpdatedAt < 60000) {
       cachePayload = countryPayload;
       cacheCountryId = countryId;
       cacheUpdatedAt = countryUpdatedAt;
@@ -316,17 +316,26 @@
     return card;
   }
 
+  function getSectionCountryIds(section) {
+    if (!section) return ["default"];
+    if (Array.isArray(section.country_ids) && section.country_ids.length) return section.country_ids;
+    if (!section.country_id || section.country_id === "default") return ["default"];
+    return String(section.country_id).split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+
   function matchingSections(payload) {
     var sections = payload && Array.isArray(payload.sections) ? payload.sections : [];
     var countryId = activeCountryId();
-    var matching = sections.filter(function (section) {
-      return section.published !== false && String(section.country_id || "") === countryId;
+    var published = sections.filter(function (section) { return section.published !== false; });
+    var specific = published.filter(function (section) {
+      var ids = getSectionCountryIds(section);
+      return !ids.includes("default") && (countryId ? ids.includes(countryId) : false);
     });
-    if (!matching.length) {
-      matching = sections.filter(function (section) {
-        return section.published !== false && (!section.country_id || section.country_id === "default");
-      });
-    }
+    var defaults = published.filter(function (section) {
+      var ids = getSectionCountryIds(section);
+      return ids.includes("default") || ids.includes("all");
+    });
+    var matching = specific.length ? specific : defaults;
     return matching.sort(function (a, b) {
       return (Number(a.section_order) || 0) - (Number(b.section_order) || 0);
     });
@@ -511,7 +520,11 @@
 
   document.addEventListener("velora-app-ready", loadAndRender);
   document.addEventListener("velora-countries-ready", loadAndRender);
+  document.addEventListener("velora-country-change", function () { window.setTimeout(loadAndRender, 40); });
+  document.addEventListener("velora-country-changed", function () { window.setTimeout(loadAndRender, 40); });
+  document.addEventListener("velora-country-switch", function () { window.setTimeout(loadAndRender, 40); });
   document.getElementById("country-select")?.addEventListener("change", loadAndRender);
+  document.getElementById("home-country-select")?.addEventListener("change", loadAndRender);
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", loadAndRender, { once: true });
   } else {

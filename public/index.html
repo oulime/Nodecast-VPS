@@ -1512,9 +1512,13 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
       rel="stylesheet"
     />
+    <link
+      href="/assets/velora-home-sections.css?v=section-empty-multi-v20260831-12"
+      rel="stylesheet"
+    />
     <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-54"></script>
-    <script defer src="/assets/velora-home-sections.js?v=section-hero-search-v20260831-7"></script>
-    <script defer src="/assets/velora-home-cache-fallback.js?v=instant-nav-v20260821-132"></script>
+    <script defer src="/assets/velora-home-sections.js?v=section-empty-multi-v20260831-17"></script>
+    <script defer src="/assets/velora-home-cache-fallback.js?v=instant-nav-v20260831-134"></script>
     <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=instant-nav-v20260821-147"></script>
     <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-54"></script>
@@ -1578,7 +1582,6 @@
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css?v=vod-contrast-shimmer-v5-20260830">
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=large-package-virtualization-v1-20260810">
     <link rel="stylesheet" href="/assets/live-package-text-cards.css?v=tv-package-flat-inner-v1-20260814">
-    <link rel="stylesheet" href="/assets/velora-home-sections.css?v=section-three-dots-v20260831-1">
     <link rel="stylesheet" href="/assets/velora-live-wheel.css?v=instant-nav-v20260821-150">
     <link rel="stylesheet" href="/assets/pkg-hub-selector.css?v=20260830-visibility-fix-v43">
     <style>
@@ -5443,73 +5446,105 @@
           <section id="settings-tab-home" class="settings-tab-panel panel countries-admin-form hidden"
             role="tabpanel" aria-labelledby="settings-tab-btn-home" data-settings-tab="home" hidden>
             <h2>Sections de la page Accueil</h2>
-            <p class="countries-admin-intro" style="margin-top: 0">Créez des rangées horizontales depuis un package Live, Films ou Séries.</p>
+            <p class="countries-admin-intro" style="margin-top: 0">Gérez et organisez les sections affichées sur la page d'Accueil.</p>
             <p id="home-sections-admin-status" class="status" aria-live="polite"></p>
-            <div class="field row" style="align-items: flex-start; gap: 1rem;">
-              <div style="flex: 1.4;">
-                <label for="home-section-country">Pays d'affichage</label>
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                  <select id="home-section-country" class="admin-add-package-dialog__select" style="flex: 1; margin: 0;">
-                    <option value="default">🌐 Accueil général (Par défaut — tous les pays)</option>
+
+            <div class="vel-home-sections-admin-toolbar" style="margin-top: 0.5rem; display:flex; justify-content:space-between; align-items:center; gap:0.75rem; flex-wrap:wrap; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.1));">
+              <div style="display:flex; align-items:center; gap:0.6rem;">
+                <label for="home-section-filter-country" style="margin:0; font-size:0.9rem; font-weight:600;">Filtrer la liste :</label>
+                <select id="home-section-filter-country" class="admin-add-package-dialog__select" style="margin:0; min-width:200px;">
+                  <option value="default" selected>🌐 Accueil par défaut</option>
+                  <option value="all">🌍 Toutes les sections</option>
+                </select>
+              </div>
+              <button type="button" id="home-sections-show-all" class="countries-admin-cancel" aria-pressed="false" style="display:none;">Afficher toutes les sections</button>
+            </div>
+
+            <div id="home-sections-admin-list" class="vel-home-sections-admin-list" style="margin-top: 0.75rem;"></div>
+
+            <div class="vel-home-section-create-box" style="margin-top: 1.75rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color, rgba(255,255,255,0.1));">
+              <h3 id="home-section-form-title" style="margin-top:0; margin-bottom:0.75rem; font-size:1.05rem;">Ajouter / Modifier une section</h3>
+              
+              <div class="field row" style="align-items: flex-start; gap: 1rem;">
+                <div style="flex: 1.2;">
+                  <label for="home-section-title">Nom de la section</label>
+                  <input id="home-section-title" type="text" placeholder="Ex. Films populaires, Séries recommandées..." maxlength="80" style="margin: 0;" />
+                </div>
+                <div style="flex: 0.8;">
+                  <label for="home-section-type">Type de contenu</label>
+                  <select id="home-section-type" class="admin-add-package-dialog__select" style="margin: 0;">
+                    <option value="movies">Films</option>
+                    <option value="series">Séries</option>
                   </select>
+                </div>
+              </div>
+
+              <div class="field row" style="align-items: flex-start; gap: 1rem;">
+                <div style="flex: 1;">
+                  <label for="home-section-card-orientation">Format des vignettes</label>
+                  <select id="home-section-card-orientation" class="admin-add-package-dialog__select" style="margin: 0;">
+                    <option value="vertical">Vertical (Affiche standard - portrait)</option>
+                    <option value="horizontal">Horizontal (Format fiche / paysage)</option>
+                  </select>
+                </div>
+                <div style="flex: 1;">
+                  <label for="home-section-logo-url">Logo du bouquet / section</label>
+                  <div style="display:flex;gap:.5rem;align-items:center;margin-top:.25rem;">
+                    <input id="home-section-logo-url" type="text" placeholder="URL du logo ou importer un fichier" style="flex:1;margin:0;" />
+                    <input type="file" id="home-section-logo-file" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif" style="display:none;" />
+                    <button type="button" id="home-section-logo-upload-btn" class="countries-admin-cancel" style="white-space:nowrap;padding:.45rem .75rem;cursor:pointer;">📁 Importer</button>
+                    <img id="home-section-logo-preview" class="vel-home-sections-admin-logo-preview" style="display:none;" alt="Aperçu du logo" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="field" style="margin-top: 0.5rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <label style="margin-bottom:0;font-weight:600;">Pays d'appartenance de la section</label>
                   <label title="Afficher uniquement les pays visibles dans l'application" style="display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer; white-space: nowrap; margin: 0; font-size: 0.8rem; color: var(--text-secondary, #cbd5e1); user-select: none;">
                     <input id="home-section-country-visible-only" type="checkbox" checked style="cursor: pointer; margin: 0;" />
-                    <span title="Afficher uniquement les pays visibles dans l'application">👁️ Visibles</span>
+                    <span>👁️ Pays visibles uniquement</span>
                   </label>
                 </div>
-              </div>
-              <div style="flex: 0.8;">
-                <label for="home-section-type">Type de contenu</label>
-                <select id="home-section-type" class="admin-add-package-dialog__select" style="margin: 0;">
-                  <option value="movies">Films</option>
-                  <option value="series">Séries</option>
-                </select>
-              </div>
-            </div>
-            <div class="field row" style="align-items: flex-start; gap: 1rem;">
-              <div style="flex: 1;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                  <label for="home-section-package" style="margin-bottom:0;">Package à afficher</label>
-                  <span id="home-section-package-count" style="font-size:0.75rem;color:var(--text-secondary,#cbd5e1);"></span>
+                <div class="vel-home-countries-picker">
+                  <div class="vel-home-countries-picker__top">
+                    <label class="vel-home-country-checkbox-item" style="font-weight:600;color:#93c5fd;">
+                      <input id="home-section-country-default" type="checkbox" checked />
+                      <span>🌐 Accueil général (Par défaut — tous les pays)</span>
+                    </label>
+                    <div style="display:flex;gap:0.4rem;">
+                      <button type="button" id="home-section-countries-all" class="countries-admin-cancel" style="padding:0.25rem 0.55rem;font-size:0.75rem;">Tous les pays</button>
+                      <button type="button" id="home-section-countries-none" class="countries-admin-cancel" style="padding:0.25rem 0.55rem;font-size:0.75rem;">Désélectionner</button>
+                    </div>
+                  </div>
+                  <div id="home-section-countries-list" class="vel-home-countries-grid"></div>
                 </div>
-                <input id="home-section-package-search" type="search" placeholder="🔍 Filtrer les packages..." style="margin-bottom:.35rem;" />
-                <select id="home-section-package" class="admin-add-package-dialog__select" style="margin: 0;"></select>
               </div>
-              <div style="flex: 1;">
-                <label for="home-section-title">Nom de la section</label>
-                <input id="home-section-title" type="text" placeholder="Ex. Films populaires" maxlength="80" style="margin: 0;" />
-              </div>
-            </div>
-            <div class="field row" style="align-items: flex-start; gap: 1rem;">
-              <div style="flex: 1;">
-                <label for="home-section-card-orientation">Format des vignettes</label>
-                <select id="home-section-card-orientation" class="admin-add-package-dialog__select" style="margin: 0;">
-                  <option value="vertical">Vertical (Affiche standard - portrait)</option>
-                  <option value="horizontal">Horizontal (Format fiche / paysage)</option>
-                </select>
-              </div>
-              <div style="flex: 1;">
-                <label for="home-section-logo-url">Logo du bouquet / section</label>
-                <div style="display:flex;gap:.5rem;align-items:center;margin-top:.25rem;">
-                  <input id="home-section-logo-url" type="text" placeholder="URL du logo ou importer un fichier" style="flex:1;margin:0;" />
-                  <input type="file" id="home-section-logo-file" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif" style="display:none;" />
-                  <button type="button" id="home-section-logo-upload-btn" class="countries-admin-cancel" style="white-space:nowrap;padding:.45rem .75rem;cursor:pointer;">📁 Importer</button>
-                  <img id="home-section-logo-preview" class="vel-home-sections-admin-logo-preview" style="display:none;" alt="Aperçu du logo" />
+
+              <div class="field row" style="align-items: flex-start; gap: 1rem; margin-top: 0.75rem;">
+                <div style="flex: 1;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                    <label for="home-section-package" style="margin-bottom:0;">Package source (Optionnel pour section vide)</label>
+                    <span id="home-section-package-count" style="font-size:0.75rem;color:var(--text-secondary,#cbd5e1);"></span>
+                  </div>
+                  <input id="home-section-package-search" type="search" placeholder="🔍 Filtrer les packages ou laisser vide..." style="margin-bottom:.35rem;" />
+                  <select id="home-section-package" class="admin-add-package-dialog__select" style="margin: 0;">
+                    <option value="">✨ Section vide personnalisée (sans package lié)</option>
+                  </select>
+                </div>
+                <div style="flex: 1; display:flex; flex-direction:column; justify-content:flex-end; padding-top: 1.5rem;">
+                  <div class="actions" style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin:0;">
+                    <button type="button" id="home-section-add" class="primary">Créer la section</button>
+                    <button type="button" id="home-section-cancel" class="countries-admin-cancel" hidden>Annuler</button>
+                    <label title="Rendre la section visible immédiatement sur la page d'accueil" style="display:inline-flex;align-items:center;gap:.35rem;font-size:0.82rem;color:var(--text-secondary,#cbd5e1);cursor:pointer;user-select:none;margin:0;">
+                      <input id="home-section-published" type="checkbox" checked style="cursor:pointer;margin:0;" />
+                      <span title="Rendre la section visible immédiatement sur la page d'accueil">Publier immédiatement</span>
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
-            <div class="actions" style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
-              <button type="button" id="home-section-add" class="primary">Créer la section</button>
-              <button type="button" id="home-section-cancel" class="countries-admin-cancel" hidden>Annuler</button>
-              <label title="Rendre la section visible immédiatement sur la page d'accueil" style="display:inline-flex;align-items:center;gap:.35rem;font-size:0.82rem;color:var(--text-secondary,#cbd5e1);cursor:pointer;user-select:none;margin:0;">
-                <input id="home-section-published" type="checkbox" checked style="cursor:pointer;margin:0;" />
-                <span title="Rendre la section visible immédiatement sur la page d'accueil">Publier immédiatement</span>
-              </label>
-            </div>
-            <div class="vel-home-sections-admin-toolbar" style="margin-top: 1.25rem;">
-              <button type="button" id="home-sections-show-all" class="countries-admin-cancel" aria-pressed="false">Afficher toutes les sections</button>
-            </div>
-            <div id="home-sections-admin-list" class="vel-home-sections-admin-list"></div>
+
             <div class="vel-home-cache-admin-block" style="margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color, rgba(255,255,255,0.1));">
               <div class="actions"><button type="button" id="home-cache-rebuild" class="countries-admin-cancel">Reconstruire le cache Accueil</button></div>
               <p id="home-cache-status" class="status" aria-live="polite" style="margin-top: 0.5rem;"></p>

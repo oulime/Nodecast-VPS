@@ -1484,6 +1484,7 @@ function buildHomeCache() {
         const providerCategoryId = String(packageRow.category_id ?? '').trim();
         const providerKind = String(packageRow.kind ?? '').trim();
         const expectedKind = type === 'movies' ? 'vod' : type;
+        const providerBacked = Boolean(providerSourceId && providerCategoryId && (!providerKind || providerKind === expectedKind));
         const membership = packageStreams.get(String(section.package_id)) || { keys: new Set(), sourceAware: false };
         const orientation = String(section.card_orientation || 'vertical').toLowerCase() === 'horizontal' ? 'horizontal' : 'vertical';
         const isHorizontal = orientation === 'horizontal';
@@ -1559,7 +1560,7 @@ function buildHomeCache() {
                 };
             }).filter(item => item?.name).slice(0, HOME_CACHE_ENTRIES_PER_PACKAGE);
         }
-        return { ...section, content_type: type, card_orientation: orientation, logo_url: String(section.logo_url || section.badge_logo_url || '').trim(), entries };
+        return { ...section, country_ids: Array.isArray(section.country_ids) ? section.country_ids : (section.country_id ? String(section.country_id).split(',').map(s => s.trim()).filter(Boolean) : ['default']), content_type: type, card_orientation: orientation, logo_url: String(section.logo_url || section.badge_logo_url || '').trim(), entries };
     });
     const payload = { generatedAt: new Date().toISOString(), sections: output };
     writeJsonAtomic(homeCachePath, payload);
@@ -1577,12 +1578,20 @@ router.get('/home-cache', (req, res) => {
         const offset = Math.max(Number.parseInt(req.query.offset, 10) || 0, 0);
         let sections = Array.isArray(payload.sections) ? payload.sections : [];
         if (countryId) {
-            const countrySections = sections.filter(section =>
-                section.published !== false && String(section.country_id || '') === countryId
-            );
-            sections = countrySections.length ? countrySections : sections.filter(section =>
-                section.published !== false && (!section.country_id || section.country_id === 'default')
-            );
+            const countrySections = sections.filter(section => {
+                if (section.published === false) return false;
+                const ids = Array.isArray(section.country_ids) && section.country_ids.length
+                    ? section.country_ids
+                    : String(section.country_id || '').split(',').map(s => s.trim()).filter(Boolean);
+                return ids.includes(countryId);
+            });
+            sections = countrySections.length ? countrySections : sections.filter(section => {
+                if (section.published === false) return false;
+                const ids = Array.isArray(section.country_ids) && section.country_ids.length
+                    ? section.country_ids
+                    : String(section.country_id || '').split(',').map(s => s.trim()).filter(Boolean);
+                return !ids.length || ids.includes('default') || ids.includes('all');
+            });
         }
         if (sectionId) sections = sections.filter(section => String(section.id) === sectionId);
         sections = sections.map(section => {

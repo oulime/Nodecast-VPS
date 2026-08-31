@@ -886,4 +886,196 @@
 }
 
 
+.vel-home-section__package-link--horizontal {
+  aspect-ratio: 16/9 !important;
+  flex-basis: clamp(12rem, 36vw, 16.5rem) !important;
+}
+
+/* Custom Section Voir plus Popup Modal */
+.vel-home-custom-section-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(0.6rem, 2.5vw, 1.8rem);
+  box-sizing: border-box;
+  animation: vel-modal-fade-in .22s cubic-bezier(0.2, 0, 0.2, 1);
+}
+.vel-home-custom-section-modal.hidden {
+  display: none !important;
+}
+@keyframes vel-modal-fade-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+.vel-home-custom-section-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 2, 10, 0.86);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.vel-home-custom-section-modal__dialog {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 1240px;
+  height: 88vh;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: #0d0c18;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 20px;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.95);
+  overflow: hidden;
+}
+.vel-home-custom-section-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.6rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01));
+  flex-shrink: 0;
+}
+.vel-home-custom-section-modal__header-info {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+}
+.vel-home-custom-section-modal__title {
+  margin: 0;
+  font-size: clamp(1.15rem, 2.2vw, 1.45rem);
+  font-weight: 850;
+  color: #fff;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vel-home-custom-section-modal__badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 750;
+  color: #c4b5fd;
+  background: rgba(139, 92, 246, 0.2);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.vel-home-custom-section-modal__close {
+  display: grid;
+  place-items: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.18s ease;
+}
+.vel-home-custom-section-modal__close:hover,
+.vel-home-custom-section-modal__close:focus-visible {
+  background: rgba(239, 68, 68, 0.85);
+  border-color: rgba(239, 68, 68, 1);
+  transform: scale(1.08);
+}
+.vel-home-custom-section-modal__body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1.5rem;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 92, 246, 0.5) rgba(255, 255, 255, 0.04);
+}
+.vel-home-custom-section-modal__body::-webkit-scrollbar {
+  width: 8px;
+}
+.vel-home-custom-section-modal__body::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+}
+.vel-home-custom-section-modal__body::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.45);
+  border-radius: 999px;
+}
+.vel-home-custom-section-modal__body::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.75);
+}
+
+/* Card Grid inside Popup */
+.vel-home-custom-section-modal__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(clamp(8.5rem, 15vw, 11rem), 1fr));
+  gap: 1.25rem 1rem;
+  align-items: stretch;
+}
+.vel-home-custom-section-modal__grid--horizontal {
+  grid-template-columns: repeat(auto-fill, minmax(clamp(14rem, 24vw, 18rem), 1fr));
+}
+
+/* Full Card presentation inside Popup */
+.vel-home-custom-section-modal__grid .vel-home-section__card {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  flex: none !important;
+  margin: 0 !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  background: #141322 !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6) !important;
+  cursor: pointer !important;
+  transition: transform .2s cubic-bezier(0.2, 0, 0.2, 1), box-shadow .2s ease, border-color .2s ease !important;
+}
+.vel-home-custom-section-modal__grid .vel-home-section__card:hover,
+.vel-home-custom-section-modal__grid .vel-home-section__card:focus-visible {
+  transform: translateY(-5px) scale(1.03) !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.9), 0 0 20px rgba(139, 92, 246, 0.35) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+  z-index: 2 !important;
+}
+.vel-home-custom-section-modal__grid .vel-home-section__media {
+  display: block !important;
+  width: 100% !important;
+  aspect-ratio: 2/3 !important;
+  object-fit: cover !important;
+  background: #090811 !important;
+}
+.vel-home-custom-section-modal__grid--horizontal .vel-home-section__media,
+.vel-home-custom-section-modal__grid .vel-home-section__card--horizontal .vel-home-section__media {
+  aspect-ratio: 16/9 !important;
+}
+.vel-home-custom-section-modal__grid .vel-home-section__card--live .vel-home-section__media {
+  aspect-ratio: 1/1 !important;
+  object-fit: contain !important;
+  padding: 8% !important;
+}
+.vel-home-custom-section-modal__grid .vel-home-section__name {
+  display: block !important;
+  min-height: 2.6rem !important;
+  padding: 0.6rem 0.65rem !important;
+  font-size: 0.78rem !important;
+  font-weight: 750 !important;
+  line-height: 1.25 !important;
+  color: #fff !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+
 

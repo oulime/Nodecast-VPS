@@ -1799,6 +1799,19 @@ router.get('/hero-slider/search-catalog', (req, res) => {
             LIMIT 150
         `).all(...params);
 
+        const countryId = String(req.query.country_id || 'country_etats_unis').trim();
+        const matcher = HERO_COUNTRY_MATCHERS.find(m => m.id === countryId || m.altId === countryId) ||
+            HERO_COUNTRY_MATCHERS.find(m => m.code === 'US');
+
+        // Prioritize rows matching selected country (USA by default) BEFORE deduplication
+        rows.sort((a, b) => {
+            const matchA = matcher ? matcher.patterns.some(p => p.test(`${a.cat_name || ''} ${a.name || ''}`)) : false;
+            const matchB = matcher ? matcher.patterns.some(p => p.test(`${b.cat_name || ''} ${b.name || ''}`)) : false;
+            if (matchA && !matchB) return -1;
+            if (!matchA && matchB) return 1;
+            return 0;
+        });
+
         const candidates = [];
         const seen = new Set();
 
@@ -1832,12 +1845,12 @@ router.get('/hero-slider/search-catalog', (req, res) => {
             }
         }
 
-        // Sort candidates: newer years first
+        // Sort candidates: newer years first, then clean title
         candidates.sort((a, b) => {
             const yearA = parseInt(a.year, 10) || 0;
             const yearB = parseInt(b.year, 10) || 0;
             if (yearB !== yearA) return yearB - yearA;
-            return a.cleanTitle.localeCompare(b.cleanTitle);
+            return a.cleanTitle.localeCompare(b.cleanTitle, 'fr');
         });
 
         return res.json(candidates.slice(0, 30));

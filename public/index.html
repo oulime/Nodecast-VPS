@@ -8,6 +8,43 @@
     />
     <title>VeloraVIP</title>
     <script>
+      // Automatically route insecure HTTP images (picons, channel logos, posters) through /api/proxy/image
+      // to eliminate (blocked:mixed-content) browser errors when running over HTTPS.
+      (function () {
+        function safeImageUrl(url) {
+          if (typeof url !== "string") return url;
+          var trimmed = url.trim();
+          if (trimmed.indexOf("http://") === 0) {
+            return "/api/proxy/image?url=" + encodeURIComponent(trimmed);
+          }
+          return url;
+        }
+
+        try {
+          var desc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "src");
+          if (desc && desc.set) {
+            Object.defineProperty(HTMLImageElement.prototype, "src", {
+              get: function () {
+                return desc.get.call(this);
+              },
+              set: function (val) {
+                desc.set.call(this, safeImageUrl(val));
+              },
+              configurable: true,
+              enumerable: true
+            });
+          }
+
+          var origSetAttr = HTMLImageElement.prototype.setAttribute;
+          HTMLImageElement.prototype.setAttribute = function (name, val) {
+            if (name && String(name).toLowerCase() === "src") {
+              val = safeImageUrl(val);
+            }
+            return origSetAttr.call(this, name, val);
+          };
+        } catch (_) {}
+      })();
+
       (function () {
         try {
           var redirectingToLogin = false;

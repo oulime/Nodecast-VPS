@@ -1322,42 +1322,55 @@ router.get('/stream', async (req, res) => {
  * Fixes mixed content errors when loading HTTP images on HTTPS pages
  * GET /api/proxy/image?url=...
  */
+const TRANSPARENT_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
+
 router.get('/image', async (req, res) => {
     try {
-        const { url } = req.query;
+        const url = String(req.query.url || '').trim();
         if (!url) {
-            return res.status(400).json({ error: 'URL required' });
+            res.set('Content-Type', 'image/png');
+            return res.send(TRANSPARENT_PNG);
         }
 
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'image/*,*/*;q=0.8'
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+
+        try {
+            const response = await fetch(url, {
+                signal: controller.signal,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'image/*,*/*;q=0.8'
+                }
+            });
+            clearTimeout(timeout);
+
+            if (!response.ok) {
+                res.set('Content-Type', 'image/png');
+                res.set('Cache-Control', 'public, max-age=3600');
+                return res.send(TRANSPARENT_PNG);
             }
-        });
 
-        if (!response.ok) {
-            return res.status(response.status).send('Failed to fetch image');
+            const contentType = response.headers.get('content-type') || 'image/png';
+            res.set('Content-Type', contentType);
+            res.set('Access-Control-Allow-Origin', '*');
+            res.set('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+
+            if (response.body) {
+                const stream = Readable.from(response.body);
+                stream.pipe(res);
+            } else {
+                res.end();
+            }
+        } catch (fetchErr) {
+            clearTimeout(timeout);
+            res.set('Content-Type', 'image/png');
+            res.set('Cache-Control', 'public, max-age=1800');
+            return res.send(TRANSPARENT_PNG);
         }
-
-        const contentType = response.headers.get('content-type') || 'image/png';
-        res.set('Content-Type', contentType);
-        res.set('Access-Control-Allow-Origin', '*');
-        res.set('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
-
-        // Efficiently pipe the response body
-        if (response.body) {
-            // response.body is an AsyncIterable in standard fetch/undici
-            // Readable.from converts it to a Node.js Readable stream
-            const stream = Readable.from(response.body);
-            stream.pipe(res);
-        } else {
-            res.end();
-        }
-
     } catch (err) {
-        console.error('Image proxy error:', err.message);
-        res.status(500).send('Image proxy error');
+        res.set('Content-Type', 'image/png');
+        return res.send(TRANSPARENT_PNG);
     }
 });
 

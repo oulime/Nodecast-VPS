@@ -68,6 +68,45 @@
     });
   });
 
+  let adultPackageIds = new Set();
+  async function loadAdultPackageRules() {
+    try {
+      const res = await fetch("/api/velora-db/rest/v1/admin_settings?key=eq.adult_packages", { cache: "no-store" });
+      if (res.ok) {
+        const rows = await res.json();
+        if (Array.isArray(rows) && rows[0] && rows[0].value) {
+          const list = JSON.parse(rows[0].value);
+          if (Array.isArray(list)) {
+            adultPackageIds = new Set(list.flatMap(r => [
+              String(r.package_id),
+              String(r.id),
+              `${r.kind}:${r.source_id}:${r.category_id}`
+            ]).filter(Boolean));
+            return;
+          }
+        }
+      }
+      const cached = localStorage.getItem("velora_admin_adult_packages");
+      if (cached) {
+        const list = JSON.parse(cached);
+        if (Array.isArray(list)) {
+          adultPackageIds = new Set(list.flatMap(r => [
+            String(r.package_id),
+            String(r.id),
+            `${r.kind}:${r.source_id}:${r.category_id}`
+          ]).filter(Boolean));
+        }
+      }
+    } catch (_) {}
+  }
+  loadAdultPackageRules();
+  document.addEventListener("velora-adult-packages-changed", () => {
+    loadAdultPackageRules().then(() => {
+      lastFeedKey = "";
+      render();
+    });
+  });
+
   function stripTitle(name) {
     let clean = String(name || "").trim();
 
@@ -787,7 +826,7 @@
             }
           }
           return cloned;
-        }).filter(p => Array.isArray(p.items) && p.items.length > 0);
+        }).filter(p => !adultPackageIds.has(String(p.id)) && Array.isArray(p.items) && p.items.length > 0);
       }
 
       const validMovies = processPackages(movieFeed?.packages, "movies");
@@ -951,8 +990,8 @@
         }
       }
 
-      // Filter packages that have preview items
-      const validPackages = packages.filter(p => Array.isArray(p.items) && p.items.length > 0);
+      // Filter packages that have preview items and are not assigned to adult
+      const validPackages = packages.filter(p => !adultPackageIds.has(String(p.id)) && Array.isArray(p.items) && p.items.length > 0);
 
       if (!validPackages.length) {
         container.style.display = "none";

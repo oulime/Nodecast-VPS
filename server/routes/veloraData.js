@@ -173,6 +173,7 @@ async function enrichHomeCacheBackdrops(payload) {
     return payload;
 }
 const COUNTRY_PACKAGE_TABLES = new Set([
+    'admin_adult_packages',
     'admin_countries',
     'canonical_countries',
     'admin_country_package_order',
@@ -359,6 +360,7 @@ async function enrichHomeCacheMoviePosters(payload) {
 }
 
 const ALLOWED_TABLES = new Set([
+    'admin_adult_packages',
     'admin_channel_name_prefixes',
     'admin_channel_name_suffixes',
     'admin_countries',
@@ -377,6 +379,7 @@ const ALLOWED_TABLES = new Set([
 ]);
 
 const NATURAL_KEYS = {
+    admin_adult_packages: ['package_id'],
     admin_channel_name_prefixes: ['prefix'],
     admin_channel_name_suffixes: ['suffix'],
     admin_countries: ['name'],

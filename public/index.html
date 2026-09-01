@@ -5354,6 +5354,18 @@
             <button
               type="button"
               role="tab"
+              id="settings-tab-btn-adult"
+              class="settings-tabs__tab"
+              data-settings-tab="adult"
+              aria-selected="false"
+              aria-controls="settings-tab-adult"
+              tabindex="-1"
+            >
+              🔞 Adulte +18
+            </button>
+            <button
+              type="button"
+              role="tab"
               id="settings-tab-btn-cache"
               class="settings-tabs__tab"
               data-settings-tab="cache"
@@ -5943,6 +5955,60 @@
           </section>
 
           <section
+            id="settings-tab-adult"
+            class="settings-tab-panel panel countries-admin-form hidden"
+            role="tabpanel"
+            aria-labelledby="settings-tab-btn-adult"
+            data-settings-tab="adult"
+            hidden
+          >
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+              <h2>🔞 Gestion des Bouquets Adulte +18</h2>
+              <span id="vel-admin-adult-count-badge" class="vel-admin-adult-badge">0 bouquet(s) activé(s)</span>
+            </div>
+            <p class="countries-admin-intro" style="margin-top: 0">
+              Sélectionnez les bouquets (TV en direct, Films ou Séries de tous vos fournisseurs) à inclure dans la section <strong>Adulte +18</strong>.
+              Ces bouquets seront réservés au portail Adulte avec confirmation d'âge.
+            </p>
+
+            <div class="vel-admin-adult-toolbar">
+              <div class="vel-admin-adult-search-wrap">
+                <input
+                  type="text"
+                  id="vel-admin-adult-search"
+                  placeholder="Rechercher un bouquet (nom, catégorie, fournisseur)..."
+                  autocomplete="off"
+                />
+              </div>
+              <div class="vel-admin-adult-source-wrap">
+                <select id="vel-admin-adult-source-select" class="admin-add-package-dialog__select" style="min-width: 220px;">
+                  <option value="all">Tous les streams / fournisseurs</option>
+                </select>
+              </div>
+              <div class="vel-admin-adult-filters" role="radiogroup">
+                <button type="button" class="vel-admin-filter-pill active" data-filter-kind="all">Tous</button>
+                <button type="button" class="vel-admin-filter-pill" data-filter-kind="live">📺 Direct</button>
+                <button type="button" class="vel-admin-filter-pill" data-filter-kind="movies">🎬 Films</button>
+                <button type="button" class="vel-admin-filter-pill" data-filter-kind="series">🍿 Séries</button>
+                <button type="button" class="vel-admin-filter-pill" data-filter-selected="true">✅ Sélectionnés</button>
+              </div>
+            </div>
+
+            <div class="vel-admin-adult-actions-bar">
+              <button type="button" id="vel-admin-adult-auto-suggest" class="vel-btn-subtle">
+                ⚡ Sélectionner automatiquement les bouquets +18 détectés
+              </button>
+              <div style="display: flex; gap: 8px;">
+                <button type="button" id="vel-admin-adult-select-all" class="countries-admin-cancel">Tout cocher</button>
+                <button type="button" id="vel-admin-adult-deselect-all" class="countries-admin-cancel">Tout décocher</button>
+              </div>
+            </div>
+
+            <p id="vel-admin-adult-status" class="status" aria-live="polite"></p>
+            <div id="vel-admin-adult-grid" class="vel-admin-adult-grid"></div>
+          </section>
+
+          <section
             id="settings-tab-cache"
             class="settings-tab-panel panel countries-admin-form hidden"
             role="tabpanel"
@@ -6434,29 +6500,45 @@
               <div id="vel-home-sections" class="vel-home-sections" aria-live="polite"></div>
               <div class="vel-home-empty-page__canvas" hidden aria-hidden="true"></div>
             </section>
-            <div id="adult-view" class="vel-adult-portal hidden" aria-label="Contenu adulte">
-              <div class="vel-adult-portal__inner">
-                <div class="vel-adult-portal__mark">
-                  <img
-                    src="/logos/adult-18.svg"
-                    alt=""
-                    aria-hidden="true"
-                  />
-                </div>
-                <div class="vel-adult-portal__copy">
-                  <h2>Adultes +18</h2>
-                  <p>Acces reserve aux visiteurs majeurs.</p>
-                </div>
-                <div class="vel-adult-portal__actions" role="tablist" aria-label="Type de contenu adulte">
-                  <button type="button" id="adult-tab-live" class="vel-adult-tab active" data-adult-tab="live">
-                    Lives
+            <section id="adult-view" class="vel-adult-portal hidden" aria-label="Contenu adulte +18">
+              <div class="vel-adult-header">
+                <div class="vel-adult-header__left">
+                  <button type="button" id="btn-adult-back-home" class="vel-adult-back-btn" title="Retour à l'accueil">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2">
+                      <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                    <span>Accueil</span>
                   </button>
-                  <button type="button" id="adult-tab-movies" class="vel-adult-tab" data-adult-tab="movies">
-                    Films
+                  <div class="vel-adult-brand">
+                    <img src="/logos/adult-18.svg" alt="" width="38" height="38" />
+                    <div class="vel-adult-brand__text">
+                      <h1>ESPACE ADULTE <span>+18</span></h1>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="vel-adult-tabs" role="tablist" aria-label="Sections adultes">
+                  <button type="button" id="vel-adult-subtab-live" class="vel-adult-subtab active" data-adult-section="live">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
+                    <span>TV en Direct</span>
+                    <span id="vel-adult-badge-live" class="vel-adult-subtab-badge">0</span>
                   </button>
+                  <button type="button" id="vel-adult-subtab-vod" class="vel-adult-subtab" data-adult-section="vod">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    <span>Films & Séries</span>
+                    <span id="vel-adult-badge-vod" class="vel-adult-subtab-badge">0</span>
+                  </button>
+                </div>
+
+                <div class="vel-adult-header__search">
+                  <input type="text" id="vel-adult-search-input" placeholder="Rechercher un bouquet adulte..." autocomplete="off" />
                 </div>
               </div>
-            </div>
+
+              <div id="vel-adult-packages-container" class="vel-adult-packages-container">
+                <div id="vel-adult-packages-grid" class="vel-adult-packages-grid"></div>
+              </div>
+            </section>
             <header id="vel-packages-section-heading" class="vel-category-heading vel-category-heading--comedy">
               <h2 id="vel-packages-section-title" class="vel-category-heading__title">TV EN DIRECT</h2>
               <span class="vel-category-heading__accent-line" aria-hidden="true"></span>
@@ -14210,6 +14292,8 @@ if (target.closest(".trial-offer-button")) {
     <script defer src="/assets/velora-live-wheel.js?v=instant-nav-v20260821-151"></script>
     <link rel="stylesheet" href="/assets/velora-prime-carousel.css?v=20260901-feed-v4" />
     <script defer src="/assets/velora-prime-carousels.js?v=20260901-feed-v4"></script>
+    <link rel="stylesheet" href="/assets/velora-adult.css?v=20260901-adult-v1" />
+    <script defer src="/assets/velora-adult.js?v=20260901-adult-v1"></script>
   </body>
 </html>
 

@@ -76,11 +76,35 @@ body[data-vel-active-tab="movies"] .vel-header__left,
 body[data-vel-active-tab="series"] .vel-header__left,
 body[data-vel-active-tab="movies"] #vel-header-context-title,
 body[data-vel-active-tab="series"] #vel-header-context-title,
+body[data-vel-active-tab="movies"] .vel-header-context-title,
+body[data-vel-active-tab="series"] .vel-header-context-title,
 body[data-vel-active-tab="movies"] .vel-header-back-btn,
-body[data-vel-active-tab="series"] .vel-header-back-btn {
+body[data-vel-active-tab="series"] .vel-header-back-btn,
+body[data-vel-active-tab="movies"] .vel-category-heading,
+body[data-vel-active-tab="series"] .vel-category-heading,
+body[data-vel-active-tab="movies"] .vel-package-toolbar-sticky,
+body[data-vel-active-tab="series"] .vel-package-toolbar-sticky,
+body[data-vel-active-tab="movies"] .main--velora .vel-header__left,
+body[data-vel-active-tab="series"] .main--velora .vel-header__left,
+body[data-vel-active-tab="movies"] .main--velora #vel-header-context-title,
+body[data-vel-active-tab="series"] .main--velora #vel-header-context-title,
+body[data-vel-active-tab="movies"] .main--velora .vel-header-context-title,
+body[data-vel-active-tab="series"] .main--velora .vel-header-context-title,
+body[data-vel-active-tab="movies"] .main--velora .vel-header-back-btn,
+body[data-vel-active-tab="series"] .main--velora .vel-header-back-btn,
+body[data-vel-active-tab="movies"] .main--velora .vel-category-heading,
+body[data-vel-active-tab="series"] .main--velora .vel-category-heading,
+body[data-vel-active-tab="movies"] .main--velora .vel-package-toolbar-sticky,
+body[data-vel-active-tab="series"] .main--velora .vel-package-toolbar-sticky {
   display: none !important;
   visibility: hidden !important;
   pointer-events: none !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
 }
 
 body[data-vel-active-tab="movies"] .vel-header__right,

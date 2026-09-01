@@ -704,9 +704,58 @@
     }
   }
 
+  function syncHeaderForMediaTabs() {
+    const tab = activeTab();
+    const isMedia = MEDIA_TABS.has(tab);
+    const headerContext = document.getElementById("vel-header-context-title");
+    const headerLeft = document.querySelector(".vel-header__left");
+    const stickyTop = document.querySelector(".vel-sticky-top");
+    const header = document.querySelector(".vel-header");
+    const toolbar = document.getElementById("vel-package-toolbar-sticky");
+    const picker = document.getElementById("vel-media-package-picker");
+    const backBtn = document.getElementById("btn-header-back");
+
+    if (isMedia) {
+      if (headerContext) headerContext.style.setProperty("display", "none", "important");
+      if (headerLeft) headerLeft.style.setProperty("display", "none", "important");
+      if (backBtn) backBtn.style.setProperty("display", "none", "important");
+      if (toolbar) toolbar.style.setProperty("display", "none", "important");
+      if (picker) picker.style.setProperty("display", "none", "important");
+      if (stickyTop) {
+        stickyTop.style.setProperty("position", "absolute", "important");
+        stickyTop.style.setProperty("background", "transparent", "important");
+        stickyTop.style.setProperty("border", "none", "important");
+        stickyTop.style.setProperty("box-shadow", "none", "important");
+      }
+      if (header) {
+        header.style.setProperty("background", "transparent", "important");
+        header.style.setProperty("border", "none", "important");
+        header.style.setProperty("box-shadow", "none", "important");
+      }
+    } else {
+      if (headerContext) headerContext.style.removeProperty("display");
+      if (headerLeft) headerLeft.style.removeProperty("display");
+      if (backBtn) backBtn.style.removeProperty("display");
+      if (toolbar) toolbar.style.removeProperty("display");
+      if (picker) picker.style.removeProperty("display");
+      if (stickyTop) {
+        stickyTop.style.removeProperty("position");
+        stickyTop.style.removeProperty("background");
+        stickyTop.style.removeProperty("border");
+        stickyTop.style.removeProperty("box-shadow");
+      }
+      if (header) {
+        header.style.removeProperty("background");
+        header.style.removeProperty("border");
+        header.style.removeProperty("box-shadow");
+      }
+    }
+  }
+
   // Listeners & Lifecycle
   document.addEventListener("velora-home-tab", () => {
     lastFeedKey = "";
+    syncHeaderForMediaTabs();
     setTimeout(render, 30);
   });
 
@@ -714,16 +763,19 @@
     lastFeedKey = "";
     feedCache.clear();
     packageFullItemsCache.clear();
+    syncHeaderForMediaTabs();
     setTimeout(render, 30);
   });
 
   // When Xtream catalog data finishes loading in background, refresh posters if needed
   window.addEventListener("velora-vod-ready", () => {
     lastFeedKey = "";
+    syncHeaderForMediaTabs();
     render();
   });
   window.addEventListener("velora-series-ready", () => {
     lastFeedKey = "";
+    syncHeaderForMediaTabs();
     render();
   });
 
@@ -733,12 +785,14 @@
       lastFeedKey = "";
       feedCache.clear();
       packageFullItemsCache.clear();
+      syncHeaderForMediaTabs();
       setTimeout(render, 30);
     });
   }
 
   new MutationObserver(() => {
     const tab = activeTab();
+    syncHeaderForMediaTabs();
     if (MEDIA_TABS.has(tab)) {
       render();
     } else {
@@ -751,8 +805,12 @@
   });
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", render, { once: true });
+    document.addEventListener("DOMContentLoaded", () => {
+      syncHeaderForMediaTabs();
+      render();
+    }, { once: true });
   } else {
+    syncHeaderForMediaTabs();
     render();
   }
 })();

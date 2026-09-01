@@ -751,10 +751,12 @@
       } else {
         primeSearchBtn.classList.remove("is-hidden");
       }
-      primeSearchBtn.style.display = "flex";
+      primeSearchBtn.style.removeProperty("display");
     } else {
       if (stickyTop) stickyTop.style.removeProperty("display");
-      if (primeSearchBtn) primeSearchBtn.style.display = "none";
+      if (primeSearchBtn) {
+        primeSearchBtn.style.setProperty("display", "none", "important");
+      }
     }
   }
 

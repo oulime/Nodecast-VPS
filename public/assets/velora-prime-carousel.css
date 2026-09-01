@@ -55,8 +55,17 @@ body[data-vel-active-tab="series"] .main--velora .vel-sticky-top {
   padding: 0 !important;
 }
 
-/* Floating Search Button (Fixed in Viewport for all devices - PC & Mobile) */
-.vel-prime-search-btn {
+/* Floating Search Button - STRICTLY ONLY ON MOVIES & SERIES TABS */
+.vel-prime-search-btn,
+body:not([data-vel-active-tab="movies"]):not([data-vel-active-tab="series"]) .vel-prime-search-btn {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+}
+
+body[data-vel-active-tab="movies"] .vel-prime-search-btn,
+body[data-vel-active-tab="series"] .vel-prime-search-btn {
   position: fixed !important;
   top: max(16px, env(safe-area-inset-top, 16px)) !important;
   right: max(22px, env(safe-area-inset-right, 22px)) !important;
@@ -77,7 +86,8 @@ body[data-vel-active-tab="series"] .main--velora .vel-sticky-top {
   transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease !important;
 }
 
-.vel-prime-search-btn:hover {
+body[data-vel-active-tab="movies"] .vel-prime-search-btn:hover,
+body[data-vel-active-tab="series"] .vel-prime-search-btn:hover {
   transform: scale(1.1) !important;
   background: #e50914 !important;
   border-color: #e50914 !important;

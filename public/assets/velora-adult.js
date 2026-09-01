@@ -1075,29 +1075,84 @@
 
     delete document.body.dataset.veloraReturnHome;
     delete document.body.dataset.veloraReturnFavorites;
+    delete window._veloraFavoriteReturnTab;
     document.body.dataset.veloraReturnAdult = "true";
+    document.body.classList.remove("vel-home-empty-active");
 
-    const adultView = document.getElementById("adult-view");
-    if (adultView) adultView.classList.add("hidden");
+    // 1. Highlight current movie in list
+    const rows = document.querySelectorAll(".vel-adult-movie-row");
+    rows.forEach((row, idx) => {
+      const isCurrent = idx === index;
+      row.classList.toggle("vel-adult-movie-row--active", isCurrent);
+      row.classList.toggle("selected", isCurrent);
+      const badge = row.querySelector(".vel-adult-movie-row__playing-badge");
+      if (badge) badge.style.display = isCurrent ? "inline-flex" : "none";
+      if (isCurrent) {
+        row.setAttribute("aria-current", "true");
+        row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      } else {
+        row.removeAttribute("aria-current");
+      }
+    });
 
-    const pkgId = String(movie.package_id || movie.category_id || "adult-movies");
-    if (typeof window.veloraOpenCachedHomeItem === "function") {
-      window.veloraOpenCachedHomeItem({
-        id: "adult-movies",
-        content_type: "movies",
-        package_id: pkgId
-      }, {
-        id: `adult:${movie.source_id}:${movie.stream_id}`,
-        name: movie.name,
-        thumbUrl: movie.stream_icon || movie.thumb_url || "",
-        streamId: movie.stream_id,
-        sourceId: movie.source_id,
-        containerExtension: movie.container_extension || "mp4",
-        packageId: pkgId
-      });
-      const contextTitle = document.getElementById("vel-header-context-title-text");
-      if (contextTitle) contextTitle.textContent = "ADULTE +18";
-      return;
+    // 2. Set up player on the listed page (Series layout)
+    const livePlayer = document.getElementById("player-container");
+    const vodPlayer = document.getElementById("vod-player-container");
+    const video = document.getElementById("video");
+    const nowPlaying = document.getElementById("now-playing");
+
+    if (vodPlayer) {
+      vodPlayer.classList.add("hidden");
+      vodPlayer.setAttribute("aria-hidden", "true");
+    }
+
+    if (livePlayer) {
+      livePlayer.classList.remove("hidden");
+      livePlayer.removeAttribute("aria-hidden");
+      livePlayer.classList.remove("player-container--live-tv");
+    }
+
+    if (nowPlaying) {
+      nowPlaying.classList.remove("hidden");
+      nowPlaying.textContent = movie.name;
+    }
+
+    // 3. Update top title
+    const contextTitle = document.getElementById("vel-header-context-title-text");
+    if (contextTitle) contextTitle.textContent = "ADULTE +18";
+
+    // 4. Resolve & play video stream directly
+    const ext = movie.container_extension || "mp4";
+    const apiUrl = `/api/proxy/xtream/${encodeURIComponent(movie.source_id)}/stream/${encodeURIComponent(movie.stream_id)}/movie?container=${encodeURIComponent(ext)}`;
+    const resolvedUrl = await resolveStreamMediaUrl(apiUrl);
+    const finalUrl = resolvedUrl || apiUrl;
+
+    if (video) {
+      if (video.hls && typeof video.hls.destroy === "function") {
+        try { video.hls.destroy(); } catch (_) {}
+        video.hls = null;
+      }
+
+      const isHls = finalUrl.includes(".m3u8") || finalUrl.includes("m3u8");
+      if (isHls && window.Hls && window.Hls.isSupported()) {
+        const hls = new window.Hls();
+        hls.loadSource(finalUrl);
+        hls.attachMedia(video);
+        video.hls = hls;
+        hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+          video.play().catch(e => console.warn("[Adult VOD] Autoplay prevented:", e));
+        });
+      } else {
+        video.src = finalUrl;
+        video.load();
+        video.play().catch(e => console.warn("[Adult VOD] Play notice:", e));
+      }
+
+      video.onended = function () {
+        if (window._veloraAdultVodMovies && window._veloraAdultVodCurrentIndex < window._veloraAdultVodMovies.length - 1) {
+          playAdultMovieByIndex(window._veloraAdultVodCurrentIndex + 1);
+        }
+      };
     }
   }
 
@@ -1141,7 +1196,18 @@
     const adultView = document.getElementById("adult-view");
     if (adultView) adultView.classList.add("hidden");
 
+    const packagesView = document.getElementById("packages-view");
+    if (packagesView) packagesView.classList.add("hidden");
+
+    const contentView = document.getElementById("content-view");
+    if (contentView) {
+      contentView.classList.remove("hidden");
+      contentView.removeAttribute("aria-hidden");
+      contentView.classList.remove("content-view--vod-film-detail");
+    }
+
     renderAdultMoviesListView(uniqueMovies);
+    await playAdultMovieByIndex(0);
   }
 
   async function renderAdultPortal() {

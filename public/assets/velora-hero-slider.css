@@ -5,8 +5,8 @@
 .vel-hero-slider-wrap {
   position: relative;
   width: 100%;
-  max-width: 100%;
-  margin: 0 0 1.5rem 0;
+  max-width: 1720px;
+  margin: 0 auto 1.5rem auto;
   padding: 0 max(.75rem, env(safe-area-inset-left, 0px));
   box-sizing: border-box;
   z-index: 5;
@@ -16,7 +16,8 @@
 .vel-hero-slider {
   position: relative;
   width: 100%;
-  height: clamp(280px, 42vw, 480px);
+  height: clamp(320px, 32vw, 560px);
+  aspect-ratio: 2.5 / 1;
   min-height: 280px;
   border-radius: 20px;
   overflow: hidden;
@@ -26,8 +27,9 @@
 
 @media (max-width: 768px) {
   .vel-hero-slider {
-    height: clamp(230px, 56vw, 340px);
-    border-radius: 16px;
+    height: clamp(210px, 52vw, 320px);
+    aspect-ratio: 16 / 9;
+    border-radius: 14px;
   }
 }
 
@@ -50,33 +52,39 @@
   cursor: pointer;
 }
 
-/* Backdrop Image with Ken Burns Zoom */
+/* Backdrop Image with Subtle Cinematic Camera Drift */
 .vel-hero-slide__bg {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 25%;
-  transform: scale(1.01);
-  transition: transform 7s cubic-bezier(0.25, 1, 0.5, 1);
+  object-position: center 18%;
+  transform: scale(1);
+  transform-origin: center 20%;
+  transition: transform 7s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease;
+  will-change: transform;
 }
 
 .vel-hero-slide.active .vel-hero-slide__bg {
-  transform: scale(1.08);
+  transform: scale(1.025);
 }
 
-/* Multi-layer Cinematic Vignettes & Gradients */
+/* Multi-layer Cinematic Vignettes & Gradients (Prime Video style left + bottom scrims) */
 .vel-hero-slide__overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(0deg, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.2) 30%, transparent 60%);
+  background: 
+    linear-gradient(90deg, rgba(9, 8, 19, 0.88) 0%, rgba(9, 8, 19, 0.42) 42%, rgba(9, 8, 19, 0.05) 75%, transparent 100%),
+    linear-gradient(0deg, rgba(9, 8, 19, 0.92) 0%, rgba(9, 8, 19, 0.25) 35%, transparent 65%);
   pointer-events: none;
 }
 
 @media (max-width: 768px) {
   .vel-hero-slide__overlay {
-    background: linear-gradient(0deg, rgba(0, 0, 0, 0.78) 0%, rgba(0, 0, 0, 0.25) 35%, transparent 65%);
+    background: 
+      linear-gradient(90deg, rgba(9, 8, 19, 0.75) 0%, rgba(9, 8, 19, 0.2) 60%, transparent 100%),
+      linear-gradient(0deg, rgba(9, 8, 19, 0.95) 0%, rgba(9, 8, 19, 0.35) 40%, transparent 70%);
   }
 }
 
@@ -100,6 +108,35 @@
 .vel-hero-actions,
 .vel-hero-btn {
   display: none !important;
+}
+
+/* Transparent PNG Title Logo (Prime Video / Netflix style) */
+.vel-hero-title-art {
+  margin: 0 0 0.35rem 0;
+  padding: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  line-height: 0;
+}
+
+.vel-hero-title-logo {
+  max-width: min(400px, 85%);
+  max-height: clamp(65px, 11vw, 130px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  object-position: left bottom;
+  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.95)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.8));
+  user-select: none;
+  pointer-events: none;
+}
+
+@media (max-width: 600px) {
+  .vel-hero-title-logo {
+    max-width: min(270px, 90%);
+    max-height: clamp(48px, 14vw, 75px);
+  }
 }
 
 /* Clean Stylized Title */

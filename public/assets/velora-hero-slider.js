@@ -157,6 +157,15 @@
     startAutoSlide();
   }
 
+  function formatLogoUrl(url) {
+    if (!url) return "";
+    var u = String(url).trim();
+    if (u.includes("fanart.tv") || (!u.includes("tmdb.org") && (u.startsWith("http://") || u.startsWith("https://")))) {
+      return "/api/proxy/image?url=" + encodeURIComponent(u);
+    }
+    return u;
+  }
+
   function renderHeroSlider(items) {
     if (!container) return;
     sliderItems = items;
@@ -185,7 +194,11 @@
       img.className = "vel-hero-slide__bg";
       var cleanTitle = formatCleanTitle(item.title);
       img.alt = cleanTitle;
+      img.decoding = "async";
       img.loading = idx === 0 ? "eager" : "lazy";
+      if (idx === 0) {
+        img.setAttribute("fetchpriority", "high");
+      }
       img.src = item.backdrop || item.image || "";
 
       var overlay = document.createElement("div");
@@ -194,11 +207,40 @@
       var content = document.createElement("div");
       content.className = "vel-hero-slide__content";
 
-      var title = document.createElement("h2");
-      title.className = "vel-hero-title";
-      title.textContent = cleanTitle;
+      var logoUrl = (item.logo || item.logo_url || item.title_logo || (item.stream && item.stream.logo) || "").trim();
+      if (logoUrl) {
+        var logoWrap = document.createElement("h2");
+        logoWrap.className = "vel-hero-title-art";
+        logoWrap.setAttribute("aria-label", cleanTitle);
 
-      content.appendChild(title);
+        var logoImg = document.createElement("img");
+        logoImg.className = "vel-hero-title-logo";
+        logoImg.alt = cleanTitle;
+        logoImg.decoding = "async";
+        logoImg.loading = idx === 0 ? "eager" : "lazy";
+
+        logoImg.onerror = function() {
+          console.warn("[Hero Slider] Logo image failed to load for:", cleanTitle, logoUrl);
+          var fallbackTitle = document.createElement("h2");
+          fallbackTitle.className = "vel-hero-title";
+          fallbackTitle.textContent = cleanTitle;
+          if (logoWrap.parentNode) {
+            logoWrap.parentNode.replaceChild(fallbackTitle, logoWrap);
+          } else {
+            logoWrap.replaceWith(fallbackTitle);
+          }
+        };
+
+        var resolvedLogoSrc = formatLogoUrl(logoUrl);
+        logoImg.src = resolvedLogoSrc;
+        logoWrap.appendChild(logoImg);
+        content.appendChild(logoWrap);
+      } else {
+        var title = document.createElement("h2");
+        title.className = "vel-hero-title";
+        title.textContent = cleanTitle;
+        content.appendChild(title);
+      }
 
       if (item.overview) {
         var overview = document.createElement("p");

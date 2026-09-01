@@ -43,35 +43,23 @@
   // ---------------------------------------------------------------------------
   // Data Fetching & Sync Across All Providers
   // ---------------------------------------------------------------------------
-  async function fetchAssignedAdultPackages() {
-    try {
-      const res = await fetch(`${REST_BASE}/admin_settings?key=eq.adult_packages`, {
-        cache: "no-store",
-        headers: { "Content-Type": "application/json" }
-      });
-      if (res.ok) {
-        const rows = await res.json();
-        if (Array.isArray(rows) && rows[0] && rows[0].value) {
-          try {
-            const list = JSON.parse(rows[0].value);
-            if (Array.isArray(list)) {
-              assignedAdultPackages.clear();
-              list.forEach(r => {
-                const pkgId = String(r.package_id || r.id);
-                if (pkgId) assignedAdultPackages.set(pkgId, r);
-                if (r.kind && r.source_id && r.category_id) {
-                  assignedAdultPackages.set(makePackageKey(r.kind, r.source_id, r.category_id), r);
-                }
-              });
-              localStorage.setItem(LOCAL_STORAGE_ADULT_KEY, JSON.stringify(list));
-              return;
-            }
-          } catch (_) {}
-        }
-      }
+  let fetchAssignedPromise = null;
 
-      const cached = localStorage.getItem(LOCAL_STORAGE_ADULT_KEY);
-      if (cached) {
+  async function fetchAssignedAdultPackages(forceRefresh = false) {
+    // 1. Instant return if already loaded in memory
+    if (!forceRefresh && assignedAdultPackages.size > 0) {
+      return assignedAdultPackages;
+    }
+
+    // 2. Reuse in-flight promise if a request is already running
+    if (fetchAssignedPromise) {
+      return fetchAssignedPromise;
+    }
+
+    // 3. Immediately hydrate from localStorage for 0ms initial render
+    const cached = localStorage.getItem(LOCAL_STORAGE_ADULT_KEY);
+    if (cached && assignedAdultPackages.size === 0) {
+      try {
         const list = JSON.parse(cached);
         if (Array.isArray(list)) {
           assignedAdultPackages.clear();
@@ -83,10 +71,48 @@
             }
           });
         }
-      }
-    } catch (err) {
-      console.warn("[Velora Adult] Error fetching assigned adult packages:", err.message);
+      } catch (_) {}
     }
+
+    fetchAssignedPromise = (async () => {
+      try {
+        const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), 2500) : null;
+
+        const res = await fetch(`${REST_BASE}/admin_settings?key=eq.adult_packages`, {
+          signal: controller ? controller.signal : undefined,
+          headers: { "Content-Type": "application/json" }
+        });
+        if (timeoutId) clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const rows = await res.json();
+          if (Array.isArray(rows) && rows[0] && rows[0].value) {
+            try {
+              const list = JSON.parse(rows[0].value);
+              if (Array.isArray(list)) {
+                assignedAdultPackages.clear();
+                list.forEach(r => {
+                  const pkgId = String(r.package_id || r.id);
+                  if (pkgId) assignedAdultPackages.set(pkgId, r);
+                  if (r.kind && r.source_id && r.category_id) {
+                    assignedAdultPackages.set(makePackageKey(r.kind, r.source_id, r.category_id), r);
+                  }
+                });
+                localStorage.setItem(LOCAL_STORAGE_ADULT_KEY, JSON.stringify(list));
+              }
+            } catch (_) {}
+          }
+        }
+      } catch (err) {
+        console.warn("[Velora Adult] Network notice for adult_packages (using cached state):", err.message);
+      } finally {
+        fetchAssignedPromise = null;
+      }
+      return assignedAdultPackages;
+    })();
+
+    return fetchAssignedPromise;
   }
 
   async function persistAssignedAdultPackages() {
@@ -489,13 +515,24 @@
     const key = `${pkg.source_id}:${pkg.category_id}`;
     if (adultLiveChannelCache.has(key)) return adultLiveChannelCache.get(key);
 
+    const sessionKey = `velora_adult_live_${key}`;
+    try {
+      const stored = sessionStorage.getItem(sessionKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          adultLiveChannelCache.set(key, parsed);
+          return parsed;
+        }
+      }
+    } catch (_) {}
+
     const token = localStorage.getItem("authToken");
     const headers = { "Content-Type": "application/json" };
     if (token) headers.Authorization = `Bearer ${token}`;
 
     try {
       const res = await fetch(`/api/proxy/xtream/${encodeURIComponent(pkg.source_id)}/live_streams?category_id=${encodeURIComponent(pkg.category_id)}`, {
-        cache: "no-store",
         headers
       });
       if (res.ok) {
@@ -508,6 +545,7 @@
           stream_id: String(ch.stream_id || ch.id || "")
         })) : [];
         adultLiveChannelCache.set(key, list);
+        try { sessionStorage.setItem(sessionKey, JSON.stringify(list)); } catch (_) {}
         return list;
       }
     } catch (e) {
@@ -798,13 +836,24 @@
     const key = `${pkg.source_id}:${catId}`;
     if (adultVodMovieCache.has(key)) return adultVodMovieCache.get(key);
 
+    const sessionKey = `velora_adult_vod_${key}`;
+    try {
+      const stored = sessionStorage.getItem(sessionKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          adultVodMovieCache.set(key, parsed);
+          return parsed;
+        }
+      }
+    } catch (_) {}
+
     const token = localStorage.getItem("authToken");
     const headers = { "Content-Type": "application/json" };
     if (token) headers.Authorization = `Bearer ${token}`;
 
     try {
       const res = await fetch(`/api/proxy/xtream/${encodeURIComponent(pkg.source_id)}/vod_streams?category_id=${encodeURIComponent(catId)}`, {
-        cache: "no-store",
         headers
       });
       if (res.ok) {
@@ -822,6 +871,7 @@
           duration: m.duration || m.duration_secs || ""
         })) : [];
         adultVodMovieCache.set(key, list);
+        try { sessionStorage.setItem(sessionKey, JSON.stringify(list)); } catch (_) {}
         return list;
       }
     } catch (e) {
@@ -1340,7 +1390,6 @@
       if (el) {
         el.classList.add("hidden");
         el.setAttribute("aria-hidden", "true");
-        el.style.setProperty("display", "none", "important");
       }
     });
   }
@@ -1363,7 +1412,6 @@
 
     if (homePage) homePage.classList.add("hidden");
     if (primeContainer) primeContainer.style.setProperty("display", "none", "important");
-    if (stickyTop) stickyTop.style.setProperty("display", "none", "important");
 
     const adultView = document.getElementById("adult-view");
     if (adultView) {
@@ -1386,6 +1434,22 @@
       adultView.classList.add("hidden");
       adultView.setAttribute("aria-hidden", "true");
     }
+    [
+      "player-container",
+      "vod-player-container",
+      "now-playing",
+      "now-playing-vod",
+      "content-view",
+      "packages-view"
+    ].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.style.removeProperty("display");
+    });
+    const stickyTop = document.querySelector(".vel-sticky-top");
+    if (stickyTop) stickyTop.style.removeProperty("display");
+    const header = document.querySelector(".vel-header");
+    if (header) header.style.removeProperty("display");
+
     document.dispatchEvent(new CustomEvent("velora-return-home"));
   }
 

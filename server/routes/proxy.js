@@ -587,14 +587,28 @@ router.get('/xtream/:sourceId/live_categories', async (req, res) => {
 });
 
 // Live Streams
+// Live Streams
 router.get('/xtream/:sourceId/live_streams', async (req, res) => {
     try {
         const sourceId = parseInt(req.params.sourceId);
         const categoryId = req.query.category_id;
         const includeHidden = req.query.includeHidden === 'true';
         if (sendCachedSourceCategory(req, res, 'live_streams', sourceId, categoryId, includeHidden)) return;
-        const streams = getStreamsFromDb(sourceId, 'live', categoryId, includeHidden);
-        res.json(streams);
+        let streams = getStreamsFromDb(sourceId, 'live', categoryId, includeHidden);
+        if (!streams || !streams.length) {
+            const cacheKey = categoryId ? `live_streams_${categoryId}` : 'live_streams';
+            const cached = cache.get('xtream', sourceId, cacheKey, 24 * 60 * 60 * 1000);
+            if (cached) return res.json(cached);
+            const source = sources.get(sourceId);
+            if (source && source.type === 'xtream') {
+                const api = xtreamApi.createFromSource(source);
+                streams = await api.getLiveStreams(categoryId);
+                if (Array.isArray(streams)) {
+                    cache.set('xtream', sourceId, cacheKey, streams);
+                }
+            }
+        }
+        res.json(streams || []);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Database error' });
@@ -604,10 +618,24 @@ router.get('/xtream/:sourceId/live_streams', async (req, res) => {
 router.get('/xtream/:sourceId/live_streams/:categoryId', async (req, res) => {
     try {
         const sourceId = parseInt(req.params.sourceId);
+        const categoryId = req.params.categoryId;
         const includeHidden = req.query.includeHidden === 'true';
-        if (sendCachedSourceCategory(req, res, 'live_streams', sourceId, req.params.categoryId, includeHidden)) return;
-        const streams = getStreamsFromDb(sourceId, 'live', req.params.categoryId, includeHidden);
-        res.json(streams);
+        if (sendCachedSourceCategory(req, res, 'live_streams', sourceId, categoryId, includeHidden)) return;
+        let streams = getStreamsFromDb(sourceId, 'live', categoryId, includeHidden);
+        if (!streams || !streams.length) {
+            const cacheKey = categoryId ? `live_streams_${categoryId}` : 'live_streams';
+            const cached = cache.get('xtream', sourceId, cacheKey, 24 * 60 * 60 * 1000);
+            if (cached) return res.json(cached);
+            const source = sources.get(sourceId);
+            if (source && source.type === 'xtream') {
+                const api = xtreamApi.createFromSource(source);
+                streams = await api.getLiveStreams(categoryId);
+                if (Array.isArray(streams)) {
+                    cache.set('xtream', sourceId, cacheKey, streams);
+                }
+            }
+        }
+        res.json(streams || []);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Database error' });
@@ -634,8 +662,21 @@ router.get('/xtream/:sourceId/vod_streams', async (req, res) => {
         const categoryId = req.query.category_id;
         const includeHidden = req.query.includeHidden === 'true';
         if (sendCachedSourceCategory(req, res, 'vod_streams', sourceId, categoryId, includeHidden)) return;
-        const streams = getStreamsFromDb(sourceId, 'movie', categoryId, includeHidden);
-        res.json(streams);
+        let streams = getStreamsFromDb(sourceId, 'movie', categoryId, includeHidden);
+        if (!streams || !streams.length) {
+            const cacheKey = categoryId ? `vod_streams_${categoryId}` : 'vod_streams';
+            const cached = cache.get('xtream', sourceId, cacheKey, 24 * 60 * 60 * 1000);
+            if (cached) return res.json(cached);
+            const source = sources.get(sourceId);
+            if (source && source.type === 'xtream') {
+                const api = xtreamApi.createFromSource(source);
+                streams = await api.getVodStreams(categoryId);
+                if (Array.isArray(streams)) {
+                    cache.set('xtream', sourceId, cacheKey, streams);
+                }
+            }
+        }
+        res.json(streams || []);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Database error' });
@@ -645,10 +686,24 @@ router.get('/xtream/:sourceId/vod_streams', async (req, res) => {
 router.get('/xtream/:sourceId/vod_streams/:categoryId', async (req, res) => {
     try {
         const sourceId = parseInt(req.params.sourceId);
+        const categoryId = req.params.categoryId;
         const includeHidden = req.query.includeHidden === 'true';
-        if (sendCachedSourceCategory(req, res, 'vod_streams', sourceId, req.params.categoryId, includeHidden)) return;
-        const streams = getStreamsFromDb(sourceId, 'movie', req.params.categoryId, includeHidden);
-        res.json(streams);
+        if (sendCachedSourceCategory(req, res, 'vod_streams', sourceId, categoryId, includeHidden)) return;
+        let streams = getStreamsFromDb(sourceId, 'movie', categoryId, includeHidden);
+        if (!streams || !streams.length) {
+            const cacheKey = categoryId ? `vod_streams_${categoryId}` : 'vod_streams';
+            const cached = cache.get('xtream', sourceId, cacheKey, 24 * 60 * 60 * 1000);
+            if (cached) return res.json(cached);
+            const source = sources.get(sourceId);
+            if (source && source.type === 'xtream') {
+                const api = xtreamApi.createFromSource(source);
+                streams = await api.getVodStreams(categoryId);
+                if (Array.isArray(streams)) {
+                    cache.set('xtream', sourceId, cacheKey, streams);
+                }
+            }
+        }
+        res.json(streams || []);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Database error' });

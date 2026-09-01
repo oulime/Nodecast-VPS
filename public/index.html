@@ -12738,7 +12738,9 @@ if (target.closest(".trial-offer-button")) {
           function syncSearchVisibility() {
             var livePlaying = !player.classList.contains("hidden") && player.getAttribute("aria-hidden") !== "true";
             var hasMovieRows = !!dynamicList.querySelector(".vel-adult-movie-row, .vel-adult-movie-list-wrap");
-            var shouldShow = livePlaying && !hasMovieRows && !contentView.classList.contains("hidden");
+            var isAdult = document.body.dataset.veloraReturnAdult === "true" || document.body.dataset.velActiveTab === "adult";
+            var isFavorites = document.body.dataset.veloraReturnFavorites === "true" || document.body.dataset.velActiveTab === "favorites";
+            var shouldShow = livePlaying && (isAdult || isFavorites) && !hasMovieRows && !contentView.classList.contains("hidden");
             wrap.classList.toggle("hidden", !shouldShow);
             if (!shouldShow && input.value) {
               input.value = "";
@@ -14167,10 +14169,33 @@ if (target.closest(".trial-offer-button")) {
           delete document.body.dataset.veloraReturnFavorites;
           delete window._veloraFavoriteReturnTab;
           delete document.body.dataset.veloraSearchMediaOpen;
+          delete document.body.dataset.veloraReturnAdult;
+          document.body.classList.remove("vel-adult-active");
           document.body.classList.remove("vel-favorites-open", "vel-favorites-player-active");
           if (typeof window.veloraCloseFavoritesPage === "function") {
             try { window.veloraCloseFavoritesPage(false); } catch (_) {}
           }
+          var adultView = document.getElementById("adult-view");
+          if (adultView) {
+            adultView.classList.add("hidden");
+            adultView.setAttribute("aria-hidden", "true");
+          }
+          [
+            "player-container",
+            "vod-player-container",
+            "now-playing",
+            "now-playing-vod",
+            "content-view",
+            "packages-view"
+          ].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.style.removeProperty("display");
+          });
+          var stickyTop = document.querySelector(".vel-sticky-top");
+          if (stickyTop) stickyTop.style.removeProperty("display");
+          var header = document.querySelector(".vel-header");
+          if (header) header.style.removeProperty("display");
+
           document.body.dataset.velTopLevel = tab;
           document.body.dataset.velActiveTab = tab;
           document.body.classList.remove("vel-home-empty-active", "vel-home-choice-loading");
@@ -14216,7 +14241,10 @@ if (target.closest(".trial-offer-button")) {
           });
           ["player-container", "vod-player-container", "now-playing", "now-playing-vod"].forEach(function (id) {
             var element = document.getElementById(id);
-            if (element) element.classList.add("hidden");
+            if (element) {
+              element.classList.add("hidden");
+              element.style.removeProperty("display");
+            }
           });
           try {
             window.dispatchEvent(new CustomEvent("velora-home-media-stop"));

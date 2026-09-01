@@ -111,15 +111,24 @@
         if (Array.isArray(rawList) && rawList.length > 0) {
           const items = rawList.map((it, idx) => {
             const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? idx;
-            let thumb = it.stream_icon || it.cover || it.cover_big || it.movie_image || it.series_image || it.backdrop_path || it.backdrop || it.backdrop_url || "";
-            if (Array.isArray(thumb) && thumb.length > 0) thumb = thumb[0];
-            if (typeof thumb === "string" && thumb.startsWith("/")) thumb = "https://image.tmdb.org/t/p/w780" + thumb;
+            let poster = it.poster || it.poster_path || it.stream_icon || it.cover || it.cover_big || it.movie_image || it.series_image || "";
+            if (Array.isArray(poster) && poster.length > 0) poster = poster[0];
+            if (typeof poster === "string" && poster.startsWith("/")) poster = "https://image.tmdb.org/t/p/w500" + poster;
+
+            let backdrop = it.backdrop_path || it.backdrop || it.backdrop_url || "";
+            if (Array.isArray(backdrop) && backdrop.length > 0) backdrop = backdrop[0];
+            if (typeof backdrop === "string" && backdrop.startsWith("/")) backdrop = "https://image.tmdb.org/t/p/w780" + backdrop;
+
+            const finalPoster = poster || backdrop;
+            const finalBackdrop = backdrop || poster;
+
             return {
               id: `feed:${pkg.id}:${rawId}`,
               name: stripTitle(it.name || it.title || it.series_name || ""),
               rawName: it.name || it.title || it.series_name || "",
-              thumbUrl: thumb,
-              backdropUrl: it.backdrop_path || it.backdrop || thumb,
+              thumbUrl: finalPoster,
+              posterUrl: finalPoster,
+              backdropUrl: finalBackdrop,
               rating: it.rating || it.rating_5based || it.score || "",
               year: it.year || it.releaseDate || "",
               plot: it.plot || it.description || it.overview || "",
@@ -604,15 +613,24 @@
               if (Array.isArray(rawList) && rawList.length > 0) {
                 pkg.items = rawList.slice(0, 20).map((it, idx) => {
                   const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? idx;
-                  let thumb = it.stream_icon || it.cover || it.cover_big || it.movie_image || it.series_image || it.backdrop_path || it.backdrop || it.backdrop_url || "";
-                  if (Array.isArray(thumb) && thumb.length > 0) thumb = thumb[0];
-                  if (typeof thumb === "string" && thumb.startsWith("/")) thumb = "https://image.tmdb.org/t/p/w780" + thumb;
+                  let poster = it.poster || it.poster_path || it.stream_icon || it.cover || it.cover_big || it.movie_image || it.series_image || "";
+                  if (Array.isArray(poster) && poster.length > 0) poster = poster[0];
+                  if (typeof poster === "string" && poster.startsWith("/")) poster = "https://image.tmdb.org/t/p/w500" + poster;
+
+                  let backdrop = it.backdrop_path || it.backdrop || it.backdrop_url || "";
+                  if (Array.isArray(backdrop) && backdrop.length > 0) backdrop = backdrop[0];
+                  if (typeof backdrop === "string" && backdrop.startsWith("/")) backdrop = "https://image.tmdb.org/t/p/w780" + backdrop;
+
+                  const finalPoster = poster || backdrop;
+                  const finalBackdrop = backdrop || poster;
+
                   return {
                     id: `feed:${pkg.id}:${rawId}`,
                     name: stripTitle(it.name || it.title || it.series_name || ""),
                     rawName: it.name || it.title || it.series_name || "",
-                    thumbUrl: thumb,
-                    backdropUrl: it.backdrop_path || it.backdrop || thumb,
+                    thumbUrl: finalPoster,
+                    posterUrl: finalPoster,
+                    backdropUrl: finalBackdrop,
                     rating: it.rating || it.rating_5based || it.score || "",
                     year: it.year || it.releaseDate || "",
                     plot: it.plot || it.description || it.overview || "",

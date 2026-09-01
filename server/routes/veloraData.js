@@ -62,6 +62,33 @@ function fetchTmdbBackdrop(name, isSeries = false) {
     });
 }
 
+function fetchTmdbPoster(name, isSeries = false) {
+    const { title, year } = cleanMediaTitleForSearch(name);
+    if (!title || title.length < 2) return Promise.resolve('');
+    const endpoint = isSeries ? 'search/tv' : 'search/movie';
+    const yearParam = year ? (isSeries ? `&first_air_date_year=${year}` : `&year=${year}`) : '';
+    const url = `https://api.themoviedb.org/3/${endpoint}?api_key=1cf50e6248dc270629e802686245c2c8&query=${encodeURIComponent(title)}${yearParam}&language=fr-FR`;
+    return new Promise((resolve) => {
+        const req = https.get(url, { timeout: 3500 }, (res) => {
+            if (res.statusCode !== 200) return resolve('');
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try {
+                    const json = JSON.parse(data);
+                    const item = json.results?.find(r => r.poster_path) || json.results?.[0];
+                    if (item?.poster_path) {
+                        return resolve(`https://image.tmdb.org/t/p/w500${item.poster_path}`);
+                    }
+                } catch (_) {}
+                resolve('');
+            });
+        });
+        req.on('error', () => resolve(''));
+        req.on('timeout', () => { req.destroy(); resolve(''); });
+    });
+}
+
 async function resolveBackdropForEntry(entry, sourceMap, apiMap, backdropCache) {
     const sourceId = String(entry.sourceId || '');
     const streamId = String(entry.streamId || '');
@@ -1485,6 +1512,8 @@ function buildMediaFeedCache() {
         series: veloraCatalogCache.getSnapshot('series') || []
     };
 
+    let posterCache = {};
+    try { posterCache = JSON.parse(fs.readFileSync(vodPosterCachePath, 'utf8')) || {}; } catch (_) {}
     let backdropCache = {};
     try { backdropCache = JSON.parse(fs.readFileSync(vodBackdropCachePath, 'utf8')) || {}; } catch (_) {}
 
@@ -1564,6 +1593,20 @@ function buildMediaFeedCache() {
                         const itemKey = `${sourceId}:${String(rawId)}`;
                         const titleKey = normalizedPosterTitle(rawName);
 
+                        let posterUrl = '';
+                        let posterCandidate = item.stream_icon ?? item.cover ?? item.cover_big ?? item.movie_image ?? item.series_image ?? item.poster_path ?? item.poster ?? '';
+                        if (Array.isArray(posterCandidate) && posterCandidate.length > 0) posterCandidate = posterCandidate[0];
+                        if (typeof posterCandidate === 'string' && posterCandidate.trim()) {
+                            let url = posterCandidate.trim();
+                            if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w500${url}`;
+                            if (!url.includes('/w1280/') && !url.includes('/backdrop')) {
+                                posterUrl = url;
+                            }
+                        }
+                        if (!posterUrl) {
+                            posterUrl = posterCache[itemKey] || posterCache[titleKey] || '';
+                        }
+
                         let backdropUrl = '';
                         let backdropCandidate = item.backdrop_path ?? item.backdrop ?? item.backdrop_url ?? '';
                         if (Array.isArray(backdropCandidate) && backdropCandidate.length > 0) backdropCandidate = backdropCandidate[0];
@@ -1572,14 +1615,19 @@ function buildMediaFeedCache() {
                             if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w780${url}`;
                             backdropUrl = url;
                         }
-                        const standardThumb = String(item.stream_icon || item.cover || item.cover_big || item.movie_image || item.series_image || '');
-                        const finalThumb = standardThumb || backdropUrl;
+                        if (!backdropUrl) {
+                            backdropUrl = backdropCache[itemKey] || backdropCache[titleKey] || '';
+                        }
+
+                        const finalPoster = posterUrl || backdropUrl;
+                        const finalBackdrop = backdropUrl || posterUrl;
 
                         items.push({
                             id: `feed:${pkgId}:${rawId}`,
                             name: rawName,
-                            thumbUrl: finalThumb,
-                            backdropUrl: backdropUrl || standardThumb,
+                            thumbUrl: finalPoster,
+                            posterUrl: finalPoster,
+                            backdropUrl: finalBackdrop,
                             rating: item.rating || item.rating_5based || item.score || '',
                             year: item.year || item.releaseDate || '',
                             plot: item.plot || item.description || item.overview || '',
@@ -1601,6 +1649,20 @@ function buildMediaFeedCache() {
                             const itemKey = `${sourceId}:${String(rawId)}`;
                             const titleKey = normalizedPosterTitle(rawName);
 
+                            let posterUrl = '';
+                            let posterCandidate = item.stream_icon ?? item.cover ?? item.cover_big ?? item.movie_image ?? item.series_image ?? item.poster_path ?? item.poster ?? '';
+                            if (Array.isArray(posterCandidate) && posterCandidate.length > 0) posterCandidate = posterCandidate[0];
+                            if (typeof posterCandidate === 'string' && posterCandidate.trim()) {
+                                let url = posterCandidate.trim();
+                                if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w500${url}`;
+                                if (!url.includes('/w1280/') && !url.includes('/backdrop')) {
+                                    posterUrl = url;
+                                }
+                            }
+                            if (!posterUrl) {
+                                posterUrl = posterCache[itemKey] || posterCache[titleKey] || '';
+                            }
+
                             let backdropUrl = '';
                             let backdropCandidate = item.backdrop_path ?? item.backdrop ?? item.backdrop_url ?? '';
                             if (Array.isArray(backdropCandidate) && backdropCandidate.length > 0) backdropCandidate = backdropCandidate[0];
@@ -1612,14 +1674,16 @@ function buildMediaFeedCache() {
                             if (!backdropUrl) {
                                 backdropUrl = backdropCache[itemKey] || backdropCache[titleKey] || '';
                             }
-                            const standardThumb = String(item.stream_icon || item.cover || item.cover_big || item.movie_image || item.series_image || '');
-                            const finalThumb = standardThumb || backdropUrl;
+
+                            const finalPoster = posterUrl || backdropUrl;
+                            const finalBackdrop = backdropUrl || posterUrl;
 
                             items.push({
                                 id: `feed:${pkgId}:${rawId}`,
                                 name: rawName,
-                                thumbUrl: finalThumb,
-                                backdropUrl: backdropUrl || standardThumb,
+                                thumbUrl: finalPoster,
+                                posterUrl: finalPoster,
+                                backdropUrl: finalBackdrop,
                                 rating: item.rating || item.rating_5based || item.score || '',
                                 year: item.year || item.releaseDate || '',
                                 plot: item.plot || item.description || item.overview || '',

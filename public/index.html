@@ -5649,20 +5649,20 @@
             <div id="cn-prefix-wrap" class="countries-admin-table-wrap" style="margin-top: 1rem"></div>
 
             <hr style="margin: 1.6rem 0; border: 0; border-top: 1px solid rgba(255, 255, 255, 0.1)" />
-            <h2>Suffixes — masquer les chaînes</h2>
+            <h2>Suffixes — noms de bouquets, films & chaînes</h2>
             <p class="countries-admin-intro" style="margin-top: 0">
-              Une chaîne est masquée uniquement lorsque son nom brut se termine par l’un de ces suffixes.
-              La comparaison est insensible à la casse et aux espaces autour du suffixe.
+              Texte retiré à la <strong>fin</strong> du nom pour l’affichage des bouquets, films, séries et chaînes (ex.
+              <code>[FR]</code>, <code>(FR)</code>, <code>[VF]</code>, <code>[VOSTFR]</code>). Comparaison insensible à la casse sur la fin du titre.
             </p>
             <p id="suffix-status" class="status" aria-live="polite"></p>
             <div class="field row">
               <div>
-                <label for="suffix-value">Suffixe de fin</label>
-                <input id="suffix-value" type="text" placeholder="ex. HEVC" autocomplete="off" />
+                <label for="suffix-value">Suffixe</label>
+                <input id="suffix-value" type="text" placeholder="[FR]" autocomplete="off" />
               </div>
             </div>
             <div class="actions">
-              <button type="button" id="suffix-add" class="primary">Ajouter le suffixe</button>
+              <button type="button" id="suffix-add" class="primary">Ajouter</button>
             </div>
             <div id="suffix-wrap" class="countries-admin-table-wrap" style="margin-top: 1rem"></div>
           </section>
@@ -14054,14 +14054,13 @@ if (target.closest(".trial-offer-button")) {
     </script>
     <script>
       (function () {
-        var marker = "suffix:";
         var status = document.getElementById("suffix-status");
         var input = document.getElementById("suffix-value");
         var addButton = document.getElementById("suffix-add");
         var wrap = document.getElementById("suffix-wrap");
         if (!status || !input || !addButton || !wrap) return;
 
-        var endpoint = "/api/velora-db/rest/v1/admin_hidden_filters";
+        var endpoint = "/api/velora-db/rest/v1/admin_channel_name_suffixes";
 
         function setStatus(message, isError) {
           status.textContent = message;
@@ -14087,20 +14086,20 @@ if (target.closest(".trial-offer-button")) {
           if (!rows.length) {
             var empty = document.createElement("p");
             empty.className = "countries-admin-empty";
-            empty.textContent = "Aucun suffixe — aucune chaîne n’est masquée selon sa terminaison.";
+            empty.textContent = "Aucun suffixe configuré — rien n’est retiré de la fin des titres.";
             wrap.appendChild(empty);
             return;
           }
 
           var table = document.createElement("table");
           table.className = "countries-admin-table";
-          table.innerHTML = "<thead><tr><th>Suffixe de fin</th><th></th></tr></thead><tbody></tbody>";
+          table.innerHTML = "<thead><tr><th>Suffixe retiré</th><th></th></tr></thead><tbody></tbody>";
           var body = table.querySelector("tbody");
           rows.forEach(function (row) {
             var tr = document.createElement("tr");
             var valueCell = document.createElement("td");
             var code = document.createElement("code");
-            code.textContent = String(row.needle).slice(marker.length);
+            code.textContent = String(row.suffix || "");
             valueCell.appendChild(code);
 
             var actionCell = document.createElement("td");
@@ -14128,14 +14127,12 @@ if (target.closest(".trial-offer-button")) {
         async function load() {
           try {
             setStatus("Chargement…");
-            var rows = await request(endpoint + "?select=id,needle&order=needle.asc");
-            var suffixes = (Array.isArray(rows) ? rows : []).filter(function (row) {
-              return typeof row.needle === "string" && row.needle.toLowerCase().startsWith(marker);
-            });
+            var rows = await request(endpoint + "?select=id,suffix,sort_order&order=sort_order.asc,suffix.asc");
+            var suffixes = Array.isArray(rows) ? rows : [];
             render(suffixes);
             setStatus(
               suffixes.length
-                ? suffixes.length + " suffixe(s). Fermez les paramètres pour actualiser le lecteur."
+                ? suffixes.length + " suffixe(s). Fermez les paramètres pour actualiser l'affichage."
                 : "Aucun suffixe configuré."
             );
           } catch (error) {
@@ -14147,7 +14144,7 @@ if (target.closest(".trial-offer-button")) {
         addButton.addEventListener("click", async function () {
           var value = input.value.trim();
           if (!value) {
-            setStatus("Saisissez un suffixe.", true);
+            setStatus("Saisissez un suffixe (ex. [FR]).", true);
             return;
           }
           addButton.disabled = true;
@@ -14155,7 +14152,7 @@ if (target.closest(".trial-offer-button")) {
             setStatus("Ajout…");
             await request(endpoint, {
               method: "POST",
-              body: JSON.stringify({ needle: marker + value })
+              body: JSON.stringify({ suffix: value, sort_order: 0 })
             });
             input.value = "";
             await load();

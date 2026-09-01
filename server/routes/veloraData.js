@@ -183,6 +183,7 @@ const COUNTRY_PACKAGE_TABLES = new Set([
 ]);
 const HOME_CHANNEL_RULE_TABLES = new Set([
     'admin_channel_name_prefixes',
+    'admin_channel_name_suffixes',
     'admin_hidden_filters'
 ]);
 const DEFAULT_CHANNEL_HIDDEN_FILTERS = ['HEVC', 'H265', 'H.265', 'H 265', 'x265'];
@@ -224,11 +225,14 @@ function homeChannelNameRules() {
     const prefixes = [...new Set(allRows('admin_channel_name_prefixes')
         .map(row => String(row.prefix || '').trim()).filter(Boolean))]
         .sort((left, right) => right.length - left.length);
+    const suffixes = [...new Set(allRows('admin_channel_name_suffixes')
+        .map(row => String(row.suffix || '').trim()).filter(Boolean))]
+        .sort((left, right) => right.length - left.length);
     const hiddenFilters = [...new Set([
         ...DEFAULT_CHANNEL_HIDDEN_FILTERS,
         ...allRows('admin_hidden_filters').map(row => String(row.needle || '').trim()).filter(Boolean)
     ])].sort((left, right) => right.length - left.length);
-    return { prefixes, hiddenFilters };
+    return { prefixes, suffixes, hiddenFilters };
 }
 
 function normalizeChannelRuleValue(value) {
@@ -253,10 +257,13 @@ function isHomeChannelHidden(rawName, hiddenFilters) {
     });
 }
 
-function stripHomeChannelPrefixes(rawName, prefixes) {
+function stripHomeChannelPrefixes(rawName, prefixes, suffixes = []) {
     const original = String(rawName || '').trim();
     let name = original;
     const allPrefixes = Array.isArray(prefixes) ? prefixes : [];
+    const allSuffixes = Array.isArray(suffixes) ? suffixes : [];
+
+    // Strip configured prefixes
     for (let pass = 0; pass < 64; pass += 1) {
         const prefix = allPrefixes.find(candidate =>
             candidate.length <= name.length
@@ -265,11 +272,23 @@ function stripHomeChannelPrefixes(rawName, prefixes) {
         if (!prefix) break;
         name = name.slice(prefix.length).trim();
     }
+
+    // Strip configured suffixes
+    for (let pass = 0; pass < 64; pass += 1) {
+        const suffix = allSuffixes.find(candidate =>
+            candidate.length <= name.length
+            && name.slice(-candidate.length).toLowerCase() === candidate.toLowerCase()
+        );
+        if (!suffix) break;
+        name = name.slice(0, -suffix.length).trim();
+    }
+
     for (let p = 0; p < 5; p += 1) {
         const next = name
             .replace(/^[\[\(]?[A-Z0-9\+\-\s]{1,12}[\]\)]\s*[-:]?\s*/i, '')
             .replace(/^([0-9]+K|[0-9]+D|HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|EN|ES|DE|MULTI|TRUEFRENCH|FRENCH)\s*[-:]?\s*/i, '')
             .replace(/^[A-Z0-9]{1,8}-[A-Z0-9]{1,8}\s*[-:]?\s*/i, '')
+            .replace(/\s*([\[\(][A-Z0-9\+\-\s]{1,8}[\]\)]|\b(HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|EN|ES|DE|MULTI|TRUEFRENCH|FRENCH)\b)$/i, '')
             .trim();
         if (next === name) break;
         name = next;
@@ -341,6 +360,7 @@ async function enrichHomeCacheMoviePosters(payload) {
 
 const ALLOWED_TABLES = new Set([
     'admin_channel_name_prefixes',
+    'admin_channel_name_suffixes',
     'admin_countries',
     'admin_country_package_order',
     'admin_global_package_allowlist',
@@ -357,6 +377,8 @@ const ALLOWED_TABLES = new Set([
 ]);
 
 const NATURAL_KEYS = {
+    admin_channel_name_prefixes: ['prefix'],
+    admin_channel_name_suffixes: ['suffix'],
     admin_countries: ['name'],
     admin_country_package_order: ['country_id', 'ui_tab'],
     admin_global_package_allowlist: ['stream_id'],
@@ -1869,7 +1891,7 @@ function buildHomeCache() {
                 const finalThumb = (isHorizontal && backdropUrl) ? backdropUrl : (standardThumb || backdropUrl);
                 return {
                     id: item.id || `home-cache:${section.id}:${rawId}`,
-                    name: stripHomeChannelPrefixes(rawName, channelRules.prefixes),
+                    name: stripHomeChannelPrefixes(rawName, channelRules.prefixes, channelRules.suffixes),
                     thumbUrl: finalThumb,
                     backdropUrl: backdropUrl || (isHorizontal ? '' : standardThumb),
                     section_logo_url: String(section.logo_url || section.badge_logo_url || item.section_logo_url || '').trim(),
@@ -1918,7 +1940,7 @@ function buildHomeCache() {
                 const finalThumb = (isHorizontal && backdropUrl) ? backdropUrl : (standardThumb || backdropUrl);
                 return {
                     id: `home-cache:${section.id}:${rawId}`,
-                    name: stripHomeChannelPrefixes(rawName, channelRules.prefixes),
+                    name: stripHomeChannelPrefixes(rawName, channelRules.prefixes, channelRules.suffixes),
                     thumbUrl: finalThumb,
                     backdropUrl: backdropUrl || (isHorizontal ? '' : standardThumb),
                     section_logo_url: String(section.logo_url || section.badge_logo_url || '').trim(),

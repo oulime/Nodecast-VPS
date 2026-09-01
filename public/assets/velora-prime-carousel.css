@@ -394,21 +394,12 @@ body.vel-modal-active {
   margin-left: 2px;
 }
 
-/* Card Title */
-.vel-prime-card-title {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 8px 10px;
-  font-size: clamp(0.76rem, 0.9vw, 0.88rem);
-  font-weight: 600;
-  color: #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  z-index: 3;
-  text-shadow: 0 2px 6px rgba(0,0,0,0.95);
+/* Card Title - Clean Poster Art (Titles are embedded in the poster images) */
+.vel-prime-card-title,
+.dDns1P.UhCVR_.fbl-gradient,
+.vel-pkg-modal__card .vel-prime-card-title,
+.vel-pkg-modal__card .dDns1P.UhCVR_ {
+  display: none !important;
 }
 
 /* Fallback Card */
@@ -476,6 +467,67 @@ body.vel-modal-active {
 
 .Zaab8D.u5kdG4 {
   right: -14px;
+}
+
+/* --------------------------------------------------------------------------
+   Accueil (Home) Mixed Random Movie & Series Lazy Feed
+   -------------------------------------------------------------------------- */
+.vel-home-prime-feed {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(20px, 3vw, 40px);
+  margin-top: clamp(24px, 3.5vw, 48px);
+  padding-bottom: clamp(60px, 8vw, 120px);
+}
+
+.vel-home-row-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: clamp(0.68rem, 0.8vw, 0.76rem);
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-right: 8px;
+  vertical-align: middle;
+  text-transform: uppercase;
+}
+
+.vel-home-row-badge--movies {
+  background: rgba(229, 9, 20, 0.85);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(229, 9, 20, 0.4);
+}
+
+.vel-home-row-badge--series {
+  background: rgba(99, 102, 241, 0.85);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+}
+
+.vel-home-feed-sentinel {
+  width: 100%;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 16px 0;
+}
+
+.vel-home-feed-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(255, 255, 255, 0.12);
+  border-top-color: #e50914;
+  animation: vel-spin 0.75s linear infinite;
+}
+
+@keyframes vel-spin {
+  to { transform: rotate(360deg); }
 }
 
 /* --------------------------------------------------------------------------

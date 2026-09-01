@@ -28,13 +28,77 @@
     return "country_france";
   }
 
+  let cachedPrefixes = [];
+  let cachedSuffixes = [];
+
+  async function loadPrefixAndSuffixRules() {
+    try {
+      const [pRes, sRes] = await Promise.all([
+        fetch("/api/velora-db/rest/v1/admin_channel_name_prefixes?select=prefix,sort_order&order=sort_order.asc,prefix.desc"),
+        fetch("/api/velora-db/rest/v1/admin_channel_name_suffixes?select=suffix,sort_order&order=sort_order.asc,suffix.desc")
+      ]);
+      if (pRes.ok) {
+        const pRows = await pRes.json();
+        if (Array.isArray(pRows)) {
+          cachedPrefixes = [...new Set(pRows.map(r => String(r.prefix || "").trim()).filter(Boolean))]
+            .sort((a, b) => b.length - a.length);
+        }
+      }
+      if (sRes.ok) {
+        const sRows = await sRes.json();
+        if (Array.isArray(sRows)) {
+          cachedSuffixes = [...new Set(sRows.map(r => String(r.suffix || "").trim()).filter(Boolean))]
+            .sort((a, b) => b.length - a.length);
+        }
+      }
+    } catch (_) {}
+  }
+
+  loadPrefixAndSuffixRules();
+  document.addEventListener("velora-channel-prefixes-changed", () => {
+    loadPrefixAndSuffixRules().then(() => {
+      lastFeedKey = "";
+      render();
+    });
+  });
+  document.addEventListener("velora-channel-suffixes-changed", () => {
+    loadPrefixAndSuffixRules().then(() => {
+      lastFeedKey = "";
+      render();
+    });
+  });
+
   function stripTitle(name) {
     let clean = String(name || "").trim();
+
+    // 1. Strip dynamic configured prefixes from database
+    for (let pass = 0; pass < 32; pass++) {
+      const match = cachedPrefixes.find(p => 
+        p.length <= clean.length && clean.slice(0, p.length).toLowerCase() === p.toLowerCase()
+      );
+      if (!match) break;
+      clean = clean.slice(match.length).trim();
+      clean = clean.replace(/^[-:|•\s]+/g, "").trim();
+    }
+
+    // 2. Strip dynamic configured suffixes from database
+    for (let pass = 0; pass < 32; pass++) {
+      const match = cachedSuffixes.find(s => 
+        s.length <= clean.length && clean.slice(-s.length).toLowerCase() === s.toLowerCase()
+      );
+      if (!match) break;
+      clean = clean.slice(0, -match.length).trim();
+      clean = clean.replace(/[-:|•\s]+$/g, "").trim();
+    }
+
+    // 3. Multi-language Regex cleanup for bracketed codes and country tags (AR, FR, UK, US, ES, etc.)
     for (let pass = 0; pass < 5; pass++) {
       const next = clean
-        .replace(/^[\[\(]?[A-Z0-9\+\-\s]{1,12}[\]\)]\s*[-:]?\s*/i, "")
-        .replace(/^([0-9]+K|[0-9]+D|HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|EN|ES|DE|MULTI|TRUEFRENCH|FRENCH)\s*[-:]?\s*/i, "")
-        .replace(/^[A-Z0-9]{1,8}-[A-Z0-9]{1,8}\s*[-:]?\s*/i, "")
+        .replace(/^[\[\(][A-Z0-9\+\-\s]{1,12}[\]\)]\s*[-:|•]?\s*/i, "")
+        .replace(/^([0-9]+K|[0-9]+D|HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|AR|EN|UK|US|ES|DE|IT|PT|TR|NL|RU|PL|RO|MULTI|TRUEFRENCH|FRENCH|ARABIC)(\s*[-:|•]\s*|\s+)/i, "")
+        .replace(/^[A-Z0-9]{1,8}-[A-Z0-9]{1,8}(\s*[-:|•]\s*|\s+)/i, "")
+        .replace(/\s*([\[\(][A-Z0-9\+\-\s]{1,12}[\]\)]|\b(HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|AR|EN|UK|US|ES|DE|IT|PT|TR|NL|RU|PL|RO|MULTI|TRUEFRENCH|FRENCH|ARABIC)\b)$/i, "")
+        .replace(/\s*[-:|•]\s*$/g, "")
         .trim();
       if (next === clean) break;
       clean = next;
@@ -44,9 +108,37 @@
 
   function formatPackageTitle(title) {
     let clean = String(title || "").trim();
+
+    // 1. Strip dynamic configured prefixes
+    for (let pass = 0; pass < 32; pass++) {
+      const match = cachedPrefixes.find(p => 
+        p.length <= clean.length && clean.slice(0, p.length).toLowerCase() === p.toLowerCase()
+      );
+      if (!match) break;
+      clean = clean.slice(match.length).trim();
+      clean = clean.replace(/^[-:|•\s]+/g, "").trim();
+    }
+
+    // 2. Strip dynamic configured suffixes
+    for (let pass = 0; pass < 32; pass++) {
+      const match = cachedSuffixes.find(s => 
+        s.length <= clean.length && clean.slice(-s.length).toLowerCase() === s.toLowerCase()
+      );
+      if (!match) break;
+      clean = clean.slice(0, -match.length).trim();
+      clean = clean.replace(/[-:|•\s]+$/g, "").trim();
+    }
+
+    // 3. Strip bracketed / parenthesized language suffixes and tags
+    clean = clean
+      .replace(/\s*([\[\(][A-Z0-9\+\-\s]{1,12}[\]\)]|\b(HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|AR|EN|UK|US|ES|DE|IT|PT|TR|NL|RU|PL|RO|MULTI|TRUEFRENCH|FRENCH|ARABIC)\b)$/i, "")
+      .replace(/\s*[-:|•]\s*$/g, "")
+      .trim();
+
+    // 4. Strip leading package prefixes
     return clean
-      .replace(/^[A-Z0-9\-_]{2,8}\s*[-:]\s*/i, "")
-      .replace(/^([A-Z]{2,4}|[0-9]+K)\s*[-:]\s*/i, "")
+      .replace(/^[A-Z0-9\-_]{2,8}(\s*[-:|•]\s*|\s+)/i, "")
+      .replace(/^([A-Z]{2,4}|[0-9]+K)(\s*[-:|•]\s*|\s+)/i, "")
       .trim() || title || "Catalogue";
   }
 
@@ -309,14 +401,7 @@
         overlay.className = "vel-pkg-modal__card-overlay";
         overlay.innerHTML = '<div class="U6kOYF"><svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg></div>';
 
-        const grad = document.createElement("div");
-        grad.className = "dDns1P UhCVR_";
-
-        const nameEl = document.createElement("div");
-        nameEl.className = "vel-prime-card-title";
-        nameEl.textContent = stripTitle(item.name);
-
-        thumbWrap.append(overlay, grad, nameEl);
+        thumbWrap.append(overlay);
         card.appendChild(thumbWrap);
 
         const playAction = (e) => {
@@ -496,14 +581,7 @@
     overlay.className = "MaQfAR OhaBAC";
     overlay.innerHTML = '<div class="U6kOYF"><svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg></div>';
 
-    const gradient = document.createElement("div");
-    gradient.className = "dDns1P UhCVR_ fbl-gradient";
-
-    const title = document.createElement("div");
-    title.className = "vel-prime-card-title";
-    title.textContent = stripTitle(item.name);
-
-    packshot.append(btn, lz, overlay, gradient, title);
+    packshot.append(btn, lz, overlay);
     section.appendChild(packshot);
     article.appendChild(section);
     li.appendChild(article);
@@ -514,6 +592,7 @@
   function buildRow(tab, pkg) {
     const pkgTitle = formatPackageTitle(pkg.name);
     const items = Array.isArray(pkg.items) ? pkg.items : [];
+    const isHome = activeTab() === "home";
 
     const wrapper = document.createElement("div");
     wrapper.dataset.testid = "navigation-carousel-wrapper";
@@ -531,7 +610,12 @@
 
     const h2 = document.createElement("h2");
     h2.className = "qwttco";
-    h2.innerHTML = `<span data-testid="carousel-title"><span>${pkgTitle}</span></span>`;
+    const typeBadge = isHome
+      ? (tab === "movies"
+          ? '<span class="vel-home-row-badge vel-home-row-badge--movies">🎬 FILMS</span>'
+          : '<span class="vel-home-row-badge vel-home-row-badge--series">🍿 SÉRIES</span>')
+      : "";
+    h2.innerHTML = `<span data-testid="carousel-title">${typeBadge}<span>${pkgTitle}</span></span>`;
     h2.style.cursor = "pointer";
 
     const seeMore = document.createElement("a");
@@ -592,11 +676,198 @@
     return wrapper;
   }
 
+  // ---------------------------------------------------------------------------
+  // Accueil (Home) Lazy Mixed Random Movie & Series Feed
+  // ---------------------------------------------------------------------------
+  let homeQueue = [];
+  let homeRenderedCount = 0;
+  let homeSentinelObserver = null;
+  let isHomeLoading = false;
+
+  function shuffleArray(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function getHomeFeedContainer() {
+    let container = document.getElementById("vel-home-prime-feed");
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "vel-home-prime-feed";
+      container.className = "vel-home-prime-feed";
+      const homeSections = document.getElementById("vel-home-sections");
+      const homePage = document.getElementById("vel-home-empty-page");
+      if (homeSections && homeSections.parentNode) {
+        homeSections.parentNode.insertBefore(container, homeSections.nextSibling);
+      } else if (homePage) {
+        homePage.appendChild(container);
+      }
+    }
+    return container;
+  }
+
+  async function initHomeMixedFeed() {
+    const tab = activeTab();
+    if (tab !== "home") return;
+
+    const country = getActiveCountryId();
+    const container = getHomeFeedContainer();
+    if (!container) return;
+
+    if (isHomeLoading) return;
+    isHomeLoading = true;
+
+    try {
+      container.innerHTML = "";
+      homeRenderedCount = 0;
+      homeQueue = [];
+
+      const [movieFeed, seriesFeed] = await Promise.all([
+        fetchCountryMediaFeed(country, "movies"),
+        fetchCountryMediaFeed(country, "series")
+      ]);
+
+      const appState = typeof window.veloraGetState === "function" ? window.veloraGetState() : null;
+
+      function processPackages(pkgs, t) {
+        if (!Array.isArray(pkgs)) return [];
+        const streamMap = appState ? (t === "movies" ? appState.vodStreamsByCat : appState.seriesStreamsByCat) : null;
+
+        return pkgs.map(pkg => {
+          const cloned = { ...pkg, _tab: t };
+          if (streamMap && streamMap.size > 0) {
+            const rawList = streamMap.get(pkg.id) || streamMap.get(String(pkg.id)) || (pkg.category_id ? streamMap.get(String(pkg.category_id)) : null);
+            if (Array.isArray(rawList) && rawList.length > 0) {
+              cloned.totalCount = Math.max(cloned.totalCount || 0, rawList.length);
+              const streamById = new Map();
+              rawList.forEach(it => {
+                const rawId = String(it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? '');
+                if (rawId) streamById.set(rawId, it);
+              });
+
+              if (Array.isArray(cloned.items) && cloned.items.length > 0) {
+                cloned.items.forEach(it => {
+                  const raw = streamById.get(String(it.streamId || ''));
+                  if (raw) {
+                    const { poster, backdrop } = extractMediaImages(raw);
+                    if (poster) { cloned.posterUrl = poster; it.posterUrl = poster; it.thumbUrl = poster; }
+                    if (backdrop) it.backdropUrl = backdrop;
+                  }
+                });
+              } else {
+                cloned.items = rawList.slice(0, 20).map((it, idx) => {
+                  const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? idx;
+                  const { poster, backdrop } = extractMediaImages(it);
+                  return {
+                    id: `feed:${cloned.id}:${rawId}`,
+                    name: stripTitle(it.name || it.title || it.series_name || ""),
+                    rawName: it.name || it.title || it.series_name || "",
+                    thumbUrl: poster,
+                    posterUrl: poster,
+                    backdropUrl: backdrop,
+                    rating: it.rating || it.rating_5based || it.score || "",
+                    year: it.year || it.releaseDate || "",
+                    plot: it.plot || it.description || it.overview || "",
+                    streamId: rawId,
+                    sourceId: it.nodecast_source_id ?? it.source_id,
+                    globalStreamId: it.nodecast_global_stream_id ?? it.global_stream_id ?? rawId,
+                    containerExtension: it.container_extension || "",
+                    contentType: t,
+                    packageId: cloned.id
+                  };
+                });
+              }
+            }
+          }
+          return cloned;
+        }).filter(p => Array.isArray(p.items) && p.items.length > 0);
+      }
+
+      const validMovies = processPackages(movieFeed?.packages, "movies");
+      const validSeries = processPackages(seriesFeed?.packages, "series");
+
+      // Random shuffle the mix every time
+      homeQueue = shuffleArray([...validMovies, ...validSeries]);
+
+      // Render initial 4 rows
+      renderNextHomeChunk(4);
+
+      // Attach scroll observer for lazy loading remaining rows
+      setupHomeScrollSentinel(container);
+    } finally {
+      isHomeLoading = false;
+    }
+  }
+
+  function renderNextHomeChunk(count = 3) {
+    if (!homeQueue.length || homeRenderedCount >= homeQueue.length) return;
+    const container = getHomeFeedContainer();
+    if (!container) return;
+
+    const sentinel = document.getElementById("vel-home-feed-sentinel");
+    const nextChunk = homeQueue.slice(homeRenderedCount, homeRenderedCount + count);
+    homeRenderedCount += nextChunk.length;
+
+    nextChunk.forEach(pkg => {
+      const rowEl = buildRow(pkg._tab, pkg);
+      if (sentinel && sentinel.parentNode === container) {
+        container.insertBefore(rowEl, sentinel);
+      } else {
+        container.appendChild(rowEl);
+      }
+    });
+
+    if (homeRenderedCount >= homeQueue.length && sentinel) {
+      sentinel.remove();
+    }
+  }
+
+  function setupHomeScrollSentinel(container) {
+    if (homeRenderedCount >= homeQueue.length) return;
+    let sentinel = document.getElementById("vel-home-feed-sentinel");
+    if (!sentinel) {
+      sentinel = document.createElement("div");
+      sentinel.id = "vel-home-feed-sentinel";
+      sentinel.className = "vel-home-feed-sentinel";
+      sentinel.innerHTML = '<div class="vel-home-feed-spinner" aria-hidden="true"></div>';
+      container.appendChild(sentinel);
+    }
+
+    if (homeSentinelObserver) {
+      homeSentinelObserver.disconnect();
+    }
+
+    if ("IntersectionObserver" in window) {
+      homeSentinelObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            renderNextHomeChunk(3);
+          }
+        });
+      }, {
+        root: null,
+        rootMargin: "600px 0px",
+        threshold: 0.01
+      });
+      homeSentinelObserver.observe(sentinel);
+    }
+  }
+
   // Render the full Netflix-style page feed instantly from precomputed cache
   async function render() {
     const tab = activeTab();
     const country = getActiveCountryId();
     const container = getContainer();
+
+    if (tab === "home") {
+      container.style.setProperty("display", "none", "important");
+      initHomeMixedFeed();
+      return;
+    }
 
     if (!MEDIA_TABS.has(tab)) {
       container.style.setProperty("display", "none", "important");
@@ -838,18 +1109,26 @@
     });
   }
 
+  document.addEventListener("velora-return-home", () => {
+    setTimeout(initHomeMixedFeed, 50);
+  });
+
   new MutationObserver(() => {
     const tab = activeTab();
     syncHeaderForMediaTabs();
     if (MEDIA_TABS.has(tab)) {
       render();
+    } else if (tab === "home") {
+      const c = document.getElementById("vel-prime-carousels-container");
+      if (c) c.style.display = "none";
+      initHomeMixedFeed();
     } else {
       const c = document.getElementById("vel-prime-carousels-container");
       if (c) c.style.display = "none";
     }
   }).observe(document.body, {
     attributes: true,
-    attributeFilter: ["data-vel-active-tab"]
+    attributeFilter: ["data-vel-active-tab", "class"]
   });
 
   if (document.readyState === "loading") {

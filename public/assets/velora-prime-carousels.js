@@ -1,5 +1,5 @@
 /**
- * Velora Netflix-Style Multi-Row Carousel Feed
+ * Velora Netflix-Style Multi-Row Carousel Feed & Full Package Modal
  * Powered by VPS Precomputed Media Feed Cache (/api/velora-db/country-media-feed)
  */
 (() => {
@@ -9,6 +9,7 @@
   let isRendering = false;
   let lastFeedKey = "";
   const feedCache = new Map(); // key: `${countryId}:${tab}` -> feedData
+  const packageFullItemsCache = new Map(); // key: `${tab}:${pkgId}` -> items array
 
   function activeTab() {
     return document.body.dataset.velActiveTab || "";
@@ -93,23 +94,230 @@
       window.veloraOpenHomeCacheEntry({ id: pkg.id, content_type: tab, package_id: pkg.id }, item, cardEl);
       return;
     }
-    openFullPackage(pkg);
   }
 
-  // Open Full Package View on demand ("Voir tout" / "Voir plus")
-  function openFullPackage(pkg) {
-    if (typeof window.veloraActivateMediaPackage === "function") {
-      window.veloraActivateMediaPackage(pkg.id);
-      return;
+  // Fetch full items of a package for the "Voir tout" popup
+  async function fetchPackageFullItems(tab, pkg) {
+    const cacheKey = `${tab}:${pkg.id}`;
+    if (packageFullItemsCache.has(cacheKey)) {
+      return packageFullItemsCache.get(cacheKey);
     }
-    const packagesView = document.getElementById("packages-view");
-    if (packagesView) {
-      const card = packagesView.querySelector(`.vel-package-card[data-package-id="${pkg.id}"]`);
-      if (card) {
-        card.click();
-        return;
+
+    const appState = typeof window.veloraGetState === "function" ? window.veloraGetState() : null;
+    if (appState) {
+      const streamMap = tab === "movies" ? appState.vodStreamsByCat : appState.seriesStreamsByCat;
+      if (streamMap) {
+        const rawList = streamMap.get(pkg.id) || streamMap.get(String(pkg.id)) || (pkg.category_id ? streamMap.get(String(pkg.category_id)) : null);
+        if (Array.isArray(rawList) && rawList.length > 0) {
+          const items = rawList.map((it, idx) => {
+            const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? idx;
+            let thumb = it.backdrop_path || it.backdrop || it.backdrop_url || it.cover_big || it.movie_image || it.series_image || it.stream_icon || it.cover || "";
+            if (Array.isArray(thumb) && thumb.length > 0) thumb = thumb[0];
+            if (typeof thumb === "string" && thumb.startsWith("/")) thumb = "https://image.tmdb.org/t/p/w780" + thumb;
+            return {
+              id: `feed:${pkg.id}:${rawId}`,
+              name: stripTitle(it.name || it.title || it.series_name || ""),
+              rawName: it.name || it.title || it.series_name || "",
+              thumbUrl: thumb,
+              backdropUrl: thumb,
+              rating: it.rating || it.rating_5based || it.score || "",
+              year: it.year || it.releaseDate || "",
+              plot: it.plot || it.description || it.overview || "",
+              streamId: rawId,
+              sourceId: it.nodecast_source_id ?? it.source_id ?? pkg.source_id,
+              globalStreamId: it.nodecast_global_stream_id ?? it.global_stream_id ?? rawId,
+              containerExtension: it.container_extension || "",
+              contentType: tab,
+              packageId: pkg.id
+            };
+          });
+          packageFullItemsCache.set(cacheKey, items);
+          return items;
+        }
       }
     }
+
+    // Fetch from backend package-media-items API
+    try {
+      const countryId = getActiveCountryId();
+      const kind = tab === "movies" ? "vod" : "series";
+      const res = await fetch(`/api/velora-db/admin/package-media-items?countryId=${encodeURIComponent(countryId)}&packageId=${encodeURIComponent(pkg.id)}&kind=${encodeURIComponent(kind)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.items) && data.items.length > 0) {
+          const items = data.items.map(it => {
+            const rawId = it.stream_id || it.id;
+            let thumb = it.backdropUrl || it.thumbUrl || it.stream_icon || it.cover || "";
+            return {
+              id: `feed:${pkg.id}:${rawId}`,
+              name: stripTitle(it.name || it.title || ""),
+              rawName: it.name || it.title || "",
+              thumbUrl: thumb,
+              backdropUrl: thumb,
+              rating: it.rating || "",
+              year: it.year || "",
+              plot: it.plot || it.description || "",
+              streamId: rawId,
+              sourceId: it.source_id || pkg.source_id,
+              globalStreamId: it.globalStreamId || rawId,
+              containerExtension: it.containerExtension || "",
+              contentType: tab,
+              packageId: pkg.id
+            };
+          });
+          packageFullItemsCache.set(cacheKey, items);
+          return items;
+        }
+      }
+    } catch (err) {
+      console.warn("[Velora Prime] Could not fetch package items:", err.message);
+    }
+
+    return Array.isArray(pkg.items) ? pkg.items : [];
+  }
+
+  // Open Full Package Content Modal (Popup)
+  async function openPackageModal(tab, pkg) {
+    let modal = document.getElementById("vel-pkg-modal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "vel-pkg-modal";
+      modal.className = "vel-pkg-modal";
+      modal.innerHTML = `
+        <div class="vel-pkg-modal__backdrop"></div>
+        <div class="vel-pkg-modal__dialog">
+          <div class="vel-pkg-modal__header">
+            <div class="vel-pkg-modal__titles">
+              <h2 class="vel-pkg-modal__title" id="vel-pkg-modal-title"></h2>
+              <span class="vel-pkg-modal__count" id="vel-pkg-modal-count"></span>
+            </div>
+            <div class="vel-pkg-modal__search-wrap">
+              <svg class="vel-pkg-modal__search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" class="vel-pkg-modal__search" id="vel-pkg-modal-search" placeholder="Rechercher un titre..." />
+            </div>
+            <button type="button" class="vel-pkg-modal__close" id="vel-pkg-modal-close" aria-label="Fermer">✕</button>
+          </div>
+          <div class="vel-pkg-modal__body" id="vel-pkg-modal-body">
+            <div class="vel-pkg-modal__loader">
+              <div class="vel-pkg-modal__spinner"></div>
+              <span>Chargement du contenu...</span>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      const closeBtn = modal.querySelector("#vel-pkg-modal-close");
+      const backdrop = modal.querySelector(".vel-pkg-modal__backdrop");
+      const closeModal = () => {
+        modal.classList.remove("is-open");
+        document.body.classList.remove("vel-modal-active");
+      };
+      closeBtn.addEventListener("click", closeModal);
+      backdrop.addEventListener("click", closeModal);
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && modal.classList.contains("is-open")) closeModal();
+      });
+    }
+
+    const titleEl = modal.querySelector("#vel-pkg-modal-title");
+    const countEl = modal.querySelector("#vel-pkg-modal-count");
+    const searchInput = modal.querySelector("#vel-pkg-modal-search");
+    const bodyEl = modal.querySelector("#vel-pkg-modal-body");
+
+    const pkgTitle = formatPackageTitle(pkg.name);
+    titleEl.textContent = pkgTitle;
+    countEl.textContent = `${pkg.totalCount || pkg.items?.length || 0} ${tab === "series" ? "séries" : "films"}`;
+    searchInput.value = "";
+
+    bodyEl.innerHTML = `
+      <div class="vel-pkg-modal__loader">
+        <div class="vel-pkg-modal__spinner"></div>
+        <span>Chargement du catalogue complet...</span>
+      </div>
+    `;
+
+    modal.classList.add("is-open");
+    document.body.classList.add("vel-modal-active");
+
+    const allItems = await fetchPackageFullItems(tab, pkg);
+    countEl.textContent = `${allItems.length} ${tab === "series" ? "séries" : "films"}`;
+
+    function renderGrid(filterText = "") {
+      const q = filterText.trim().toLowerCase();
+      const filtered = q ? allItems.filter(it => (it.name || "").toLowerCase().includes(q) || (it.rawName || "").toLowerCase().includes(q)) : allItems;
+
+      if (!filtered.length) {
+        bodyEl.innerHTML = `<div class="vel-pkg-modal__empty">Aucun résultat trouvé pour « ${filterText} ».</div>`;
+        return;
+      }
+
+      bodyEl.innerHTML = "";
+      const grid = document.createElement("div");
+      grid.className = "vel-pkg-modal__grid";
+
+      filtered.forEach((item, idx) => {
+        const card = document.createElement("div");
+        card.className = "vel-pkg-modal__card";
+        card.setAttribute("role", "button");
+        card.tabIndex = 0;
+
+        const thumbWrap = document.createElement("div");
+        thumbWrap.className = "vel-pkg-modal__card-thumb";
+
+        const thumb = item.backdropUrl || item.thumbUrl;
+        if (thumb) {
+          const img = document.createElement("img");
+          img.alt = item.name;
+          img.loading = "lazy";
+          img.decoding = "async";
+          img.src = thumb;
+          img.onload = () => img.classList.add("is-loaded");
+          img.onerror = () => { thumbWrap.innerHTML = `<div class="vel-prime-fallback"><div class="vel-prime-fallback__title">${stripTitle(item.name)}</div></div>`; };
+          thumbWrap.appendChild(img);
+        } else {
+          thumbWrap.innerHTML = `<div class="vel-prime-fallback"><div class="vel-prime-fallback__title">${stripTitle(item.name)}</div></div>`;
+        }
+
+        const overlay = document.createElement("div");
+        overlay.className = "vel-pkg-modal__card-overlay";
+        overlay.innerHTML = '<div class="U6kOYF"><svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg></div>';
+
+        const grad = document.createElement("div");
+        grad.className = "dDns1P UhCVR_";
+
+        const nameEl = document.createElement("div");
+        nameEl.className = "vel-prime-card-title";
+        nameEl.textContent = stripTitle(item.name);
+
+        thumbWrap.append(overlay, grad, nameEl);
+        card.appendChild(thumbWrap);
+
+        const playAction = (e) => {
+          e.stopPropagation();
+          modal.classList.remove("is-open");
+          document.body.classList.remove("vel-modal-active");
+          openItem(tab, pkg, item, card);
+        };
+
+        card.addEventListener("click", playAction);
+        card.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") playAction(e);
+        });
+
+        grid.appendChild(card);
+      });
+
+      bodyEl.appendChild(grid);
+    }
+
+    renderGrid();
+
+    searchInput.oninput = (e) => {
+      renderGrid(e.target.value);
+    };
   }
 
   // Build Hero Spotlight Banner
@@ -203,7 +411,7 @@
     `;
     infoBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      openFullPackage(pkg);
+      openPackageModal(tab, pkg);
     });
 
     actions.append(playBtn, infoBtn);
@@ -315,7 +523,7 @@
     const openPkg = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      openFullPackage(pkg);
+      openPackageModal(tab, pkg);
     };
 
     h2.addEventListener("click", openPkg);
@@ -462,6 +670,7 @@
   document.addEventListener("velora-country-change", () => {
     lastFeedKey = "";
     feedCache.clear();
+    packageFullItemsCache.clear();
     setTimeout(render, 30);
   });
 
@@ -470,6 +679,7 @@
     countrySelect.addEventListener("change", () => {
       lastFeedKey = "";
       feedCache.clear();
+      packageFullItemsCache.clear();
       setTimeout(render, 30);
     });
   }

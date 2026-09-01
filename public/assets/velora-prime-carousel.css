@@ -1,11 +1,20 @@
 /**
- * Velora Netflix-Style Row Carousel Styles
+ * Velora Netflix-Style Row Carousel Styles & Full Package Modal
  */
 
-/* Hide legacy package grid cards when viewing Movies or Series */
+/* Completely hide legacy package grid cards, package-hub triggers, and wheels */
 body[data-vel-active-tab="movies"] #packages-view > .vel-package-card,
-body[data-vel-active-tab="series"] #packages-view > .vel-package-card {
+body[data-vel-active-tab="series"] #packages-view > .vel-package-card,
+#pkgHubBtn,
+.pkg-hub-trigger,
+#pkg-hub-panel,
+.pkg-hub-roller-wrapper,
+#vel-media-package-picker,
+#vel-live-wheel,
+#vel-live-wheel-modal {
   display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 body[data-vel-active-tab="movies"] #packages-view,
@@ -13,6 +22,11 @@ body[data-vel-active-tab="series"] #packages-view {
   min-height: 0 !important;
   padding-bottom: 0 !important;
   margin-bottom: 0 !important;
+}
+
+/* Prevent scrolling when modal is open */
+body.vel-modal-active {
+  overflow: hidden !important;
 }
 
 /* Main Container */
@@ -71,6 +85,7 @@ body[data-vel-active-tab="series"] #packages-view {
   font-weight: 600;
   color: #94a3b8;
   text-decoration: none;
+  cursor: pointer;
   transition: color 0.2s ease, transform 0.2s ease;
 }
 
@@ -489,4 +504,253 @@ body[data-vel-active-tab="series"] #packages-view {
   transform: scale(1.05);
   background: rgba(109, 109, 110, 0.65);
   border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* --------------------------------------------------------------------------
+   Full Package Modal (Popup for "Voir tout")
+   -------------------------------------------------------------------------- */
+.vel-pkg-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: clamp(12px, 2.5vw, 32px);
+  box-sizing: border-box;
+}
+
+.vel-pkg-modal.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.vel-pkg-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 6, 10, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.vel-pkg-modal__dialog {
+  position: relative;
+  width: min(100%, 1280px);
+  height: min(100%, 880px);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  background: #0d0d14;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+  transform: scale(0.96) translateY(12px);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 2;
+}
+
+.vel-pkg-modal.is-open .vel-pkg-modal__dialog {
+  transform: scale(1) translateY(0);
+}
+
+.vel-pkg-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: clamp(14px, 1.8vw, 22px) clamp(18px, 2.4vw, 28px);
+  background: rgba(18, 18, 28, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-wrap: wrap;
+}
+
+.vel-pkg-modal__titles {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.vel-pkg-modal__title {
+  margin: 0;
+  font-size: clamp(1.2rem, 1.8vw, 1.6rem);
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+
+.vel-pkg-modal__count {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 12px;
+  background: rgba(229, 9, 20, 0.2);
+  border: 1px solid rgba(229, 9, 20, 0.4);
+  color: #ff6b6b;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.vel-pkg-modal__search-wrap {
+  position: relative;
+  flex: 1 1 240px;
+  max-width: 380px;
+}
+
+.vel-pkg-modal__search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: #64748b;
+  pointer-events: none;
+}
+
+.vel-pkg-modal__search {
+  width: 100%;
+  padding: 9px 14px 9px 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 0.9rem;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.vel-pkg-modal__search:focus {
+  border-color: #e50914;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.vel-pkg-modal__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.vel-pkg-modal__close:hover {
+  background: #e50914;
+  border-color: #e50914;
+  transform: scale(1.08);
+}
+
+.vel-pkg-modal__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: clamp(16px, 2.4vw, 28px);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.vel-pkg-modal__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(clamp(150px, 18vw, 230px), 1fr));
+  gap: clamp(12px, 1.8vw, 20px);
+}
+
+.vel-pkg-modal__card {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #14141e;
+  cursor: pointer;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.vel-pkg-modal__card:hover {
+  transform: translateY(-5px) scale(1.03);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.2);
+  z-index: 4;
+}
+
+.vel-pkg-modal__card-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #09090f;
+  overflow: hidden;
+}
+
+.vel-pkg-modal__card-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.35s ease;
+}
+
+.vel-pkg-modal__card-thumb img.is-loaded {
+  opacity: 1;
+}
+
+.vel-pkg-modal__card:hover .vel-pkg-modal__card-thumb img {
+  transform: scale(1.06);
+}
+
+.vel-pkg-modal__card-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
+  transition: opacity 0.2s ease;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.vel-pkg-modal__card:hover .vel-pkg-modal__card-overlay {
+  opacity: 1;
+}
+
+.vel-pkg-modal__loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 80px 20px;
+  color: #94a3b8;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.vel-pkg-modal__spinner {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid rgba(229, 9, 20, 0.2);
+  border-top-color: #e50914;
+  animation: vel-spin 0.8s linear infinite;
+}
+
+@keyframes vel-spin {
+  to { transform: rotate(360deg); }
+}
+
+.vel-pkg-modal__empty {
+  padding: 80px 20px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 1.05rem;
+  font-weight: 600;
 }

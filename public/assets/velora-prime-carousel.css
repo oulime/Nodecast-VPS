@@ -55,6 +55,8 @@ body[data-vel-active-tab="series"]:not(:has(#content-view:not(.hidden))):not(:ha
   padding: 0 !important;
 }
 
+
+
 /* Netflix Prime Carousels & Hero - STRICTLY ONLY ON MOVIES & SERIES TABS */
 #vel-prime-carousels-container,
 .vel-prime-container,
@@ -482,12 +484,12 @@ body.vel-modal-active {
 .vel-netflix-hero {
   position: relative;
   width: 100%;
-  min-height: clamp(360px, 48vw, 620px);
+  min-height: clamp(400px, 52vw, 660px);
   display: flex;
   align-items: flex-end;
   box-sizing: border-box;
-  padding: clamp(24px, 4vw, 56px) clamp(16px, 3.5vw, 48px);
-  margin-bottom: clamp(12px, 2vw, 24px);
+  padding: clamp(100px, 14vw, 160px) clamp(24px, 5vw, 64px) clamp(36px, 4.5vw, 60px) clamp(24px, 5vw, 64px) !important;
+  margin-bottom: clamp(18px, 2.5vw, 36px);
   overflow: hidden;
   background: #08080c;
 }
@@ -519,18 +521,20 @@ body.vel-modal-active {
   position: absolute;
   inset: 0;
   background: 
-    linear-gradient(180deg, rgba(8,8,12,0.15) 0%, rgba(8,8,12,0.6) 60%, #08080c 100%),
-    linear-gradient(90deg, #08080c 0%, rgba(8,8,12,0.85) 40%, rgba(8,8,12,0.2) 100%);
+    linear-gradient(180deg, rgba(8,8,12,0.1) 0%, rgba(8,8,12,0.55) 55%, #08080c 100%),
+    linear-gradient(90deg, #08080c 0%, rgba(8,8,12,0.85) 45%, rgba(8,8,12,0.15) 100%);
   z-index: 2;
 }
 
 .vel-netflix-hero__content {
   position: relative;
   z-index: 3;
-  max-width: clamp(340px, 52vw, 680px);
+  max-width: clamp(340px, 54vw, 700px);
   display: flex;
   flex-direction: column;
-  gap: clamp(10px, 1.2vw, 16px);
+  gap: clamp(12px, 1.4vw, 18px);
+  margin-left: max(0px, env(safe-area-inset-left));
+  margin-bottom: max(0px, env(safe-area-inset-bottom));
 }
 
 .vel-netflix-hero__badge-row {

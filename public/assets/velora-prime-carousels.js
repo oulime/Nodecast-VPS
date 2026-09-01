@@ -12,6 +12,9 @@
   const packageFullItemsCache = new Map(); // key: `${tab}:${pkgId}` -> items array
 
   function activeTab() {
+    if (document.body.classList.contains("vel-home-empty-active")) return "home";
+    const homePage = document.getElementById("vel-home-empty-page");
+    if (homePage && !homePage.classList.contains("hidden")) return "home";
     return document.body.dataset.velActiveTab || "";
   }
 
@@ -707,17 +710,30 @@
   function syncHeaderForMediaTabs() {
     const tab = activeTab();
     const isMedia = MEDIA_TABS.has(tab);
+    const homePage = document.getElementById("vel-home-empty-page");
+    const isHome = tab === "home" || document.body.classList.contains("vel-home-empty-active") || (homePage && !homePage.classList.contains("hidden"));
     const contentView = document.getElementById("content-view");
     const vodPlayer = document.getElementById("vod-player-container");
-    const isDetailOrPlayerOpen = (contentView && !contentView.classList.contains("hidden")) || (vodPlayer && !vodPlayer.classList.contains("hidden"));
+    const livePlayer = document.getElementById("player-container");
+    const isDetailOrPlayerOpen = (contentView && !contentView.classList.contains("hidden")) || (vodPlayer && !vodPlayer.classList.contains("hidden")) || (livePlayer && !livePlayer.classList.contains("hidden"));
     const stickyTop = document.querySelector(".vel-sticky-top");
+    const velHeader = document.querySelector(".vel-header");
     let primeSearchBtn = document.getElementById("vel-prime-search-btn");
     const globalSearch = document.getElementById("vel-global-search");
     const primeContainer = document.getElementById("vel-prime-carousels-container");
 
+    if (isHome) {
+      if (primeContainer) primeContainer.style.setProperty("display", "none", "important");
+      if (primeSearchBtn) primeSearchBtn.style.setProperty("display", "none", "important");
+      if (velHeader) velHeader.style.setProperty("display", "none", "important");
+      if (stickyTop && !isDetailOrPlayerOpen) stickyTop.style.setProperty("display", "none", "important");
+      return;
+    }
+
     if (isMedia && !isDetailOrPlayerOpen) {
       if (primeContainer) primeContainer.style.removeProperty("display");
       if (stickyTop) stickyTop.style.setProperty("display", "none", "important");
+      if (velHeader) velHeader.style.setProperty("display", "none", "important");
       if (!primeSearchBtn) {
         primeSearchBtn = document.createElement("button");
         primeSearchBtn.id = "vel-prime-search-btn";
@@ -760,6 +776,7 @@
       }
     } else {
       if (stickyTop) stickyTop.style.removeProperty("display");
+      if (velHeader) velHeader.style.removeProperty("display");
       if (primeSearchBtn) {
         primeSearchBtn.style.setProperty("display", "none", "important");
       }

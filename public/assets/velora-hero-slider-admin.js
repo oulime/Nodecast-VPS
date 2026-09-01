@@ -152,6 +152,9 @@
       badgeSpan.className = "vel-slider-tag vel-slider-tag--found";
       badgeSpan.textContent = item.badge || item.category || "Trending";
 
+      var typeSpan = document.createElement("span");
+      typeSpan.textContent = "Type: " + (item.category || "movie");
+
       sub.appendChild(badgeSpan);
       sub.appendChild(typeSpan);
 

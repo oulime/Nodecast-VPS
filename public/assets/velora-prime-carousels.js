@@ -709,6 +709,7 @@
     const isMedia = MEDIA_TABS.has(tab);
     const stickyTop = document.querySelector(".vel-sticky-top");
     let primeSearchBtn = document.getElementById("vel-prime-search-btn");
+    const globalSearch = document.getElementById("vel-global-search");
 
     if (isMedia) {
       if (stickyTop) stickyTop.style.setProperty("display", "none", "important");
@@ -726,9 +727,29 @@
         `;
         primeSearchBtn.addEventListener("click", (e) => {
           e.stopPropagation();
+          primeSearchBtn.classList.add("is-hidden");
           document.dispatchEvent(new CustomEvent("velora-open-search"));
         });
         document.body.appendChild(primeSearchBtn);
+      }
+
+      if (globalSearch && !globalSearch._primeObserverAttached) {
+        globalSearch._primeObserverAttached = true;
+        new MutationObserver(() => {
+          const isOpen = !globalSearch.classList.contains("hidden");
+          const btn = document.getElementById("vel-prime-search-btn");
+          if (btn) {
+            if (isOpen) btn.classList.add("is-hidden");
+            else btn.classList.remove("is-hidden");
+          }
+        }).observe(globalSearch, { attributes: true, attributeFilter: ["class"] });
+      }
+
+      const isSearchOpen = globalSearch && !globalSearch.classList.contains("hidden");
+      if (isSearchOpen) {
+        primeSearchBtn.classList.add("is-hidden");
+      } else {
+        primeSearchBtn.classList.remove("is-hidden");
       }
       primeSearchBtn.style.display = "flex";
     } else {

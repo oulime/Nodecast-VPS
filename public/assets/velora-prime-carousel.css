@@ -61,32 +61,45 @@ body[data-vel-active-tab="series"] .main--velora .vel-sticky-top {
   top: max(16px, env(safe-area-inset-top, 16px)) !important;
   right: max(22px, env(safe-area-inset-right, 22px)) !important;
   z-index: 99999 !important;
-  width: clamp(40px, 3.8vw, 48px) !important;
-  height: clamp(40px, 3.8vw, 48px) !important;
+  width: clamp(48px, 4.4vw, 54px) !important;
+  height: clamp(48px, 4.4vw, 54px) !important;
   border-radius: 50% !important;
-  background: rgba(12, 12, 20, 0.72) !important;
-  backdrop-filter: blur(16px) !important;
-  -webkit-backdrop-filter: blur(16px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  background: rgba(14, 14, 24, 0.78) !important;
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.28) !important;
   color: #fff !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   cursor: pointer !important;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.65) !important;
-  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.7) !important;
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease !important;
 }
 
 .vel-prime-search-btn:hover {
-  transform: scale(1.08) !important;
+  transform: scale(1.1) !important;
   background: #e50914 !important;
   border-color: #e50914 !important;
 }
 
 .vel-prime-search-btn svg {
-  width: 20px;
-  height: 20px;
-  fill: #fff;
+  width: 25px !important;
+  height: 25px !important;
+  fill: #fff !important;
+}
+
+/* Hide floating search button when search modal, video player, or detail popup is open */
+body:has(#vel-global-search:not(.hidden)) .vel-prime-search-btn,
+body.vel-modal-active .vel-prime-search-btn,
+body.vel-vod-fullscreen-active .vel-prime-search-btn,
+body.vel-live-fullscreen-active .vel-prime-search-btn,
+body.vel-home-choice-loading .vel-prime-search-btn,
+.vel-prime-search-btn.is-hidden {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
 }
 
 body[data-vel-active-tab="movies"] .vel-prime-container,

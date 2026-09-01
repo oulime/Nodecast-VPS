@@ -707,48 +707,33 @@
   function syncHeaderForMediaTabs() {
     const tab = activeTab();
     const isMedia = MEDIA_TABS.has(tab);
-    const headerContext = document.getElementById("vel-header-context-title");
-    const headerLeft = document.querySelector(".vel-header__left");
     const stickyTop = document.querySelector(".vel-sticky-top");
-    const header = document.querySelector(".vel-header");
-    const toolbar = document.getElementById("vel-package-toolbar-sticky");
-    const picker = document.getElementById("vel-media-package-picker");
-    const backBtn = document.getElementById("btn-header-back");
+    let primeSearchBtn = document.getElementById("vel-prime-search-btn");
 
     if (isMedia) {
-      if (headerContext) headerContext.style.setProperty("display", "none", "important");
-      if (headerLeft) headerLeft.style.setProperty("display", "none", "important");
-      if (backBtn) backBtn.style.setProperty("display", "none", "important");
-      if (toolbar) toolbar.style.setProperty("display", "none", "important");
-      if (picker) picker.style.setProperty("display", "none", "important");
-      if (stickyTop) {
-        stickyTop.style.setProperty("position", "absolute", "important");
-        stickyTop.style.setProperty("background", "transparent", "important");
-        stickyTop.style.setProperty("border", "none", "important");
-        stickyTop.style.setProperty("box-shadow", "none", "important");
+      if (stickyTop) stickyTop.style.setProperty("display", "none", "important");
+      if (!primeSearchBtn) {
+        primeSearchBtn = document.createElement("button");
+        primeSearchBtn.id = "vel-prime-search-btn";
+        primeSearchBtn.type = "button";
+        primeSearchBtn.className = "vel-prime-search-btn vel-header-search-btn";
+        primeSearchBtn.setAttribute("aria-label", "Rechercher");
+        primeSearchBtn.setAttribute("title", "Recherche");
+        primeSearchBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <path d="M10.8 4a6.8 6.8 0 1 0 4.24 12.12l3.42 3.42a1 1 0 0 0 1.42-1.42l-3.42-3.42A6.8 6.8 0 0 0 10.8 4Zm0 2a4.8 4.8 0 1 1 0 9.6 4.8 4.8 0 0 1 0-9.6Z"></path>
+          </svg>
+        `;
+        primeSearchBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          document.dispatchEvent(new CustomEvent("velora-open-search"));
+        });
+        document.body.appendChild(primeSearchBtn);
       }
-      if (header) {
-        header.style.setProperty("background", "transparent", "important");
-        header.style.setProperty("border", "none", "important");
-        header.style.setProperty("box-shadow", "none", "important");
-      }
+      primeSearchBtn.style.display = "flex";
     } else {
-      if (headerContext) headerContext.style.removeProperty("display");
-      if (headerLeft) headerLeft.style.removeProperty("display");
-      if (backBtn) backBtn.style.removeProperty("display");
-      if (toolbar) toolbar.style.removeProperty("display");
-      if (picker) picker.style.removeProperty("display");
-      if (stickyTop) {
-        stickyTop.style.removeProperty("position");
-        stickyTop.style.removeProperty("background");
-        stickyTop.style.removeProperty("border");
-        stickyTop.style.removeProperty("box-shadow");
-      }
-      if (header) {
-        header.style.removeProperty("background");
-        header.style.removeProperty("border");
-        header.style.removeProperty("box-shadow");
-      }
+      if (stickyTop) stickyTop.style.removeProperty("display");
+      if (primeSearchBtn) primeSearchBtn.style.display = "none";
     }
   }
 

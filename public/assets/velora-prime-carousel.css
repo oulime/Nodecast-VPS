@@ -43,107 +43,50 @@ body[data-vel-active-tab="series"] #main {
 }
 
 body[data-vel-active-tab="movies"] .vel-sticky-top,
-body[data-vel-active-tab="series"] .vel-sticky-top {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  background: transparent !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  border: none !important;
-  box-shadow: none !important;
-  pointer-events: none !important;
-  z-index: 100 !important;
-  padding: clamp(14px, 2.2vw, 24px) clamp(16px, 3.5vw, 48px) !important;
-}
-
-body[data-vel-active-tab="movies"] .vel-header,
-body[data-vel-active-tab="series"] .vel-header {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  min-height: 0 !important;
-  pointer-events: none !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: flex-end !important;
-}
-
-body[data-vel-active-tab="movies"] .vel-header__left,
-body[data-vel-active-tab="series"] .vel-header__left,
-body[data-vel-active-tab="movies"] #vel-header-context-title,
-body[data-vel-active-tab="series"] #vel-header-context-title,
-body[data-vel-active-tab="movies"] .vel-header-context-title,
-body[data-vel-active-tab="series"] .vel-header-context-title,
-body[data-vel-active-tab="movies"] .vel-header-back-btn,
-body[data-vel-active-tab="series"] .vel-header-back-btn,
-body[data-vel-active-tab="movies"] .vel-category-heading,
-body[data-vel-active-tab="series"] .vel-category-heading,
-body[data-vel-active-tab="movies"] .vel-package-toolbar-sticky,
-body[data-vel-active-tab="series"] .vel-package-toolbar-sticky,
-body[data-vel-active-tab="movies"] .main--velora .vel-header__left,
-body[data-vel-active-tab="series"] .main--velora .vel-header__left,
-body[data-vel-active-tab="movies"] .main--velora #vel-header-context-title,
-body[data-vel-active-tab="series"] .main--velora #vel-header-context-title,
-body[data-vel-active-tab="movies"] .main--velora .vel-header-context-title,
-body[data-vel-active-tab="series"] .main--velora .vel-header-context-title,
-body[data-vel-active-tab="movies"] .main--velora .vel-header-back-btn,
-body[data-vel-active-tab="series"] .main--velora .vel-header-back-btn,
-body[data-vel-active-tab="movies"] .main--velora .vel-category-heading,
-body[data-vel-active-tab="series"] .main--velora .vel-category-heading,
-body[data-vel-active-tab="movies"] .main--velora .vel-package-toolbar-sticky,
-body[data-vel-active-tab="series"] .main--velora .vel-package-toolbar-sticky {
+body[data-vel-active-tab="series"] .vel-sticky-top,
+body[data-vel-active-tab="movies"] .main--velora .vel-sticky-top,
+body[data-vel-active-tab="series"] .main--velora .vel-sticky-top {
   display: none !important;
   visibility: hidden !important;
   pointer-events: none !important;
-  opacity: 0 !important;
-  width: 0 !important;
   height: 0 !important;
+  min-height: 0 !important;
   margin: 0 !important;
   padding: 0 !important;
-  border: 0 !important;
 }
 
-body[data-vel-active-tab="movies"] .vel-header__right,
-body[data-vel-active-tab="series"] .vel-header__right,
-body[data-vel-active-tab="movies"] .main--velora .vel-header__right,
-body[data-vel-active-tab="series"] .main--velora .vel-header__right {
-  position: absolute !important;
-  top: clamp(14px, 2.2vw, 24px) !important;
-  right: clamp(16px, 3.5vw, 48px) !important;
-  left: auto !important;
-  margin: 0 !important;
-  pointer-events: auto !important;
-  z-index: 120 !important;
-  transition: none !important;
-}
-
-body[data-vel-active-tab="movies"] #btn-header-search,
-body[data-vel-active-tab="series"] #btn-header-search {
+/* Floating Search Button (Fixed in Viewport for all devices - PC & Mobile) */
+.vel-prime-search-btn {
+  position: fixed !important;
+  top: max(16px, env(safe-area-inset-top, 16px)) !important;
+  right: max(22px, env(safe-area-inset-right, 22px)) !important;
+  z-index: 99999 !important;
+  width: clamp(40px, 3.8vw, 48px) !important;
+  height: clamp(40px, 3.8vw, 48px) !important;
+  border-radius: 50% !important;
+  background: rgba(12, 12, 20, 0.72) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  color: #fff !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: clamp(40px, 4.4vw, 48px) !important;
-  height: clamp(40px, 4.4vw, 48px) !important;
-  border-radius: 50% !important;
-  background: rgba(10, 10, 16, 0.65) !important;
-  backdrop-filter: blur(14px) !important;
-  -webkit-backdrop-filter: blur(14px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.22) !important;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6) !important;
-  pointer-events: auto !important;
   cursor: pointer !important;
-  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease !important;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.65) !important;
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease !important;
 }
 
-body[data-vel-active-tab="movies"] #btn-header-search:hover,
-body[data-vel-active-tab="series"] #btn-header-search:hover {
-  transform: scale(1.1) !important;
+.vel-prime-search-btn:hover {
+  transform: scale(1.08) !important;
   background: #e50914 !important;
   border-color: #e50914 !important;
+}
+
+.vel-prime-search-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: #fff;
 }
 
 body[data-vel-active-tab="movies"] .vel-prime-container,
@@ -155,7 +98,7 @@ body[data-vel-active-tab="series"] .vel-prime-container {
 body[data-vel-active-tab="movies"] .vel-netflix-hero,
 body[data-vel-active-tab="series"] .vel-netflix-hero {
   margin-top: 0 !important;
-  padding-top: clamp(90px, 14vw, 150px) !important;
+  padding-top: clamp(80px, 12vw, 140px) !important;
   min-height: clamp(440px, 58vw, 700px) !important;
 }
 

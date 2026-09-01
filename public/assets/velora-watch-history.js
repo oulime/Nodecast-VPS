@@ -63,7 +63,7 @@
       }
       .vel-resume-play-center {
         position: absolute;
-        top: 42%;
+        top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
         width: 2.6rem;
@@ -180,39 +180,13 @@
         box-shadow: 0 0 8px rgba(229, 9, 20, 0.9) !important;
       }
       .vel-home-section__card--resume .vel-home-section__name {
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: flex-end !important;
-        position: absolute !important;
-        bottom: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        z-index: 3 !important;
-        min-height: auto !important;
-        padding: 1.8rem 0.55rem 0.55rem !important;
-        background: linear-gradient(0deg, rgba(5,4,10,0.96) 0%, rgba(5,4,10,0.72) 65%, transparent 100%) !important;
-        text-align: left !important;
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
         pointer-events: none !important;
-      }
-      .vel-home-section__card--resume .vel-home-section__name strong {
-        display: block;
-        font-size: 0.76rem;
-        font-weight: 900;
-        color: #fff;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        text-shadow: 0 2px 8px rgba(0,0,0,0.8);
-      }
-      .vel-home-section__card--resume .vel-home-section__name small {
-        display: block;
-        font-size: 0.64rem;
-        font-weight: 700;
-        color: #cbd5e1;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        margin-top: 1px;
       }
 
       /* --- Series Episode Rows in Series Detail Page --- */
@@ -1376,25 +1350,6 @@
       progressFill.style.width = Math.min(100, Math.max(0, item.progressPercent || 0)) + "%";
       progressBar.appendChild(progressFill);
 
-      // Card Title Info
-      var name = document.createElement("span");
-      name.className = "vel-home-section__name";
-      var titleStrong = document.createElement("strong");
-      titleStrong.textContent = item.name;
-      name.appendChild(titleStrong);
-
-      if (isSeries && item.episodeTitle) {
-        var epTitle = item.episodeTitle.trim();
-        if (item.name && epTitle.toLowerCase().startsWith(item.name.toLowerCase())) {
-          epTitle = epTitle.slice(item.name.length).replace(/^[\s\-–—:]+/, "").trim();
-        }
-        if (epTitle && epTitle.toLowerCase() !== item.name.toLowerCase()) {
-          var sub = document.createElement("small");
-          sub.textContent = epTitle;
-          name.appendChild(sub);
-        }
-      }
-
       // Top-Right Remove Button (vector close icon)
       var removeBtn = document.createElement("button");
       removeBtn.type = "button";
@@ -1439,7 +1394,7 @@
       removeBtn.addEventListener("touchend", stopBubble, { passive: false });
       removeBtn.addEventListener("click", handleRemoveAction);
 
-      card.append(media, centerPlay, badge, removeBtn, name, progressBar);
+      card.append(media, centerPlay, badge, removeBtn, progressBar);
 
       card.addEventListener("click", function (event) {
         if (event.target && event.target.closest(".vel-resume-remove-btn, [data-prevent-card-open]")) {

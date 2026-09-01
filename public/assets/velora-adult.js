@@ -511,6 +511,28 @@
   // ---------------------------------------------------------------------------
   // Dedicated Adult Portal View Controller (#adult-view)
   // ---------------------------------------------------------------------------
+  async function resolveStreamMediaUrl(endpoint) {
+    try {
+      const token = localStorage.getItem("authToken");
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await fetch(endpoint, { headers });
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.url) {
+          let directUrl = String(json.url).trim();
+          if (location.protocol === "https:" && directUrl.startsWith("http://")) {
+            return `/api/proxy/stream?url=${encodeURIComponent(directUrl)}`;
+          }
+          return directUrl;
+        }
+      }
+    } catch (e) {
+      console.warn("[Velora Adult] Failed to resolve stream URL from endpoint:", endpoint, e.message);
+    }
+    return null;
+  }
+
   async function fetchLiveChannelsForPackage(pkg) {
     const key = `${pkg.source_id}:${pkg.category_id}`;
     if (adultLiveChannelCache.has(key)) return adultLiveChannelCache.get(key);
@@ -696,7 +718,7 @@
     dynamicList.appendChild(wrap);
   }
 
-  function playAdultChannelByIndex(index) {
+  async function playAdultChannelByIndex(index) {
     const list = window._veloraAdultLiveChannels;
     if (!list || index < 0 || index >= list.length) return;
 
@@ -739,15 +761,46 @@
     if (contextTitle) contextTitle.textContent = "ADULTE +18";
 
     // 4. Play video
-    const streamUrl = `/api/proxy/xtream/${encodeURIComponent(channel.source_id)}/stream/${encodeURIComponent(channel.stream_id || channel.item_id)}/live`;
+    const apiUrl = `/api/proxy/xtream/${encodeURIComponent(channel.source_id)}/stream/${encodeURIComponent(channel.stream_id || channel.item_id)}/live`;
+    const resolvedUrl = await resolveStreamMediaUrl(apiUrl);
+    const finalUrl = resolvedUrl || apiUrl;
 
     if (video) {
-      video.pause();
-      video.src = streamUrl;
-      video.load();
-      video.play().catch(e => {
-        console.warn("[Velora Adult] Live TV play prevented:", e.message);
-      });
+      if (video.hls && typeof video.hls.destroy === "function") {
+        try { video.hls.destroy(); } catch (_) {}
+        video.hls = null;
+      }
+      if (window.hls && typeof window.hls.destroy === "function") {
+        try { window.hls.destroy(); } catch (_) {}
+        window.hls = null;
+      }
+
+      const isHls = finalUrl.includes(".m3u8") || finalUrl.includes("/live");
+      if (isHls && window.Hls && window.Hls.isSupported()) {
+        const hls = new window.Hls({ enableWorker: true, lowLatencyMode: true });
+        hls.loadSource(finalUrl);
+        hls.attachMedia(video);
+        hls.on(window.Hls.Events.MANIFEST_PARSED, function () {
+          video.play().catch(function (e) { console.warn("[Velora Adult] HLS play error:", e.message); });
+        });
+        hls.on(window.Hls.Events.ERROR, function (_, data) {
+          if (data && data.fatal) {
+            console.warn("[Velora Adult] Fatal HLS error, falling back to direct video.src:", data.type);
+            try { hls.destroy(); } catch (_) {}
+            video.src = finalUrl;
+            video.load();
+            video.play().catch(function () {});
+          }
+        });
+        video.hls = hls;
+        window.hls = hls;
+      } else {
+        video.src = finalUrl;
+        video.load();
+        video.play().catch(function (e) {
+          console.warn("[Velora Adult] Live TV play prevented:", e.message);
+        });
+      }
     }
   }
 
@@ -1104,7 +1157,7 @@
     dynamicList.appendChild(wrap);
   }
 
-  function playAdultMovieByIndex(index) {
+  async function playAdultMovieByIndex(index) {
     const list = window._veloraAdultVodMovies;
     if (!list || index < 0 || index >= list.length) return;
 
@@ -1163,15 +1216,33 @@
 
     // 5. Construct stream URL and start playback
     const containerExt = (movie.container_extension || "mp4").toLowerCase().replace(/^\./, "");
-    const streamUrl = `/api/proxy/xtream/${encodeURIComponent(movie.source_id)}/stream/${encodeURIComponent(movie.stream_id)}/movie?container=${encodeURIComponent(containerExt)}`;
+    const apiUrl = `/api/proxy/xtream/${encodeURIComponent(movie.source_id)}/stream/${encodeURIComponent(movie.stream_id)}/movie?container=${encodeURIComponent(containerExt)}`;
+    const resolvedUrl = await resolveStreamMediaUrl(apiUrl);
+    const finalUrl = resolvedUrl || apiUrl;
 
     if (videoVod) {
-      try { videoVod.pause(); } catch (_) {}
-      videoVod.src = streamUrl;
-      videoVod.load();
-      videoVod.play().catch(e => {
-        console.warn("[Velora Adult] Video play autoplay prevented:", e.message);
-      });
+      if (videoVod.hls && typeof videoVod.hls.destroy === "function") {
+        try { videoVod.hls.destroy(); } catch (_) {}
+        videoVod.hls = null;
+      }
+
+      const isHls = finalUrl.includes(".m3u8");
+      if (isHls && window.Hls && window.Hls.isSupported()) {
+        const hls = new window.Hls({ enableWorker: true });
+        hls.loadSource(finalUrl);
+        hls.attachMedia(videoVod);
+        hls.on(window.Hls.Events.MANIFEST_PARSED, function () {
+          videoVod.play().catch(function () {});
+        });
+        videoVod.hls = hls;
+      } else {
+        try { videoVod.pause(); } catch (_) {}
+        videoVod.src = finalUrl;
+        videoVod.load();
+        videoVod.play().catch(e => {
+          console.warn("[Velora Adult] Video play autoplay prevented:", e.message);
+        });
+      }
 
       // Auto-advance on ended
       videoVod.onended = function () {

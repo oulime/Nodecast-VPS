@@ -265,33 +265,35 @@ function stripHomeChannelPrefixes(rawName, prefixes, suffixes = []) {
     const allSuffixes = Array.isArray(suffixes) ? suffixes : [];
 
     // Strip configured prefixes
-    for (let pass = 0; pass < 64; pass += 1) {
+    for (let pass = 0; pass < 32; pass += 1) {
         const prefix = allPrefixes.find(candidate =>
             candidate.length <= name.length
             && name.slice(0, candidate.length).toLowerCase() === candidate.toLowerCase()
         );
         if (!prefix) break;
         name = name.slice(prefix.length).trim();
+        name = name.replace(/^[-:|•\s]+/g, '').trim();
     }
 
     // Strip configured suffixes
-    for (let pass = 0; pass < 64; pass += 1) {
+    for (let pass = 0; pass < 32; pass += 1) {
         const suffix = allSuffixes.find(candidate =>
             candidate.length <= name.length
             && name.slice(-candidate.length).toLowerCase() === candidate.toLowerCase()
         );
         if (!suffix) break;
         name = name.slice(0, -suffix.length).trim();
+        name = name.replace(/[-:|•\s]+$/g, '').trim();
     }
 
     for (let p = 0; p < 5; p += 1) {
         const next = name
-            .replace(/^[\[\(]?[A-Z0-9\+\-\s]{1,12}[\]\)]\s*[-:]?\s*/i, '')
-            .replace(/^([0-9]+K|[0-9]+D|HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|EN|ES|DE|MULTI|TRUEFRENCH|FRENCH)\s*[-:]?\s*/i, '')
-            .replace(/^[A-Z0-9]{1,8}-[A-Z0-9]{1,8}\s*[-:]?\s*/i, '')
-            .replace(/\s*([\[\(][A-Z0-9\+\-\s]{1,8}[\]\)]|\b(HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|EN|ES|DE|MULTI|TRUEFRENCH|FRENCH)\b)$/i, '')
+            .replace(/^[\[\(][A-Z0-9\+\-\s]{1,12}[\]\)]\s*[-:|•]?\s*/i, '')
+            .replace(/^([0-9]+K|[0-9]+D|HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|AR|EN|UK|US|ES|DE|IT|PT|TR|NL|RU|PL|RO|MULTI|TRUEFRENCH|FRENCH)(\s*[-:|•]\s*|\s+)/i, '')
+            .replace(/\s*([\[\(][A-Z0-9\+\-\s]{1,12}[\]\)]|\b(HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|AR|EN|UK|US|ES|DE|IT|PT|TR|NL|RU|PL|RO|MULTI|TRUEFRENCH|FRENCH)\b)$/i, '')
+            .replace(/\s*[-:|•]\s*$/g, '')
             .trim();
-        if (next === name) break;
+        if (next === name || !next) break;
         name = next;
     }
     return name || original;

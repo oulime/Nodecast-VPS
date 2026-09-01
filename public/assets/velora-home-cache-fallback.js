@@ -250,13 +250,20 @@
     card.type = "button";
     card.className = "vel-home-section__card vel-home-section__card--" + section.content_type + (isHorizontal ? " vel-home-section__card--horizontal" : "");
     var cleanTitle = String(entry.name || "").trim();
-    for (var p = 0; p < 5; p += 1) {
-      var next = cleanTitle.replace(/^[\[\(]?[A-Z0-9\+\-\s]{1,12}[\]\)]\s*[-:]?\s*/i, "")
-                           .replace(/^([0-9]+K|[0-9]+D|HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|EN|ES|DE|MULTI|TRUEFRENCH|FRENCH)\s*[-:]?\s*/i, "")
-                           .replace(/^[A-Z0-9]{1,8}-[A-Z0-9]{1,8}\s*[-:]?\s*/i, "")
-                           .trim();
-      if (next === cleanTitle) break;
-      cleanTitle = next;
+    if (typeof window.veloraApplyHomeChannelRules === "function") {
+      var processed = window.veloraApplyHomeChannelRules(section, [entry]);
+      if (processed && processed[0] && processed[0].name) cleanTitle = processed[0].name;
+    } else {
+      for (var p = 0; p < 5; p += 1) {
+        var next = cleanTitle
+          .replace(/^[\[\(][A-Z0-9\+\-\s]{1,12}[\]\)]\s*[-:|•]?\s*/i, "")
+          .replace(/^([0-9]+K|[0-9]+D|HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|AR|EN|UK|US|ES|DE|IT|PT|TR|NL|RU|PL|RO|MULTI|TRUEFRENCH|FRENCH)(\s*[-:|•]\s*|\s+)/i, "")
+          .replace(/\s*([\[\(][A-Z0-9\+\-\s]{1,12}[\]\)]|\b(HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|AR|EN|UK|US|ES|DE|IT|PT|TR|NL|RU|PL|RO|MULTI|TRUEFRENCH|FRENCH)\b)$/i, "")
+          .replace(/\s*[-:|•]\s*$/g, "")
+          .trim();
+        if (next === cleanTitle || !next) break;
+        cleanTitle = next;
+      }
     }
     card.setAttribute("aria-label", cleanTitle || entry.name || "");
     card.dataset.packageId = String(section.package_id || entry.packageId || "");

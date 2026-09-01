@@ -135,11 +135,14 @@
       .replace(/\s*[-:|•]\s*$/g, "")
       .trim();
 
-    // 4. Strip leading package prefixes
-    return clean
-      .replace(/^[A-Z0-9\-_]{2,8}(\s*[-:|•]\s*|\s+)/i, "")
-      .replace(/^([A-Z]{2,4}|[0-9]+K)(\s*[-:|•]\s*|\s+)/i, "")
-      .trim() || title || "Catalogue";
+    // 4. Strip bracketed or delimiter-separated prefix tags (e.g. [FR] -, FR -, AR :)
+    clean = clean
+      .replace(/^[\[\(][A-Z0-9\+\-\s]{1,12}[\]\)]\s*[-:|•]?\s*/i, "")
+      .replace(/^([0-9]+K|[0-9]+D|HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|AR|EN|UK|US|ES|DE|IT|PT|TR|NL|RU|PL|RO|MULTI|TRUEFRENCH|FRENCH|ARABIC)\s*[-:|•]\s*/i, "")
+      .replace(/^[A-Z0-9]{1,6}-[A-Z0-9]{1,6}\s*[-:|•]\s*/i, "")
+      .trim();
+
+    return clean || title || "Catalogue";
   }
 
   function getContainer() {
@@ -959,12 +962,20 @@
       lastFeedKey = feedKey;
       container.innerHTML = "";
 
-      // 1. Create top Hero Spotlight Banner from the first package with items
-      const heroPkg = validPackages[0];
-      if (heroPkg && heroPkg.items.length > 0) {
-        const heroItem = heroPkg.items.find(it => it.backdropUrl || it.thumbUrl) || heroPkg.items[0];
-        const heroEl = buildHeroSpotlight(tab, heroItem, heroPkg);
-        container.appendChild(heroEl);
+      // 1. Create top Hero Spotlight Banner (randomized across packages on each visit)
+      const candidatePackages = validPackages.filter(p => Array.isArray(p.items) && p.items.length > 0);
+      if (candidatePackages.length > 0) {
+        const samplePool = candidatePackages.slice(0, Math.min(candidatePackages.length, 12));
+        const randPkg = samplePool[Math.floor(Math.random() * samplePool.length)];
+        const itemsWithArt = randPkg.items.filter(it => it.backdropUrl || it.posterUrl || it.thumbUrl);
+        const heroItem = (itemsWithArt.length > 0)
+          ? itemsWithArt[Math.floor(Math.random() * Math.min(itemsWithArt.length, 6))]
+          : randPkg.items[0];
+
+        if (heroItem) {
+          const heroEl = buildHeroSpotlight(tab, heroItem, randPkg);
+          container.appendChild(heroEl);
+        }
       }
 
       // 2. Render horizontal carousel rows (vertical cards)
@@ -1113,8 +1124,13 @@
     setTimeout(initHomeMixedFeed, 50);
   });
 
+  let prevObservedTab = "";
   new MutationObserver(() => {
     const tab = activeTab();
+    if (tab !== prevObservedTab) {
+      prevObservedTab = tab;
+      lastFeedKey = "";
+    }
     syncHeaderForMediaTabs();
     if (MEDIA_TABS.has(tab)) {
       render();

@@ -1,5 +1,5 @@
 /**
- * Velora Netflix-Style Multi-Row Carousel Feed & Full Package Modal
+ * Velora Netflix-Style Multi-Row Carousel Feed (Vertical Poster Cards) & Full Package Modal
  * Powered by VPS Precomputed Media Feed Cache (/api/velora-db/country-media-feed)
  */
 (() => {
@@ -111,7 +111,7 @@
         if (Array.isArray(rawList) && rawList.length > 0) {
           const items = rawList.map((it, idx) => {
             const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? idx;
-            let thumb = it.backdrop_path || it.backdrop || it.backdrop_url || it.cover_big || it.movie_image || it.series_image || it.stream_icon || it.cover || "";
+            let thumb = it.stream_icon || it.cover || it.cover_big || it.movie_image || it.series_image || it.backdrop_path || it.backdrop || it.backdrop_url || "";
             if (Array.isArray(thumb) && thumb.length > 0) thumb = thumb[0];
             if (typeof thumb === "string" && thumb.startsWith("/")) thumb = "https://image.tmdb.org/t/p/w780" + thumb;
             return {
@@ -119,7 +119,7 @@
               name: stripTitle(it.name || it.title || it.series_name || ""),
               rawName: it.name || it.title || it.series_name || "",
               thumbUrl: thumb,
-              backdropUrl: thumb,
+              backdropUrl: it.backdrop_path || it.backdrop || thumb,
               rating: it.rating || it.rating_5based || it.score || "",
               year: it.year || it.releaseDate || "",
               plot: it.plot || it.description || it.overview || "",
@@ -147,13 +147,13 @@
         if (data && Array.isArray(data.items) && data.items.length > 0) {
           const items = data.items.map(it => {
             const rawId = it.stream_id || it.id;
-            let thumb = it.backdropUrl || it.thumbUrl || it.stream_icon || it.cover || "";
+            let thumb = it.stream_icon || it.cover || it.thumbUrl || it.backdropUrl || "";
             return {
               id: `feed:${pkg.id}:${rawId}`,
               name: stripTitle(it.name || it.title || ""),
               rawName: it.name || it.title || "",
               thumbUrl: thumb,
-              backdropUrl: thumb,
+              backdropUrl: it.backdropUrl || thumb,
               rating: it.rating || "",
               year: it.year || "",
               plot: it.plot || it.description || "",
@@ -267,7 +267,7 @@
         const thumbWrap = document.createElement("div");
         thumbWrap.className = "vel-pkg-modal__card-thumb";
 
-        const thumb = item.backdropUrl || item.thumbUrl;
+        const thumb = item.thumbUrl || item.backdropUrl;
         if (thumb) {
           const img = document.createElement("img");
           img.alt = item.name;
@@ -420,7 +420,7 @@
     return hero;
   }
 
-  // Build a single Card inside a horizontal rail
+  // Build a single Vertical Card inside a horizontal rail
   function buildCard(tab, pkg, item, index) {
     const li = document.createElement("li");
     li.className = "NQEYQF egDugf";
@@ -448,15 +448,15 @@
 
     const lz = document.createElement("div");
     lz.className = "lz5SHd ITi_XJ";
-    lz.style.aspectRatio = "16/9";
+    lz.style.aspectRatio = "2/3";
 
-    const thumb = item.backdropUrl || item.thumbUrl;
+    const thumb = item.thumbUrl || item.backdropUrl;
     if (thumb) {
       const picture = document.createElement("picture");
       const img = document.createElement("img");
       img.alt = item.name;
       img.className = "dJLfVG X6Hqju znZ24z";
-      img.style.aspectRatio = "16/9";
+      img.style.aspectRatio = "2/3";
       img.loading = "lazy";
       img.decoding = "async";
       img.src = thumb;
@@ -554,12 +554,12 @@
 
     leftBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      ul.scrollBy({ left: -Math.max(320, ul.clientWidth * 0.75), behavior: "smooth" });
+      ul.scrollBy({ left: -Math.max(260, ul.clientWidth * 0.75), behavior: "smooth" });
     });
 
     rightBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      ul.scrollBy({ left: Math.max(320, ul.clientWidth * 0.75), behavior: "smooth" });
+      ul.scrollBy({ left: Math.max(260, ul.clientWidth * 0.75), behavior: "smooth" });
     });
 
     railWrap.append(leftBtn, ul, rightBtn);
@@ -604,7 +604,7 @@
               if (Array.isArray(rawList) && rawList.length > 0) {
                 pkg.items = rawList.slice(0, 20).map((it, idx) => {
                   const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? idx;
-                  let thumb = it.backdrop_path || it.backdrop || it.backdrop_url || it.cover_big || it.movie_image || it.series_image || it.stream_icon || it.cover || "";
+                  let thumb = it.stream_icon || it.cover || it.cover_big || it.movie_image || it.series_image || it.backdrop_path || it.backdrop || it.backdrop_url || "";
                   if (Array.isArray(thumb) && thumb.length > 0) thumb = thumb[0];
                   if (typeof thumb === "string" && thumb.startsWith("/")) thumb = "https://image.tmdb.org/t/p/w780" + thumb;
                   return {
@@ -612,7 +612,7 @@
                     name: stripTitle(it.name || it.title || it.series_name || ""),
                     rawName: it.name || it.title || it.series_name || "",
                     thumbUrl: thumb,
-                    backdropUrl: thumb,
+                    backdropUrl: it.backdrop_path || it.backdrop || thumb,
                     rating: it.rating || it.rating_5based || it.score || "",
                     year: it.year || it.releaseDate || "",
                     plot: it.plot || it.description || it.overview || "",
@@ -650,7 +650,7 @@
         container.appendChild(heroEl);
       }
 
-      // 2. Render horizontal carousel rows
+      // 2. Render horizontal carousel rows (vertical cards)
       validPackages.forEach(pkg => {
         const rowEl = buildRow(tab, pkg);
         container.appendChild(rowEl);

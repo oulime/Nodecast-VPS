@@ -1572,11 +1572,8 @@ function buildMediaFeedCache() {
                             if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w780${url}`;
                             backdropUrl = url;
                         }
-                        if (!backdropUrl) {
-                            backdropUrl = backdropCache[itemKey] || backdropCache[titleKey] || '';
-                        }
-                        const standardThumb = String(item.stream_icon || item.cover || '');
-                        const finalThumb = backdropUrl || standardThumb;
+                        const standardThumb = String(item.stream_icon || item.cover || item.cover_big || item.movie_image || item.series_image || '');
+                        const finalThumb = standardThumb || backdropUrl;
 
                         items.push({
                             id: `feed:${pkgId}:${rawId}`,
@@ -1615,8 +1612,8 @@ function buildMediaFeedCache() {
                             if (!backdropUrl) {
                                 backdropUrl = backdropCache[itemKey] || backdropCache[titleKey] || '';
                             }
-                            const standardThumb = String(item.stream_icon || item.cover || '');
-                            const finalThumb = backdropUrl || standardThumb;
+                            const standardThumb = String(item.stream_icon || item.cover || item.cover_big || item.movie_image || item.series_image || '');
+                            const finalThumb = standardThumb || backdropUrl;
 
                             items.push({
                                 id: `feed:${pkgId}:${rawId}`,

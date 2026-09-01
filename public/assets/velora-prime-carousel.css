@@ -1,5 +1,5 @@
 /**
- * Velora Netflix-Style Row Carousel Styles & Full Package Modal
+ * Velora Netflix-Style Vertical Poster Row Carousel Styles & Full Package Modal
  */
 
 /* Completely hide legacy package grid cards, package-hub triggers, and wheels */
@@ -124,10 +124,10 @@ body.vel-modal-active {
   display: none;
 }
 
-/* Card Item */
+/* Card Item - Vertical 2:3 Poster Ratio */
 .NQEYQF {
-  flex: 0 0 clamp(170px, 22vw, 290px);
-  max-width: clamp(170px, 22vw, 290px);
+  flex: 0 0 clamp(130px, 15vw, 195px);
+  max-width: clamp(130px, 15vw, 195px);
   box-sizing: border-box;
 }
 
@@ -139,19 +139,19 @@ body.vel-modal-active {
   background: #12121a;
   transition: transform 0.28s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.28s ease;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
 }
 
 .ulDoOY:hover {
-  transform: translateY(-5px) scale(1.03);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.2);
+  transform: translateY(-6px) scale(1.04);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.22);
   z-index: 10;
 }
 
 .BVySw9 {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 2 / 3;
   overflow: hidden;
   background: #0d0d14;
 }
@@ -171,11 +171,13 @@ body.vel-modal-active {
 .lz5SHd {
   width: 100%;
   height: 100%;
+  aspect-ratio: 2 / 3;
 }
 
 .dJLfVG {
   width: 100%;
   height: 100%;
+  aspect-ratio: 2 / 3;
   object-fit: cover;
   display: block;
   transition: transform 0.35s ease;
@@ -189,7 +191,7 @@ body.vel-modal-active {
 .dDns1P {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.85) 100%);
+  background: linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,0.9) 100%);
   pointer-events: none;
   z-index: 2;
 }
@@ -202,7 +204,7 @@ body.vel-modal-active {
   align-items: center;
   justify-content: center;
   opacity: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(2px);
   transition: opacity 0.2s ease;
   z-index: 3;
@@ -243,34 +245,36 @@ body.vel-modal-active {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 8px 12px;
-  font-size: clamp(0.78rem, 0.95vw, 0.9rem);
+  padding: 8px 10px;
+  font-size: clamp(0.76rem, 0.9vw, 0.88rem);
   font-weight: 600;
   color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   z-index: 3;
-  text-shadow: 0 2px 6px rgba(0,0,0,0.9);
+  text-shadow: 0 2px 6px rgba(0,0,0,0.95);
 }
 
 /* Fallback Card */
 .vel-prime-fallback {
   width: 100%;
   height: 100%;
+  aspect-ratio: 2 / 3;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: 14px;
   background: linear-gradient(135deg, #1e1e2d 0%, #111118 100%);
   box-sizing: border-box;
   text-align: center;
 }
 
 .vel-prime-fallback__title {
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   font-weight: 600;
   color: #e2e8f0;
+  line-height: 1.3;
 }
 
 /* Left / Right Nav Arrows */
@@ -507,7 +511,7 @@ body.vel-modal-active {
 }
 
 /* --------------------------------------------------------------------------
-   Full Package Modal (Popup for "Voir tout")
+   Full Package Modal (Popup for "Voir tout" - Vertical 2:3 Posters)
    -------------------------------------------------------------------------- */
 .vel-pkg-modal {
   position: fixed;
@@ -538,9 +542,9 @@ body.vel-modal-active {
 
 .vel-pkg-modal__dialog {
   position: relative;
-  width: min(100%, 1280px);
-  height: min(100%, 880px);
-  max-height: 92vh;
+  width: min(100%, 1320px);
+  height: min(100%, 900px);
+  max-height: 94vh;
   display: flex;
   flex-direction: column;
   background: #0d0d14;
@@ -659,8 +663,8 @@ body.vel-modal-active {
 
 .vel-pkg-modal__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(clamp(150px, 18vw, 230px), 1fr));
-  gap: clamp(12px, 1.8vw, 20px);
+  grid-template-columns: repeat(auto-fill, minmax(clamp(130px, 15vw, 190px), 1fr));
+  gap: clamp(12px, 1.6vw, 20px);
 }
 
 .vel-pkg-modal__card {
@@ -670,19 +674,19 @@ body.vel-modal-active {
   background: #14141e;
   cursor: pointer;
   transition: transform 0.25s ease, box-shadow 0.25s ease;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
 }
 
 .vel-pkg-modal__card:hover {
-  transform: translateY(-5px) scale(1.03);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.2);
+  transform: translateY(-5px) scale(1.04);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.22);
   z-index: 4;
 }
 
 .vel-pkg-modal__card-thumb {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 2 / 3;
   background: #09090f;
   overflow: hidden;
 }
@@ -690,6 +694,7 @@ body.vel-modal-active {
 .vel-pkg-modal__card-thumb img {
   width: 100%;
   height: 100%;
+  aspect-ratio: 2 / 3;
   object-fit: cover;
   display: block;
   opacity: 0;
@@ -711,7 +716,7 @@ body.vel-modal-active {
   align-items: center;
   justify-content: center;
   opacity: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(2px);
   transition: opacity 0.2s ease;
   z-index: 3;

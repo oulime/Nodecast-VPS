@@ -2186,10 +2186,12 @@ router.get('/hero-slider', (req, res) => {
                 selectedStream = mappings['country_usa'] || mappings['country_etats_unis'] || mappings['default'] || Object.values(mappings)[0] || null;
             }
 
+            const resolvedLogo = mappings[resolvedCountryId]?.logo || item.country_mappings?.[resolvedCountryId]?.logo || item.logo || item.logo_url || item.title_logo || selectedStream?.logo || '';
+
             return {
                 id: item.id,
                 title: item.title || selectedStream?.name || '',
-                logo: item.logo || item.logo_url || item.title_logo || selectedStream?.logo || '',
+                logo: resolvedLogo,
                 category: item.category || selectedStream?.contentType || 'movie',
                 badge: item.badge || 'Top Trending',
                 image: item.image || selectedStream?.thumbUrl || '',

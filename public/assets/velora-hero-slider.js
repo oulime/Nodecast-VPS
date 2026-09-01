@@ -157,6 +157,15 @@
     startAutoSlide();
   }
 
+  function formatLogoUrl(url) {
+    if (!url) return "";
+    var u = String(url).trim();
+    if (u.includes("fanart.tv") || (!u.includes("tmdb.org") && (u.startsWith("http://") || u.startsWith("https://")))) {
+      return "/api/proxy/image?url=" + encodeURIComponent(u);
+    }
+    return u;
+  }
+
   function renderHeroSlider(items) {
     if (!container) return;
     sliderItems = items;
@@ -198,7 +207,7 @@
       var content = document.createElement("div");
       content.className = "vel-hero-slide__content";
 
-      var logoUrl = (item.logo || item.logo_url || item.title_logo || "").trim();
+      var logoUrl = (item.logo || item.logo_url || item.title_logo || (item.stream && item.stream.logo) || "").trim();
       if (logoUrl) {
         var logoWrap = document.createElement("h2");
         logoWrap.className = "vel-hero-title-art";
@@ -209,17 +218,21 @@
         logoImg.alt = cleanTitle;
         logoImg.decoding = "async";
         logoImg.loading = idx === 0 ? "eager" : "lazy";
-        logoImg.src = logoUrl;
 
-        logoImg.addEventListener("error", function() {
+        logoImg.onerror = function() {
+          console.warn("[Hero Slider] Logo image failed to load for:", cleanTitle, logoUrl);
           var fallbackTitle = document.createElement("h2");
           fallbackTitle.className = "vel-hero-title";
           fallbackTitle.textContent = cleanTitle;
           if (logoWrap.parentNode) {
             logoWrap.parentNode.replaceChild(fallbackTitle, logoWrap);
+          } else {
+            logoWrap.replaceWith(fallbackTitle);
           }
-        });
+        };
 
+        var resolvedLogoSrc = formatLogoUrl(logoUrl);
+        logoImg.src = resolvedLogoSrc;
         logoWrap.appendChild(logoImg);
         content.appendChild(logoWrap);
       } else {

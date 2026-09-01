@@ -16,33 +16,14 @@
   z-index: 10;
 }
 
+/* Adult Portal Visibility */
 .vel-adult-portal.hidden {
   display: none !important;
 }
 
-/* Ensure all video players and other views are completely hidden when viewing the Adult Portal */
-body.vel-adult-active #player-container,
-body.vel-adult-active #vod-player-container,
-body.vel-adult-active #now-playing,
-body.vel-adult-active #now-playing-vod,
-body.vel-adult-active #content-view,
-body.vel-adult-active #packages-view,
-body.vel-adult-active #vel-home-empty-page,
-body.vel-adult-active .vel-sticky-top,
-body.vel-adult-active .vel-header,
-body:has(#adult-view:not(.hidden)) .vel-header,
-body:has(#adult-view:not(.hidden)) .vel-sticky-top,
-body:has(#adult-view:not(.hidden)) #player-container,
-body:has(#adult-view:not(.hidden)) #vod-player-container,
-body:has(#adult-view:not(.hidden)) #content-view,
-body:has(#adult-view:not(.hidden)) #packages-view {
+body.vel-adult-portal-open #packages-view,
+body.vel-adult-portal-open #vel-home-empty-page {
   display: none !important;
-  visibility: hidden !important;
-  height: 0 !important;
-  min-height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  pointer-events: none !important;
 }
 
 /* --------------------------------------------------------------------------

@@ -1138,36 +1138,10 @@
     document.body.dataset.veloraReturnAdult = "true";
     document.body.classList.remove("vel-adult-active");
 
-    const livePlayer = document.getElementById("player-container");
-    const liveVideo = document.getElementById("video");
-    if (livePlayer) {
-      livePlayer.classList.add("hidden");
-      livePlayer.setAttribute("aria-hidden", "true");
-      livePlayer.style.setProperty("display", "none", "important");
-    }
-    if (liveVideo) {
-      try {
-        liveVideo.pause();
-        liveVideo.removeAttribute("src");
-        liveVideo.load();
-      } catch (_) {}
-    }
-
-    const vodPlayer = document.getElementById("vod-player-container");
-    if (vodPlayer) {
-      vodPlayer.classList.remove("hidden");
-      vodPlayer.removeAttribute("aria-hidden");
-      vodPlayer.style.removeProperty("display");
-    }
-    const cv = document.getElementById("content-view");
-    if (cv) {
-      cv.classList.remove("hidden");
-      cv.removeAttribute("aria-hidden");
-      cv.style.removeProperty("display");
-    }
+    const adultView = document.getElementById("adult-view");
+    if (adultView) adultView.classList.add("hidden");
 
     renderAdultMoviesListView(uniqueMovies);
-    playAdultMovieByIndex(0);
   }
 
   async function renderAdultPortal() {

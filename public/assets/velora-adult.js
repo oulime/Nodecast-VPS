@@ -1056,6 +1056,7 @@
     contentView.classList.remove("hidden");
     contentView.removeAttribute("aria-hidden");
     contentView.classList.remove("content-view--vod-film-detail");
+    dynamicList.className = "item-list vel-adult-list-mode";
     dynamicList.replaceChildren();
 
     const wrap = document.createElement("div");

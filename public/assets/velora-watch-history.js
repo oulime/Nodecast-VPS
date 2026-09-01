@@ -255,10 +255,14 @@
     if (!media || typeof media !== "object") return false;
     if (media.type === "live" || media.type === "channel" || media.contentType === "live" || media.item_type === "channel" || media.item_type === "live") return false;
     if (media.type !== "movie" && media.type !== "series") return false;
+    if (media.isAdult || media.is_adult || media.source === "adult" || media.sourceId === "adult") return false;
     var id = String(media.id || "");
-    if (id.startsWith("live:") || id.startsWith("channel:")) return false;
+    if (id.startsWith("live:") || id.startsWith("channel:") || id.startsWith("adult:") || id.startsWith("favorite:adult:")) return false;
+    var pkg = String(media.packageId || media.package_id || media.category_id || "").toLowerCase();
+    if (pkg.includes("adult") || pkg.includes("xxx") || pkg.includes("adulte") || pkg.includes("+18")) return false;
     var name = String(media.name || "").trim();
     if (!name || name.toLowerCase() === "titre" || name.toLowerCase() === "titre...") return false;
+    if (/\b(adult|adulte|\+18|18\+|xxx)\b/i.test(name)) return false;
     if (!media.streamId && !media.episodeStreamId && !media.seriesId) return false;
     return true;
   }
@@ -512,8 +516,8 @@
 
   // Record playback progress (Strictly for VOD Movies & Series Episodes only)
   function recordProgress(video, isEnd) {
-    if (!video || video.id === "video" || isNaN(video.currentTime) || (video.currentTime < MIN_WATCH_SECONDS && !isEnd)) return;
-    if (document.body.dataset.velActiveTab === "live") return;
+    if (!video || video.id === "video" || video.id === "vel-adult-video" || isNaN(video.currentTime) || (video.currentTime < MIN_WATCH_SECONDS && !isEnd)) return;
+    if (document.body.dataset.velActiveTab === "live" || document.body.dataset.velActiveTab === "adult" || document.body.dataset.veloraReturnAdult === "true" || document.body.classList.contains("vel-adult-active")) return;
     var vodContainer = document.getElementById("vod-player-container");
     if (!vodContainer || vodContainer.classList.contains("hidden")) return;
 

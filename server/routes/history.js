@@ -16,12 +16,14 @@ router.get('/', (req, res) => {
         const userId = req.user.id;
         const limit = parseInt(req.query.limit) || 20;
 
-        // Clean out any legacy channel/live records from the database
-        db.prepare("DELETE FROM watch_history WHERE user_id = ? AND item_type NOT IN ('movie', 'series')").run(userId);
+        // Clean out any legacy channel/live and adult records from the database
+        db.prepare("DELETE FROM watch_history WHERE user_id = ? AND (item_type NOT IN ('movie', 'series') OR id LIKE '%adult%' OR item_id LIKE '%adult%' OR json_extract(data, '$.packageId') LIKE '%adult%' OR json_extract(data, '$.isAdult') = 1)").run(userId);
 
         const rows = db.prepare(`
             SELECT * FROM watch_history 
             WHERE user_id = ? AND item_type IN ('movie', 'series')
+              AND id NOT LIKE '%adult%'
+              AND item_id NOT LIKE '%adult%'
             ORDER BY updated_at DESC 
             LIMIT ?
         `).all(userId, limit);
@@ -52,9 +54,16 @@ router.post('/', (req, res) => {
             return res.status(400).json({ error: 'Missing required fields (id, type)' });
         }
 
-        // Strictly reject live TV channels
+        // Strictly reject live TV channels and adult content
         if (type !== 'movie' && type !== 'series') {
             return res.status(400).json({ error: 'Only movies and series are supported in history' });
+        }
+
+        const idStr = String(id || '').toLowerCase();
+        const pkgStr = String((data && (data.packageId || data.package_id)) || '').toLowerCase();
+        const nameStr = String((data && data.name) || '').toLowerCase();
+        if (idStr.includes('adult') || pkgStr.includes('adult') || pkgStr.includes('xxx') || (data && (data.isAdult || data.is_adult)) || /\b(adult|adulte|\+18|18\+|xxx)\b/i.test(nameStr)) {
+            return res.status(200).json({ success: false, skipped: true, reason: 'Adult content excluded' });
         }
 
         const compositeId = `${userId}:${id}`;

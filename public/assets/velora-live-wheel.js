@@ -1182,7 +1182,9 @@
         const thumbWrap = document.createElement("div");
         thumbWrap.className = "media-item__thumb vel-image-loaded-host";
 
-        if (logo) {
+        const isAdultCh = !!(document.body.dataset.velActiveTab === "adult" || document.body.dataset.veloraReturnAdult === "true" || document.body.classList.contains("vel-adult-active") || (ch && (ch.isAdult || ch.is_adult || String(ch.category_name || "").toLowerCase().includes("adult") || String(ch.package_id || "").toLowerCase().includes("adult"))));
+
+        if (logo && !isAdultCh) {
           const img = document.createElement("img");
           img.className = "vel-image-loaded vel-image-fade is-ready";
           img.loading = globalIdx < 16 ? "eager" : "lazy";
@@ -1195,12 +1197,16 @@
               img.src = `/api/proxy/image?url=${encodeURIComponent(rawLogo)}`;
             } else {
               img.remove();
-              thumbWrap.innerHTML = `<span class="text-sm">📺</span>`;
+              thumbWrap.classList.add("media-item__thumb--empty");
+              thumbWrap.setAttribute("aria-hidden", "true");
+              thumbWrap.textContent = "📺";
             }
           };
           thumbWrap.appendChild(img);
         } else {
-          thumbWrap.innerHTML = `<span class="text-sm">📺</span>`;
+          thumbWrap.classList.add("media-item__thumb--empty");
+          thumbWrap.setAttribute("aria-hidden", "true");
+          thumbWrap.textContent = "📺";
         }
 
         const infoWrap = document.createElement("div");

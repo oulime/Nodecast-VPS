@@ -2,16 +2,19 @@
  * Velora Netflix-Style Vertical Poster Row Carousel Styles & Full Package Modal
  */
 
-/* Completely hide legacy package grid cards, package-hub triggers, and wheels */
+/* Completely hide legacy package grid cards and roller triggers ONLY on Movies and Series tabs */
 body[data-vel-active-tab="movies"] #packages-view > .vel-package-card,
 body[data-vel-active-tab="series"] #packages-view > .vel-package-card,
-#pkgHubBtn,
-.pkg-hub-trigger,
-#pkg-hub-panel,
-.pkg-hub-roller-wrapper,
-#vel-media-package-picker,
-#vel-live-wheel,
-#vel-live-wheel-modal {
+body[data-vel-active-tab="movies"] #pkgHubBtn,
+body[data-vel-active-tab="series"] #pkgHubBtn,
+body[data-vel-active-tab="movies"] .pkg-hub-trigger,
+body[data-vel-active-tab="series"] .pkg-hub-trigger,
+body[data-vel-active-tab="movies"] #pkg-hub-panel,
+body[data-vel-active-tab="series"] #pkg-hub-panel,
+body[data-vel-active-tab="movies"] .pkg-hub-roller-wrapper,
+body[data-vel-active-tab="series"] .pkg-hub-roller-wrapper,
+body[data-vel-active-tab="movies"] #vel-media-package-picker,
+body[data-vel-active-tab="series"] #vel-media-package-picker {
   display: none !important;
   visibility: hidden !important;
   pointer-events: none !important;

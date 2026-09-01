@@ -6533,8 +6533,8 @@
                       <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
                     </div>
                     <div class="vel-adult-action-btn__text">
-                      <span class="vel-adult-action-btn__title">Films & Séries</span>
-                      <span class="vel-adult-action-btn__subtitle">Parcourir les vidéos</span>
+                      <span class="vel-adult-action-btn__title">Films</span>
+                      <span class="vel-adult-action-btn__subtitle">Ouvrir le lecteur de films</span>
                     </div>
                   </button>
                 </div>
@@ -6567,6 +6567,14 @@
                   <path d="M14.7 5.3a1 1 0 0 1 0 1.4L10.41 11H20a1 1 0 1 1 0 2h-9.59l4.3 4.3a1 1 0 0 1-1.42 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.42 0Z"></path>
                 </svg>
               </button>
+              <div id="vel-live-channel-search-wrap" class="vel-live-channel-search-wrap hidden">
+                <div class="vel-live-channel-search-box">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  <input type="text" id="vel-live-channel-search-input" class="vel-live-channel-search-input" placeholder="Rechercher une chaîne..." autocomplete="off" />
+                  <button type="button" id="vel-live-channel-search-clear" class="vel-live-channel-search-clear hidden" aria-label="Effacer">✕</button>
+                </div>
+              </div>
+
               <div id="cat-pills-wrap" class="cat-pills-wrap vel-cat-pills-wrap hidden">
                 <div id="cat-pills" class="vel-pills" role="tablist" aria-label="Filtres"></div>
               </div>
@@ -12063,9 +12071,26 @@ if (target.closest(".trial-offer-button")) {
           }
 
           function syncEpisodeButtons() {
-            var state = episodeState();
             var playerVisible = !player.classList.contains("hidden") &&
               player.getAttribute("aria-hidden") !== "true";
+
+            if (window._veloraAdultVodMovies && window._veloraAdultVodMovies.length) {
+              var adultVodPlaying = playerVisible && window._veloraAdultVodCurrentIndex >= 0;
+              player.classList.toggle("player-container--series-episode", adultVodPlaying);
+              previousButton.hidden = !adultVodPlaying;
+              nextButton.hidden = !adultVodPlaying;
+              if (adultVodPlaying) {
+                previousButton.disabled = window._veloraAdultVodCurrentIndex <= 0;
+                nextButton.disabled = window._veloraAdultVodCurrentIndex >= window._veloraAdultVodMovies.length - 1;
+                previousButton.setAttribute("aria-label", "Film précédent");
+                previousButton.title = "Film précédent";
+                nextButton.setAttribute("aria-label", "Film suivant");
+                nextButton.title = "Film suivant";
+                return;
+              }
+            }
+
+            var state = episodeState();
             var seriesPlaying = document.body.dataset.velActiveTab === "series" &&
               !!state.detail && playerVisible && state.currentIndex >= 0;
             player.classList.toggle("player-container--series-episode", seriesPlaying);
@@ -12077,6 +12102,11 @@ if (target.closest(".trial-offer-button")) {
               return;
             }
 
+            previousButton.setAttribute("aria-label", "Épisode précédent");
+            previousButton.title = "Épisode précédent";
+            nextButton.setAttribute("aria-label", "Épisode suivant");
+            nextButton.title = "Épisode suivant";
+
             var firstSeason = !state.season || state.season.selectedIndex <= 0;
             var lastSeason = !state.season || state.season.selectedIndex >= state.season.options.length - 1;
             previousButton.disabled = state.currentIndex === 0 && firstSeason;
@@ -12084,6 +12114,16 @@ if (target.closest(".trial-offer-button")) {
           }
 
           function playAdjacent(direction) {
+            if (window._veloraAdultVodMovies && window._veloraAdultVodMovies.length) {
+              var targetIdx = (window._veloraAdultVodCurrentIndex || 0) + direction;
+              if (targetIdx >= 0 && targetIdx < window._veloraAdultVodMovies.length) {
+                if (typeof window.veloraPlayAdultMovieByIndex === "function") {
+                  window.veloraPlayAdultMovieByIndex(targetIdx);
+                }
+              }
+              return;
+            }
+
             var state = episodeState();
             if (state.currentIndex < 0) return;
             var targetIndex = state.currentIndex + direction;
@@ -12662,6 +12702,58 @@ if (target.closest(".trial-offer-button")) {
           syncCenterWithToolbar();
         }
 
+        function initLiveChannelSearch() {
+          var wrap = document.getElementById("vel-live-channel-search-wrap");
+          var input = document.getElementById("vel-live-channel-search-input");
+          var clearBtn = document.getElementById("vel-live-channel-search-clear");
+          var player = document.getElementById("player-container");
+          var contentView = document.getElementById("content-view");
+          var dynamicList = document.getElementById("dynamic-list");
+
+          if (!wrap || !input || !clearBtn || !player || !contentView || !dynamicList) return;
+
+          function filterChannels() {
+            var query = input.value.trim().toLowerCase();
+            clearBtn.classList.toggle("hidden", !query);
+
+            var rows = Array.from(dynamicList.querySelectorAll(".vel-media-item-row, .media-item"));
+            rows.forEach(function (row) {
+              if (row.classList.contains("vel-adult-movie-row") || row.classList.contains("vel-adult-movie-list-wrap")) return;
+              var titleEl = row.querySelector(".media-item__title, .vel-media-title, .media-item__main");
+              var text = (titleEl ? titleEl.textContent : row.textContent || "").trim().toLowerCase();
+              var match = !query || text.includes(query);
+              row.style.display = match ? "" : "none";
+            });
+          }
+
+          input.addEventListener("input", filterChannels);
+
+          clearBtn.addEventListener("click", function () {
+            input.value = "";
+            filterChannels();
+            input.focus();
+          });
+
+          function syncSearchVisibility() {
+            var livePlaying = !player.classList.contains("hidden") && player.getAttribute("aria-hidden") !== "true";
+            var hasMovieRows = !!dynamicList.querySelector(".vel-adult-movie-row, .vel-adult-movie-list-wrap");
+            var shouldShow = livePlaying && !hasMovieRows && !contentView.classList.contains("hidden");
+            wrap.classList.toggle("hidden", !shouldShow);
+            if (!shouldShow && input.value) {
+              input.value = "";
+              filterChannels();
+            }
+          }
+
+          new MutationObserver(syncSearchVisibility).observe(player, { attributes: true, attributeFilter: ["class", "aria-hidden"] });
+          new MutationObserver(syncSearchVisibility).observe(contentView, { attributes: true, attributeFilter: ["class"] });
+          new MutationObserver(function () {
+            if (input.value.trim()) filterChannels();
+          }).observe(dynamicList, { childList: true });
+
+          syncSearchVisibility();
+        }
+
         function initPageControls() {
           if (document.body.dataset.pageControlsReady === "true") return;
           document.body.dataset.pageControlsReady = "true";
@@ -12671,6 +12763,7 @@ if (target.closest(".trial-offer-button")) {
           initVideoFormatControls();
           initSeriesEpisodeControls();
           initModernVodControls();
+          initLiveChannelSearch();
           suppressAllNativePlayerControls();
           ["video", "video-vod"].forEach(function (id) {
             var video = document.getElementById(id);
@@ -13456,30 +13549,106 @@ if (target.closest(".trial-offer-button")) {
         margin-top: 0 !important;
       }
 
-      /* Mobile & Universal: channel list under Live player scrollability */
-      .main--velora:has(#player-container:not(.hidden)) .vel-dashboard {
+      /* Player Mutual Exclusivity - Never show both players simultaneously */
+      #player-container.hidden,
+      #vod-player-container.hidden,
+      .player-container.hidden {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      body:has(#vod-player-container:not(.hidden)) #player-container,
+      .main--velora:has(#vod-player-container:not(.hidden)) #player-container {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      body:has(#player-container:not(.hidden)) #vod-player-container,
+      .main--velora:has(#player-container:not(.hidden)) #vod-player-container {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      /* Mobile & Universal: channel and movie list under Live/VOD player layout */
+      body:has(#player-container:not(.hidden)) .main--velora .vel-dashboard,
+      body:has(#vod-player-container:not(.hidden)) .main--velora .vel-dashboard,
+      .main--velora:has(#player-container:not(.hidden)) .vel-dashboard,
+      .main--velora:has(#vod-player-container:not(.hidden)) .vel-dashboard {
         display: flex !important;
         flex-direction: column !important;
         overflow: hidden !important;
+        height: calc(100dvh - var(--vel-bottom-nav-height, 76px)) !important;
+        max-height: calc(100dvh - var(--vel-bottom-nav-height, 76px)) !important;
       }
 
-      .main--velora:has(#player-container:not(.hidden)) .vel-body {
+      body:has(#player-container:not(.hidden)) .main--velora .vel-sticky-top,
+      body:has(#vod-player-container:not(.hidden)) .main--velora .vel-sticky-top,
+      .main--velora:has(#player-container:not(.hidden)) .vel-sticky-top,
+      .main--velora:has(#vod-player-container:not(.hidden)) .vel-sticky-top {
+        flex: 0 0 auto !important;
+        position: relative !important;
+        top: auto !important;
+        height: auto !important;
+        max-height: none !important;
+        align-self: stretch !important;
+        width: 100% !important;
+        margin-bottom: 0 !important;
+        padding-bottom: 0 !important;
+      }
+
+      body:has(#player-container:not(.hidden)) .main--velora .vel-body,
+      body:has(#vod-player-container:not(.hidden)) .main--velora .vel-body,
+      .main--velora:has(#player-container:not(.hidden)) .vel-body,
+      .main--velora:has(#vod-player-container:not(.hidden)) .vel-body {
         display: flex !important;
         flex-direction: column !important;
         flex: 1 1 auto !important;
         min-height: 0 !important;
         overflow: hidden !important;
+        position: relative !important;
+        visibility: visible !important;
+        opacity: 1 !important;
       }
 
-      .main--velora:has(#player-container:not(.hidden)) #content-view:not(.hidden) {
+      body:has(#player-container:not(.hidden)) .main--velora #content-view:not(.hidden),
+      body:has(#vod-player-container:not(.hidden)) .main--velora #content-view:not(.hidden),
+      .main--velora:has(#player-container:not(.hidden)) #content-view:not(.hidden),
+      .main--velora:has(#vod-player-container:not(.hidden)) #content-view:not(.hidden) {
         display: flex !important;
         flex-direction: column !important;
         flex: 1 1 auto !important;
         min-height: 0 !important;
         overflow: hidden !important;
+        position: relative !important;
+        top: auto !important;
+        left: auto !important;
+        right: auto !important;
+        bottom: auto !important;
+        height: auto !important;
+        max-height: none !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        padding-top: 0 !important;
+        z-index: 1 !important;
       }
 
-      .main--velora:has(#player-container:not(.hidden)) #dynamic-list {
+      body:has(#player-container:not(.hidden)) .main--velora #dynamic-list,
+      body:has(#vod-player-container:not(.hidden)) .main--velora #dynamic-list,
+      .main--velora:has(#player-container:not(.hidden)) #dynamic-list,
+      .main--velora:has(#vod-player-container:not(.hidden)) #dynamic-list {
+        display: block !important;
         flex: 1 1 auto !important;
         min-height: 0 !important;
         max-height: none !important;
@@ -13487,57 +13656,86 @@ if (target.closest(".trial-offer-button")) {
         -webkit-overflow-scrolling: touch !important;
         touch-action: pan-y !important;
         overscroll-behavior-y: contain !important;
-        padding-bottom: calc(var(--vel-bottom-nav-height, 76px) + 24px) !important;
+        padding-bottom: calc(var(--vel-bottom-nav-height, 76px) + 32px) !important;
       }
 
-      .main--velora:has(#player-container:not(.hidden)) #dynamic-list * {
+      .main--velora:has(#player-container:not(.hidden)) #dynamic-list *,
+      .main--velora:has(#vod-player-container:not(.hidden)) #dynamic-list * {
         touch-action: pan-y !important;
       }
 
       @media (max-width: 767.98px) {
-        .main--velora:has(#player-container:not(.hidden)) #player-container.player-container {
+        body .main--velora #player-container.player-container,
+        body .main--velora #vod-player-container.player-container,
+        .main--velora #player-container.player-container,
+        .main--velora #vod-player-container.player-container,
+        .main--velora:has(#player-container:not(.hidden)) #player-container.player-container,
+        .main--velora:has(#vod-player-container:not(.hidden)) #vod-player-container.player-container {
           flex: 0 0 auto !important;
           width: 100% !important;
           max-width: 100% !important;
           margin: 0 0 0.35rem 0 !important;
           border-radius: 0 0 12px 12px !important;
+          position: relative !important;
+          top: auto !important;
+          right: auto !important;
+          bottom: auto !important;
+          left: auto !important;
+          z-index: 10 !important;
         }
 
-        .main--velora:has(#player-container:not(.hidden)) #player-container .video-wrapper {
+        .main--velora:has(#player-container:not(.hidden)) #player-container .video-wrapper,
+        .main--velora:has(#vod-player-container:not(.hidden)) #vod-player-container .video-wrapper {
           width: 100% !important;
-          max-height: 36vh !important;
+          max-height: 32vh !important;
           aspect-ratio: 16 / 9;
         }
 
-        .main--velora:has(#player-container:not(.hidden)) #player-container #video {
-          max-height: 36vh !important;
+        .main--velora:has(#player-container:not(.hidden)) #player-container #video,
+        .main--velora:has(#vod-player-container:not(.hidden)) #vod-player-container #video-vod {
+          max-height: 32vh !important;
           object-fit: contain !important;
         }
       }
 
-      /* Desktop / PC browser: keep Live TV player compact so package channels are clearly visible */
+      /* Desktop / PC browser: keep Live TV & VOD player compact at the top */
       @media (min-width: 768px) {
+        body .main--velora #player-container.player-container,
+        body .main--velora #vod-player-container.player-container,
         .main--velora #player-container.player-container,
+        .main--velora #vod-player-container.player-container,
         .main--velora:has(#player-container:not(.hidden)) #player-container.player-container,
-        .main--velora:has(#content-view:not(.hidden)):has(#player-container:not(.hidden)) #player-container.player-container {
+        .main--velora:has(#vod-player-container:not(.hidden)) #vod-player-container.player-container,
+        .main--velora:has(#content-view:not(.hidden)):has(#player-container:not(.hidden)) #player-container.player-container,
+        .main--velora:has(#content-view:not(.hidden)):has(#vod-player-container:not(.hidden)) #vod-player-container.player-container {
+          flex: 0 0 auto !important;
           max-width: 480px !important;
           width: min(100%, 480px) !important;
           margin: 0.25rem auto 0.35rem !important;
           border-radius: 14px !important;
           box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 20px rgba(138, 43, 226, 0.25) !important;
+          position: relative !important;
+          top: auto !important;
+          right: auto !important;
+          bottom: auto !important;
+          left: auto !important;
+          z-index: 10 !important;
         }
 
-        #player-container .video-wrapper {
-          max-height: 270px !important;
+        #player-container .video-wrapper,
+        #vod-player-container .video-wrapper {
+          max-height: 260px !important;
           aspect-ratio: 16 / 9;
         }
 
-        #player-container #video {
-          max-height: 270px !important;
+        #player-container #video,
+        #vod-player-container #video-vod {
+          max-height: 260px !important;
           object-fit: contain !important;
         }
 
-        .main--velora:has(#player-container:not(.hidden)) .vel-body {
+        .main--velora:has(#player-container:not(.hidden)) .vel-body,
+        .main--velora:has(#vod-player-container:not(.hidden)) .vel-body {
           flex: 1 1 auto !important;
           min-height: 0 !important;
           overflow-y: auto !important;

@@ -516,6 +516,286 @@
     return [];
   }
 
+  let liveChannelImageObserver = null;
+  function getLiveChannelImageObserver() {
+    if (liveChannelImageObserver) return liveChannelImageObserver;
+    if ("IntersectionObserver" in window) {
+      liveChannelImageObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const img = entry.target;
+            const src = img.dataset.src;
+            if (src) {
+              img.src = src;
+              img.removeAttribute("data-src");
+            }
+            observer.unobserve(img);
+          }
+        });
+      }, { rootMargin: "250px 0px" });
+    }
+    return liveChannelImageObserver;
+  }
+
+  function renderAdultLiveChannelsListView(channels) {
+    const contentView = document.getElementById("content-view");
+    const dynamicList = document.getElementById("dynamic-list");
+    const adultView = document.getElementById("adult-view");
+    const packagesView = document.getElementById("packages-view");
+
+    if (adultView) adultView.classList.add("hidden");
+    if (packagesView) packagesView.classList.add("hidden");
+
+    if (!contentView || !dynamicList) return;
+
+    contentView.classList.remove("hidden");
+    contentView.removeAttribute("aria-hidden");
+    dynamicList.replaceChildren();
+
+    const wrap = document.createElement("div");
+    wrap.className = "vel-adult-channel-list-wrap";
+
+    const header = document.createElement("div");
+    header.className = "vel-adult-channel-list-header";
+
+    const headerLeft = document.createElement("div");
+    headerLeft.className = "vel-adult-movie-list-header__left";
+
+    const title = document.createElement("div");
+    title.className = "vel-adult-channel-list-title";
+    title.innerHTML = `
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
+      <span>TV en Direct</span>
+    `;
+
+    const count = document.createElement("span");
+    count.className = "vel-adult-channel-list-count";
+    count.textContent = `${channels.length} chaîne${channels.length > 1 ? "s" : ""}`;
+
+    headerLeft.append(title, count);
+
+    const searchWrap = document.createElement("div");
+    searchWrap.className = "vel-adult-movie-search-wrap";
+    searchWrap.innerHTML = `
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      <input type="text" class="vel-adult-movie-search-input" placeholder="Filtrer les chaînes..." autocomplete="off" />
+    `;
+
+    header.append(headerLeft, searchWrap);
+    wrap.appendChild(header);
+
+    const itemsContainer = document.createElement("div");
+    itemsContainer.className = "vel-adult-channel-list-items";
+
+    const BATCH_SIZE = 30;
+    let currentRenderedCount = 0;
+    let currentFiltered = [];
+
+    function appendNextChannelChunk() {
+      const nextChunk = currentFiltered.slice(currentRenderedCount, currentRenderedCount + BATCH_SIZE);
+      if (!nextChunk.length) return;
+
+      const observer = getLiveChannelImageObserver();
+
+      nextChunk.forEach((channel, chunkIdx) => {
+        const originalIdx = channel.originalIdx;
+        const globalIdx = currentRenderedCount + chunkIdx;
+
+        const row = document.createElement("div");
+        row.className = `vel-adult-channel-row ${originalIdx === (window._veloraAdultLiveCurrentIndex || 0) ? "vel-adult-channel-row--active" : ""}`;
+        row.setAttribute("role", "button");
+        row.tabIndex = 0;
+        row.dataset.streamId = String(channel.stream_id);
+        row.dataset.index = String(originalIdx);
+
+        const indexEl = document.createElement("span");
+        indexEl.className = "vel-adult-channel-row__index";
+        indexEl.textContent = String(originalIdx + 1);
+
+        const logo = document.createElement("div");
+        logo.className = "vel-adult-channel-row__logo";
+        const iconUrl = channel.thumb_url || channel.stream_icon;
+        if (iconUrl) {
+          const img = document.createElement("img");
+          img.alt = channel.name;
+          img.className = "vel-lazy-logo";
+          img.onerror = () => {
+            logo.innerHTML = '<span class="vel-adult-channel-row__logo--fallback">📺</span>';
+          };
+
+          if (globalIdx < 10) {
+            img.src = iconUrl;
+          } else {
+            img.dataset.src = iconUrl;
+            if (observer) {
+              observer.observe(img);
+            } else {
+              img.src = iconUrl;
+            }
+          }
+          logo.appendChild(img);
+        } else {
+          logo.innerHTML = '<span class="vel-adult-channel-row__logo--fallback">📺</span>';
+        }
+
+        const info = document.createElement("div");
+        info.className = "vel-adult-channel-row__info";
+
+        const channelTitle = document.createElement("div");
+        channelTitle.className = "vel-adult-channel-row__title";
+        channelTitle.textContent = channel.name;
+
+        const meta = document.createElement("div");
+        meta.className = "vel-adult-channel-row__meta";
+        
+        const badge = document.createElement("span");
+        badge.className = "vel-adult-channel-row__playing-badge";
+        badge.innerHTML = `
+          <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          <span>En Direct</span>
+        `;
+        badge.style.display = originalIdx === (window._veloraAdultLiveCurrentIndex || 0) ? "inline-flex" : "none";
+
+        const sourceInfo = document.createElement("span");
+        sourceInfo.textContent = channel.package_name ? `${channel.package_name}` : "🔞 Chaîne Adulte";
+
+        meta.append(badge, sourceInfo);
+        info.append(channelTitle, meta);
+
+        row.append(indexEl, logo, info);
+
+        const heartBtn = typeof window.veloraCreateFavoriteHeart === "function"
+          ? window.veloraCreateFavoriteHeart({
+              sourceId: String(channel.source_id),
+              itemId: String(channel.stream_id),
+              itemType: "channel",
+              name: String(channel.name),
+              thumbUrl: String(channel.thumb_url || channel.stream_icon || ""),
+              packageId: String(channel.package_id || "")
+            })
+          : null;
+
+        if (heartBtn) {
+          row.appendChild(heartBtn);
+        }
+
+        row.onclick = (e) => {
+          if (e.target.closest(".vel-favorite-heart, .vel-favorite-detail-button")) return;
+          playAdultChannelByIndex(originalIdx);
+        };
+
+        itemsContainer.appendChild(row);
+      });
+
+      currentRenderedCount += nextChunk.length;
+    }
+
+    function renderChannels(filterQuery = "") {
+      itemsContainer.replaceChildren();
+      currentRenderedCount = 0;
+      const q = filterQuery.trim().toLowerCase();
+      currentFiltered = q
+        ? channels.map((ch, originalIdx) => ({ ...ch, originalIdx })).filter(ch => String(ch.name || "").toLowerCase().includes(q))
+        : channels.map((ch, originalIdx) => ({ ...ch, originalIdx }));
+
+      if (q) {
+        count.textContent = `${currentFiltered.length} / ${channels.length} chaîne${channels.length > 1 ? "s" : ""}`;
+      } else {
+        count.textContent = `${channels.length} chaîne${channels.length > 1 ? "s" : ""}`;
+      }
+
+      if (!currentFiltered.length) {
+        const empty = document.createElement("div");
+        empty.className = "vel-adult-empty";
+        empty.style.padding = "30px 16px";
+        empty.textContent = "Aucune chaîne ne correspond à votre recherche.";
+        itemsContainer.appendChild(empty);
+        return;
+      }
+
+      appendNextChannelChunk();
+    }
+
+    const searchInput = searchWrap.querySelector(".vel-adult-movie-search-input");
+    if (searchInput) {
+      searchInput.oninput = (e) => {
+        renderChannels(e.target.value);
+      };
+    }
+
+    const handleScroll = () => {
+      if (dynamicList.scrollTop + dynamicList.clientHeight >= dynamicList.scrollHeight - 350) {
+        if (currentRenderedCount < currentFiltered.length) {
+          appendNextChannelChunk();
+        }
+      }
+    };
+    dynamicList.onscroll = handleScroll;
+
+    renderChannels("");
+    wrap.appendChild(itemsContainer);
+    dynamicList.appendChild(wrap);
+  }
+
+  function playAdultChannelByIndex(index) {
+    const list = window._veloraAdultLiveChannels;
+    if (!list || index < 0 || index >= list.length) return;
+
+    window._veloraAdultLiveCurrentIndex = index;
+    const channel = list[index];
+
+    // 1. Highlight in list
+    const rows = document.querySelectorAll(".vel-adult-channel-row");
+    rows.forEach((row, idx) => {
+      const isCurrent = idx === index;
+      row.classList.toggle("vel-adult-channel-row--active", isCurrent);
+      row.classList.toggle("selected", isCurrent);
+      const badge = row.querySelector(".vel-adult-channel-row__playing-badge");
+      if (badge) badge.style.display = isCurrent ? "inline-flex" : "none";
+      if (isCurrent) {
+        row.setAttribute("aria-current", "true");
+        row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      } else {
+        row.removeAttribute("aria-current");
+      }
+    });
+
+    // 2. Setup player
+    const livePlayer = document.getElementById("player-container");
+    const video = document.getElementById("video");
+    const vodPlayer = document.getElementById("vod-player-container");
+
+    if (vodPlayer) {
+      vodPlayer.classList.add("hidden");
+      vodPlayer.setAttribute("aria-hidden", "true");
+      vodPlayer.style.setProperty("display", "none", "important");
+    }
+
+    if (livePlayer) {
+      livePlayer.classList.remove("hidden");
+      livePlayer.removeAttribute("aria-hidden");
+      livePlayer.style.removeProperty("display");
+    }
+
+    // 3. Update top title
+    const contextTitle = document.getElementById("vel-header-context-title-text");
+    if (contextTitle) contextTitle.textContent = channel.name;
+
+    // 4. Play video
+    const streamUrl = `/api/proxy/xtream/${encodeURIComponent(channel.source_id)}/stream/${encodeURIComponent(channel.stream_id || channel.item_id)}/live`;
+
+    if (video) {
+      video.pause();
+      video.src = streamUrl;
+      video.load();
+      video.play().catch(e => {
+        console.warn("[Velora Adult] Live TV play prevented:", e.message);
+      });
+    }
+  }
+
+  window.veloraPlayAdultChannelByIndex = playAdultChannelByIndex;
+
   async function openAdultLivePlayerDirectly() {
     await fetchAssignedAdultPackages();
     const livePackages = Array.from(assignedAdultPackages.values()).filter(p => p.kind === "live");
@@ -532,38 +812,474 @@
       return;
     }
 
-    const channelList = allChannels.map(ch => ({
-      source_id: String(ch.source_id || ch.sourceId || ""),
-      item_id: String(ch.stream_id || ch.streamId || ch.id || ""),
-      item_type: "channel",
-      name: cleanChannelTitle(ch.name),
-      thumb_url: ch.stream_icon || ""
-    }));
+    const seen = new Set();
+    const uniqueChannels = [];
+    allChannels.forEach(ch => {
+      const sid = String(ch.stream_id || ch.id || "");
+      const key = `${ch.source_id}:${sid}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueChannels.push({
+          source_id: String(ch.source_id || ch.sourceId || ""),
+          stream_id: sid,
+          item_id: sid,
+          item_type: "channel",
+          name: cleanChannelTitle(ch.name),
+          thumb_url: ch.stream_icon || "",
+          package_name: ch.package_name || ""
+        });
+      }
+    });
 
-    const firstChannel = channelList[0];
+    window._veloraAdultLiveChannels = uniqueChannels;
+    window._veloraAdultLiveCurrentIndex = 0;
+
     delete document.body.dataset.veloraReturnFavorites;
     delete window._veloraFavoriteReturnTab;
     delete document.body.dataset.veloraReturnHome;
     document.body.dataset.veloraReturnAdult = "true";
     document.body.classList.remove("vel-adult-active");
 
-    ["player-container", "vod-player-container", "content-view", "now-playing"].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.style.removeProperty("display");
-    });
+    const vodPlayer = document.getElementById("vod-player-container");
+    const videoVod = document.getElementById("video-vod");
+    if (vodPlayer) {
+      vodPlayer.classList.add("hidden");
+      vodPlayer.setAttribute("aria-hidden", "true");
+      vodPlayer.style.setProperty("display", "none", "important");
+    }
+    if (videoVod) {
+      try {
+        videoVod.pause();
+        videoVod.removeAttribute("src");
+        videoVod.load();
+      } catch (_) {}
+    }
 
-    if (typeof window.veloraOpenFavoriteItem === "function") {
-      const opened = await window.veloraOpenFavoriteItem(firstChannel, channelList);
-      if (opened !== false) {
-        const adultView = document.getElementById("adult-view");
-        if (adultView) adultView.classList.add("hidden");
+    const livePlayer = document.getElementById("player-container");
+    if (livePlayer) {
+      livePlayer.classList.remove("hidden");
+      livePlayer.removeAttribute("aria-hidden");
+      livePlayer.style.removeProperty("display");
+    }
+    const cv = document.getElementById("content-view");
+    if (cv) {
+      cv.classList.remove("hidden");
+      cv.removeAttribute("aria-hidden");
+      cv.style.removeProperty("display");
+    }
+
+    renderAdultLiveChannelsListView(uniqueChannels);
+    playAdultChannelByIndex(0);
+  }
+
+  const adultVodMovieCache = new Map();
+
+  async function fetchVodMoviesForPackage(pkg) {
+    const catId = pkg.category_id || pkg.package_id || pkg.id;
+    const key = `${pkg.source_id}:${catId}`;
+    if (adultVodMovieCache.has(key)) return adultVodMovieCache.get(key);
+
+    const token = localStorage.getItem("authToken");
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    try {
+      const res = await fetch(`/api/proxy/xtream/${encodeURIComponent(pkg.source_id)}/vod_streams?category_id=${encodeURIComponent(catId)}`, {
+        cache: "no-store",
+        headers
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        const list = Array.isArray(rows) ? rows.map(m => ({
+          ...m,
+          source_id: String(pkg.source_id),
+          source_name: pkg.source_name || "",
+          package_name: pkg.name || "",
+          stream_id: String(m.stream_id || m.id || ""),
+          name: cleanChannelTitle(m.name || m.title || "Film Adulte"),
+          stream_icon: m.stream_icon || m.cover || "",
+          container_extension: m.container_extension || "mp4",
+          rating: m.rating || m.rating_5based || "",
+          duration: m.duration || m.duration_secs || ""
+        })) : [];
+        adultVodMovieCache.set(key, list);
+        return list;
+      }
+    } catch (e) {
+      console.warn("[Velora Adult] Failed to fetch movies for package", pkg.name, e.message);
+    }
+    return [];
+  }
+
+  function renderAdultMoviesListView(movies) {
+    const contentView = document.getElementById("content-view");
+    const dynamicList = document.getElementById("dynamic-list");
+    const adultView = document.getElementById("adult-view");
+    const packagesView = document.getElementById("packages-view");
+
+    if (adultView) adultView.classList.add("hidden");
+    if (packagesView) packagesView.classList.add("hidden");
+
+    if (!contentView || !dynamicList) return;
+
+    contentView.classList.remove("hidden");
+    contentView.removeAttribute("aria-hidden");
+    contentView.classList.remove("content-view--vod-film-detail");
+    dynamicList.replaceChildren();
+
+    const wrap = document.createElement("div");
+    wrap.className = "vel-adult-movie-list-wrap";
+
+    const header = document.createElement("div");
+    header.className = "vel-adult-movie-list-header";
+
+    const headerLeft = document.createElement("div");
+    headerLeft.className = "vel-adult-movie-list-header__left";
+
+    const title = document.createElement("div");
+    title.className = "vel-adult-movie-list-title";
+    title.innerHTML = `
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+      <span>Films Adultes</span>
+    `;
+
+    const count = document.createElement("span");
+    count.className = "vel-adult-movie-list-count";
+    count.textContent = `${movies.length} film${movies.length > 1 ? "s" : ""}`;
+
+    headerLeft.append(title, count);
+
+    const searchWrap = document.createElement("div");
+    searchWrap.className = "vel-adult-movie-search-wrap";
+    searchWrap.innerHTML = `
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      <input type="text" class="vel-adult-movie-search-input" placeholder="Filtrer les films..." autocomplete="off" />
+    `;
+
+    header.append(headerLeft, searchWrap);
+    wrap.appendChild(header);
+
+    const itemsContainer = document.createElement("div");
+    itemsContainer.className = "vel-adult-movie-list-items";
+
+    let movieImageObserver = null;
+    function getImageObserver() {
+      if (movieImageObserver) return movieImageObserver;
+      if ("IntersectionObserver" in window) {
+        movieImageObserver = new IntersectionObserver((entries, observer) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              const img = entry.target;
+              const src = img.dataset.src;
+              if (src) {
+                img.src = src;
+                img.removeAttribute("data-src");
+              }
+              observer.unobserve(img);
+            }
+          });
+        }, { rootMargin: "250px 0px" });
+      }
+      return movieImageObserver;
+    }
+
+    const BATCH_SIZE = 30;
+    let currentRenderedCount = 0;
+    let currentFiltered = [];
+
+    function appendNextChunk() {
+      const nextChunk = currentFiltered.slice(currentRenderedCount, currentRenderedCount + BATCH_SIZE);
+      if (!nextChunk.length) return;
+
+      const observer = getImageObserver();
+
+      nextChunk.forEach((movie, chunkIdx) => {
+        const originalIdx = movie.originalIdx;
+        const globalIdx = currentRenderedCount + chunkIdx;
+
+        const row = document.createElement("div");
+        row.className = `vel-adult-movie-row ${originalIdx === (window._veloraAdultVodCurrentIndex || 0) ? "vel-adult-movie-row--active" : ""}`;
+        row.setAttribute("role", "button");
+        row.tabIndex = 0;
+        row.dataset.streamId = String(movie.stream_id);
+        row.dataset.index = String(originalIdx);
+
+        const indexEl = document.createElement("span");
+        indexEl.className = "vel-adult-movie-row__index";
+        indexEl.textContent = String(originalIdx + 1);
+
+        const poster = document.createElement("div");
+        poster.className = "vel-adult-movie-row__poster";
+        if (movie.stream_icon) {
+          const img = document.createElement("img");
+          img.alt = movie.name;
+          img.className = "vel-lazy-poster";
+          img.onerror = () => {
+            poster.innerHTML = '<span class="vel-adult-movie-row__poster--fallback">🔞</span>';
+          };
+
+          if (globalIdx < 8) {
+            // Load the first 8 visible posters immediately
+            img.src = movie.stream_icon;
+          } else {
+            // Lazy load remaining posters as they scroll into view
+            img.dataset.src = movie.stream_icon;
+            if (observer) {
+              observer.observe(img);
+            } else {
+              img.src = movie.stream_icon;
+            }
+          }
+          poster.appendChild(img);
+        } else {
+          poster.innerHTML = '<span class="vel-adult-movie-row__poster--fallback">🔞</span>';
+        }
+
+        const info = document.createElement("div");
+        info.className = "vel-adult-movie-row__info";
+
+        const movieTitle = document.createElement("div");
+        movieTitle.className = "vel-adult-movie-row__title";
+        movieTitle.textContent = movie.name;
+
+        const meta = document.createElement("div");
+        meta.className = "vel-adult-movie-row__meta";
+        
+        const badge = document.createElement("span");
+        badge.className = "vel-adult-movie-row__playing-badge";
+        badge.innerHTML = `
+          <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          <span>Lecture</span>
+        `;
+        badge.style.display = originalIdx === (window._veloraAdultVodCurrentIndex || 0) ? "inline-flex" : "none";
+
+        const sourceInfo = document.createElement("span");
+        sourceInfo.textContent = movie.package_name ? `${movie.package_name}` : "🔞 Film Adulte";
+
+        meta.append(badge, sourceInfo);
+        info.append(movieTitle, meta);
+
+        row.append(indexEl, poster, info);
+
+        const heartBtn = typeof window.veloraCreateFavoriteHeart === "function"
+          ? window.veloraCreateFavoriteHeart({
+              sourceId: String(movie.source_id),
+              itemId: String(movie.stream_id),
+              itemType: "movie",
+              name: String(movie.name),
+              thumbUrl: String(movie.stream_icon || ""),
+              packageId: String(movie.package_id || ""),
+              containerExtension: String(movie.container_extension || "mp4")
+            })
+          : null;
+
+        if (heartBtn) {
+          row.appendChild(heartBtn);
+        }
+
+        row.onclick = (e) => {
+          if (e.target.closest(".vel-favorite-heart, .vel-favorite-detail-button")) return;
+          playAdultMovieByIndex(originalIdx);
+        };
+
+        itemsContainer.appendChild(row);
+      });
+
+      currentRenderedCount += nextChunk.length;
+    }
+
+    function renderItems(filterQuery = "") {
+      itemsContainer.replaceChildren();
+      currentRenderedCount = 0;
+      const q = filterQuery.trim().toLowerCase();
+      currentFiltered = q
+        ? movies.map((m, originalIdx) => ({ ...m, originalIdx })).filter(m => String(m.name || "").toLowerCase().includes(q))
+        : movies.map((m, originalIdx) => ({ ...m, originalIdx }));
+
+      if (q) {
+        count.textContent = `${currentFiltered.length} / ${movies.length} film${movies.length > 1 ? "s" : ""}`;
+      } else {
+        count.textContent = `${movies.length} film${movies.length > 1 ? "s" : ""}`;
+      }
+
+      if (!currentFiltered.length) {
+        const empty = document.createElement("div");
+        empty.className = "vel-adult-empty";
+        empty.style.padding = "30px 16px";
+        empty.textContent = "Aucun film ne correspond à votre recherche.";
+        itemsContainer.appendChild(empty);
         return;
       }
+
+      appendNextChunk();
     }
 
-    if (typeof window.veloraOpenSearchResult === "function") {
-      window.veloraOpenSearchResult(`adult:live:${firstChannel.source_id}:${firstChannel.item_id}`);
+    const searchInput = searchWrap.querySelector(".vel-adult-movie-search-input");
+    if (searchInput) {
+      searchInput.oninput = (e) => {
+        renderItems(e.target.value);
+      };
     }
+
+    const handleScroll = () => {
+      if (dynamicList.scrollTop + dynamicList.clientHeight >= dynamicList.scrollHeight - 350) {
+        if (currentRenderedCount < currentFiltered.length) {
+          appendNextChunk();
+        }
+      }
+    };
+    dynamicList.onscroll = handleScroll;
+
+    renderItems("");
+    wrap.appendChild(itemsContainer);
+    dynamicList.appendChild(wrap);
+  }
+
+  function playAdultMovieByIndex(index) {
+    const list = window._veloraAdultVodMovies;
+    if (!list || index < 0 || index >= list.length) return;
+
+    window._veloraAdultVodCurrentIndex = index;
+    const movie = list[index];
+
+    // 1. Highlight current movie in list
+    const rows = document.querySelectorAll(".vel-adult-movie-row");
+    rows.forEach((row, idx) => {
+      const isCurrent = idx === index;
+      row.classList.toggle("vel-adult-movie-row--active", isCurrent);
+      row.classList.toggle("selected", isCurrent);
+      const badge = row.querySelector(".vel-adult-movie-row__playing-badge");
+      if (badge) badge.style.display = isCurrent ? "inline-flex" : "none";
+      if (isCurrent) {
+        row.setAttribute("aria-current", "true");
+        row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      } else {
+        row.removeAttribute("aria-current");
+      }
+    });
+
+    // 2. Set up VOD player container
+    const playerContainer = document.getElementById("vod-player-container");
+    const videoVod = document.getElementById("video-vod");
+    const livePlayer = document.getElementById("player-container");
+
+    if (livePlayer) livePlayer.classList.add("hidden");
+
+    if (playerContainer) {
+      playerContainer.classList.remove("hidden");
+      playerContainer.removeAttribute("aria-hidden");
+      playerContainer.classList.add("player-container--series-episode");
+      playerContainer.style.removeProperty("display");
+    }
+
+    // 3. Update top title
+    const contextTitle = document.getElementById("vel-header-context-title-text");
+    if (contextTitle) contextTitle.textContent = movie.name;
+
+    // 4. Update Prev / Next Buttons
+    const prevBtn = document.getElementById("vod-ctl-prev-episode");
+    const nextBtn = document.getElementById("vod-ctl-next-episode");
+    if (prevBtn) {
+      prevBtn.hidden = false;
+      prevBtn.disabled = (index <= 0);
+      prevBtn.setAttribute("aria-label", "Film précédent");
+      prevBtn.title = "Film précédent";
+    }
+    if (nextBtn) {
+      nextBtn.hidden = false;
+      nextBtn.disabled = (index >= list.length - 1);
+      nextBtn.setAttribute("aria-label", "Film suivant");
+      nextBtn.title = "Film suivant";
+    }
+
+    // 5. Construct stream URL and start playback
+    const containerExt = (movie.container_extension || "mp4").toLowerCase().replace(/^\./, "");
+    const streamUrl = `/api/proxy/xtream/${encodeURIComponent(movie.source_id)}/stream/${encodeURIComponent(movie.stream_id)}/movie?container=${encodeURIComponent(containerExt)}`;
+
+    if (videoVod) {
+      try { videoVod.pause(); } catch (_) {}
+      videoVod.src = streamUrl;
+      videoVod.load();
+      videoVod.play().catch(e => {
+        console.warn("[Velora Adult] Video play autoplay prevented:", e.message);
+      });
+
+      // Auto-advance on ended
+      videoVod.onended = function () {
+        if (window._veloraAdultVodMovies && window._veloraAdultVodCurrentIndex < window._veloraAdultVodMovies.length - 1) {
+          playAdultMovieByIndex(window._veloraAdultVodCurrentIndex + 1);
+        }
+      };
+    }
+  }
+
+  window.veloraPlayAdultMovieByIndex = playAdultMovieByIndex;
+
+  async function openAdultMoviesPlayerDirectly() {
+    await fetchAssignedAdultPackages();
+    const vodPackages = Array.from(assignedAdultPackages.values()).filter(p => p.kind === "movies" || p.kind === "vod");
+    if (!vodPackages.length) {
+      alert("Aucun bouquet de films adultes n'a été configuré par l'administrateur.");
+      return;
+    }
+
+    const movieGroups = await Promise.all(vodPackages.map(p => fetchVodMoviesForPackage(p)));
+    const allMovies = movieGroups.flat();
+
+    if (!allMovies.length) {
+      alert("Aucun film trouvé dans les bouquets adultes sélectionnés.");
+      return;
+    }
+
+    const seen = new Set();
+    const uniqueMovies = [];
+    allMovies.forEach(m => {
+      const key = `${m.source_id}:${m.stream_id}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueMovies.push(m);
+      }
+    });
+
+    window._veloraAdultVodMovies = uniqueMovies;
+    window._veloraAdultVodCurrentIndex = 0;
+
+    delete document.body.dataset.veloraReturnFavorites;
+    delete window._veloraFavoriteReturnTab;
+    delete document.body.dataset.veloraReturnHome;
+    document.body.dataset.veloraReturnAdult = "true";
+    document.body.classList.remove("vel-adult-active");
+
+    const livePlayer = document.getElementById("player-container");
+    const liveVideo = document.getElementById("video");
+    if (livePlayer) {
+      livePlayer.classList.add("hidden");
+      livePlayer.setAttribute("aria-hidden", "true");
+      livePlayer.style.setProperty("display", "none", "important");
+    }
+    if (liveVideo) {
+      try {
+        liveVideo.pause();
+        liveVideo.removeAttribute("src");
+        liveVideo.load();
+      } catch (_) {}
+    }
+
+    const vodPlayer = document.getElementById("vod-player-container");
+    if (vodPlayer) {
+      vodPlayer.classList.remove("hidden");
+      vodPlayer.removeAttribute("aria-hidden");
+      vodPlayer.style.removeProperty("display");
+    }
+    const cv = document.getElementById("content-view");
+    if (cv) {
+      cv.classList.remove("hidden");
+      cv.removeAttribute("aria-hidden");
+      cv.style.removeProperty("display");
+    }
+
+    renderAdultMoviesListView(uniqueMovies);
+    playAdultMovieByIndex(0);
   }
 
   async function renderAdultPortal() {
@@ -586,83 +1302,17 @@
       }
     });
 
-    const livePackages = uniquePackages.filter(p => p.kind === "live");
-    const vodPackages = uniquePackages.filter(p => p.kind === "movies" || p.kind === "vod" || p.kind === "series");
-
     function updateView() {
       container.replaceChildren();
 
-      if (currentAdultView === "vod") {
-        if (searchWrap) searchWrap.style.display = "block";
-        const q = searchInput ? searchInput.value.trim().toLowerCase() : "";
-
-        const vodGrid = document.createElement("div");
-        vodGrid.className = "vel-adult-packages-grid";
-        container.appendChild(vodGrid);
-
-        const filtered = q
-          ? vodPackages.filter(p => String(p.name || "").toLowerCase().includes(q))
-          : vodPackages;
-
-        if (!filtered.length) {
-          const emptyMsg = vodPackages.length === 0
-            ? "Aucun bouquet Films/Séries adulte n'est actuellement configuré.<br><small style='opacity: 0.7;'>Rendez-vous dans les Paramètres Admin > 🔞 Adulte +18 pour sélectionner des bouquets VOD.</small>"
-            : "Aucun bouquet trouvé dans cette section.";
-          vodGrid.innerHTML = `<div class="vel-adult-empty">${emptyMsg}</div>`;
-          return;
-        }
-
-        filtered.forEach(pkg => {
-          const card = document.createElement("div");
-          card.className = "vel-adult-card";
-          card.setAttribute("role", "button");
-          card.tabIndex = 0;
-
-          const thumb = document.createElement("div");
-          thumb.className = "vel-adult-card__thumb";
-          
-          const icon = document.createElement("img");
-          icon.src = pkg.cover_url || "/logos/adult-18.svg";
-          icon.alt = pkg.name || "";
-          icon.loading = "lazy";
-          icon.onerror = () => { icon.src = "/logos/adult-18.svg"; };
-          thumb.appendChild(icon);
-
-          const badge = document.createElement("span");
-          badge.className = "vel-adult-card__badge";
-          badge.textContent = pkg.kind === "series" ? "🍿 SÉRIE" : "🎬 FILM";
-          thumb.appendChild(badge);
-
-          const body = document.createElement("div");
-          body.className = "vel-adult-card__body";
-
-          const title = document.createElement("h3");
-          title.className = "vel-adult-card__title";
-          title.textContent = cleanChannelTitle(pkg.name);
-
-          const meta = document.createElement("div");
-          meta.className = "vel-adult-card__meta";
-          meta.textContent = pkg.source_name ? `${pkg.source_name} • +18 VOD` : "+18 Contenu Exclusif";
-
-          body.append(title, meta);
-          card.append(thumb, body);
-
-          card.onclick = () => {
-            openAdultPackage(pkg);
-          };
-
-          vodGrid.appendChild(card);
-        });
-      } else {
-        // Default state when opening portal: Neither is active, prompt to choose
-        if (searchWrap) searchWrap.style.display = "none";
-        container.innerHTML = `
-          <div style="text-align:center;padding:50px 20px;color:#94a3b8;">
-            <div style="font-size:1.15rem;font-weight:700;color:#f1f5f9;margin-bottom:8px;">Bienvenue dans votre Espace Adulte +18</div>
-            <div>Sélectionnez <strong>TV en Direct</strong> pour lancer le lecteur TV ou <strong>Films & Séries</strong> pour explorer les bouquets vidéo.</div>
-          </div>
-        `;
-      }
+      // Default state when opening portal: Neither is active, prompt to choose
+      if (searchWrap) searchWrap.style.display = "none";
+      container.innerHTML = `
+        <div style="text-align:center;padding:50px 20px;color:#94a3b8;">
+          <div style="font-size:1.15rem;font-weight:700;color:#f1f5f9;margin-bottom:8px;">Bienvenue dans votre Espace Adulte +18</div>
+          <div>Sélectionnez <strong>TV en Direct</strong> pour lancer le lecteur TV ou <strong>Films</strong> pour lancer le lecteur de films.</div>
+        </div>
+      `;
     }
 
     if (searchInput) {
@@ -678,8 +1328,7 @@
     }
     if (vodBtn) {
       vodBtn.onclick = () => {
-        currentAdultView = "vod";
-        updateView();
+        openAdultMoviesPlayerDirectly();
       };
     }
 

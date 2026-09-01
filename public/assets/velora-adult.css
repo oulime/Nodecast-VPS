@@ -1025,7 +1025,7 @@ body.vel-adult-active .vel-sticky-top {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 12px;
+  padding: 12px 16px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 12px;
@@ -1047,67 +1047,15 @@ body.vel-adult-active .vel-sticky-top {
   box-shadow: 0 0 16px rgba(138, 43, 226, 0.25);
 }
 
-.vel-adult-channel-row__index {
-  font-size: 0.85rem;
-  font-weight: 800;
-  color: #64748b;
-  min-width: 24px;
-  text-align: center;
-}
-
-.vel-adult-channel-row--active .vel-adult-channel-row__index {
-  color: #c084fc;
-}
-
-.vel-adult-channel-row__logo {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.vel-adult-channel-row__logo img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  padding: 3px;
-  box-sizing: border-box;
-  transition: opacity 0.25s ease;
-}
-
-.vel-adult-channel-row__logo img:not([src]) {
-  opacity: 0;
-}
-
-.vel-adult-channel-row__logo img[src] {
-  opacity: 1;
-}
-
-.vel-adult-channel-row__logo--fallback {
-  font-size: 1.2rem;
-}
-
-.vel-adult-channel-row__info {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  overflow: hidden;
-  flex: 1;
-}
-
 .vel-adult-channel-row__title {
-  font-size: 0.92rem;
+  font-size: 0.98rem;
   font-weight: 700;
   color: #f1f5f9;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
 }
 
 .vel-adult-channel-row--active .vel-adult-channel-row__title {
@@ -1115,47 +1063,21 @@ body.vel-adult-active .vel-sticky-top {
   font-weight: 800;
 }
 
-.vel-adult-channel-row__meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.74rem;
-  color: #94a3b8;
-}
-
-.vel-adult-channel-row__playing-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.7rem;
-  font-weight: 800;
-  color: #c084fc;
-  background: rgba(138, 43, 226, 0.2);
-  border: 1px solid rgba(168, 85, 247, 0.4);
-  padding: 2px 6px;
-  border-radius: 4px;
-  text-transform: uppercase;
-}
-
-.vel-adult-channel-row__playing-badge svg {
-  width: 9px;
-  height: 9px;
-  fill: currentColor;
-}
-
 .vel-adult-channel-row .vel-favorite-heart {
   margin-left: auto;
   flex-shrink: 0;
-  width: 34px;
-  height: 34px;
-  min-width: 34px;
-  min-height: 34px;
-  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   color: #94a3b8;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1176,8 +1098,9 @@ body.vel-adult-active .vel-sticky-top {
 }
 
 .vel-adult-channel-row .vel-favorite-heart svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   fill: currentColor;
   pointer-events: none;
+  display: block;
 }

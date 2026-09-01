@@ -555,35 +555,6 @@
     const wrap = document.createElement("div");
     wrap.className = "vel-adult-channel-list-wrap";
 
-    const header = document.createElement("div");
-    header.className = "vel-adult-channel-list-header";
-
-    const headerLeft = document.createElement("div");
-    headerLeft.className = "vel-adult-movie-list-header__left";
-
-    const title = document.createElement("div");
-    title.className = "vel-adult-channel-list-title";
-    title.innerHTML = `
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
-      <span>TV en Direct</span>
-    `;
-
-    const count = document.createElement("span");
-    count.className = "vel-adult-channel-list-count";
-    count.textContent = `${channels.length} chaîne${channels.length > 1 ? "s" : ""}`;
-
-    headerLeft.append(title, count);
-
-    const searchWrap = document.createElement("div");
-    searchWrap.className = "vel-adult-movie-search-wrap";
-    searchWrap.innerHTML = `
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-      <input type="text" class="vel-adult-movie-search-input" placeholder="Filtrer les chaînes..." autocomplete="off" />
-    `;
-
-    header.append(headerLeft, searchWrap);
-    wrap.appendChild(header);
-
     const itemsContainer = document.createElement("div");
     itemsContainer.className = "vel-adult-channel-list-items";
 
@@ -595,11 +566,8 @@
       const nextChunk = currentFiltered.slice(currentRenderedCount, currentRenderedCount + BATCH_SIZE);
       if (!nextChunk.length) return;
 
-      const observer = getLiveChannelImageObserver();
-
-      nextChunk.forEach((channel, chunkIdx) => {
+      nextChunk.forEach((channel) => {
         const originalIdx = channel.originalIdx;
-        const globalIdx = currentRenderedCount + chunkIdx;
 
         const row = document.createElement("div");
         row.className = `vel-adult-channel-row ${originalIdx === (window._veloraAdultLiveCurrentIndex || 0) ? "vel-adult-channel-row--active" : ""}`;
@@ -608,61 +576,11 @@
         row.dataset.streamId = String(channel.stream_id);
         row.dataset.index = String(originalIdx);
 
-        const indexEl = document.createElement("span");
-        indexEl.className = "vel-adult-channel-row__index";
-        indexEl.textContent = String(originalIdx + 1);
-
-        const logo = document.createElement("div");
-        logo.className = "vel-adult-channel-row__logo";
-        const iconUrl = channel.thumb_url || channel.stream_icon;
-        if (iconUrl) {
-          const img = document.createElement("img");
-          img.alt = channel.name;
-          img.className = "vel-lazy-logo";
-          img.onerror = () => {
-            logo.innerHTML = '<span class="vel-adult-channel-row__logo--fallback">📺</span>';
-          };
-
-          if (globalIdx < 10) {
-            img.src = iconUrl;
-          } else {
-            img.dataset.src = iconUrl;
-            if (observer) {
-              observer.observe(img);
-            } else {
-              img.src = iconUrl;
-            }
-          }
-          logo.appendChild(img);
-        } else {
-          logo.innerHTML = '<span class="vel-adult-channel-row__logo--fallback">📺</span>';
-        }
-
-        const info = document.createElement("div");
-        info.className = "vel-adult-channel-row__info";
-
         const channelTitle = document.createElement("div");
         channelTitle.className = "vel-adult-channel-row__title";
         channelTitle.textContent = channel.name;
 
-        const meta = document.createElement("div");
-        meta.className = "vel-adult-channel-row__meta";
-        
-        const badge = document.createElement("span");
-        badge.className = "vel-adult-channel-row__playing-badge";
-        badge.innerHTML = `
-          <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-          <span>En Direct</span>
-        `;
-        badge.style.display = originalIdx === (window._veloraAdultLiveCurrentIndex || 0) ? "inline-flex" : "none";
-
-        const sourceInfo = document.createElement("span");
-        sourceInfo.textContent = channel.package_name ? `${channel.package_name}` : "🔞 Chaîne Adulte";
-
-        meta.append(badge, sourceInfo);
-        info.append(channelTitle, meta);
-
-        row.append(indexEl, logo, info);
+        row.appendChild(channelTitle);
 
         const heartBtn = typeof window.veloraCreateFavoriteHeart === "function"
           ? window.veloraCreateFavoriteHeart({
@@ -698,12 +616,6 @@
         ? channels.map((ch, originalIdx) => ({ ...ch, originalIdx })).filter(ch => String(ch.name || "").toLowerCase().includes(q))
         : channels.map((ch, originalIdx) => ({ ...ch, originalIdx }));
 
-      if (q) {
-        count.textContent = `${currentFiltered.length} / ${channels.length} chaîne${channels.length > 1 ? "s" : ""}`;
-      } else {
-        count.textContent = `${channels.length} chaîne${channels.length > 1 ? "s" : ""}`;
-      }
-
       if (!currentFiltered.length) {
         const empty = document.createElement("div");
         empty.className = "vel-adult-empty";
@@ -716,11 +628,20 @@
       appendNextChannelChunk();
     }
 
-    const searchInput = searchWrap.querySelector(".vel-adult-movie-search-input");
-    if (searchInput) {
-      searchInput.oninput = (e) => {
+    const liveSearchInput = document.getElementById("vel-live-channel-search-input");
+    if (liveSearchInput) {
+      liveSearchInput.oninput = (e) => {
         renderChannels(e.target.value);
       };
+      const clearBtn = document.getElementById("vel-live-channel-search-clear");
+      if (clearBtn) {
+        clearBtn.onclick = () => {
+          liveSearchInput.value = "";
+          renderChannels("");
+          clearBtn.classList.add("hidden");
+          liveSearchInput.focus();
+        };
+      }
     }
 
     const handleScroll = () => {
@@ -732,7 +653,7 @@
     };
     dynamicList.onscroll = handleScroll;
 
-    renderChannels("");
+    renderChannels(liveSearchInput ? liveSearchInput.value : "");
     wrap.appendChild(itemsContainer);
     dynamicList.appendChild(wrap);
   }
@@ -750,8 +671,6 @@
       const isCurrent = idx === index;
       row.classList.toggle("vel-adult-channel-row--active", isCurrent);
       row.classList.toggle("selected", isCurrent);
-      const badge = row.querySelector(".vel-adult-channel-row__playing-badge");
-      if (badge) badge.style.display = isCurrent ? "inline-flex" : "none";
       if (isCurrent) {
         row.setAttribute("aria-current", "true");
         row.scrollIntoView({ block: "nearest", behavior: "smooth" });

@@ -725,82 +725,26 @@
     window._veloraAdultLiveCurrentIndex = index;
     const channel = list[index];
 
-    // 1. Highlight in list
-    const rows = document.querySelectorAll(".vel-adult-channel-row");
-    rows.forEach((row, idx) => {
-      const isCurrent = idx === index;
-      row.classList.toggle("vel-adult-channel-row--active", isCurrent);
-      row.classList.toggle("selected", isCurrent);
-      if (isCurrent) {
-        row.setAttribute("aria-current", "true");
-        row.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      } else {
-        row.removeAttribute("aria-current");
-      }
-    });
+    delete document.body.dataset.veloraReturnHome;
+    delete document.body.dataset.veloraReturnFavorites;
+    document.body.dataset.veloraReturnAdult = "true";
 
-    // 2. Setup player
-    const livePlayer = document.getElementById("player-container");
-    const video = document.getElementById("video");
-    const vodPlayer = document.getElementById("vod-player-container");
+    const adultView = document.getElementById("adult-view");
+    if (adultView) adultView.classList.add("hidden");
 
-    if (vodPlayer) {
-      vodPlayer.classList.add("hidden");
-      vodPlayer.setAttribute("aria-hidden", "true");
-      vodPlayer.style.setProperty("display", "none", "important");
-    }
-
-    if (livePlayer) {
-      livePlayer.classList.remove("hidden");
-      livePlayer.removeAttribute("aria-hidden");
-      livePlayer.style.removeProperty("display");
-    }
-
-    // 3. Update top title
-    const contextTitle = document.getElementById("vel-header-context-title-text");
-    if (contextTitle) contextTitle.textContent = "ADULTE +18";
-
-    // 4. Play video
-    const apiUrl = `/api/proxy/xtream/${encodeURIComponent(channel.source_id)}/stream/${encodeURIComponent(channel.stream_id || channel.item_id)}/live`;
-    const resolvedUrl = await resolveStreamMediaUrl(apiUrl);
-    const finalUrl = resolvedUrl || apiUrl;
-
-    if (video) {
-      if (video.hls && typeof video.hls.destroy === "function") {
-        try { video.hls.destroy(); } catch (_) {}
-        video.hls = null;
-      }
-      if (window.hls && typeof window.hls.destroy === "function") {
-        try { window.hls.destroy(); } catch (_) {}
-        window.hls = null;
-      }
-
-      const isHls = finalUrl.includes(".m3u8") || finalUrl.includes("/live");
-      if (isHls && window.Hls && window.Hls.isSupported()) {
-        const hls = new window.Hls({ enableWorker: true, lowLatencyMode: true });
-        hls.loadSource(finalUrl);
-        hls.attachMedia(video);
-        hls.on(window.Hls.Events.MANIFEST_PARSED, function () {
-          video.play().catch(function (e) { console.warn("[Velora Adult] HLS play error:", e.message); });
-        });
-        hls.on(window.Hls.Events.ERROR, function (_, data) {
-          if (data && data.fatal) {
-            console.warn("[Velora Adult] Fatal HLS error, falling back to direct video.src:", data.type);
-            try { hls.destroy(); } catch (_) {}
-            video.src = finalUrl;
-            video.load();
-            video.play().catch(function () {});
-          }
-        });
-        video.hls = hls;
-        window.hls = hls;
-      } else {
-        video.src = finalUrl;
-        video.load();
-        video.play().catch(function (e) {
-          console.warn("[Velora Adult] Live TV play prevented:", e.message);
-        });
-      }
+    if (typeof window.veloraOpenFavoriteItem === "function") {
+      const item = {
+        source_id: String(channel.source_id),
+        item_id: String(channel.stream_id || channel.item_id),
+        item_type: "channel",
+        name: channel.name,
+        thumb_url: channel.thumb_url || channel.stream_icon || "",
+        package_id: String(channel.package_id || "")
+      };
+      await window.veloraOpenFavoriteItem(item, list);
+      const contextTitle = document.getElementById("vel-header-context-title-text");
+      if (contextTitle) contextTitle.textContent = "ADULTE +18";
+      return;
     }
   }
 
@@ -844,42 +788,7 @@
     window._veloraAdultLiveChannels = uniqueChannels;
     window._veloraAdultLiveCurrentIndex = 0;
 
-    delete document.body.dataset.veloraReturnFavorites;
-    delete window._veloraFavoriteReturnTab;
-    delete document.body.dataset.veloraReturnHome;
-    document.body.dataset.veloraReturnAdult = "true";
-    document.body.classList.remove("vel-adult-active");
-
-    const vodPlayer = document.getElementById("vod-player-container");
-    const videoVod = document.getElementById("video-vod");
-    if (vodPlayer) {
-      vodPlayer.classList.add("hidden");
-      vodPlayer.setAttribute("aria-hidden", "true");
-      vodPlayer.style.setProperty("display", "none", "important");
-    }
-    if (videoVod) {
-      try {
-        videoVod.pause();
-        videoVod.removeAttribute("src");
-        videoVod.load();
-      } catch (_) {}
-    }
-
-    const livePlayer = document.getElementById("player-container");
-    if (livePlayer) {
-      livePlayer.classList.remove("hidden");
-      livePlayer.removeAttribute("aria-hidden");
-      livePlayer.style.removeProperty("display");
-    }
-    const cv = document.getElementById("content-view");
-    if (cv) {
-      cv.classList.remove("hidden");
-      cv.removeAttribute("aria-hidden");
-      cv.style.removeProperty("display");
-    }
-
-    renderAdultLiveChannelsListView(uniqueChannels);
-    playAdultChannelByIndex(0);
+    await playAdultChannelByIndex(0);
   }
 
   const adultVodMovieCache = new Map();
@@ -1164,92 +1073,31 @@
     window._veloraAdultVodCurrentIndex = index;
     const movie = list[index];
 
-    // 1. Highlight current movie in list
-    const rows = document.querySelectorAll(".vel-adult-movie-row");
-    rows.forEach((row, idx) => {
-      const isCurrent = idx === index;
-      row.classList.toggle("vel-adult-movie-row--active", isCurrent);
-      row.classList.toggle("selected", isCurrent);
-      const badge = row.querySelector(".vel-adult-movie-row__playing-badge");
-      if (badge) badge.style.display = isCurrent ? "inline-flex" : "none";
-      if (isCurrent) {
-        row.setAttribute("aria-current", "true");
-        row.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      } else {
-        row.removeAttribute("aria-current");
-      }
-    });
+    delete document.body.dataset.veloraReturnHome;
+    delete document.body.dataset.veloraReturnFavorites;
+    document.body.dataset.veloraReturnAdult = "true";
 
-    // 2. Set up VOD player container
-    const playerContainer = document.getElementById("vod-player-container");
-    const videoVod = document.getElementById("video-vod");
-    const livePlayer = document.getElementById("player-container");
+    const adultView = document.getElementById("adult-view");
+    if (adultView) adultView.classList.add("hidden");
 
-    if (livePlayer) livePlayer.classList.add("hidden");
-
-    if (playerContainer) {
-      playerContainer.classList.remove("hidden");
-      playerContainer.removeAttribute("aria-hidden");
-      playerContainer.classList.add("player-container--series-episode");
-      playerContainer.style.removeProperty("display");
-    }
-
-    // 3. Update top title
-    const contextTitle = document.getElementById("vel-header-context-title-text");
-    if (contextTitle) contextTitle.textContent = "ADULTE +18";
-
-    // 4. Update Prev / Next Buttons
-    const prevBtn = document.getElementById("vod-ctl-prev-episode");
-    const nextBtn = document.getElementById("vod-ctl-next-episode");
-    if (prevBtn) {
-      prevBtn.hidden = false;
-      prevBtn.disabled = (index <= 0);
-      prevBtn.setAttribute("aria-label", "Film précédent");
-      prevBtn.title = "Film précédent";
-    }
-    if (nextBtn) {
-      nextBtn.hidden = false;
-      nextBtn.disabled = (index >= list.length - 1);
-      nextBtn.setAttribute("aria-label", "Film suivant");
-      nextBtn.title = "Film suivant";
-    }
-
-    // 5. Construct stream URL and start playback
-    const containerExt = (movie.container_extension || "mp4").toLowerCase().replace(/^\./, "");
-    const apiUrl = `/api/proxy/xtream/${encodeURIComponent(movie.source_id)}/stream/${encodeURIComponent(movie.stream_id)}/movie?container=${encodeURIComponent(containerExt)}`;
-    const resolvedUrl = await resolveStreamMediaUrl(apiUrl);
-    const finalUrl = resolvedUrl || apiUrl;
-
-    if (videoVod) {
-      if (videoVod.hls && typeof videoVod.hls.destroy === "function") {
-        try { videoVod.hls.destroy(); } catch (_) {}
-        videoVod.hls = null;
-      }
-
-      const isHls = finalUrl.includes(".m3u8");
-      if (isHls && window.Hls && window.Hls.isSupported()) {
-        const hls = new window.Hls({ enableWorker: true });
-        hls.loadSource(finalUrl);
-        hls.attachMedia(videoVod);
-        hls.on(window.Hls.Events.MANIFEST_PARSED, function () {
-          videoVod.play().catch(function () {});
-        });
-        videoVod.hls = hls;
-      } else {
-        try { videoVod.pause(); } catch (_) {}
-        videoVod.src = finalUrl;
-        videoVod.load();
-        videoVod.play().catch(e => {
-          console.warn("[Velora Adult] Video play autoplay prevented:", e.message);
-        });
-      }
-
-      // Auto-advance on ended
-      videoVod.onended = function () {
-        if (window._veloraAdultVodMovies && window._veloraAdultVodCurrentIndex < window._veloraAdultVodMovies.length - 1) {
-          playAdultMovieByIndex(window._veloraAdultVodCurrentIndex + 1);
-        }
-      };
+    const pkgId = String(movie.package_id || movie.category_id || "adult-movies");
+    if (typeof window.veloraOpenCachedHomeItem === "function") {
+      window.veloraOpenCachedHomeItem({
+        id: "adult-movies",
+        content_type: "movies",
+        package_id: pkgId
+      }, {
+        id: `adult:${movie.source_id}:${movie.stream_id}`,
+        name: movie.name,
+        thumbUrl: movie.stream_icon || movie.thumb_url || "",
+        streamId: movie.stream_id,
+        sourceId: movie.source_id,
+        containerExtension: movie.container_extension || "mp4",
+        packageId: pkgId
+      });
+      const contextTitle = document.getElementById("vel-header-context-title-text");
+      if (contextTitle) contextTitle.textContent = "ADULTE +18";
+      return;
     }
   }
 

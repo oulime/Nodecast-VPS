@@ -96,6 +96,27 @@
     }
   }
 
+  // Helper to extract vertical poster vs backdrop from raw stream item
+  function extractMediaImages(it) {
+    let poster = it.poster || it.poster_path || it.stream_icon || it.cover || it.cover_big || it.movie_image || it.series_image || "";
+    if (Array.isArray(poster) && poster.length > 0) poster = poster[0];
+    if (typeof poster === "string" && poster.startsWith("/")) poster = "https://image.tmdb.org/t/p/w500" + poster;
+
+    let backdrop = it.backdrop_path || it.backdrop || it.backdrop_url || "";
+    if (Array.isArray(backdrop) && backdrop.length > 0) backdrop = backdrop[0];
+    if (typeof backdrop === "string" && backdrop.startsWith("/")) backdrop = "https://image.tmdb.org/t/p/w780" + backdrop;
+
+    // If poster is an obvious horizontal landscape TMDb backdrop (w1280), try not to use it as poster
+    if (typeof poster === "string" && (poster.includes("/w1280/") || poster.includes("/backdrop/"))) {
+      if (!backdrop) backdrop = poster;
+      // keep it only if no other option
+    }
+
+    const finalPoster = poster || backdrop;
+    const finalBackdrop = backdrop || poster;
+    return { poster: finalPoster, backdrop: finalBackdrop };
+  }
+
   // Fetch full items of a package for the "Voir tout" popup
   async function fetchPackageFullItems(tab, pkg) {
     const cacheKey = `${tab}:${pkg.id}`;
@@ -111,24 +132,14 @@
         if (Array.isArray(rawList) && rawList.length > 0) {
           const items = rawList.map((it, idx) => {
             const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? idx;
-            let poster = it.poster || it.poster_path || it.stream_icon || it.cover || it.cover_big || it.movie_image || it.series_image || "";
-            if (Array.isArray(poster) && poster.length > 0) poster = poster[0];
-            if (typeof poster === "string" && poster.startsWith("/")) poster = "https://image.tmdb.org/t/p/w500" + poster;
-
-            let backdrop = it.backdrop_path || it.backdrop || it.backdrop_url || "";
-            if (Array.isArray(backdrop) && backdrop.length > 0) backdrop = backdrop[0];
-            if (typeof backdrop === "string" && backdrop.startsWith("/")) backdrop = "https://image.tmdb.org/t/p/w780" + backdrop;
-
-            const finalPoster = poster || backdrop;
-            const finalBackdrop = backdrop || poster;
-
+            const { poster, backdrop } = extractMediaImages(it);
             return {
               id: `feed:${pkg.id}:${rawId}`,
               name: stripTitle(it.name || it.title || it.series_name || ""),
               rawName: it.name || it.title || it.series_name || "",
-              thumbUrl: finalPoster,
-              posterUrl: finalPoster,
-              backdropUrl: finalBackdrop,
+              thumbUrl: poster,
+              posterUrl: poster,
+              backdropUrl: backdrop,
               rating: it.rating || it.rating_5based || it.score || "",
               year: it.year || it.releaseDate || "",
               plot: it.plot || it.description || it.overview || "",
@@ -156,13 +167,14 @@
         if (data && Array.isArray(data.items) && data.items.length > 0) {
           const items = data.items.map(it => {
             const rawId = it.stream_id || it.id;
-            let thumb = it.stream_icon || it.cover || it.thumbUrl || it.backdropUrl || "";
+            const { poster, backdrop } = extractMediaImages(it);
             return {
               id: `feed:${pkg.id}:${rawId}`,
               name: stripTitle(it.name || it.title || ""),
               rawName: it.name || it.title || "",
-              thumbUrl: thumb,
-              backdropUrl: it.backdropUrl || thumb,
+              thumbUrl: poster,
+              posterUrl: poster,
+              backdropUrl: backdrop,
               rating: it.rating || "",
               year: it.year || "",
               plot: it.plot || it.description || "",
@@ -276,7 +288,7 @@
         const thumbWrap = document.createElement("div");
         thumbWrap.className = "vel-pkg-modal__card-thumb";
 
-        const thumb = item.thumbUrl || item.backdropUrl;
+        const thumb = item.posterUrl || item.thumbUrl || item.backdropUrl;
         if (thumb) {
           const img = document.createElement("img");
           img.alt = item.name;
@@ -345,7 +357,7 @@
     backdropImg.loading = "eager";
     backdropImg.decoding = "async";
 
-    const backdropUrl = heroItem.backdropUrl || heroItem.thumbUrl || "";
+    const backdropUrl = heroItem.backdropUrl || heroItem.posterUrl || heroItem.thumbUrl || "";
     if (backdropUrl) {
       backdropImg.src = backdropUrl;
       backdropImg.onload = () => backdropImg.classList.add("is-loaded");
@@ -459,7 +471,7 @@
     lz.className = "lz5SHd ITi_XJ";
     lz.style.aspectRatio = "2/3";
 
-    const thumb = item.thumbUrl || item.backdropUrl;
+    const thumb = item.posterUrl || item.thumbUrl || item.backdropUrl;
     if (thumb) {
       const picture = document.createElement("picture");
       const img = document.createElement("img");
@@ -602,35 +614,49 @@
       const feed = await fetchCountryMediaFeed(country, tab);
       let packages = feed && Array.isArray(feed.packages) ? feed.packages : [];
 
-      // If server feed has packages without preview items, hydrate from appState if populated
+      // Always cross-reference and enrich items from appState if available
       const appState = typeof window.veloraGetState === "function" ? window.veloraGetState() : null;
       if (appState) {
         const streamMap = tab === "movies" ? appState.vodStreamsByCat : appState.seriesStreamsByCat;
         if (streamMap && streamMap.size > 0) {
           packages.forEach(pkg => {
-            if (!Array.isArray(pkg.items) || pkg.items.length === 0) {
-              const rawList = streamMap.get(pkg.id) || streamMap.get(String(pkg.id)) || (pkg.category_id ? streamMap.get(String(pkg.category_id)) : null);
-              if (Array.isArray(rawList) && rawList.length > 0) {
+            const rawList = streamMap.get(pkg.id) || streamMap.get(String(pkg.id)) || (pkg.category_id ? streamMap.get(String(pkg.category_id)) : null);
+            if (Array.isArray(rawList) && rawList.length > 0) {
+              pkg.totalCount = Math.max(pkg.totalCount || 0, rawList.length);
+
+              const streamById = new Map();
+              rawList.forEach(it => {
+                const rawId = String(it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? '');
+                if (rawId) streamById.set(rawId, it);
+              });
+
+              if (Array.isArray(pkg.items) && pkg.items.length > 0) {
+                // Enrich existing preview items with real vertical poster from appState
+                pkg.items.forEach(it => {
+                  const raw = streamById.get(String(it.streamId || ''));
+                  if (raw) {
+                    const { poster, backdrop } = extractMediaImages(raw);
+                    if (poster) {
+                      it.posterUrl = poster;
+                      it.thumbUrl = poster;
+                    }
+                    if (backdrop) {
+                      it.backdropUrl = backdrop;
+                    }
+                  }
+                });
+              } else {
+                // Populate preview items if empty
                 pkg.items = rawList.slice(0, 20).map((it, idx) => {
                   const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? idx;
-                  let poster = it.poster || it.poster_path || it.stream_icon || it.cover || it.cover_big || it.movie_image || it.series_image || "";
-                  if (Array.isArray(poster) && poster.length > 0) poster = poster[0];
-                  if (typeof poster === "string" && poster.startsWith("/")) poster = "https://image.tmdb.org/t/p/w500" + poster;
-
-                  let backdrop = it.backdrop_path || it.backdrop || it.backdrop_url || "";
-                  if (Array.isArray(backdrop) && backdrop.length > 0) backdrop = backdrop[0];
-                  if (typeof backdrop === "string" && backdrop.startsWith("/")) backdrop = "https://image.tmdb.org/t/p/w780" + backdrop;
-
-                  const finalPoster = poster || backdrop;
-                  const finalBackdrop = backdrop || poster;
-
+                  const { poster, backdrop } = extractMediaImages(it);
                   return {
                     id: `feed:${pkg.id}:${rawId}`,
                     name: stripTitle(it.name || it.title || it.series_name || ""),
                     rawName: it.name || it.title || it.series_name || "",
-                    thumbUrl: finalPoster,
-                    posterUrl: finalPoster,
-                    backdropUrl: finalBackdrop,
+                    thumbUrl: poster,
+                    posterUrl: poster,
+                    backdropUrl: backdrop,
                     rating: it.rating || it.rating_5based || it.score || "",
                     year: it.year || it.releaseDate || "",
                     plot: it.plot || it.description || it.overview || "",
@@ -642,7 +668,6 @@
                     packageId: pkg.id
                   };
                 });
-                pkg.totalCount = Math.max(pkg.totalCount || 0, rawList.length);
               }
             }
           });
@@ -690,6 +715,16 @@
     feedCache.clear();
     packageFullItemsCache.clear();
     setTimeout(render, 30);
+  });
+
+  // When Xtream catalog data finishes loading in background, refresh posters if needed
+  window.addEventListener("velora-vod-ready", () => {
+    lastFeedKey = "";
+    render();
+  });
+  window.addEventListener("velora-series-ready", () => {
+    lastFeedKey = "";
+    render();
   });
 
   const countrySelect = document.getElementById("country-select");

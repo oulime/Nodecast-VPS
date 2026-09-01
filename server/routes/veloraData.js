@@ -1719,6 +1719,7 @@ function buildMediaFeedCache() {
     }
 
     const payload = {
+        version: 3,
         generatedAt: new Date().toISOString(),
         totalPackages: totalCachedPackages,
         totalItems: totalCachedItems,
@@ -1737,11 +1738,11 @@ function buildMediaFeedCache() {
 }
 
 function getMediaFeedCache() {
-    if (currentMediaFeedCache) return currentMediaFeedCache;
+    if (currentMediaFeedCache && currentMediaFeedCache.version >= 3) return currentMediaFeedCache;
     try {
         if (fs.existsSync(mediaFeedCachePath)) {
             const raw = JSON.parse(fs.readFileSync(mediaFeedCachePath, 'utf8'));
-            if (raw && raw.feed) {
+            if (raw && raw.feed && raw.version >= 3) {
                 currentMediaFeedCache = raw;
                 return currentMediaFeedCache;
             }

@@ -596,11 +596,11 @@
     const container = getContainer();
 
     if (!MEDIA_TABS.has(tab)) {
-      container.style.display = "none";
+      container.style.setProperty("display", "none", "important");
       return;
     }
 
-    container.style.display = "flex";
+    container.style.removeProperty("display");
 
     const feedKey = `${country}:${tab}`;
     if (feedKey === lastFeedKey && container.children.length > 0) {
@@ -763,7 +763,7 @@
       if (primeSearchBtn) {
         primeSearchBtn.style.setProperty("display", "none", "important");
       }
-      if (isDetailOrPlayerOpen && primeContainer) {
+      if (primeContainer) {
         primeContainer.style.setProperty("display", "none", "important");
       }
     }

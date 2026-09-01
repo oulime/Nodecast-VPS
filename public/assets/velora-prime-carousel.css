@@ -55,10 +55,60 @@ body[data-vel-active-tab="series"]:not(:has(#content-view:not(.hidden))):not(:ha
   padding: 0 !important;
 }
 
-/* When detail view (#content-view) or video player is open, hide Netflix prime carousels so they don't push the fiche down */
+/* Netflix Prime Carousels & Hero - STRICTLY ONLY ON MOVIES & SERIES TABS */
+#vel-prime-carousels-container,
+.vel-prime-container,
+.vel-netflix-hero,
+body:not([data-vel-active-tab="movies"]):not([data-vel-active-tab="series"]) #vel-prime-carousels-container,
+body:not([data-vel-active-tab="movies"]):not([data-vel-active-tab="series"]) .vel-prime-container,
+body:not([data-vel-active-tab="movies"]):not([data-vel-active-tab="series"]) .vel-netflix-hero,
+body[data-vel-active-tab="home"] #vel-prime-carousels-container,
+body[data-vel-active-tab="home"] .vel-prime-container,
+body[data-vel-active-tab="home"] .vel-netflix-hero,
+body[data-vel-active-tab="live"] #vel-prime-carousels-container,
+body[data-vel-active-tab="live"] .vel-prime-container,
+body[data-vel-active-tab="live"] .vel-netflix-hero,
+body.vel-home-empty-active #vel-prime-carousels-container,
+body.vel-home-empty-active .vel-prime-container,
+body.vel-home-empty-active .vel-netflix-hero,
 body:has(#content-view:not(.hidden)) #vel-prime-carousels-container,
 body:has(#vod-player-container:not(.hidden)) #vel-prime-carousels-container {
   display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+body[data-vel-active-tab="movies"]:not(:has(#content-view:not(.hidden))):not(:has(#vod-player-container:not(.hidden))) #vel-prime-carousels-container,
+body[data-vel-active-tab="series"]:not(:has(#content-view:not(.hidden))):not(:has(#vod-player-container:not(.hidden))) #vel-prime-carousels-container {
+  display: flex !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  opacity: 1 !important;
+  height: auto !important;
+  min-height: auto !important;
+}
+
+body[data-vel-active-tab="movies"]:not(:has(#content-view:not(.hidden))):not(:has(#vod-player-container:not(.hidden))) .vel-prime-container,
+body[data-vel-active-tab="series"]:not(:has(#content-view:not(.hidden))):not(:has(#vod-player-container:not(.hidden))) .vel-prime-container {
+  display: flex !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  opacity: 1 !important;
+  height: auto !important;
+  min-height: auto !important;
+}
+
+body[data-vel-active-tab="movies"]:not(:has(#content-view:not(.hidden))):not(:has(#vod-player-container:not(.hidden))) .vel-netflix-hero,
+body[data-vel-active-tab="series"]:not(:has(#content-view:not(.hidden))):not(:has(#vod-player-container:not(.hidden))) .vel-netflix-hero {
+  display: flex !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  opacity: 1 !important;
 }
 
 /* Floating Search Button - STRICTLY ONLY ON MOVIES & SERIES TABS */

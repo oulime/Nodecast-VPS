@@ -5925,6 +5925,9 @@
               <button type="button" id="cache-warm-run" class="primary">
                 Actualiser le cache catalogue
               </button>
+              <button type="button" id="media-feed-cache-rebuild" class="secondary" style="background: rgba(229, 9, 20, 0.2); border: 1px solid #e50914; color: #fff; cursor: pointer;">
+                🎬 Reconstruire le cache Netflix (Films &amp; Séries)
+              </button>
             </div>
             <pre
               id="cache-warm-details"
@@ -14139,8 +14142,39 @@ if (target.closest(".trial-offer-button")) {
         load();
       })();
     </script>
+    <script>
+      (() => {
+        document.addEventListener("click", async (e) => {
+          const btn = e.target && e.target.closest("#media-feed-cache-rebuild");
+          if (!btn) return;
+          const status = document.getElementById("cache-warm-status");
+          const details = document.getElementById("cache-warm-details");
+          btn.disabled = true;
+          btn.textContent = "Reconstruction en cours...";
+          if (status) status.textContent = "Génération du cache feed Netflix pour tous les pays et catégories...";
+          try {
+            const res = await fetch("/api/velora-db/admin/rebuild-media-feed", { method: "POST" });
+            const json = await res.json();
+            if (json.ok) {
+              if (status) status.textContent = `✅ Cache Netflix actualisé (${json.totalPackages} packages, ${json.totalItems} médias pré-calculés).`;
+              if (details) details.textContent = JSON.stringify(json, null, 2);
+              window.dispatchEvent(new CustomEvent("velora-country-change"));
+            } else {
+              if (status) status.textContent = `❌ Erreur: ${json.error || "Échec"}`;
+            }
+          } catch (err) {
+            if (status) status.textContent = `❌ Erreur: ${err.message}`;
+          } finally {
+            btn.disabled = false;
+            btn.textContent = "🎬 Reconstruire le cache Netflix (Films & Séries)";
+          }
+        });
+      })();
+    </script>
     <script defer src="/assets/cast-bridge.js?v=20260821-cast-airplay-v1"></script>
     <script defer src="/assets/velora-live-wheel.js?v=instant-nav-v20260821-151"></script>
+    <link rel="stylesheet" href="/assets/velora-prime-carousel.css?v=20260901-feed-v2" />
+    <script defer src="/assets/velora-prime-carousels.js?v=20260901-feed-v2"></script>
   </body>
 </html>
 

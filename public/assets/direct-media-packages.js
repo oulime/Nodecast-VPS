@@ -576,6 +576,7 @@
   }
 
   function openSelectedPackage(tab, cards) {
+    if (!isAdultMode()) return;
     if (
       !MEDIA_TABS.has(tab) ||
       isParentPackageView() ||

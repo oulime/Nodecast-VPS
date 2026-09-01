@@ -15,6 +15,9 @@ const countryPackageCachePath = path.join(
 );
 const vodPosterCachePath = path.join(__dirname, '..', '..', 'data', 'vod-poster-cache.json');
 const vodBackdropCachePath = path.join(__dirname, '..', '..', 'data', 'vod-backdrop-cache.json');
+const mediaFeedCachePath = path.join(__dirname, '..', '..', 'data', 'velora-cache', 'media-feed-cache.json');
+const MEDIA_FEED_ENTRIES_PER_PACKAGE = 20;
+let currentMediaFeedCache = null;
 const https = require('https');
 
 function cleanMediaTitleForSearch(raw) {
@@ -169,13 +172,20 @@ function removeCacheFile(filePath) {
 
 function invalidateCountryPackageCache() {
     currentCountryPackageCache = null;
+    currentMediaFeedCache = null;
     removeCacheFile(countryPackageCachePath);
-    // Home sections are another derived view of the same package memberships.
+    // Home sections and media feeds are derived views of the same package memberships.
     removeCacheFile(homeCachePath);
+    removeCacheFile(mediaFeedCachePath);
 }
 
 function invalidateHomeCache() {
     removeCacheFile(homeCachePath);
+}
+
+function invalidateMediaFeedCache() {
+    currentMediaFeedCache = null;
+    removeCacheFile(mediaFeedCachePath);
 }
 
 function invalidateDerivedCachesForTable(table) {
@@ -1439,6 +1449,305 @@ router.get('/channel-rules', (req, res) => {
         return res.status(500).json({ error: error.message });
     }
 });
+
+function buildMediaFeedCache() {
+    const countryPackageCache = getCountryPackageCache();
+    const resolvedPackages = countryPackageCache.packages;
+    const curations = expandMemberships(countryPackageCache.memberships);
+
+    const packageStreams = new Map();
+    const packageStreamCounts = new Map();
+
+    for (const row of curations) {
+        const countryId = String(row.country_id || '').trim();
+        const packageId = String(row.target_package_id || '').trim();
+        const streamId = String(row.stream_id || '').trim();
+        const kind = String(row.kind || '').trim();
+        if (!countryId || !packageId || !streamId || (kind !== 'vod' && kind !== 'series')) continue;
+
+        const key = `${countryId}:${packageId}`;
+        if (!packageStreams.has(key)) {
+            packageStreams.set(key, { keys: new Set(), sourceAware: false });
+        }
+        const membership = packageStreams.get(key);
+        const sourceId = String(row.source_id || '').trim();
+        if (sourceId) {
+            membership.sourceAware = true;
+            membership.keys.add(`${sourceId}:${streamId}`);
+        } else {
+            membership.keys.add(streamId);
+        }
+        packageStreamCounts.set(key, (packageStreamCounts.get(key) || 0) + 1);
+    }
+
+    const snapshots = {
+        movies: veloraCatalogCache.getSnapshot('vod_streams') || [],
+        series: veloraCatalogCache.getSnapshot('series') || []
+    };
+
+    let backdropCache = {};
+    try { backdropCache = JSON.parse(fs.readFileSync(vodBackdropCachePath, 'utf8')) || {}; } catch (_) {}
+
+    const snapshotIndexes = {
+        movies: new Map(),
+        series: new Map()
+    };
+    for (const kind of ['movies', 'series']) {
+        const list = snapshots[kind];
+        const idx = snapshotIndexes[kind];
+        for (const item of list) {
+            const rawId = String(item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id ?? '');
+            const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
+            if (rawId) {
+                if (sourceId) idx.set(`${sourceId}:${rawId}`, item);
+                if (!idx.has(rawId)) idx.set(rawId, item);
+            }
+        }
+    }
+
+    const countries = allRows('admin_countries');
+    const orderRows = allRows('admin_country_package_order');
+
+    const feedByCountry = {};
+    let totalCachedItems = 0;
+    let totalCachedPackages = 0;
+
+    for (const country of countries) {
+        const countryId = String(country.id);
+        feedByCountry[countryId] = {
+            countryId,
+            countryName: country.name,
+            movies: [],
+            series: []
+        };
+
+        for (const tab of ['movies', 'series']) {
+            const kind = tab === 'movies' ? 'vod' : 'series';
+            const countryPackages = resolvedPackages.filter(p => 
+                String(p.country_id) === countryId && (p.kind === kind || (kind === 'vod' && p.kind === 'movies'))
+                && p.is_hidden !== true && p.is_hidden !== 'true'
+            );
+
+            const orderRow = orderRows.find(r => String(r.country_id) === countryId && (r.ui_tab === tab || (tab === 'movies' && r.ui_tab === 'vod')));
+            const orderList = Array.isArray(orderRow?.package_order) ? orderRow.package_order.map(String) : [];
+            const posMap = new Map(orderList.map((id, index) => [id, index]));
+
+            countryPackages.sort((a, b) => {
+                const posA = posMap.has(String(a.id)) ? posMap.get(String(a.id)) : 999999;
+                const posB = posMap.has(String(b.id)) ? posMap.get(String(b.id)) : 999999;
+                return posA - posB || String(a.name).localeCompare(String(b.name), 'fr');
+            });
+
+            const tabFeed = [];
+
+            for (const pkg of countryPackages) {
+                const pkgId = String(pkg.id);
+                const memKey = `${countryId}:${pkgId}`;
+                const membership = packageStreams.get(memKey) || { keys: new Set(), sourceAware: false };
+                const totalCount = packageStreamCounts.get(memKey) || membership.keys.size || 0;
+
+                const providerSourceId = String(pkg.source_id ?? '').trim();
+                const providerCategoryId = String(pkg.category_id ?? '').trim();
+                const providerBacked = Boolean(providerSourceId && providerCategoryId);
+
+                const items = [];
+                const snapshotList = snapshots[tab];
+                const snapshotIdx = snapshotIndexes[tab];
+
+                if (membership.keys.size > 0) {
+                    for (const key of membership.keys) {
+                        const item = snapshotIdx.get(key);
+                        if (!item) continue;
+                        const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
+                        const rawName = String(item.name || item.title || item.series_name || '').trim();
+                        const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
+                        const itemKey = `${sourceId}:${String(rawId)}`;
+                        const titleKey = normalizedPosterTitle(rawName);
+
+                        let backdropUrl = '';
+                        let backdropCandidate = item.backdrop_path ?? item.backdrop ?? item.backdrop_url ?? '';
+                        if (Array.isArray(backdropCandidate) && backdropCandidate.length > 0) backdropCandidate = backdropCandidate[0];
+                        if (typeof backdropCandidate === 'string' && backdropCandidate.trim()) {
+                            let url = backdropCandidate.trim();
+                            if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w780${url}`;
+                            backdropUrl = url;
+                        }
+                        if (!backdropUrl) {
+                            backdropUrl = backdropCache[itemKey] || backdropCache[titleKey] || '';
+                        }
+                        const standardThumb = String(item.stream_icon || item.cover || '');
+                        const finalThumb = backdropUrl || standardThumb;
+
+                        items.push({
+                            id: `feed:${pkgId}:${rawId}`,
+                            name: rawName,
+                            thumbUrl: finalThumb,
+                            backdropUrl: backdropUrl || standardThumb,
+                            rating: item.rating || item.rating_5based || item.score || '',
+                            year: item.year || item.releaseDate || '',
+                            plot: item.plot || item.description || item.overview || '',
+                            streamId: rawId,
+                            sourceId: sourceId || pkg.source_id,
+                            globalStreamId: item.global_stream_id || item.nodecast_global_stream_id || rawId,
+                            containerExtension: item.container_extension || '',
+                            contentType: tab,
+                            packageId: pkgId
+                        });
+                        if (items.length >= MEDIA_FEED_ENTRIES_PER_PACKAGE) break;
+                    }
+                } else if (providerBacked) {
+                    for (const item of snapshotList) {
+                        const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
+                        if (sourceId === providerSourceId && String(item.raw_category_id ?? '') === providerCategoryId) {
+                            const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
+                            const rawName = String(item.name || item.title || item.series_name || '').trim();
+                            const itemKey = `${sourceId}:${String(rawId)}`;
+                            const titleKey = normalizedPosterTitle(rawName);
+
+                            let backdropUrl = '';
+                            let backdropCandidate = item.backdrop_path ?? item.backdrop ?? item.backdrop_url ?? '';
+                            if (Array.isArray(backdropCandidate) && backdropCandidate.length > 0) backdropCandidate = backdropCandidate[0];
+                            if (typeof backdropCandidate === 'string' && backdropCandidate.trim()) {
+                                let url = backdropCandidate.trim();
+                                if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w780${url}`;
+                                backdropUrl = url;
+                            }
+                            if (!backdropUrl) {
+                                backdropUrl = backdropCache[itemKey] || backdropCache[titleKey] || '';
+                            }
+                            const standardThumb = String(item.stream_icon || item.cover || '');
+                            const finalThumb = backdropUrl || standardThumb;
+
+                            items.push({
+                                id: `feed:${pkgId}:${rawId}`,
+                                name: rawName,
+                                thumbUrl: finalThumb,
+                                backdropUrl: backdropUrl || standardThumb,
+                                rating: item.rating || item.rating_5based || item.score || '',
+                                year: item.year || item.releaseDate || '',
+                                plot: item.plot || item.description || item.overview || '',
+                                streamId: rawId,
+                                sourceId: sourceId || pkg.source_id,
+                                globalStreamId: item.global_stream_id || item.nodecast_global_stream_id || rawId,
+                                containerExtension: item.container_extension || '',
+                                contentType: tab,
+                                packageId: pkgId
+                            });
+                            if (items.length >= MEDIA_FEED_ENTRIES_PER_PACKAGE) break;
+                        }
+                    }
+                }
+
+                totalCachedItems += items.length;
+                totalCachedPackages += 1;
+
+                tabFeed.push({
+                    id: pkgId,
+                    name: pkg.name,
+                    kind: pkg.kind,
+                    countryId: pkg.country_id,
+                    sourceId: pkg.source_id,
+                    categoryId: pkg.category_id,
+                    totalCount: Math.max(totalCount, items.length),
+                    items
+                });
+            }
+
+            feedByCountry[countryId][tab] = tabFeed;
+        }
+    }
+
+    const payload = {
+        generatedAt: new Date().toISOString(),
+        totalPackages: totalCachedPackages,
+        totalItems: totalCachedItems,
+        feed: feedByCountry
+    };
+
+    try {
+        fs.mkdirSync(path.dirname(mediaFeedCachePath), { recursive: true });
+        fs.writeFileSync(mediaFeedCachePath, JSON.stringify(payload));
+    } catch (e) {
+        console.warn('[Velora data] Could not save media feed cache:', e.message);
+    }
+
+    currentMediaFeedCache = payload;
+    return payload;
+}
+
+function getMediaFeedCache() {
+    if (currentMediaFeedCache) return currentMediaFeedCache;
+    try {
+        if (fs.existsSync(mediaFeedCachePath)) {
+            const raw = JSON.parse(fs.readFileSync(mediaFeedCachePath, 'utf8'));
+            if (raw && raw.feed) {
+                currentMediaFeedCache = raw;
+                return currentMediaFeedCache;
+            }
+        }
+    } catch (_) {}
+    return buildMediaFeedCache();
+}
+
+router.get('/country-media-feed', (req, res) => {
+    try {
+        const countryId = String(req.query.country_id || req.query.countryId || 'country_france').trim();
+        const tab = String(req.query.tab || 'movies').trim().toLowerCase();
+        const fullFeed = getMediaFeedCache();
+        const countryData = fullFeed.feed?.[countryId] || fullFeed.feed?.['country_france'] || fullFeed.feed?.['default'] || { movies: [], series: [] };
+        const packages = countryData[tab] || [];
+        res.set('Cache-Control', 'public, max-age=60');
+        res.set('X-Velora-Media-Feed-Cache', 'vps-local-derived');
+        return res.json({
+            ok: true,
+            countryId,
+            tab,
+            generatedAt: fullFeed.generatedAt,
+            totalFeedPackages: fullFeed.totalPackages || packages.length,
+            packages
+        });
+    } catch (error) {
+        console.error('[Velora data] Media feed route failed:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/admin/rebuild-media-feed', (req, res) => {
+    try {
+        invalidateMediaFeedCache();
+        const payload = buildMediaFeedCache();
+        return res.json({
+            ok: true,
+            generatedAt: payload.generatedAt,
+            totalPackages: payload.totalPackages,
+            totalItems: payload.totalItems
+        });
+    } catch (error) {
+        console.error('[Velora data] Rebuild media feed failed:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+// Nightly automatic feed cache rebuild (every 24 hours) & on snapshot ready
+try {
+    veloraCatalogCache.onSnapshotReady(() => {
+        try {
+            buildMediaFeedCache();
+            console.log('[Velora cache] Media feed cache auto-refreshed on snapshot update.');
+        } catch (e) {
+            console.warn('[Velora cache] Media feed post-build hook error:', e.message);
+        }
+    });
+} catch (_) {}
+
+setInterval(() => {
+    try {
+        buildMediaFeedCache();
+        console.log('[Velora cache] Nightly media feed cache rebuild completed.');
+    } catch (e) {
+        console.warn('[Velora cache] Nightly rebuild failed:', e.message);
+    }
+}, 24 * 60 * 60 * 1000).unref?.();
 
 function buildHomeCache() {
     const sections = sortRows(allRows('admin_home_sections'), 'section_order.asc');

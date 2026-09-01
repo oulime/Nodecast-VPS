@@ -42,10 +42,10 @@ body[data-vel-active-tab="series"] #main {
   margin-top: 0 !important;
 }
 
-body[data-vel-active-tab="movies"] .vel-sticky-top,
-body[data-vel-active-tab="series"] .vel-sticky-top,
-body[data-vel-active-tab="movies"] .main--velora .vel-sticky-top,
-body[data-vel-active-tab="series"] .main--velora .vel-sticky-top {
+body[data-vel-active-tab="movies"]:not(:has(#content-view:not(.hidden))):not(:has(#vod-player-container:not(.hidden))) .vel-sticky-top,
+body[data-vel-active-tab="series"]:not(:has(#content-view:not(.hidden))):not(:has(#vod-player-container:not(.hidden))) .vel-sticky-top,
+body[data-vel-active-tab="movies"]:not(:has(#content-view:not(.hidden))):not(:has(#vod-player-container:not(.hidden))) .main--velora .vel-sticky-top,
+body[data-vel-active-tab="series"]:not(:has(#content-view:not(.hidden))):not(:has(#vod-player-container:not(.hidden))) .main--velora .vel-sticky-top {
   display: none !important;
   visibility: hidden !important;
   pointer-events: none !important;
@@ -53,6 +53,12 @@ body[data-vel-active-tab="series"] .main--velora .vel-sticky-top {
   min-height: 0 !important;
   margin: 0 !important;
   padding: 0 !important;
+}
+
+/* When detail view (#content-view) or video player is open, hide Netflix prime carousels so they don't push the fiche down */
+body:has(#content-view:not(.hidden)) #vel-prime-carousels-container,
+body:has(#vod-player-container:not(.hidden)) #vel-prime-carousels-container {
+  display: none !important;
 }
 
 /* Floating Search Button - STRICTLY ONLY ON MOVIES & SERIES TABS */

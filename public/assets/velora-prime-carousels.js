@@ -707,11 +707,16 @@
   function syncHeaderForMediaTabs() {
     const tab = activeTab();
     const isMedia = MEDIA_TABS.has(tab);
+    const contentView = document.getElementById("content-view");
+    const vodPlayer = document.getElementById("vod-player-container");
+    const isDetailOrPlayerOpen = (contentView && !contentView.classList.contains("hidden")) || (vodPlayer && !vodPlayer.classList.contains("hidden"));
     const stickyTop = document.querySelector(".vel-sticky-top");
     let primeSearchBtn = document.getElementById("vel-prime-search-btn");
     const globalSearch = document.getElementById("vel-global-search");
+    const primeContainer = document.getElementById("vel-prime-carousels-container");
 
-    if (isMedia) {
+    if (isMedia && !isDetailOrPlayerOpen) {
+      if (primeContainer) primeContainer.style.removeProperty("display");
       if (stickyTop) stickyTop.style.setProperty("display", "none", "important");
       if (!primeSearchBtn) {
         primeSearchBtn = document.createElement("button");
@@ -758,7 +763,24 @@
       if (primeSearchBtn) {
         primeSearchBtn.style.setProperty("display", "none", "important");
       }
+      if (isDetailOrPlayerOpen && primeContainer) {
+        primeContainer.style.setProperty("display", "none", "important");
+      }
     }
+  }
+
+  const cvEl = document.getElementById("content-view");
+  if (cvEl) {
+    new MutationObserver(() => {
+      syncHeaderForMediaTabs();
+    }).observe(cvEl, { attributes: true, attributeFilter: ["class"] });
+  }
+
+  const vpEl = document.getElementById("vod-player-container");
+  if (vpEl) {
+    new MutationObserver(() => {
+      syncHeaderForMediaTabs();
+    }).observe(vpEl, { attributes: true, attributeFilter: ["class"] });
   }
 
   // Listeners & Lifecycle

@@ -842,6 +842,206 @@
     return [];
   }
 
+  function formatAdultPlayerClock(seconds) {
+    if (!Number.isFinite(seconds) || seconds < 0) return "00:00";
+    const total = Math.max(0, Math.floor(seconds));
+    const hrs = Math.floor(total / 3600);
+    const mins = Math.floor((total % 3600) / 60);
+    const secs = total % 60;
+    if (hrs > 0) {
+      return `${hrs}:${mins < 10 ? "0" : ""}${mins}:${secs < 10 ? "0" : ""}${secs}`;
+    }
+    return `${mins < 10 ? "0" : ""}${mins}:${secs < 10 ? "0" : ""}${secs}`;
+  }
+
+  function createAdultPlayerWidget() {
+    const container = document.createElement("div");
+    container.id = "vel-adult-player-container";
+    container.className = "vel-adult-player-container";
+
+    container.innerHTML = `
+      <div class="vel-adult-video-wrapper">
+        <video id="vel-adult-video" playsinline webkit-playsinline preload="auto"></video>
+        <div id="vel-adult-player-buffering" class="vel-adult-buffering hidden">
+          <div class="vel-adult-spinner"></div>
+        </div>
+        <div id="vel-adult-center-controls" class="vel-adult-center-controls">
+          <button id="vel-adult-btn-back-10" class="vel-adult-center-btn" title="−10s" aria-label="−10 secondes">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/><text x="12" y="15" font-size="7" font-weight="bold" fill="currentColor" text-anchor="middle" stroke="none">10</text></svg>
+          </button>
+          <button id="vel-adult-btn-center-play" class="vel-adult-center-btn vel-adult-play-btn" title="Lecture / Pause" aria-label="Lecture">
+            <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          </button>
+          <button id="vel-adult-btn-fwd-10" class="vel-adult-center-btn" title="+10s" aria-label="+10 secondes">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"/><text x="12" y="15" font-size="7" font-weight="bold" fill="currentColor" text-anchor="middle" stroke="none">10</text></svg>
+          </button>
+        </div>
+        <div id="vel-adult-toolbar" class="vel-adult-toolbar">
+          <div class="vel-adult-toolbar-row">
+            <button id="vel-adult-prev" class="vel-adult-tool-btn" title="Film précédent" aria-label="Film précédent">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+            </button>
+            <button id="vel-adult-play-bar" class="vel-adult-tool-btn" title="Lecture / Pause" aria-label="Lecture">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            </button>
+            <button id="vel-adult-next" class="vel-adult-tool-btn" title="Film suivant" aria-label="Film suivant">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+            </button>
+            <span id="vel-adult-current-time" class="vel-adult-time">00:00</span>
+            <div id="vel-adult-seek-track" class="vel-adult-seek-track">
+              <div id="vel-adult-seek-fill" class="vel-adult-seek-fill"></div>
+              <div id="vel-adult-seek-handle" class="vel-adult-seek-handle"></div>
+            </div>
+            <span id="vel-adult-duration" class="vel-adult-time">00:00</span>
+            <button id="vel-adult-fullscreen" class="vel-adult-tool-btn" title="Plein écran" aria-label="Plein écran">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div id="vel-adult-now-playing-title" class="vel-adult-now-playing-title">Sélectionnez un film</div>
+    `;
+
+    const video = container.querySelector("#vel-adult-video");
+    const centerControls = container.querySelector("#vel-adult-center-controls");
+    const toolbar = container.querySelector("#vel-adult-toolbar");
+    const centerPlay = container.querySelector("#vel-adult-btn-center-play");
+    const barPlay = container.querySelector("#vel-adult-play-bar");
+    const back10 = container.querySelector("#vel-adult-btn-back-10");
+    const fwd10 = container.querySelector("#vel-adult-btn-fwd-10");
+    const prevBtn = container.querySelector("#vel-adult-prev");
+    const nextBtn = container.querySelector("#vel-adult-next");
+    const curTime = container.querySelector("#vel-adult-current-time");
+    const durTime = container.querySelector("#vel-adult-duration");
+    const seekTrack = container.querySelector("#vel-adult-seek-track");
+    const seekFill = container.querySelector("#vel-adult-seek-fill");
+    const seekHandle = container.querySelector("#vel-adult-seek-handle");
+    const fullscreenBtn = container.querySelector("#vel-adult-fullscreen");
+    const buffering = container.querySelector("#vel-adult-player-buffering");
+
+    let idleTimer = null;
+    function showControls() {
+      if (idleTimer) clearTimeout(idleTimer);
+      centerControls.classList.remove("idle");
+      toolbar.classList.remove("idle");
+      if (!video.paused) {
+        idleTimer = setTimeout(() => {
+          centerControls.classList.add("idle");
+          toolbar.classList.add("idle");
+        }, 3000);
+      }
+    }
+
+    container.querySelector(".vel-adult-video-wrapper").onmousemove = showControls;
+    container.querySelector(".vel-adult-video-wrapper").ontouchstart = showControls;
+
+    function togglePlay() {
+      if (video.paused) {
+        video.play().catch(() => {});
+      } else {
+        video.pause();
+      }
+      showControls();
+    }
+
+    centerPlay.onclick = (e) => { e.stopPropagation(); togglePlay(); };
+    barPlay.onclick = (e) => { e.stopPropagation(); togglePlay(); };
+
+    back10.onclick = (e) => {
+      e.stopPropagation();
+      video.currentTime = Math.max(0, video.currentTime - 10);
+      showControls();
+    };
+
+    fwd10.onclick = (e) => {
+      e.stopPropagation();
+      video.currentTime = Math.min(video.duration || Infinity, video.currentTime + 10);
+      showControls();
+    };
+
+    prevBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (window._veloraAdultVodMovies && window._veloraAdultVodCurrentIndex > 0) {
+        playAdultMovieByIndex(window._veloraAdultVodCurrentIndex - 1);
+      }
+    };
+
+    nextBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (window._veloraAdultVodMovies && window._veloraAdultVodCurrentIndex < window._veloraAdultVodMovies.length - 1) {
+        playAdultMovieByIndex(window._veloraAdultVodCurrentIndex + 1);
+      }
+    };
+
+    fullscreenBtn.onclick = (e) => {
+      e.stopPropagation();
+      const wrapper = container.querySelector(".vel-adult-video-wrapper");
+      if (!document.fullscreenElement) {
+        wrapper.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    };
+
+    seekTrack.onclick = (e) => {
+      e.stopPropagation();
+      if (!Number.isFinite(video.duration) || video.duration <= 0) return;
+      const rect = seekTrack.getBoundingClientRect();
+      const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      video.currentTime = pos * video.duration;
+      showControls();
+    };
+
+    video.onplay = () => {
+      const pauseSvg = '<svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+      const barPauseSvg = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+      centerPlay.innerHTML = pauseSvg;
+      barPlay.innerHTML = barPauseSvg;
+      buffering.classList.add("hidden");
+      showControls();
+    };
+
+    video.onpause = () => {
+      const playSvg = '<svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
+      const barPlaySvg = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
+      centerPlay.innerHTML = playSvg;
+      barPlay.innerHTML = barPlaySvg;
+      centerControls.classList.remove("idle");
+      toolbar.classList.remove("idle");
+    };
+
+    video.onwaiting = () => {
+      buffering.classList.remove("hidden");
+    };
+
+    video.onplaying = () => {
+      buffering.classList.add("hidden");
+    };
+
+    video.ontimeupdate = () => {
+      if (!Number.isFinite(video.duration) || video.duration <= 0) {
+        curTime.textContent = formatAdultPlayerClock(video.currentTime);
+        return;
+      }
+      curTime.textContent = formatAdultPlayerClock(video.currentTime);
+      durTime.textContent = formatAdultPlayerClock(video.duration);
+      const pct = (video.currentTime / video.duration) * 100;
+      seekFill.style.width = `${pct}%`;
+      seekHandle.style.left = `${pct}%`;
+
+      prevBtn.disabled = !window._veloraAdultVodMovies || window._veloraAdultVodCurrentIndex <= 0;
+      nextBtn.disabled = !window._veloraAdultVodMovies || window._veloraAdultVodCurrentIndex >= window._veloraAdultVodMovies.length - 1;
+    };
+
+    video.onended = () => {
+      if (window._veloraAdultVodMovies && window._veloraAdultVodCurrentIndex < window._veloraAdultVodMovies.length - 1) {
+        playAdultMovieByIndex(window._veloraAdultVodCurrentIndex + 1);
+      }
+    };
+
+    return container;
+  }
+
   function renderAdultMoviesListView(movies) {
     const contentView = document.getElementById("content-view");
     const dynamicList = document.getElementById("dynamic-list");
@@ -860,6 +1060,9 @@
 
     const wrap = document.createElement("div");
     wrap.className = "vel-adult-movie-list-wrap";
+
+    // Prepend dedicated Adult Player widget
+    wrap.appendChild(createAdultPlayerWidget());
 
     const header = document.createElement("div");
     header.className = "vel-adult-movie-list-header";
@@ -950,10 +1153,8 @@
           };
 
           if (globalIdx < 8) {
-            // Load the first 8 visible posters immediately
             img.src = movie.stream_icon;
           } else {
-            // Lazy load remaining posters as they scroll into view
             img.dataset.src = movie.stream_icon;
             if (observer) {
               observer.observe(img);
@@ -1079,7 +1280,13 @@
     document.body.dataset.veloraReturnAdult = "true";
     document.body.classList.remove("vel-home-empty-active");
 
-    // 1. Highlight current movie in list
+    // Hide normal players so they never conflict
+    const livePlayer = document.getElementById("player-container");
+    const vodPlayer = document.getElementById("vod-player-container");
+    if (livePlayer) livePlayer.classList.add("hidden");
+    if (vodPlayer) vodPlayer.classList.add("hidden");
+
+    // Highlight current movie in list
     const rows = document.querySelectorAll(".vel-adult-movie-row");
     rows.forEach((row, idx) => {
       const isCurrent = idx === index;
@@ -1095,64 +1302,39 @@
       }
     });
 
-    // 2. Set up player on the listed page (Series layout)
-    const livePlayer = document.getElementById("player-container");
-    const vodPlayer = document.getElementById("vod-player-container");
-    const video = document.getElementById("video");
-    const nowPlaying = document.getElementById("now-playing");
+    const titleEl = document.getElementById("vel-adult-now-playing-title");
+    if (titleEl) titleEl.textContent = movie.name;
 
-    if (vodPlayer) {
-      vodPlayer.classList.add("hidden");
-      vodPlayer.setAttribute("aria-hidden", "true");
-    }
-
-    if (livePlayer) {
-      livePlayer.classList.remove("hidden");
-      livePlayer.removeAttribute("aria-hidden");
-      livePlayer.classList.remove("player-container--live-tv");
-    }
-
-    if (nowPlaying) {
-      nowPlaying.classList.remove("hidden");
-      nowPlaying.textContent = movie.name;
-    }
-
-    // 3. Update top title
     const contextTitle = document.getElementById("vel-header-context-title-text");
     if (contextTitle) contextTitle.textContent = "ADULTE +18";
 
-    // 4. Resolve & play video stream directly
+    // Play on dedicated adult video element #vel-adult-video
+    const video = document.getElementById("vel-adult-video");
+    if (!video) return;
+
     const ext = movie.container_extension || "mp4";
     const apiUrl = `/api/proxy/xtream/${encodeURIComponent(movie.source_id)}/stream/${encodeURIComponent(movie.stream_id)}/movie?container=${encodeURIComponent(ext)}`;
     const resolvedUrl = await resolveStreamMediaUrl(apiUrl);
     const finalUrl = resolvedUrl || apiUrl;
 
-    if (video) {
-      if (video.hls && typeof video.hls.destroy === "function") {
-        try { video.hls.destroy(); } catch (_) {}
-        video.hls = null;
-      }
+    if (video.hls && typeof video.hls.destroy === "function") {
+      try { video.hls.destroy(); } catch (_) {}
+      video.hls = null;
+    }
 
-      const isHls = finalUrl.includes(".m3u8") || finalUrl.includes("m3u8");
-      if (isHls && window.Hls && window.Hls.isSupported()) {
-        const hls = new window.Hls();
-        hls.loadSource(finalUrl);
-        hls.attachMedia(video);
-        video.hls = hls;
-        hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
-          video.play().catch(e => console.warn("[Adult VOD] Autoplay prevented:", e));
-        });
-      } else {
-        video.src = finalUrl;
-        video.load();
-        video.play().catch(e => console.warn("[Adult VOD] Play notice:", e));
-      }
-
-      video.onended = function () {
-        if (window._veloraAdultVodMovies && window._veloraAdultVodCurrentIndex < window._veloraAdultVodMovies.length - 1) {
-          playAdultMovieByIndex(window._veloraAdultVodCurrentIndex + 1);
-        }
-      };
+    const isHls = finalUrl.includes(".m3u8") || finalUrl.includes("m3u8");
+    if (isHls && window.Hls && window.Hls.isSupported()) {
+      const hls = new window.Hls();
+      hls.loadSource(finalUrl);
+      hls.attachMedia(video);
+      video.hls = hls;
+      hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch(e => console.warn("[Adult VOD] Autoplay prevented:", e));
+      });
+    } else {
+      video.src = finalUrl;
+      video.load();
+      video.play().catch(e => console.warn("[Adult VOD] Play notice:", e));
     }
   }
 

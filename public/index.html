@@ -12121,16 +12121,6 @@ if (target.closest(".trial-offer-button")) {
           }
 
           function playAdjacent(direction) {
-            if (window._veloraAdultVodMovies && window._veloraAdultVodMovies.length) {
-              var targetIdx = (window._veloraAdultVodCurrentIndex || 0) + direction;
-              if (targetIdx >= 0 && targetIdx < window._veloraAdultVodMovies.length) {
-                if (typeof window.veloraPlayAdultMovieByIndex === "function") {
-                  window.veloraPlayAdultMovieByIndex(targetIdx);
-                }
-              }
-              return;
-            }
-
             var state = episodeState();
             if (state.currentIndex < 0) return;
             var targetIndex = state.currentIndex + direction;

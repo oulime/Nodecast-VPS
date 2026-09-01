@@ -12,7 +12,8 @@
   let assignedAdultPackages = new Map(); // key: package_id -> row
   let allCatalogPackages = [];
   let allSources = [];
-  let currentAdultSubtab = "live"; // "live" | "vod"
+  let currentAdultView = null; // null | "vod"
+  let adultLiveChannelCache = new Map(); // key -> Array of channels
   let adminSearchQuery = "";
   let adminKindFilter = "all";
   let adminSourceFilter = "all";
@@ -23,12 +24,27 @@
     return `${kind}:${sourceId}:${categoryId}`;
   }
 
+  function cleanChannelTitle(name) {
+    let clean = String(name || "").trim();
+    for (let pass = 0; pass < 4; pass++) {
+      const next = clean
+        .replace(/^[\[\(][A-Z0-9\+\-\s]{1,12}[\]\)]\s*[-:|•]?\s*/i, "")
+        .replace(/^([0-9]+K|[0-9]+D|HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|AR|EN|UK|US|ES|DE|IT|PT|TR|NL|RU|PL|RO|MULTI|TRUEFRENCH|FRENCH|ARABIC)(\s*[-:|•]\s*|\s+)/i, "")
+        .replace(/^[A-Z0-9]{1,6}-[A-Z0-9]{1,6}\s*[-:|•]\s*/i, "")
+        .replace(/\s*([\[\(][A-Z0-9\+\-\s]{1,12}[\]\)]|\b(HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|AR|EN|UK|US|ES|DE|IT|PT|TR|NL|RU|PL|RO|MULTI|TRUEFRENCH|FRENCH|ARABIC)\b)$/i, "")
+        .replace(/\s*[-:|•]\s*$/g, "")
+        .trim();
+      if (next === clean) break;
+      clean = next;
+    }
+    return clean || name || "";
+  }
+
   // ---------------------------------------------------------------------------
   // Data Fetching & Sync Across All Providers
   // ---------------------------------------------------------------------------
   async function fetchAssignedAdultPackages() {
     try {
-      // 1. Fetch from admin_settings table
       const res = await fetch(`${REST_BASE}/admin_settings?key=eq.adult_packages`, {
         cache: "no-store",
         headers: { "Content-Type": "application/json" }
@@ -54,7 +70,6 @@
         }
       }
 
-      // 2. Fallback to localStorage
       const cached = localStorage.getItem(LOCAL_STORAGE_ADULT_KEY);
       if (cached) {
         const list = JSON.parse(cached);
@@ -119,7 +134,6 @@
       const headers = { "Content-Type": "application/json" };
       if (token) headers.Authorization = `Bearer ${token}`;
 
-      // 1. Fetch all active Xtream sources
       let sources = [];
       try {
         const sRes = await fetch("/api/sources/catalog", { cache: "no-store", headers });
@@ -135,7 +149,6 @@
 
       allSources = sources;
 
-      // 2. Fetch categories for every single source in parallel
       const sourceJobs = sources.map(async (source) => {
         const sourceId = String(source.id);
         const sourceName = source.name || `Stream ${sourceId}`;
@@ -200,7 +213,6 @@
 
       await Promise.all(sourceJobs);
 
-      // 3. Also include all custom created database packages
       try {
         const res = await fetch(`${REST_BASE}/admin_packages?select=id,name,kind,source_id,category_id,country_id,cover_url&order=name.asc`, {
           cache: "no-store",
@@ -266,7 +278,6 @@
     await Promise.all([fetchAssignedAdultPackages(), fetchAllCatalogPackages()]);
     setStatus("");
 
-    // Populate source select
     if (sourceSelect) {
       sourceSelect.replaceChildren();
       const allOpt = document.createElement("option");
@@ -291,7 +302,6 @@
     }
 
     function renderAdminGrid() {
-      // Calculate unique selected packages count
       const activeCount = allCatalogPackages.filter(isPackageSelected).length;
       if (badge) {
         badge.textContent = `${activeCount} bouquet(s) activé(s)`;
@@ -418,7 +428,6 @@
       };
     });
 
-    // Auto-suggest +18 packages across all providers
     const autoSuggestBtn = document.getElementById("vel-admin-adult-auto-suggest");
     if (autoSuggestBtn) {
       autoSuggestBtn.onclick = async () => {
@@ -441,7 +450,6 @@
       };
     }
 
-    // Select all displayed / Deselect all displayed
     const selectAllBtn = document.getElementById("vel-admin-adult-select-all");
     if (selectAllBtn) {
       selectAllBtn.onclick = async () => {
@@ -477,13 +485,93 @@
   // ---------------------------------------------------------------------------
   // Dedicated Adult Portal View Controller (#adult-view)
   // ---------------------------------------------------------------------------
+  async function fetchLiveChannelsForPackage(pkg) {
+    const key = `${pkg.source_id}:${pkg.category_id}`;
+    if (adultLiveChannelCache.has(key)) return adultLiveChannelCache.get(key);
+
+    const token = localStorage.getItem("authToken");
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    try {
+      const res = await fetch(`/api/proxy/xtream/${encodeURIComponent(pkg.source_id)}/live_streams?category_id=${encodeURIComponent(pkg.category_id)}`, {
+        cache: "no-store",
+        headers
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        const list = Array.isArray(rows) ? rows.map(ch => ({
+          ...ch,
+          source_id: String(pkg.source_id),
+          source_name: pkg.source_name || "",
+          package_name: pkg.name || "",
+          stream_id: String(ch.stream_id || ch.id || "")
+        })) : [];
+        adultLiveChannelCache.set(key, list);
+        return list;
+      }
+    } catch (e) {
+      console.warn("[Velora Adult] Failed to fetch channels for package", pkg.name, e.message);
+    }
+    return [];
+  }
+
+  async function openAdultLivePlayerDirectly() {
+    await fetchAssignedAdultPackages();
+    const livePackages = Array.from(assignedAdultPackages.values()).filter(p => p.kind === "live");
+    if (!livePackages.length) {
+      alert("Aucun bouquet TV adulte n'a été configuré par l'administrateur.");
+      return;
+    }
+
+    const channelGroups = await Promise.all(livePackages.map(p => fetchLiveChannelsForPackage(p)));
+    const allChannels = channelGroups.flat();
+
+    if (!allChannels.length) {
+      alert("Aucune chaîne TV trouvée dans les bouquets adultes sélectionnés.");
+      return;
+    }
+
+    const channelList = allChannels.map(ch => ({
+      source_id: String(ch.source_id || ch.sourceId || ""),
+      item_id: String(ch.stream_id || ch.streamId || ch.id || ""),
+      item_type: "channel",
+      name: cleanChannelTitle(ch.name),
+      thumb_url: ch.stream_icon || ""
+    }));
+
+    const firstChannel = channelList[0];
+    delete document.body.dataset.veloraReturnFavorites;
+    delete window._veloraFavoriteReturnTab;
+    delete document.body.dataset.veloraReturnHome;
+    document.body.dataset.veloraReturnAdult = "true";
+    document.body.classList.remove("vel-adult-active");
+
+    ["player-container", "vod-player-container", "content-view", "now-playing"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.removeProperty("display");
+    });
+
+    if (typeof window.veloraOpenFavoriteItem === "function") {
+      const opened = await window.veloraOpenFavoriteItem(firstChannel, channelList);
+      if (opened !== false) {
+        const adultView = document.getElementById("adult-view");
+        if (adultView) adultView.classList.add("hidden");
+        return;
+      }
+    }
+
+    if (typeof window.veloraOpenSearchResult === "function") {
+      window.veloraOpenSearchResult(`adult:live:${firstChannel.source_id}:${firstChannel.item_id}`);
+    }
+  }
+
   async function renderAdultPortal() {
     const portal = document.getElementById("adult-view");
-    const grid = document.getElementById("vel-adult-packages-grid");
-    const liveBadge = document.getElementById("vel-adult-badge-live");
-    const vodBadge = document.getElementById("vel-adult-badge-vod");
+    const container = document.getElementById("vel-adult-packages-container");
+    const searchWrap = document.getElementById("vel-adult-search-wrap");
     const searchInput = document.getElementById("vel-adult-search-input");
-    if (!portal || !grid) return;
+    if (!portal || !container) return;
 
     await fetchAssignedAdultPackages();
 
@@ -501,98 +589,107 @@
     const livePackages = uniquePackages.filter(p => p.kind === "live");
     const vodPackages = uniquePackages.filter(p => p.kind === "movies" || p.kind === "vod" || p.kind === "series");
 
-    if (liveBadge) liveBadge.textContent = String(livePackages.length);
-    if (vodBadge) vodBadge.textContent = String(vodPackages.length);
+    function updateView() {
+      container.replaceChildren();
 
-    function updateGrid() {
-      grid.replaceChildren();
-      const currentList = currentAdultSubtab === "live" ? livePackages : vodPackages;
-      const q = searchInput ? searchInput.value.trim().toLowerCase() : "";
+      if (currentAdultView === "vod") {
+        if (searchWrap) searchWrap.style.display = "block";
+        const q = searchInput ? searchInput.value.trim().toLowerCase() : "";
 
-      const filtered = q
-        ? currentList.filter(p => String(p.name || "").toLowerCase().includes(q))
-        : currentList;
+        const vodGrid = document.createElement("div");
+        vodGrid.className = "vel-adult-packages-grid";
+        container.appendChild(vodGrid);
 
-      if (!filtered.length) {
-        const emptyMsg = uniquePackages.length === 0
-          ? "Aucun bouquet adulte n'est actuellement configuré.<br><small style='opacity: 0.7;'>Rendez-vous dans les Paramètres Admin > 🔞 Adulte +18 pour sélectionner des bouquets parmi tous vos fournisseurs.</small>"
-          : "Aucun bouquet trouvé dans cette section.";
-        grid.innerHTML = `<div class="vel-adult-empty">${emptyMsg}</div>`;
-        return;
+        const filtered = q
+          ? vodPackages.filter(p => String(p.name || "").toLowerCase().includes(q))
+          : vodPackages;
+
+        if (!filtered.length) {
+          const emptyMsg = vodPackages.length === 0
+            ? "Aucun bouquet Films/Séries adulte n'est actuellement configuré.<br><small style='opacity: 0.7;'>Rendez-vous dans les Paramètres Admin > 🔞 Adulte +18 pour sélectionner des bouquets VOD.</small>"
+            : "Aucun bouquet trouvé dans cette section.";
+          vodGrid.innerHTML = `<div class="vel-adult-empty">${emptyMsg}</div>`;
+          return;
+        }
+
+        filtered.forEach(pkg => {
+          const card = document.createElement("div");
+          card.className = "vel-adult-card";
+          card.setAttribute("role", "button");
+          card.tabIndex = 0;
+
+          const thumb = document.createElement("div");
+          thumb.className = "vel-adult-card__thumb";
+          
+          const icon = document.createElement("img");
+          icon.src = pkg.cover_url || "/logos/adult-18.svg";
+          icon.alt = pkg.name || "";
+          icon.loading = "lazy";
+          icon.onerror = () => { icon.src = "/logos/adult-18.svg"; };
+          thumb.appendChild(icon);
+
+          const badge = document.createElement("span");
+          badge.className = "vel-adult-card__badge";
+          badge.textContent = pkg.kind === "series" ? "🍿 SÉRIE" : "🎬 FILM";
+          thumb.appendChild(badge);
+
+          const body = document.createElement("div");
+          body.className = "vel-adult-card__body";
+
+          const title = document.createElement("h3");
+          title.className = "vel-adult-card__title";
+          title.textContent = cleanChannelTitle(pkg.name);
+
+          const meta = document.createElement("div");
+          meta.className = "vel-adult-card__meta";
+          meta.textContent = pkg.source_name ? `${pkg.source_name} • +18 VOD` : "+18 Contenu Exclusif";
+
+          body.append(title, meta);
+          card.append(thumb, body);
+
+          card.onclick = () => {
+            openAdultPackage(pkg);
+          };
+
+          vodGrid.appendChild(card);
+        });
+      } else {
+        // Default state when opening portal: Neither is active, prompt to choose
+        if (searchWrap) searchWrap.style.display = "none";
+        container.innerHTML = `
+          <div style="text-align:center;padding:50px 20px;color:#94a3b8;">
+            <div style="font-size:1.15rem;font-weight:700;color:#f1f5f9;margin-bottom:8px;">Bienvenue dans votre Espace Adulte +18</div>
+            <div>Sélectionnez <strong>TV en Direct</strong> pour lancer le lecteur TV ou <strong>Films & Séries</strong> pour explorer les bouquets vidéo.</div>
+          </div>
+        `;
       }
-
-      filtered.forEach(pkg => {
-        const card = document.createElement("div");
-        card.className = "vel-adult-card";
-        card.setAttribute("role", "button");
-        card.tabIndex = 0;
-
-        const thumb = document.createElement("div");
-        thumb.className = "vel-adult-card__thumb";
-        
-        const icon = document.createElement("img");
-        icon.src = pkg.cover_url || "/logos/adult-18.svg";
-        icon.alt = pkg.name || "";
-        icon.loading = "lazy";
-        icon.onerror = () => { icon.src = "/logos/adult-18.svg"; };
-        thumb.appendChild(icon);
-
-        const badge = document.createElement("span");
-        badge.className = "vel-adult-card__badge";
-        badge.textContent = pkg.kind === "series" ? "🍿 SÉRIE" : (pkg.kind === "movies" || pkg.kind === "vod" ? "🎬 FILM" : "📺 DIRECT");
-        thumb.appendChild(badge);
-
-        const body = document.createElement("div");
-        body.className = "vel-adult-card__body";
-
-        const title = document.createElement("h3");
-        title.className = "vel-adult-card__title";
-        title.textContent = pkg.name || "Bouquet Adulte";
-
-        const meta = document.createElement("div");
-        meta.className = "vel-adult-card__meta";
-        meta.textContent = pkg.source_name ? `${pkg.source_name} • +18` : "+18 Contenu Exclusif";
-
-        body.append(title, meta);
-        card.append(thumb, body);
-
-        card.onclick = () => {
-          openAdultPackage(pkg);
-        };
-
-        grid.appendChild(card);
-      });
     }
 
     if (searchInput) {
-      searchInput.oninput = updateGrid;
+      searchInput.oninput = updateView;
     }
 
-    // Subtabs toggle
-    const liveSubtab = document.getElementById("vel-adult-subtab-live");
-    const vodSubtab = document.getElementById("vel-adult-subtab-vod");
-    if (liveSubtab && vodSubtab) {
-      liveSubtab.onclick = () => {
-        currentAdultSubtab = "live";
-        liveSubtab.classList.add("active");
-        vodSubtab.classList.remove("active");
-        updateGrid();
+    const liveBtn = document.getElementById("vel-adult-btn-live");
+    const vodBtn = document.getElementById("vel-adult-btn-vod");
+    if (liveBtn) {
+      liveBtn.onclick = () => {
+        openAdultLivePlayerDirectly();
       };
-      vodSubtab.onclick = () => {
-        currentAdultSubtab = "vod";
-        vodSubtab.classList.add("active");
-        liveSubtab.classList.remove("active");
-        updateGrid();
+    }
+    if (vodBtn) {
+      vodBtn.onclick = () => {
+        currentAdultView = "vod";
+        updateView();
       };
     }
 
-    updateGrid();
+    updateView();
   }
 
-  // Open an adult package content
+  // Open an adult VOD package
   function openAdultPackage(pkg) {
     if (typeof window.veloraOpenSearchResult === "function") {
-      const kind = pkg.kind === "movies" || pkg.kind === "vod" ? "movies-package" : (pkg.kind === "series" ? "series-package" : "live");
+      const kind = pkg.kind === "series" ? "series-package" : "movies-package";
       window.veloraOpenSearchResult(`adult:${kind}:${pkg.package_id || pkg.id}`);
       return;
     }
@@ -633,22 +730,70 @@
     showAdultView();
   }
 
+  function closeActivePlayers() {
+    if (typeof window.veloraStopAllPlayback === "function") {
+      try { window.veloraStopAllPlayback(); } catch (_) {}
+    }
+
+    document.querySelectorAll("video, audio").forEach(function (v) {
+      try {
+        v.pause();
+        v.muted = true;
+        v.currentTime = 0;
+        if (v.hls && typeof v.hls.destroy === "function") {
+          try { v.hls.destroy(); } catch (_) {}
+          v.hls = null;
+        }
+        v.removeAttribute("src");
+        v.load();
+      } catch (_) {}
+    });
+
+    if (window.hls && typeof window.hls.destroy === "function") {
+      try { window.hls.destroy(); } catch (_) {}
+      window.hls = null;
+    }
+
+    try {
+      if (document.fullscreenElement && typeof document.exitFullscreen === "function") {
+        document.exitFullscreen().catch(function () {});
+      }
+    } catch (_) {}
+
+    [
+      "player-container",
+      "vod-player-container",
+      "now-playing",
+      "now-playing-vod",
+      "content-view",
+      "packages-view"
+    ].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.classList.add("hidden");
+        el.setAttribute("aria-hidden", "true");
+        el.style.setProperty("display", "none", "important");
+      }
+    });
+  }
+
   function showAdultView() {
+    window._veloraNavLock = true;
+    setTimeout(function () { window._veloraNavLock = false; }, 600);
+
+    closeActivePlayers();
+
     isAdultOpen = true;
+    currentAdultView = null; // Unselected by default
     document.body.classList.add("vel-adult-active");
     document.body.dataset.velActiveTab = "adult";
     document.body.classList.remove("vel-home-empty-active");
 
-    // Hide home and media containers
     const homePage = document.getElementById("vel-home-empty-page");
-    const contentView = document.getElementById("content-view");
-    const packagesView = document.getElementById("packages-view");
     const primeContainer = document.getElementById("vel-prime-carousels-container");
     const stickyTop = document.querySelector(".vel-sticky-top");
 
     if (homePage) homePage.classList.add("hidden");
-    if (contentView) contentView.classList.add("hidden");
-    if (packagesView) packagesView.classList.add("hidden");
     if (primeContainer) primeContainer.style.setProperty("display", "none", "important");
     if (stickyTop) stickyTop.style.setProperty("display", "none", "important");
 
@@ -656,6 +801,7 @@
     if (adultView) {
       adultView.classList.remove("hidden");
       adultView.setAttribute("aria-hidden", "false");
+      adultView.style.removeProperty("display");
     }
 
     window.scrollTo(0, 0);
@@ -664,7 +810,9 @@
 
   function closeAdultView() {
     isAdultOpen = false;
+    currentAdultView = null;
     document.body.classList.remove("vel-adult-active");
+    delete document.body.dataset.veloraReturnAdult;
     const adultView = document.getElementById("adult-view");
     if (adultView) {
       adultView.classList.add("hidden");
@@ -682,6 +830,15 @@
       e.preventDefault();
       closeAdultView();
       return;
+    }
+
+    // Returning to adult portal when closing player if opened from adult
+    if (e.target && e.target.closest("#btn-close-player, #btn-close-vod-player")) {
+      if (document.body.dataset.veloraReturnAdult === "true") {
+        setTimeout(() => {
+          showAdultView();
+        }, 80);
+      }
     }
 
     // Adult portal buttons (from Home or Profile menu)
@@ -717,12 +874,12 @@
   });
 
   document.addEventListener("velora-adult-packages-changed", () => {
+    adultLiveChannelCache.clear();
     if (isAdultOpen) {
       renderAdultPortal();
     }
   });
 
-  // Pre-fetch assigned adult packages on boot
   fetchAssignedAdultPackages();
 
   window.veloraOpenAdultPortal = openAdultPortal;

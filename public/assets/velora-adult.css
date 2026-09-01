@@ -20,6 +20,19 @@
   display: none !important;
 }
 
+/* Ensure all video players and other views are completely hidden when viewing the Adult Portal */
+body.vel-adult-active #player-container,
+body.vel-adult-active #vod-player-container,
+body.vel-adult-active #now-playing,
+body.vel-adult-active #now-playing-vod,
+body.vel-adult-active #content-view,
+body.vel-adult-active #packages-view,
+body.vel-adult-active #vel-home-empty-page,
+body.vel-adult-active .vel-sticky-top {
+  display: none !important;
+  visibility: hidden !important;
+}
+
 /* --------------------------------------------------------------------------
    Adult Header
    -------------------------------------------------------------------------- */
@@ -87,47 +100,101 @@
 }
 
 /* --------------------------------------------------------------------------
-   Adult Subtabs
+   Adult Action Buttons (TV & Movies Action Buttons)
    -------------------------------------------------------------------------- */
-.vel-adult-tabs {
+.vel-adult-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: rgba(15, 15, 22, 0.8);
-  padding: 4px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 14px;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 620px;
+  margin: 6px 0 10px 0;
 }
 
-.vel-adult-subtab {
-  display: inline-flex;
+.vel-adult-action-btn {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 18px;
-  border-radius: 8px;
-  border: none;
-  background: transparent;
-  color: #94a3b8;
-  font-size: 0.92rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.vel-adult-subtab:hover {
-  color: #f1f5f9;
-}
-
-.vel-adult-subtab.active {
-  background: #e11d48;
+  gap: 14px;
+  padding: 12px 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
   color: #fff;
-  box-shadow: 0 2px 12px rgba(225, 29, 72, 0.45);
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: left;
+  user-select: none;
 }
 
-.vel-adult-subtab-badge {
-  font-size: 0.72rem;
-  background: rgba(0, 0, 0, 0.3);
-  padding: 2px 6px;
+.vel-adult-action-btn:hover {
+  transform: translateY(-3px);
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(244, 63, 94, 0.6);
+  box-shadow: 0 8px 24px rgba(225, 29, 72, 0.28);
+}
+
+.vel-adult-action-btn:active {
+  transform: translateY(-1px);
+}
+
+.vel-adult-action-btn__icon {
+  width: 42px;
+  height: 42px;
+  background: rgba(225, 29, 72, 0.15);
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.vel-adult-action-btn:hover .vel-adult-action-btn__icon {
+  transform: scale(1.08);
+}
+
+.vel-adult-action-btn__icon svg {
+  width: 22px;
+  height: 22px;
+  fill: #f43f5e;
+  stroke: none;
+}
+
+.vel-adult-action-btn--live .vel-adult-action-btn__icon svg {
+  fill: none;
+  stroke: #f43f5e;
+  stroke-width: 2;
+}
+
+.vel-adult-action-btn__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.vel-adult-action-btn__title {
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.vel-adult-action-btn__subtitle {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.vel-adult-action-btn__badge {
+  font-size: 0.75rem;
+  background: rgba(225, 29, 72, 0.22);
+  border: 1px solid rgba(244, 63, 94, 0.4);
+  color: #fda4af;
+  padding: 3px 8px;
   border-radius: 9999px;
   font-weight: 800;
 }
@@ -236,6 +303,167 @@
   font-size: 0.78rem;
   color: #94a3b8;
   font-weight: 600;
+}
+
+/* --------------------------------------------------------------------------
+   Adult Live TV Navigation & Channel Grid (TV Player Integration)
+   -------------------------------------------------------------------------- */
+.vel-adult-live-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 14px 2px;
+  margin-bottom: 16px;
+  scrollbar-width: thin;
+}
+
+.vel-adult-live-nav::-webkit-scrollbar {
+  height: 4px;
+}
+
+.vel-adult-live-nav::-webkit-scrollbar-thumb {
+  background: rgba(244, 63, 94, 0.4);
+  border-radius: 4px;
+}
+
+.vel-adult-package-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
+  color: #cbd5e1;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.vel-adult-package-pill:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.vel-adult-package-pill.active {
+  background: #e11d48;
+  color: #fff;
+  border-color: #f43f5e;
+  box-shadow: 0 2px 10px rgba(225, 29, 72, 0.4);
+}
+
+.vel-adult-channel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: clamp(10px, 1.5vw, 18px);
+  width: 100%;
+}
+
+.vel-adult-channel-card {
+  position: relative;
+  background: #111118;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  user-select: none;
+}
+
+.vel-adult-channel-card:hover {
+  transform: translateY(-4px);
+  background: #181824;
+  border-color: rgba(244, 63, 94, 0.5);
+  box-shadow: 0 10px 24px rgba(225, 29, 72, 0.22);
+}
+
+.vel-adult-channel-card__logo-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: #08080c;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.vel-adult-channel-card__logo {
+  max-width: 85%;
+  max-height: 85%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6));
+  transition: transform 0.25s ease;
+}
+
+.vel-adult-channel-card:hover .vel-adult-channel-card__logo {
+  transform: scale(1.08);
+}
+
+.vel-adult-channel-card__play-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(225, 29, 72, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  backdrop-filter: blur(2px);
+}
+
+.vel-adult-channel-card:hover .vel-adult-channel-card__play-overlay {
+  opacity: 1;
+}
+
+.vel-adult-channel-card__play-icon {
+  width: 32px;
+  height: 32px;
+  background: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.vel-adult-channel-card__play-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: #e11d48;
+  margin-left: 2px;
+}
+
+.vel-adult-channel-card__name {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin: 0;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.vel-adult-channel-card__meta {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .vel-adult-empty {

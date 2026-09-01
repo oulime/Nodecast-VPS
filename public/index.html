@@ -6517,20 +6517,29 @@
                   </div>
                 </div>
 
-                <div class="vel-adult-tabs" role="tablist" aria-label="Sections adultes">
-                  <button type="button" id="vel-adult-subtab-live" class="vel-adult-subtab active" data-adult-section="live">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
-                    <span>TV en Direct</span>
-                    <span id="vel-adult-badge-live" class="vel-adult-subtab-badge">0</span>
+                <div class="vel-adult-actions" aria-label="Choix de contenu adulte">
+                  <button type="button" id="vel-adult-btn-live" class="vel-adult-action-btn vel-adult-action-btn--live">
+                    <div class="vel-adult-action-btn__icon">
+                      <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
+                    </div>
+                    <div class="vel-adult-action-btn__text">
+                      <span class="vel-adult-action-btn__title">TV en Direct</span>
+                      <span class="vel-adult-action-btn__subtitle">Ouvrir le lecteur TV</span>
+                    </div>
                   </button>
-                  <button type="button" id="vel-adult-subtab-vod" class="vel-adult-subtab" data-adult-section="vod">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                    <span>Films & Séries</span>
-                    <span id="vel-adult-badge-vod" class="vel-adult-subtab-badge">0</span>
+
+                  <button type="button" id="vel-adult-btn-vod" class="vel-adult-action-btn vel-adult-action-btn--vod">
+                    <div class="vel-adult-action-btn__icon">
+                      <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    </div>
+                    <div class="vel-adult-action-btn__text">
+                      <span class="vel-adult-action-btn__title">Films & Séries</span>
+                      <span class="vel-adult-action-btn__subtitle">Parcourir les vidéos</span>
+                    </div>
                   </button>
                 </div>
 
-                <div class="vel-adult-header__search">
+                <div id="vel-adult-search-wrap" class="vel-adult-header__search" style="display: none;">
                   <input type="text" id="vel-adult-search-input" placeholder="Rechercher un bouquet adulte..." autocomplete="off" />
                 </div>
               </div>
@@ -7991,17 +8000,17 @@
                 if (mobileBackActivatedAt && Date.now() - mobileBackActivatedAt < 700) return;
               }
 
-              if (document.body.classList.contains("vel-favorites-open")) {
-                if (typeof window.veloraCloseFavoritesPage === "function") {
-                  window.veloraCloseFavoritesPage(true);
-                } else {
-                  document.dispatchEvent(new CustomEvent("velora-show-home"));
+              if (window._veloraNavLock) {
+                if (event) {
+                  try { event.preventDefault(); event.stopPropagation(); } catch (_) {}
                 }
                 return;
               }
 
-              var favReturn = document.body.dataset.veloraReturnFavorites || window._veloraFavoriteReturnTab;
-              if (favReturn) {
+              if (document.body.dataset.veloraReturnAdult === "true") {
+                window._veloraNavLock = true;
+                setTimeout(function () { window._veloraNavLock = false; }, 600);
+                delete document.body.dataset.veloraReturnAdult;
                 delete document.body.dataset.veloraReturnFavorites;
                 delete window._veloraFavoriteReturnTab;
                 delete document.body.dataset.veloraReturnHome;
@@ -8029,12 +8038,69 @@
                   window.hls = null;
                 }
 
+                ["content-view", "packages-view", "player-container", "vod-player-container", "now-playing", "now-playing-vod"].forEach(function (id) {
+                  var element = document.getElementById(id);
+                  if (element) element.classList.add("hidden");
+                });
+
+                if (typeof window.veloraOpenAdultPortal === "function") {
+                  window.veloraOpenAdultPortal();
+                }
+                return;
+              }
+
+              var favReturn = document.body.dataset.veloraReturnFavorites || window._veloraFavoriteReturnTab;
+              if (favReturn) {
+                window._veloraNavLock = true;
+                setTimeout(function () { window._veloraNavLock = false; }, 600);
+                delete document.body.dataset.veloraReturnFavorites;
+                delete window._veloraFavoriteReturnTab;
+                delete document.body.dataset.veloraReturnAdult;
+                delete document.body.dataset.veloraReturnHome;
+
+                if (typeof window.veloraStopAllPlayback === "function") {
+                  try { window.veloraStopAllPlayback(); } catch (_) {}
+                }
+
+                document.querySelectorAll("video, audio").forEach(function (v) {
+                  try {
+                    v.pause();
+                    v.muted = true;
+                    v.currentTime = 0;
+                    if (v.hls && typeof v.hls.destroy === "function") {
+                      try { v.hls.destroy(); } catch (_) {}
+                      v.hls = null;
+                    }
+                    v.removeAttribute("src");
+                    v.load();
+                  } catch (_) {}
+                });
+
+                if (window.hls && typeof window.hls.destroy === "function") {
+                  try { window.hls.destroy(); } catch (_) {}
+                  window.hls = null;
+                }
+
+                ["content-view", "packages-view", "player-container", "vod-player-container", "now-playing", "now-playing-vod"].forEach(function (id) {
+                  var element = document.getElementById(id);
+                  if (element) element.classList.add("hidden");
+                });
+
                 if (typeof window.veloraStopAndReturnFavorites === "function") {
                   window.veloraStopAndReturnFavorites(favReturn);
                 } else {
                   document.dispatchEvent(new CustomEvent("velora-return-favorites", {
                     detail: { tab: favReturn }
                   }));
+                }
+                return;
+              }
+
+              if (document.body.classList.contains("vel-favorites-open")) {
+                if (typeof window.veloraCloseFavoritesPage === "function") {
+                  window.veloraCloseFavoritesPage(true);
+                } else {
+                  document.dispatchEvent(new CustomEvent("velora-show-home"));
                 }
                 return;
               }
@@ -8095,89 +8161,81 @@
                   }
                   return;
                 }
+                if (packagesView && !packagesView.classList.contains("hidden")) {
+                  var adultBackHome = document.getElementById("btn-adult-back-home");
+                  if (adultBackHome) {
+                    adultBackHome.click();
+                    return;
+                  }
+                }
                 document.dispatchEvent(new CustomEvent("velora-show-home"));
                 return;
               }
 
-
-
-              var livePlayer = document.getElementById("player-container");
-              var vodPlayer = document.getElementById("vod-player-container");
-              var contentView = document.getElementById("content-view");
-              var packagesView = document.getElementById("packages-view");
-              var activeCatalogTab = document.body.dataset.velActiveTab;
-              var isCatalogTab = activeCatalogTab === "live" || activeCatalogTab === "movies" || activeCatalogTab === "series";
-
-              // 1. If inside content-view (channels list, movie list, or detail):
-              // Directly call the existing page for the current tab (e.g. TV En Direct bouquets page)!
-              if (contentView && !contentView.classList.contains("hidden")) {
-                if (typeof window.veloraStopAllPlayback === "function") {
-                  try { window.veloraStopAllPlayback(); } catch (_) {}
-                }
-                var tab = activeCatalogTab || "live";
-                if (typeof window.veloraOpenTab === "function") {
-                  window.veloraOpenTab(tab);
-                } else {
-                  var tabBtn = document.querySelector('[data-bottom-nav="' + tab + '"]');
-                  if (tabBtn) tabBtn.click();
-                }
-                packageContextTitle = "";
-                mediaContextTitle = "";
-                window.setTimeout(refreshHeaderContextTitle, 0);
-                return;
-              }
-
-              // 2. If video player is open alone without content-view:
               if (livePlayer && !livePlayer.classList.contains("hidden")) {
                 var closeLivePlayer = document.getElementById("btn-close-player");
                 if (closeLivePlayer) closeLivePlayer.click();
-                if (packagesView) {
-                  packagesView.classList.remove("hidden");
-                  packagesView.setAttribute("aria-hidden", "false");
-                }
-                packageContextTitle = "";
-                mediaContextTitle = "";
-                window.setTimeout(refreshHeaderContextTitle, 0);
                 return;
               }
+
               if (vodPlayer && !vodPlayer.classList.contains("hidden")) {
                 var closeVodPlayer = document.getElementById("btn-close-vod-player");
                 if (closeVodPlayer) closeVodPlayer.click();
-                if (packagesView) {
-                  packagesView.classList.remove("hidden");
-                  packagesView.setAttribute("aria-hidden", "false");
-                }
-                packageContextTitle = "";
-                mediaContextTitle = "";
-                window.setTimeout(refreshHeaderContextTitle, 0);
                 return;
               }
 
-              // 3. If in nested parent package sub-view:
-              if (isCatalogTab && packagesView && packagesView.dataset.parentPackageId) {
-                var parentPackageBack = packagesView.querySelector(".vel-parent-package-view__back");
-                if (parentPackageBack) {
-                  parentPackageBack.click();
+              if (contentView && !contentView.classList.contains("hidden")) {
+                var isCustomPackage = document.body.dataset.velCustomPackageOpen === "true";
+                var isCustomBackHome = isCustomPackage && document.body.dataset.velCustomPackageHome === "true";
+                var isDirectDetailOpen = document.body.dataset.veloraDirectDetailOpen === "true";
+                var isLiveSection = (document.body.dataset.velActiveTab || "live") === "live";
+
+                if (isCustomPackage) {
+                  delete document.body.dataset.velCustomPackageOpen;
+                  delete document.body.dataset.velCustomPackageHome;
+                  if (isCustomBackHome) {
+                    document.dispatchEvent(new CustomEvent("velora-return-home"));
+                    return;
+                  }
+                }
+
+                if (isDirectDetailOpen) {
+                  delete document.body.dataset.veloraDirectDetailOpen;
+                  delete document.body.dataset.veloraDirectDetailHome;
+                  document.dispatchEvent(new CustomEvent("velora-return-home"));
                   return;
                 }
-              }
 
-              // 4. If already at top-level packages view (TV En Direct bouquets), go back to Home:
-              if (isCatalogTab) {
-                document.dispatchEvent(new CustomEvent("velora-show-home"));
+                if (isLiveSection) {
+                  document.dispatchEvent(new CustomEvent("velora-return-home"));
+                  return;
+                }
+
+                var contentBack = document.getElementById("btn-back-home");
+                if (contentBack) {
+                  if (typeof PointerEvent === "function") {
+                    contentBack.dispatchEvent(new PointerEvent("pointerdown", {
+                      bubbles: true,
+                      cancelable: true,
+                      button: 0,
+                      pointerId: 1,
+                      pointerType: "mouse"
+                    }));
+                  } else {
+                    contentBack.click();
+                  }
+                }
                 return;
               }
 
-              var state = window.history.state && typeof window.history.state === "object" ? window.history.state : {};
-              if (state.veloraNav || state.veloraSettings) {
-                window.history.back();
+              if (packagesView && !packagesView.classList.contains("hidden")) {
+                document.dispatchEvent(new CustomEvent("velora-return-home"));
                 return;
               }
 
-              showHomeChoice(event);
+              document.dispatchEvent(new CustomEvent("velora-return-home"));
             };
 
-            headerBack.addEventListener("click", goBack, true);
             document.addEventListener("velora-header-back", goBack);
             headerBack.addEventListener("keydown", function (event) {
               if (
@@ -8190,7 +8248,58 @@
               }
             }, true);
 
-            window.addEventListener("popstate", function () {
+            window.addEventListener("popstate", function (event) {
+              if (window._veloraNavLock) {
+                if (event) {
+                  try { event.preventDefault(); event.stopPropagation(); } catch (_) {}
+                }
+                return;
+              }
+              if (document.body.dataset.veloraReturnAdult === "true") {
+                window._veloraNavLock = true;
+                setTimeout(function () { window._veloraNavLock = false; }, 600);
+                delete document.body.dataset.veloraReturnAdult;
+                delete document.body.dataset.veloraReturnFavorites;
+                delete window._veloraFavoriteReturnTab;
+                delete document.body.dataset.veloraReturnHome;
+                if (typeof window.veloraStopAllPlayback === "function") {
+                  try { window.veloraStopAllPlayback(); } catch (_) {}
+                }
+                ["content-view", "packages-view", "player-container", "vod-player-container", "now-playing", "now-playing-vod"].forEach(function (id) {
+                  var element = document.getElementById(id);
+                  if (element) element.classList.add("hidden");
+                });
+                if (typeof window.veloraOpenAdultPortal === "function") {
+                  window.veloraOpenAdultPortal();
+                }
+                return;
+              }
+              if (document.body.dataset.veloraReturnFavorites) {
+                var favoriteTab = document.body.dataset.veloraReturnFavorites;
+                window._veloraNavLock = true;
+                setTimeout(function () { window._veloraNavLock = false; }, 600);
+                delete document.body.dataset.veloraReturnFavorites;
+                delete window._veloraFavoriteReturnTab;
+                delete document.body.dataset.veloraReturnAdult;
+                delete document.body.dataset.veloraReturnHome;
+                if (typeof window.veloraStopAllPlayback === "function") {
+                  try { window.veloraStopAllPlayback(); } catch (_) {}
+                }
+                ["content-view", "packages-view", "player-container", "vod-player-container", "now-playing", "now-playing-vod"].forEach(function (id) {
+                  var element = document.getElementById(id);
+                  if (element) element.classList.add("hidden");
+                });
+                var contextTitle = document.getElementById("vel-header-context-title-text");
+                if (contextTitle) contextTitle.textContent = "";
+                if (typeof window.veloraStopAndReturnFavorites === "function") {
+                  window.veloraStopAndReturnFavorites(favoriteTab);
+                } else {
+                  document.dispatchEvent(new CustomEvent("velora-return-favorites", {
+                    detail: { tab: favoriteTab }
+                  }));
+                }
+                return;
+              }
               if (document.body.classList.contains("vel-favorites-open")) {
                 if (typeof window.veloraCloseFavoritesPage === "function") {
                   window.veloraCloseFavoritesPage(true);
@@ -8199,46 +8308,14 @@
                 }
                 return;
               }
-              if (document.body.dataset.veloraReturnFavorites) {
-                var favoriteTab = document.body.dataset.veloraReturnFavorites;
-                delete document.body.dataset.veloraReturnFavorites;
-                delete document.body.dataset.veloraReturnHome;
-                var livePlayer = document.getElementById("player-container");
-                if (livePlayer && !livePlayer.classList.contains("hidden")) {
-                  var closeLivePlayer = document.getElementById("btn-close-player");
-                  if (closeLivePlayer) closeLivePlayer.click();
-                }
-                var vodPlayer = document.getElementById("vod-player-container");
-                if (vodPlayer && !vodPlayer.classList.contains("hidden")) {
-                  var closeVodPlayer = document.getElementById("btn-close-vod-player");
-                  if (closeVodPlayer) closeVodPlayer.click();
-                }
-                ["content-view", "packages-view", "player-container", "vod-player-container", "now-playing", "now-playing-vod"].forEach(function (id) {
-                  var element = document.getElementById(id);
-                  if (element) element.classList.add("hidden");
-                });
-                var contextTitle = document.getElementById("vel-header-context-title-text");
-                if (contextTitle) contextTitle.textContent = "";
-                document.dispatchEvent(new CustomEvent("velora-return-favorites", {
-                  detail: { tab: favoriteTab }
-                }));
-                return;
-              }
               if (window.__veloraInternalNavPop) {
                 window.__veloraInternalNavPop = false;
                 return;
               }
               if (document.body.dataset.veloraReturnHome === "true") {
                 delete document.body.dataset.veloraReturnHome;
-                var livePlayer = document.getElementById("player-container");
-                if (livePlayer && !livePlayer.classList.contains("hidden")) {
-                  var closeLivePlayer = document.getElementById("btn-close-player");
-                  if (closeLivePlayer) closeLivePlayer.click();
-                }
-                var vodPlayer = document.getElementById("vod-player-container");
-                if (vodPlayer && !vodPlayer.classList.contains("hidden")) {
-                  var closeVodPlayer = document.getElementById("btn-close-vod-player");
-                  if (closeVodPlayer) closeVodPlayer.click();
+                if (typeof window.veloraStopAllPlayback === "function") {
+                  try { window.veloraStopAllPlayback(); } catch (_) {}
                 }
                 document.dispatchEvent(new CustomEvent("velora-return-home"));
                 return;
@@ -8254,6 +8331,63 @@
               if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
                 if (event.key === "Backspace" || event.keyCode === 8) return;
               }
+              if (window._veloraNavLock) {
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
+                return;
+              }
+              if (document.body.dataset.veloraReturnAdult === "true") {
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
+                window._veloraNavLock = true;
+                setTimeout(function () { window._veloraNavLock = false; }, 600);
+                delete document.body.dataset.veloraReturnAdult;
+                delete document.body.dataset.veloraReturnFavorites;
+                delete window._veloraFavoriteReturnTab;
+                delete document.body.dataset.veloraReturnHome;
+                if (typeof window.veloraStopAllPlayback === "function") {
+                  try { window.veloraStopAllPlayback(); } catch (_) {}
+                }
+                ["content-view", "packages-view", "player-container", "vod-player-container", "now-playing", "now-playing-vod"].forEach(function (id) {
+                  var element = document.getElementById(id);
+                  if (element) element.classList.add("hidden");
+                });
+                if (typeof window.veloraOpenAdultPortal === "function") {
+                  window.veloraOpenAdultPortal();
+                }
+                return;
+              }
+              if (document.body.dataset.veloraReturnFavorites) {
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
+                var favoriteTab = document.body.dataset.veloraReturnFavorites;
+                window._veloraNavLock = true;
+                setTimeout(function () { window._veloraNavLock = false; }, 600);
+                delete document.body.dataset.veloraReturnFavorites;
+                delete window._veloraFavoriteReturnTab;
+                delete document.body.dataset.veloraReturnAdult;
+                delete document.body.dataset.veloraReturnHome;
+                if (typeof window.veloraStopAllPlayback === "function") {
+                  try { window.veloraStopAllPlayback(); } catch (_) {}
+                }
+                ["content-view", "packages-view", "player-container", "vod-player-container", "now-playing", "now-playing-vod"].forEach(function (id) {
+                  var element = document.getElementById(id);
+                  if (element) element.classList.add("hidden");
+                });
+                var contextTitle = document.getElementById("vel-header-context-title-text");
+                if (contextTitle) contextTitle.textContent = "";
+                if (typeof window.veloraStopAndReturnFavorites === "function") {
+                  window.veloraStopAndReturnFavorites(favoriteTab);
+                } else {
+                  document.dispatchEvent(new CustomEvent("velora-return-favorites", {
+                    detail: { tab: favoriteTab }
+                  }));
+                }
+                return;
+              }
               if (document.body.classList.contains("vel-favorites-open")) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -8265,48 +8399,13 @@
                 }
                 return;
               }
-              if (document.body.dataset.veloraReturnFavorites) {
-                event.preventDefault();
-                event.stopPropagation();
-                event.stopImmediatePropagation();
-                var favoriteTab = document.body.dataset.veloraReturnFavorites;
-                delete document.body.dataset.veloraReturnFavorites;
-                delete document.body.dataset.veloraReturnHome;
-                var livePlayer = document.getElementById("player-container");
-                if (livePlayer && !livePlayer.classList.contains("hidden")) {
-                  var closeLivePlayer = document.getElementById("btn-close-player");
-                  if (closeLivePlayer) closeLivePlayer.click();
-                }
-                var vodPlayer = document.getElementById("vod-player-container");
-                if (vodPlayer && !vodPlayer.classList.contains("hidden")) {
-                  var closeVodPlayer = document.getElementById("btn-close-vod-player");
-                  if (closeVodPlayer) closeVodPlayer.click();
-                }
-                ["content-view", "packages-view", "player-container", "vod-player-container", "now-playing", "now-playing-vod"].forEach(function (id) {
-                  var element = document.getElementById(id);
-                  if (element) element.classList.add("hidden");
-                });
-                var contextTitle = document.getElementById("vel-header-context-title-text");
-                if (contextTitle) contextTitle.textContent = "";
-                document.dispatchEvent(new CustomEvent("velora-return-favorites", {
-                  detail: { tab: favoriteTab }
-                }));
-                return;
-              }
               if (document.body.dataset.veloraReturnHome === "true") {
                 event.preventDefault();
                 event.stopPropagation();
                 event.stopImmediatePropagation();
                 delete document.body.dataset.veloraReturnHome;
-                var livePlayer = document.getElementById("player-container");
-                if (livePlayer && !livePlayer.classList.contains("hidden")) {
-                  var closeLivePlayer = document.getElementById("btn-close-player");
-                  if (closeLivePlayer) closeLivePlayer.click();
-                }
-                var vodPlayer = document.getElementById("vod-player-container");
-                if (vodPlayer && !vodPlayer.classList.contains("hidden")) {
-                  var closeVodPlayer = document.getElementById("btn-close-vod-player");
-                  if (closeVodPlayer) closeVodPlayer.click();
+                if (typeof window.veloraStopAllPlayback === "function") {
+                  try { window.veloraStopAllPlayback(); } catch (_) {}
                 }
                 document.dispatchEvent(new CustomEvent("velora-return-home"));
               }
@@ -8315,20 +8414,54 @@
             ["btn-close-player", "btn-close-vod-player"].forEach(function (id) {
               var btn = document.getElementById(id);
               if (!btn) return;
-              btn.addEventListener("click", function () {
+              btn.addEventListener("click", function (event) {
+                if (window._veloraNavLock) {
+                  if (event) { event.preventDefault(); event.stopPropagation(); }
+                  return;
+                }
+                if (document.body.dataset.veloraReturnAdult === "true") {
+                  window._veloraNavLock = true;
+                  setTimeout(function () { window._veloraNavLock = false; }, 600);
+                  delete document.body.dataset.veloraReturnAdult;
+                  delete document.body.dataset.veloraReturnFavorites;
+                  delete window._veloraFavoriteReturnTab;
+                  delete document.body.dataset.veloraReturnHome;
+                  if (typeof window.veloraStopAllPlayback === "function") {
+                    try { window.veloraStopAllPlayback(); } catch (_) {}
+                  }
+                  ["content-view", "packages-view", "player-container", "vod-player-container", "now-playing", "now-playing-vod"].forEach(function (pid) {
+                    var element = document.getElementById(pid);
+                    if (element) element.classList.add("hidden");
+                  });
+                  if (typeof window.veloraOpenAdultPortal === "function") {
+                    window.veloraOpenAdultPortal();
+                  }
+                  return;
+                }
                 if (document.body.dataset.veloraReturnFavorites) {
                   var favoriteTab = document.body.dataset.veloraReturnFavorites;
+                  window._veloraNavLock = true;
+                  setTimeout(function () { window._veloraNavLock = false; }, 600);
                   delete document.body.dataset.veloraReturnFavorites;
+                  delete window._veloraFavoriteReturnTab;
+                  delete document.body.dataset.veloraReturnAdult;
                   delete document.body.dataset.veloraReturnHome;
+                  if (typeof window.veloraStopAllPlayback === "function") {
+                    try { window.veloraStopAllPlayback(); } catch (_) {}
+                  }
                   ["content-view", "packages-view", "player-container", "vod-player-container", "now-playing", "now-playing-vod"].forEach(function (pid) {
                     var element = document.getElementById(pid);
                     if (element) element.classList.add("hidden");
                   });
                   var contextTitle = document.getElementById("vel-header-context-title-text");
                   if (contextTitle) contextTitle.textContent = "";
-                  document.dispatchEvent(new CustomEvent("velora-return-favorites", {
-                    detail: { tab: favoriteTab }
-                  }));
+                  if (typeof window.veloraStopAndReturnFavorites === "function") {
+                    window.veloraStopAndReturnFavorites(favoriteTab);
+                  } else {
+                    document.dispatchEvent(new CustomEvent("velora-return-favorites", {
+                      detail: { tab: favoriteTab }
+                    }));
+                  }
                   return;
                 }
                 if (document.body.dataset.veloraReturnHome === "true") {
@@ -8339,10 +8472,26 @@
             });
 
             document.getElementById("btn-back-home")?.addEventListener("click", function () {
-              if (document.body.dataset.veloraReturnFavorites || window._veloraFavoriteReturnTab) {
-                var favoriteTab = document.body.dataset.veloraReturnFavorites || window._veloraFavoriteReturnTab || "channel";
+              if (window._veloraNavLock) return;
+              if (document.body.dataset.veloraReturnAdult === "true") {
+                window._veloraNavLock = true;
+                setTimeout(function () { window._veloraNavLock = false; }, 600);
+                delete document.body.dataset.veloraReturnAdult;
                 delete document.body.dataset.veloraReturnFavorites;
                 delete window._veloraFavoriteReturnTab;
+                delete document.body.dataset.veloraReturnHome;
+                if (typeof window.veloraOpenAdultPortal === "function") {
+                  window.veloraOpenAdultPortal();
+                }
+                return;
+              }
+              if (document.body.dataset.veloraReturnFavorites || window._veloraFavoriteReturnTab) {
+                var favoriteTab = document.body.dataset.veloraReturnFavorites || window._veloraFavoriteReturnTab || "channel";
+                window._veloraNavLock = true;
+                setTimeout(function () { window._veloraNavLock = false; }, 600);
+                delete document.body.dataset.veloraReturnFavorites;
+                delete window._veloraFavoriteReturnTab;
+                delete document.body.dataset.veloraReturnAdult;
                 delete document.body.dataset.veloraReturnHome;
                 if (typeof window.veloraStopAndReturnFavorites === "function") {
                   window.veloraStopAndReturnFavorites(favoriteTab);
@@ -13305,6 +13454,65 @@ if (target.closest(".trial-offer-button")) {
       #player-container:-webkit-full-screen,
       #player-container.player-container--live-fullscreen {
         margin-top: 0 !important;
+      }
+
+      /* Mobile & Universal: channel list under Live player scrollability */
+      .main--velora:has(#player-container:not(.hidden)) .vel-dashboard {
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+      }
+
+      .main--velora:has(#player-container:not(.hidden)) .vel-body {
+        display: flex !important;
+        flex-direction: column !important;
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+      }
+
+      .main--velora:has(#player-container:not(.hidden)) #content-view:not(.hidden) {
+        display: flex !important;
+        flex-direction: column !important;
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+      }
+
+      .main--velora:has(#player-container:not(.hidden)) #dynamic-list {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        touch-action: pan-y !important;
+        overscroll-behavior-y: contain !important;
+        padding-bottom: calc(var(--vel-bottom-nav-height, 76px) + 24px) !important;
+      }
+
+      .main--velora:has(#player-container:not(.hidden)) #dynamic-list * {
+        touch-action: pan-y !important;
+      }
+
+      @media (max-width: 767.98px) {
+        .main--velora:has(#player-container:not(.hidden)) #player-container.player-container {
+          flex: 0 0 auto !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          margin: 0 0 0.35rem 0 !important;
+          border-radius: 0 0 12px 12px !important;
+        }
+
+        .main--velora:has(#player-container:not(.hidden)) #player-container .video-wrapper {
+          width: 100% !important;
+          max-height: 36vh !important;
+          aspect-ratio: 16 / 9;
+        }
+
+        .main--velora:has(#player-container:not(.hidden)) #player-container #video {
+          max-height: 36vh !important;
+          object-fit: contain !important;
+        }
       }
 
       /* Desktop / PC browser: keep Live TV player compact so package channels are clearly visible */

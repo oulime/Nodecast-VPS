@@ -10,6 +10,22 @@
   var state = { items: new Map(), limits: { movie: PAGE_SIZE, series: PAGE_SIZE, channel: PAGE_SIZE }, page: null, open: false, activeType: "channel", decorateTimer: 0, currentDetailDescriptor: null };
   var heartSvg = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8.5-4.8-8.5-11.2A4.8 4.8 0 0 1 12 6.7a4.8 4.8 0 0 1 8.5 3.1C20.5 16.2 12 21 12 21Z"/></svg>';
 
+  // Pre-load from local cache for 0ms instant display
+  try {
+    var initialCache = localStorage.getItem("velora_favorites_cache");
+    if (initialCache) {
+      var parsedCache = JSON.parse(initialCache);
+      if (Array.isArray(parsedCache)) {
+        parsedCache.forEach(function (row) {
+          if (row) {
+            var item = normalize(row);
+            state.items.set(favoriteKey(item), item);
+          }
+        });
+      }
+    }
+  } catch (_) {}
+
   function token() {
     try { return localStorage.getItem("authToken") || ""; } catch (_) { return ""; }
   }
@@ -80,6 +96,9 @@
       var item = normalize(row);
       return [favoriteKey(item), item];
     }));
+    try {
+      localStorage.setItem("velora_favorites_cache", JSON.stringify(Array.from(state.items.values())));
+    } catch (_) {}
     syncHearts();
     if (typeof window.veloraSyncFavoriteChannelPackage === "function") {
       window.veloraSyncFavoriteChannelPackage(Array.from(state.items.values()));
@@ -540,13 +559,15 @@
   }
 
   async function ensureCatalog() {
+    if (typeof window.veloraOpenFavoriteItem === "function") return true;
     if (typeof window.veloraHomeCatalogReady === "function" && window.veloraHomeCatalogReady()) return true;
     try { window.veloraForceAutoconnect && window.veloraForceAutoconnect(); } catch (_) {}
-    for (var attempt = 0; attempt < 100; attempt += 1) {
+    for (var attempt = 0; attempt < 20; attempt += 1) {
+      if (typeof window.veloraOpenFavoriteItem === "function") return true;
       if (typeof window.veloraHomeCatalogReady === "function" && window.veloraHomeCatalogReady()) return true;
-      await new Promise(function (resolve) { window.setTimeout(resolve, 150); });
+      await new Promise(function (resolve) { window.setTimeout(resolve, 50); });
     }
-    return false;
+    return typeof window.veloraOpenFavoriteItem === "function";
   }
 
   async function openItem(item, button) {
@@ -559,6 +580,7 @@
       var opened = await window.veloraOpenFavoriteItem(item, Array.from(state.items.values()));
       if (opened === false) throw new Error("Impossible d’ouvrir ce favori.");
       delete document.body.dataset.veloraReturnHome;
+      delete document.body.dataset.veloraReturnAdult;
       document.body.dataset.veloraReturnFavorites = favoriteType;
       window._veloraFavoriteReturnTab = favoriteType;
       closePage(false);
@@ -726,16 +748,27 @@
     state.open = true;
     document.body.classList.add("vel-favorites-open");
     page.hidden = false;
-    page.querySelector(".vel-favorites-page__content").innerHTML = '<p class="vel-favorites-page__loading">Chargement de vos favoris…</p>';
-    try {
-      await loadFavorites();
+
+    // Instant render from cache (0ms latency)
+    if (state.items.size > 0) {
       renderPage();
-    } catch (error) {
-      page.querySelector(".vel-favorites-page__content").innerHTML = '<p class="vel-favorites-page__loading is-error"></p>';
-      page.querySelector(".is-error").textContent = error.message;
+    } else {
+      page.querySelector(".vel-favorites-page__content").innerHTML = '<p class="vel-favorites-page__loading">Chargement de vos favoris…</p>';
     }
+
     var activeTabBtn = page.querySelector('[data-favorites-tab="' + state.activeType + '"]');
     if (activeTabBtn) activeTabBtn.focus();
+
+    // Silently refresh in background
+    try {
+      await loadFavorites();
+      if (state.open) renderPage();
+    } catch (error) {
+      if (state.items.size === 0) {
+        page.querySelector(".vel-favorites-page__content").innerHTML = '<p class="vel-favorites-page__loading is-error"></p>';
+        page.querySelector(".is-error").textContent = error.message;
+      }
+    }
   }
 
   function closePage(andReturnHome) {
@@ -750,12 +783,16 @@
   }
 
   function stopAndReturnFavorites(tab) {
+    window._veloraNavLock = true;
+    setTimeout(function () { window._veloraNavLock = false; }, 600);
+
     var targetTab = tab && (tab === "channel" || tab === "movie" || tab === "series")
       ? tab
       : state.activeType || "channel";
 
     delete document.body.dataset.veloraReturnFavorites;
     delete window._veloraFavoriteReturnTab;
+    delete document.body.dataset.veloraReturnAdult;
     delete document.body.dataset.veloraReturnHome;
 
     closeActivePlayers();

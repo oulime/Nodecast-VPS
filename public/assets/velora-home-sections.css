@@ -53,9 +53,9 @@
   content: "" !important;
   position: absolute !important;
   inset: 0 !important;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.05) 42%, rgba(4, 4, 10, 0.68) 72%, rgba(4, 4, 10, 0.94) 100%) !important;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.05) 30%, rgba(3, 2, 8, 0.6) 65%, rgba(3, 2, 8, 0.92) 100%) !important;
   pointer-events: none !important;
-  z-index: 1 !important;
+  z-index: 2 !important;
   transition: opacity 220ms ease !important;
 }
 .vel-home-section--horizontal .vel-home-section__media,
@@ -78,28 +78,35 @@
   transform: scale(1.055) !important;
 }
 .vel-home-section--horizontal .vel-home-section__card .vel-home-section__name,
-.vel-home-section__card--horizontal .vel-home-section__name {
+.vel-home-section__card--horizontal .vel-home-section__name,
+.vel-home-section__card--series.vel-home-section__card--horizontal .vel-home-section__name,
+.vel-home-section__card--movies.vel-home-section__card--horizontal .vel-home-section__name {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  line-clamp: 2 !important;
   position: absolute !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  display: block !important;
-  padding: 0.65rem 0.8rem 0.55rem !important;
-  font-size: clamp(0.78rem, 1.8vw, 0.88rem) !important;
-  font-weight: 850 !important;
-  letter-spacing: -0.01em !important;
-  line-height: 1.25 !important;
+  bottom: 12px !important;
+  left: 14px !important;
+  right: 14px !important;
+  max-width: calc(100% - 28px) !important;
+  padding: 0 !important;
+  font-size: clamp(1.1rem, 3.2vw, 1.65rem) !important;
+  font-weight: 950 !important;
+  letter-spacing: -0.025em !important;
+  line-height: 1.15 !important;
   color: #ffffff !important;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.92), 0 1px 3px rgba(0, 0, 0, 0.85) !important;
+  text-shadow: 0 3px 14px rgba(0, 0, 0, 0.96), 0 1px 4px rgba(0, 0, 0, 0.9) !important;
   background: transparent !important;
   border-radius: 0 !important;
   min-height: unset !important;
   box-sizing: border-box !important;
-  white-space: nowrap !important;
+  white-space: normal !important;
+  word-break: break-word !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   text-align: left !important;
-  z-index: 2 !important;
+  z-index: 3 !important;
   pointer-events: none !important;
   transition: transform 220ms ease, color 220ms ease !important;
 }
@@ -128,9 +135,16 @@
     border-radius: 9px !important;
   }
   .vel-home-section--horizontal .vel-home-section__card .vel-home-section__name,
-  .vel-home-section__card--horizontal .vel-home-section__name {
-    font-size: 0.74rem !important;
-    padding: 0.45rem 0.6rem !important;
+  .vel-home-section__card--horizontal .vel-home-section__name,
+  .vel-home-section__card--series.vel-home-section__card--horizontal .vel-home-section__name,
+  .vel-home-section__card--movies.vel-home-section__card--horizontal .vel-home-section__name {
+    font-size: clamp(0.95rem, 4.2vw, 1.25rem) !important;
+    bottom: 10px !important;
+    left: 10px !important;
+    right: 10px !important;
+    max-width: calc(100% - 20px) !important;
+    line-height: 1.15 !important;
+    padding: 0 !important;
   }
 }
 

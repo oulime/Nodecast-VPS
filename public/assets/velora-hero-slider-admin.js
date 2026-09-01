@@ -152,11 +152,17 @@
       badgeSpan.className = "vel-slider-tag vel-slider-tag--found";
       badgeSpan.textContent = item.badge || item.category || "Trending";
 
-      var typeSpan = document.createElement("span");
-      typeSpan.textContent = "Type: " + (item.category || "movie");
-
       sub.appendChild(badgeSpan);
       sub.appendChild(typeSpan);
+
+      if (item.logo || item.logo_url) {
+        var logoTag = document.createElement("span");
+        logoTag.className = "vel-slider-tag vel-slider-tag--found";
+        logoTag.style.background = "rgba(168, 85, 247, 0.25)";
+        logoTag.style.borderColor = "rgba(168, 85, 247, 0.5)";
+        logoTag.textContent = "🏷️ Logo PNG";
+        sub.appendChild(logoTag);
+      }
 
       if (selectedFilter === "all") {
         var mappingCount = item.country_mappings ? Object.keys(item.country_mappings).length : 0;
@@ -326,6 +332,7 @@
     var catInp = document.getElementById("slider-form-category");
     var badgeInp = document.getElementById("slider-form-badge");
     var imgInp = document.getElementById("slider-form-image");
+    var logoInp = document.getElementById("slider-form-logo");
     var descInp = document.getElementById("slider-form-desc");
     var saveBtn = document.getElementById("slider-form-submit");
     var cancelBtn = document.getElementById("slider-form-cancel");
@@ -337,12 +344,14 @@
     if (targetC === "all") {
       if (titleInp) titleInp.value = item.title || "";
       if (imgInp) imgInp.value = item.backdrop || item.image || "";
+      if (logoInp) logoInp.value = item.logo || item.logo_url || "";
       if (saveBtn) saveBtn.textContent = "Enregistrer pour Tous les pays (Global)";
     } else {
       var cObj = state.countries.find(function(c) { return c.id === targetC; });
       var mapped = item.country_mappings && item.country_mappings[targetC];
       if (titleInp) titleInp.value = mapped?.name || item.title || "";
       if (imgInp) imgInp.value = mapped?.thumbUrl || item.backdrop || item.image || "";
+      if (logoInp) logoInp.value = item.logo || item.logo_url || "";
       if (saveBtn) saveBtn.textContent = "Enregistrer uniquement pour " + (cObj ? cObj.name : targetC);
     }
 
@@ -364,6 +373,7 @@
     var saveBtn = document.getElementById("slider-form-submit");
     var titleInp = document.getElementById("slider-form-title");
     var imgInp = document.getElementById("slider-form-image");
+    var logoInp = document.getElementById("slider-form-logo");
 
     if (selectedCountry === "all") {
       if (saveBtn) saveBtn.textContent = state.editingItemId ? "Enregistrer pour Tous les pays (Global)" : "Ajouter manuellement au slider";
@@ -372,6 +382,7 @@
         if (itm) {
           if (titleInp) titleInp.value = itm.title || "";
           if (imgInp) imgInp.value = itm.backdrop || itm.image || "";
+          if (logoInp) logoInp.value = itm.logo || itm.logo_url || "";
         }
       }
     } else {
@@ -385,6 +396,7 @@
           var mapped = itm.country_mappings[selectedCountry];
           if (titleInp) titleInp.value = mapped.name || itm.title || "";
           if (imgInp) imgInp.value = mapped.thumbUrl || itm.image || "";
+          if (logoInp) logoInp.value = itm.logo || itm.logo_url || "";
           setStatus("Configuration spécifique chargée pour : " + cName);
         } else {
           setStatus("Aucune configuration spécifique pour " + cName + " (utilise actuellement le fallback).");
@@ -399,6 +411,7 @@
     var formCountry = document.getElementById("slider-form-country");
     var titleInp = document.getElementById("slider-form-title");
     var imgInp = document.getElementById("slider-form-image");
+    var logoInp = document.getElementById("slider-form-logo");
     var descInp = document.getElementById("slider-form-desc");
     var saveBtn = document.getElementById("slider-form-submit");
     var cancelBtn = document.getElementById("slider-form-cancel");
@@ -406,6 +419,7 @@
     if (formCountry) formCountry.value = "all";
     if (titleInp) titleInp.value = "";
     if (imgInp) imgInp.value = "";
+    if (logoInp) logoInp.value = "";
     if (descInp) descInp.value = "";
     if (saveBtn) saveBtn.textContent = "Ajouter manuellement au slider";
     if (cancelBtn) cancelBtn.hidden = true;
@@ -420,6 +434,7 @@
     var catInp = document.getElementById("slider-form-category");
     var badgeInp = document.getElementById("slider-form-badge");
     var imgInp = document.getElementById("slider-form-image");
+    var logoInp = document.getElementById("slider-form-logo");
     var descInp = document.getElementById("slider-form-desc");
 
     var targetCountry = formCountry ? formCountry.value : "all";
@@ -451,7 +466,11 @@
 
           await apiReq("/rest/v1/admin_hero_slider?id=eq." + encodeURIComponent(state.editingItemId), {
             method: "PATCH",
-            body: JSON.stringify({ country_mappings: mappings, excluded_countries: excluded })
+            body: JSON.stringify({
+              country_mappings: mappings,
+              excluded_countries: excluded,
+              logo: logoInp ? logoInp.value.trim() : (currentItem.logo || "")
+            })
           });
 
           var cObj = state.countries.find(function(c) { return c.id === targetCountry; });
@@ -464,6 +483,7 @@
             badge: badgeInp ? badgeInp.value : "Top Trending",
             image: imgInp ? imgInp.value.trim() : "",
             backdrop: imgInp ? imgInp.value.trim() : "",
+            logo: logoInp ? logoInp.value.trim() : "",
             overview: descInp ? descInp.value.trim() : ""
           };
 
@@ -482,6 +502,7 @@
           badge: badgeInp ? badgeInp.value : "Top Trending",
           image: imgInp ? imgInp.value.trim() : "",
           backdrop: imgInp ? imgInp.value.trim() : "",
+          logo: logoInp ? logoInp.value.trim() : "",
           overview: descInp ? descInp.value.trim() : "",
           sort_order: state.items.length + 1,
           published: true,

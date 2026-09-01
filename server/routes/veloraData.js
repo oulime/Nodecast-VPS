@@ -2189,6 +2189,7 @@ router.get('/hero-slider', (req, res) => {
             return {
                 id: item.id,
                 title: item.title || selectedStream?.name || '',
+                logo: item.logo || item.logo_url || item.title_logo || selectedStream?.logo || '',
                 category: item.category || selectedStream?.contentType || 'movie',
                 badge: item.badge || 'Top Trending',
                 image: item.image || selectedStream?.thumbUrl || '',

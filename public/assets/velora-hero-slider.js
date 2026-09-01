@@ -185,7 +185,11 @@
       img.className = "vel-hero-slide__bg";
       var cleanTitle = formatCleanTitle(item.title);
       img.alt = cleanTitle;
+      img.decoding = "async";
       img.loading = idx === 0 ? "eager" : "lazy";
+      if (idx === 0) {
+        img.setAttribute("fetchpriority", "high");
+      }
       img.src = item.backdrop || item.image || "";
 
       var overlay = document.createElement("div");
@@ -194,11 +198,36 @@
       var content = document.createElement("div");
       content.className = "vel-hero-slide__content";
 
-      var title = document.createElement("h2");
-      title.className = "vel-hero-title";
-      title.textContent = cleanTitle;
+      var logoUrl = (item.logo || item.logo_url || item.title_logo || "").trim();
+      if (logoUrl) {
+        var logoWrap = document.createElement("h2");
+        logoWrap.className = "vel-hero-title-art";
+        logoWrap.setAttribute("aria-label", cleanTitle);
 
-      content.appendChild(title);
+        var logoImg = document.createElement("img");
+        logoImg.className = "vel-hero-title-logo";
+        logoImg.alt = cleanTitle;
+        logoImg.decoding = "async";
+        logoImg.loading = idx === 0 ? "eager" : "lazy";
+        logoImg.src = logoUrl;
+
+        logoImg.addEventListener("error", function() {
+          var fallbackTitle = document.createElement("h2");
+          fallbackTitle.className = "vel-hero-title";
+          fallbackTitle.textContent = cleanTitle;
+          if (logoWrap.parentNode) {
+            logoWrap.parentNode.replaceChild(fallbackTitle, logoWrap);
+          }
+        });
+
+        logoWrap.appendChild(logoImg);
+        content.appendChild(logoWrap);
+      } else {
+        var title = document.createElement("h2");
+        title.className = "vel-hero-title";
+        title.textContent = cleanTitle;
+        content.appendChild(title);
+      }
 
       if (item.overview) {
         var overview = document.createElement("p");

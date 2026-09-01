@@ -748,10 +748,11 @@
       const isSearchOpen = globalSearch && !globalSearch.classList.contains("hidden");
       if (isSearchOpen) {
         primeSearchBtn.classList.add("is-hidden");
+        primeSearchBtn.style.setProperty("display", "none", "important");
       } else {
         primeSearchBtn.classList.remove("is-hidden");
+        primeSearchBtn.style.setProperty("display", "flex", "important");
       }
-      primeSearchBtn.style.removeProperty("display");
     } else {
       if (stickyTop) stickyTop.style.removeProperty("display");
       if (primeSearchBtn) {

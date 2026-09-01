@@ -56,14 +56,6 @@ body[data-vel-active-tab="series"] .main--velora .vel-sticky-top {
 }
 
 /* Floating Search Button - STRICTLY ONLY ON MOVIES & SERIES TABS */
-.vel-prime-search-btn,
-body:not([data-vel-active-tab="movies"]):not([data-vel-active-tab="series"]) .vel-prime-search-btn {
-  display: none !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-  opacity: 0 !important;
-}
-
 body[data-vel-active-tab="movies"] .vel-prime-search-btn,
 body[data-vel-active-tab="series"] .vel-prime-search-btn {
   position: fixed !important;
@@ -73,7 +65,7 @@ body[data-vel-active-tab="series"] .vel-prime-search-btn {
   width: clamp(48px, 4.4vw, 54px) !important;
   height: clamp(48px, 4.4vw, 54px) !important;
   border-radius: 50% !important;
-  background: rgba(14, 14, 24, 0.78) !important;
+  background: rgba(14, 14, 24, 0.85) !important;
   backdrop-filter: blur(18px) !important;
   -webkit-backdrop-filter: blur(18px) !important;
   border: 1.5px solid rgba(255, 255, 255, 0.28) !important;
@@ -83,7 +75,7 @@ body[data-vel-active-tab="series"] .vel-prime-search-btn {
   justify-content: center !important;
   cursor: pointer !important;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.7) !important;
-  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease !important;
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease !important;
 }
 
 body[data-vel-active-tab="movies"] .vel-prime-search-btn:hover,
@@ -99,17 +91,21 @@ body[data-vel-active-tab="series"] .vel-prime-search-btn:hover {
   fill: #fff !important;
 }
 
-/* Hide floating search button when search modal, video player, or detail popup is open */
-body:has(#vel-global-search:not(.hidden)) .vel-prime-search-btn,
-body.vel-modal-active .vel-prime-search-btn,
-body.vel-vod-fullscreen-active .vel-prime-search-btn,
-body.vel-live-fullscreen-active .vel-prime-search-btn,
-body.vel-home-choice-loading .vel-prime-search-btn,
-.vel-prime-search-btn.is-hidden {
+/* Hide on non-media tabs (home, live, etc.) */
+body:not([data-vel-active-tab="movies"]):not([data-vel-active-tab="series"]) .vel-prime-search-btn,
+body[data-vel-active-tab="home"] .vel-prime-search-btn,
+body[data-vel-active-tab="live"] .vel-prime-search-btn {
   display: none !important;
   visibility: hidden !important;
   pointer-events: none !important;
-  opacity: 0 !important;
+}
+
+/* Hide when modal or video player is open */
+body.vel-modal-active .vel-prime-search-btn,
+body.vel-vod-fullscreen-active .vel-prime-search-btn,
+body.vel-live-fullscreen-active .vel-prime-search-btn,
+.vel-prime-search-btn.is-hidden {
+  display: none !important;
 }
 
 body[data-vel-active-tab="movies"] .vel-prime-container,

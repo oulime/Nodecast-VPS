@@ -698,7 +698,7 @@
 
     // 3. Update top title
     const contextTitle = document.getElementById("vel-header-context-title-text");
-    if (contextTitle) contextTitle.textContent = channel.name;
+    if (contextTitle) contextTitle.textContent = "ADULTE +18";
 
     // 4. Play video
     const streamUrl = `/api/proxy/xtream/${encodeURIComponent(channel.source_id)}/stream/${encodeURIComponent(channel.stream_id || channel.item_id)}/live`;
@@ -1093,7 +1093,7 @@
 
     // 3. Update top title
     const contextTitle = document.getElementById("vel-header-context-title-text");
-    if (contextTitle) contextTitle.textContent = movie.name;
+    if (contextTitle) contextTitle.textContent = "ADULTE +18";
 
     // 4. Update Prev / Next Buttons
     const prevBtn = document.getElementById("vod-ctl-prev-episode");

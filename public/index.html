@@ -8532,6 +8532,7 @@
           };
           var fallbackContextTitle = function () {
             var activeTab = document.body.dataset.velActiveTab;
+            if (document.body.dataset.veloraReturnAdult === "true" || activeTab === "adult") return "ADULTE +18";
             if (activeTab === "movies") return "FILMS";
             if (activeTab === "series") return "SÉRIES";
             return "TV EN DIRECT";
@@ -13401,10 +13402,23 @@ if (target.closest(".trial-offer-button")) {
       }
 
       /* One shared package header: back, context title, search. */
-      body.vel-home-choice-picked:not(.vel-home-empty-active) .main--velora .vel-header,
-      body .main--velora:has(#content-view:not(.hidden)) .vel-header,
-      body .main--velora:has(#player-container:not(.hidden)) .vel-header,
-      body .main--velora:has(#vod-player-container:not(.hidden)) .vel-header {
+      body.vel-adult-active .main--velora .vel-header,
+      body.vel-adult-active .main--velora .vel-sticky-top,
+      body:has(#adult-view:not(.hidden)) .main--velora .vel-header,
+      body:has(#adult-view:not(.hidden)) .main--velora .vel-sticky-top {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        pointer-events: none !important;
+      }
+
+      body.vel-home-choice-picked:not(.vel-home-empty-active):not(.vel-adult-active):not(:has(#adult-view:not(.hidden))) .main--velora .vel-header,
+      body .main--velora:has(#content-view:not(.hidden)):not(:has(#adult-view:not(.hidden))) .vel-header,
+      body .main--velora:has(#player-container:not(.hidden)):not(:has(#adult-view:not(.hidden))) .vel-header,
+      body .main--velora:has(#vod-player-container:not(.hidden)):not(:has(#adult-view:not(.hidden))) .vel-header {
         position: relative !important;
         z-index: 20 !important;
         display: grid !important;
@@ -13414,10 +13428,10 @@ if (target.closest(".trial-offer-button")) {
         pointer-events: auto !important;
       }
 
-      body.vel-home-choice-picked:not(.vel-home-empty-active) .main--velora .vel-sticky-top,
-      body .main--velora:has(#content-view:not(.hidden)) .vel-sticky-top,
-      body .main--velora:has(#player-container:not(.hidden)) .vel-sticky-top,
-      body .main--velora:has(#vod-player-container:not(.hidden)) .vel-sticky-top {
+      body.vel-home-choice-picked:not(.vel-home-empty-active):not(.vel-adult-active):not(:has(#adult-view:not(.hidden))) .main--velora .vel-sticky-top,
+      body .main--velora:has(#content-view:not(.hidden)):not(:has(#adult-view:not(.hidden))) .vel-sticky-top,
+      body .main--velora:has(#player-container:not(.hidden)):not(:has(#adult-view:not(.hidden))) .vel-sticky-top,
+      body .main--velora:has(#vod-player-container:not(.hidden)):not(:has(#adult-view:not(.hidden))) .vel-sticky-top {
         display: block !important;
         visibility: visible !important;
         opacity: 1 !important;

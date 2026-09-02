@@ -557,7 +557,7 @@ router.get('/xtream/stream/:globalStreamId/:type?', async (req, res) => {
 router.get('/xtream/:sourceId', async (req, res) => {
     try {
         const source = await sources.getById(req.params.sourceId);
-        if (!source || source.type !== 'xtream') return res.status(404).send('Source not found');
+        if (!source || source.type !== 'xtream' || !source.enabled) return res.status(404).send('Source not found or disabled');
 
         // Proxy auth check to upstream to ensure credentials are still valid
 
@@ -801,8 +801,8 @@ router.get('/xtream/:sourceId/vod_info', async (req, res) => {
 router.get('/xtream/:sourceId/stream/:streamId/:type', async (req, res) => {
     try {
         const source = await sources.getById(req.params.sourceId);
-        if (!source || source.type !== 'xtream') {
-            return res.status(404).json({ error: 'Xtream source not found' });
+        if (!source || source.type !== 'xtream' || !source.enabled) {
+            return res.status(404).json({ error: 'Xtream source not found or disabled' });
         }
 
         const streamId = req.params.streamId;
@@ -1049,8 +1049,8 @@ router.get('/xtream/:sourceId/:action', async (req, res) => {
 router.get('/xtream/:sourceId/stream/:streamId/:type?', async (req, res) => {
     try {
         const source = await sources.getById(req.params.sourceId);
-        if (!source || source.type !== 'xtream') {
-            return res.status(404).json({ error: 'Xtream source not found' });
+        if (!source || source.type !== 'xtream' || !source.enabled) {
+            return res.status(404).json({ error: 'Xtream source not found or disabled' });
         }
 
         const api = xtreamApi.createFromSource(source);

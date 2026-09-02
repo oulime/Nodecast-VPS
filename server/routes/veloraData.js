@@ -20,6 +20,20 @@ const mediaFeedCachePath = path.join(__dirname, '..', '..', 'data', 'velora-cach
 const MEDIA_FEED_ENTRIES_PER_PACKAGE = 20;
 let currentMediaFeedCache = null;
 const https = require('https');
+const dbJsonPath = path.join(__dirname, '..', '..', 'data', 'db.json');
+
+function getEnabledSourceIdSet() {
+    try {
+        if (fs.existsSync(dbJsonPath)) {
+            const data = JSON.parse(fs.readFileSync(dbJsonPath, 'utf8'));
+            const list = Array.isArray(data?.sources) ? data.sources : [];
+            return new Set(list.filter(s => s.enabled !== false && s.enabled !== 0).map(s => String(s.id)));
+        }
+    } catch (e) {
+        console.warn('[Velora data] Failed to read enabled sources:', e.message);
+    }
+    return new Set();
+}
 
 function cleanMediaTitleForSearch(raw) {
     let title = String(raw || '').trim();
@@ -638,13 +652,14 @@ function effectiveCurations(packageIds = null, prepared = null) {
         }
     }
 
+    const enabledSourceIds = getEnabledSourceIdSet();
     const explicit = candidates.map(({ row, kind, itemType, streamId, packageRow }) => {
         const matches = matchesByItem.get(`${itemType}\u001f${streamId}`) || [];
         const preferredSource = String(row.source_id ?? packageRow.source_id ?? '').trim();
         const selected = preferredSource
             ? matches.find(item => String(item.source_id) === preferredSource)
             : matches.length === 1 ? matches[0] : null;
-        if (!selected) return null;
+        if (!selected || !enabledSourceIds.has(String(selected.source_id))) return null;
         return {
             ...row,
             source_id: selected.source_id,
@@ -696,6 +711,8 @@ function effectiveCurations(packageIds = null, prepared = null) {
         const kind = String(packageRow.kind || '').trim();
         const itemType = catalogueItemType(kind);
         if (!packageId || !countryId || !Number.isInteger(sourceId) || !categoryId || !itemType) continue;
+        if (!enabledSourceIds.has(String(sourceId))) continue;
+        if (packageRow.source_id && !enabledSourceIds.has(String(packageRow.source_id))) continue;
 
         for (const item of listItems.all(sourceId, itemType, categoryId)) {
             const streamId = String(item.item_id);
@@ -822,6 +839,7 @@ function getCountryPackageCache() {
 }
 
 function liveChannelsForCurations(curations, packageById) {
+    const enabledSourceIds = getEnabledSourceIdSet();
     const findItem = getDb().prepare(`
         SELECT item_id, name, stream_icon, provider_order
         FROM playlist_items
@@ -835,7 +853,7 @@ function liveChannelsForCurations(curations, packageById) {
         const streamId = String(curation.stream_id || '').trim();
         const packageId = String(curation.target_package_id || '').trim();
         const key = `${packageId}:${sourceId}:${streamId}`;
-        if (!Number.isInteger(sourceId) || !streamId || seen.has(key)) continue;
+        if (!Number.isInteger(sourceId) || !streamId || !enabledSourceIds.has(String(sourceId)) || seen.has(key)) continue;
         const item = findItem.get(sourceId, streamId);
         if (!item) continue;
         seen.add(key);
@@ -863,6 +881,7 @@ function liveChannelsForCurations(curations, packageById) {
 function mediaItemsForCurations(curations, packageById, kind) {
     const itemType = catalogueItemType(kind);
     if (kind !== 'vod' && kind !== 'series') return [];
+    const enabledSourceIds = getEnabledSourceIdSet();
     const findItem = getDb().prepare(`
         SELECT item_id, name, stream_icon, container_extension, provider_order
         FROM playlist_items
@@ -876,7 +895,7 @@ function mediaItemsForCurations(curations, packageById, kind) {
         const streamId = String(curation.stream_id || '').trim();
         const packageId = String(curation.target_package_id || '').trim();
         const key = `${packageId}:${sourceId}:${streamId}`;
-        if (!Number.isInteger(sourceId) || !streamId || seen.has(key)) continue;
+        if (!Number.isInteger(sourceId) || !streamId || !enabledSourceIds.has(String(sourceId)) || seen.has(key)) continue;
         const item = findItem.get(sourceId, itemType, streamId);
         if (!item) continue;
         seen.add(key);
@@ -1875,6 +1894,7 @@ function buildHomeCache() {
     let backdropCache = {};
     try { backdropCache = JSON.parse(fs.readFileSync(vodBackdropCachePath, 'utf8')) || {}; } catch (_) {}
 
+    const enabledSourceIds = getEnabledSourceIdSet();
     const output = sections.map(section => {
         const type = ['live', 'movies', 'series'].includes(section.content_type)
             ? section.content_type : 'live';
@@ -1892,6 +1912,8 @@ function buildHomeCache() {
             entries = section.custom_entries.map((item, a) => {
                 const rawName = String(item.name || item.title || '').trim();
                 const rawId = item.streamId ?? item.stream_id ?? item.raw_stream_id ?? a;
+                const sourceId = String(item.sourceId ?? item.source_id ?? '').trim();
+                if (sourceId && !enabledSourceIds.has(sourceId)) return null;
                 const standardThumb = String(item.thumbUrl || item.stream_icon || item.cover || '');
                 const backdropUrl = String(item.backdropUrl || item.backdrop || standardThumb || '');
                 const finalThumb = (isHorizontal && backdropUrl) ? backdropUrl : (standardThumb || backdropUrl);
@@ -1913,6 +1935,7 @@ function buildHomeCache() {
             entries = snapshots[type].filter(item => {
                 const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
                 const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
+                if (sourceId && !enabledSourceIds.has(sourceId)) return false;
                 if (membership.keys.size) {
                     return membership.sourceAware
                         ? membership.keys.has(`${sourceId}:${String(rawId)}`)
@@ -2276,6 +2299,8 @@ router.get('/hero-slider/search-catalog', (req, res) => {
                 WHERE (${tokenClauses.join(' AND ')}) AND p.is_hidden = 0${typeClause}
                 LIMIT 500
             `).all(...params);
+            const enabledSourceIds = getEnabledSourceIdSet();
+            rows = rows.filter(r => enabledSourceIds.has(String(r.source_id)));
         } catch (_) {
             rows = [];
         }

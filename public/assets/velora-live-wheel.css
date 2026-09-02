@@ -61,15 +61,23 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active):not(.vel-favorites-o
   display: block !important;
 }
 
+body[data-vel-active-tab="live"] #btn-header-back,
+body[data-vel-top-level="live"] #btn-header-back,
+body[data-vel-active-tab="live"] .vel-header-back-btn,
+body[data-vel-top-level="live"] .vel-header-back-btn,
 body[data-vel-active-tab="live"] #btn-close-player,
 body[data-vel-top-level="live"] #btn-close-player,
 body[data-vel-active-tab="live"] #btn-back-home,
 body[data-vel-top-level="live"] #btn-back-home,
+body[data-vel-active-tab="live"] .back-btn,
+body[data-vel-top-level="live"] .back-btn,
 body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]) #vel-packages-section-heading,
 body[data-vel-top-level="live"]:not(.vel-home-empty-active) #vel-packages-section-heading,
 body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]) #packages-view,
 body[data-vel-top-level="live"]:not(.vel-home-empty-active) #packages-view {
   display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]):not(.vel-favorites-open) #content-view,

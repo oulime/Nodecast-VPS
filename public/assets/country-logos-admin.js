@@ -4,11 +4,158 @@
   const key = value => String(value || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
   const escapeHtml = value => String(value || "").replace(/[&<>"']/g, char => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[char]);
 
+  const flagCodes = {
+    afghanistan: "af",
+    afrique_du_sud: "za",
+    albanie: "al",
+    algerie: "dz",
+    allemagne: "de",
+    angleterre: "gb",
+    arabie_saoudite: "sa",
+    argentine: "ar",
+    armenie: "am",
+    australie: "au",
+    autriche: "at",
+    azerbaidjan: "az",
+    bahrein: "bh",
+    bangladesh: "bd",
+    belgique: "be",
+    bielorussie: "by",
+    bolivie: "bo",
+    bosnie: "ba",
+    bosnie_herzegovine: "ba",
+    bresil: "br",
+    bulgarie: "bg",
+    cameroun: "cm",
+    canada: "ca",
+    chili: "cl",
+    chine: "cn",
+    chypre: "cy",
+    colombie: "co",
+    congo: "cg",
+    congo_gabon: "cg",
+    coree_du_sud: "kr",
+    costa_rica: "cr",
+    croatie: "hr",
+    cuba: "cu",
+    danemark: "dk",
+    ecosse: "gb-sct",
+    egypte: "eg",
+    emirats_arabes_unis: "ae",
+    equateur: "ec",
+    espagne: "es",
+    estonie: "ee",
+    etats_unis: "us",
+    finlande: "fi",
+    france: "fr",
+    gabon: "ga",
+    georgie: "ge",
+    ghana: "gh",
+    grece: "gr",
+    guatemala: "gt",
+    honduras: "hn",
+    hong_kong: "hk",
+    hongrie: "hu",
+    inde: "in",
+    indonesie: "id",
+    irak: "iq",
+    iran: "ir",
+    irlande: "ie",
+    islande: "is",
+    israel: "il",
+    italie: "it",
+    japon: "jp",
+    jordanie: "jo",
+    kazakhstan: "kz",
+    kosovo: "xk",
+    koweit: "kw",
+    kurdistan: "iq",
+    laos: "la",
+    lettonie: "lv",
+    liban: "lb",
+    libye: "ly",
+    lituanie: "lt",
+    luxembourg: "lu",
+    macedoine: "mk",
+    macedoine_du_nord: "mk",
+    malaisie: "my",
+    mali: "ml",
+    malte: "mt",
+    maroc: "ma",
+    maurice: "mu",
+    mauritanie: "mr",
+    mexique: "mx",
+    monaco: "mc",
+    montenegro: "me",
+    namibie: "na",
+    nepal: "np",
+    nicaragua: "ni",
+    nigeria: "ng",
+    norvege: "no",
+    nouvelle_zelande: "nz",
+    oman: "om",
+    ouzbekistan: "uz",
+    pakistan: "pk",
+    palestine: "ps",
+    panama: "pa",
+    paraguay: "py",
+    pays_bas: "nl",
+    pays_de_galles: "gb-wls",
+    perou: "pe",
+    philippines: "ph",
+    pologne: "pl",
+    portugal: "pt",
+    qatar: "qa",
+    republique_dominicaine: "do",
+    republique_tcheque: "cz",
+    roumanie: "ro",
+    royaume_uni: "gb",
+    russie: "ru",
+    salvador: "sv",
+    senegal: "sn",
+    serbie: "rs",
+    slovaquie: "sk",
+    slovenie: "si",
+    somalie: "so",
+    soudan: "sd",
+    sri_lanka: "lk",
+    suede: "se",
+    suisse: "ch",
+    suriname: "sr",
+    syrie: "sy",
+    taiwan: "tw",
+    thailande: "th",
+    tunisie: "tn",
+    turquie: "tr",
+    ukraine: "ua",
+    uruguay: "uy",
+    venezuela: "ve",
+    vietnam: "vn",
+    yemen: "ye",
+    usa: "us"
+  };
+
   function resolvedLogo(countryId, countryName) {
-    const custom = byId.get(String(countryId || ""))?.path || window.__veloraCountryLogosByName?.[key(countryName)] || "";
+    const k = key(countryName);
+    const custom = byId.get(String(countryId || ""))?.path || window.__veloraCountryLogosByName?.[k] || "";
     if (custom) return custom;
-    return typeof window.__veloraCountryFlagUrl === "function" ? window.__veloraCountryFlagUrl(countryName) : "";
+    if (k === "arabe") return "/logos/arabe.svg";
+    if (typeof window.__veloraCountryFlagUrl === "function") {
+      const u = window.__veloraCountryFlagUrl(countryName);
+      if (u) return u;
+    }
+    const code = flagCodes[k];
+    return code ? `https://flagcdn.com/w40/${code}.png` : "";
   }
+
+  window.__veloraCountryFlagUrl = function (countryName) {
+    const k = key(countryName);
+    const custom = byId.get(String(countryName || ""))?.path || window.__veloraCountryLogosByName?.[k] || "";
+    if (custom) return custom;
+    if (k === "arabe") return "/logos/arabe.svg";
+    const code = flagCodes[k];
+    return code ? `https://flagcdn.com/w40/${code}.png` : "";
+  };
 
   function setImageSource(image, source) {
     if (!image) return;
@@ -68,6 +215,8 @@
     refreshAppLogos();
     window.dispatchEvent(new CustomEvent("velora-country-logos-changed"));
   }
+
+  window.refreshAppCountryLogos = refreshAppLogos;
 
   async function load() {
     const response = await fetch("/api/country-logos", { cache: "no-store" });

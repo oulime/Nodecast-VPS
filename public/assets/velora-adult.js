@@ -1463,31 +1463,347 @@
     }
   }
 
-  // Open the Adult Portal page
-  async function openAdultPortal() {
-    const isConfirmed = sessionStorage.getItem(ADULT_CONFIRMED_KEY) === "1";
-    const dialog = document.getElementById("vel-adult-confirm-dialog");
-    const yesBtn = document.getElementById("vel-adult-confirm-yes");
-    const noBtn = document.getElementById("vel-adult-confirm-no");
+  // ---------------------------------------------------------------------------
+  // High-Security 4-Digit Parental PIN Gate (SHA-256 + Salt)
+  // ---------------------------------------------------------------------------
+  const ADULT_PIN_STORAGE_KEY = "velora_adult_pin_record_v1";
+  const ADULT_SESSION_KEY = "velora_adult_session_unlocked_v1";
 
-    if (!isConfirmed && dialog) {
-      dialog.showModal();
+  function bytesToHex(bytes) {
+    return Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+  }
 
-      const handleConfirm = () => {
-        sessionStorage.setItem(ADULT_CONFIRMED_KEY, "1");
-        dialog.close();
-        showAdultView();
+  function hexToBytes(hex) {
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < bytes.length; i++) {
+      bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+    }
+    return bytes;
+  }
+
+  async function hashPin(pin, saltHex) {
+    const enc = new TextEncoder();
+    const salt = saltHex ? hexToBytes(saltHex) : (window.crypto ? crypto.getRandomValues(new Uint8Array(16)) : new Uint8Array(16));
+    const pinBytes = enc.encode(String(pin));
+    const combined = new Uint8Array(salt.length + pinBytes.length);
+    combined.set(salt, 0);
+    combined.set(pinBytes, salt.length);
+    if (window.crypto && crypto.subtle) {
+      const hashBuffer = await crypto.subtle.digest("SHA-256", combined);
+      return {
+        salt: bytesToHex(salt),
+        hash: bytesToHex(new Uint8Array(hashBuffer))
       };
-      const handleCancel = () => {
-        dialog.close();
-      };
+    }
+    let simpleHash = 0;
+    for (let i = 0; i < combined.length; i++) {
+      simpleHash = ((simpleHash << 5) - simpleHash) + combined[i];
+      simpleHash |= 0;
+    }
+    return {
+      salt: bytesToHex(salt),
+      hash: "s_" + Math.abs(simpleHash).toString(16)
+    };
+  }
 
-      if (yesBtn) yesBtn.onclick = handleConfirm;
-      if (noBtn) noBtn.onclick = handleCancel;
+  function getStoredPinRecord() {
+    try {
+      const data = localStorage.getItem(ADULT_PIN_STORAGE_KEY);
+      if (!data) return null;
+      const parsed = JSON.parse(data);
+      if (parsed && typeof parsed.hash === "string" && typeof parsed.salt === "string") {
+        return parsed;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function savePinRecord(record) {
+    try {
+      localStorage.setItem(ADULT_PIN_STORAGE_KEY, JSON.stringify(record));
+    } catch (_) {}
+  }
+
+  function isAdultSessionUnlocked() {
+    try {
+      return sessionStorage.getItem(ADULT_SESSION_KEY) === "1";
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function setAdultSessionUnlocked(unlocked) {
+    try {
+      if (unlocked) {
+        sessionStorage.setItem(ADULT_SESSION_KEY, "1");
+      } else {
+        sessionStorage.removeItem(ADULT_SESSION_KEY);
+      }
+    } catch (_) {}
+  }
+
+  let pinModalEl = null;
+  let pinKeydownHandler = null;
+  let failedAttempts = 0;
+  let lockoutUntil = 0;
+
+  function ensurePinModal() {
+    if (pinModalEl && document.body.contains(pinModalEl)) return pinModalEl;
+    pinModalEl = document.createElement("div");
+    pinModalEl.id = "vel-adult-pin-modal";
+    pinModalEl.className = "vel-adult-pin-modal";
+    pinModalEl.setAttribute("aria-modal", "true");
+    pinModalEl.setAttribute("role", "dialog");
+
+    pinModalEl.innerHTML = `
+      <div class="vel-adult-pin-card" id="vel-adult-pin-card">
+        <button type="button" class="vel-adult-pin-close-btn" id="vel-adult-pin-close" aria-label="Fermer" title="Fermer">✕</button>
+        <div class="vel-adult-pin-icon-wrap" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 2C9.24 2 7 4.24 7 7v3H6c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8c0-1.1-.9-2-2-2h-1V7c0-2.76-2.24-5-5-5Zm0 2c1.66 0 3 1.34 3 3v3H9V7c0-1.66 1.34-3 3-3Zm0 10c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2Z"/></svg>
+        </div>
+        <h2 class="vel-adult-pin-title" id="vel-adult-pin-title">Zone Restreinte (+18)</h2>
+        <p class="vel-adult-pin-subtitle" id="vel-adult-pin-subtitle">Définissez un code PIN à 4 chiffres pour restreindre l'accès aux enfants.</p>
+        
+        <div class="vel-adult-pin-dots" id="vel-adult-pin-dots" aria-hidden="true">
+          <div class="vel-adult-pin-dot"></div>
+          <div class="vel-adult-pin-dot"></div>
+          <div class="vel-adult-pin-dot"></div>
+          <div class="vel-adult-pin-dot"></div>
+        </div>
+
+        <div class="vel-adult-pin-error" id="vel-adult-pin-error" role="alert"></div>
+
+        <div class="vel-adult-pin-keypad" id="vel-adult-pin-keypad">
+          <button type="button" class="vel-adult-pin-key" data-digit="1">1</button>
+          <button type="button" class="vel-adult-pin-key" data-digit="2">2</button>
+          <button type="button" class="vel-adult-pin-key" data-digit="3">3</button>
+          <button type="button" class="vel-adult-pin-key" data-digit="4">4</button>
+          <button type="button" class="vel-adult-pin-key" data-digit="5">5</button>
+          <button type="button" class="vel-adult-pin-key" data-digit="6">6</button>
+          <button type="button" class="vel-adult-pin-key" data-digit="7">7</button>
+          <button type="button" class="vel-adult-pin-key" data-digit="8">8</button>
+          <button type="button" class="vel-adult-pin-key" data-digit="9">9</button>
+          <button type="button" class="vel-adult-pin-key vel-adult-pin-key--action" id="vel-adult-pin-cancel">Annuler</button>
+          <button type="button" class="vel-adult-pin-key" data-digit="0">0</button>
+          <button type="button" class="vel-adult-pin-key vel-adult-pin-key--action" id="vel-adult-pin-backspace" aria-label="Effacer">
+            <svg viewBox="0 0 24 24"><path d="M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3 12.59L17.59 17 14 13.41 10.41 17 9 15.59 12.59 12 9 8.41 10.41 7 14 10.59 17.59 7 19 8.41 15.41 12 19 15.59z"/></svg>
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(pinModalEl);
+    return pinModalEl;
+  }
+
+  function promptAdultPinGate(onSuccess, options = {}) {
+    if (isAdultSessionUnlocked() && !options.forceSetup) {
+      if (typeof onSuccess === "function") onSuccess();
       return;
     }
 
-    showAdultView();
+    const modal = ensurePinModal();
+    const card = document.getElementById("vel-adult-pin-card");
+    const titleEl = document.getElementById("vel-adult-pin-title");
+    const subtitleEl = document.getElementById("vel-adult-pin-subtitle");
+    const dotsWrap = document.getElementById("vel-adult-pin-dots");
+    const errorEl = document.getElementById("vel-adult-pin-error");
+    const dots = dotsWrap ? dotsWrap.querySelectorAll(".vel-adult-pin-dot") : [];
+
+    let currentPin = "";
+    let firstPin = ""; // For setup step 1
+    const storedRecord = getStoredPinRecord();
+    let mode = (storedRecord && !options.forceSetup) ? "UNLOCK" : "CREATE_1";
+
+    function updateView() {
+      if (mode === "CREATE_1") {
+        titleEl.textContent = "🔐 Créer le code d'accès (+18)";
+        subtitleEl.textContent = "Choisissez un code PIN à 4 chiffres pour restreindre l'accès aux enfants.";
+      } else if (mode === "CREATE_2") {
+        titleEl.textContent = "🔐 Confirmez le code PIN";
+        subtitleEl.textContent = "Ressaisissez votre code PIN à 4 chiffres pour confirmer.";
+      } else {
+        titleEl.textContent = "🔒 Zone Verrouillée (+18)";
+        subtitleEl.textContent = "Entrez votre code PIN à 4 chiffres pour accéder au contenu adulte.";
+      }
+
+      dots.forEach((dot, index) => {
+        dot.classList.toggle("is-filled", index < currentPin.length);
+      });
+    }
+
+    function showError(msg) {
+      if (!errorEl) return;
+      errorEl.textContent = msg;
+      errorEl.classList.add("is-visible");
+      if (card) {
+        card.classList.remove("is-shaking");
+        void card.offsetWidth;
+        card.classList.add("is-shaking");
+        setTimeout(() => card.classList.remove("is-shaking"), 450);
+      }
+    }
+
+    function clearError() {
+      if (!errorEl) return;
+      errorEl.textContent = "";
+      errorEl.classList.remove("is-visible");
+    }
+
+    function closeModal() {
+      modal.classList.remove("is-open");
+      currentPin = "";
+      firstPin = "";
+      if (pinKeydownHandler) {
+        document.removeEventListener("keydown", pinKeydownHandler, true);
+        pinKeydownHandler = null;
+      }
+    }
+
+    async function handlePinComplete() {
+      if (currentPin.length !== 4) return;
+
+      if (Date.now() < lockoutUntil) {
+        showError("⚠️ Veuillez patienter avant de réessayer.");
+        currentPin = "";
+        updateView();
+        return;
+      }
+
+      if (mode === "CREATE_1") {
+        firstPin = currentPin;
+        currentPin = "";
+        mode = "CREATE_2";
+        clearError();
+        updateView();
+        return;
+      }
+
+      if (mode === "CREATE_2") {
+        if (currentPin === firstPin) {
+          const newRecord = await hashPin(currentPin);
+          savePinRecord(newRecord);
+          setAdultSessionUnlocked(true);
+          failedAttempts = 0;
+          clearError();
+          if (titleEl) titleEl.textContent = "✓ Code PIN créé !";
+          if (subtitleEl) subtitleEl.textContent = "Accès adulte sécurisé avec succès.";
+          setTimeout(() => {
+            closeModal();
+            if (typeof onSuccess === "function") onSuccess();
+          }, 350);
+        } else {
+          showError("❌ Les codes PIN ne correspondent pas. Recommencez.");
+          firstPin = "";
+          currentPin = "";
+          mode = "CREATE_1";
+          setTimeout(updateView, 400);
+        }
+        return;
+      }
+
+      if (mode === "UNLOCK") {
+        const isValid = await (async () => {
+          if (!storedRecord) return true;
+          const computed = await hashPin(currentPin, storedRecord.salt);
+          return computed.hash === storedRecord.hash;
+        })();
+
+        if (isValid) {
+          setAdultSessionUnlocked(true);
+          failedAttempts = 0;
+          clearError();
+          if (titleEl) titleEl.textContent = "✓ Accès Déverrouillé";
+          setTimeout(() => {
+            closeModal();
+            if (typeof onSuccess === "function") onSuccess();
+          }, 250);
+        } else {
+          failedAttempts++;
+          currentPin = "";
+          updateView();
+          if (failedAttempts >= 5) {
+            lockoutUntil = Date.now() + 30000;
+            showError("❌ Trop d'essais erronés. Verrouillé 30 secondes.");
+          } else {
+            showError(`❌ Code PIN incorrect (${5 - failedAttempts} essai(s) restant(s))`);
+          }
+        }
+      }
+    }
+
+    function addDigit(digit) {
+      if (Date.now() < lockoutUntil) {
+        showError("⚠️ Trop de tentatives. Veuillez patienter.");
+        return;
+      }
+      if (currentPin.length >= 4) return;
+      clearError();
+      currentPin += String(digit);
+      updateView();
+      if (currentPin.length === 4) {
+        setTimeout(handlePinComplete, 60);
+      }
+    }
+
+    function removeDigit() {
+      if (currentPin.length > 0) {
+        currentPin = currentPin.slice(0, -1);
+        clearError();
+        updateView();
+      }
+    }
+
+    modal.onclick = (e) => {
+      if (e.target === modal || e.target.closest("#vel-adult-pin-close") || e.target.closest("#vel-adult-pin-cancel")) {
+        closeModal();
+        return;
+      }
+      const keyBtn = e.target.closest(".vel-adult-pin-key");
+      if (!keyBtn) return;
+      const digit = keyBtn.dataset.digit;
+      if (digit != null) {
+        addDigit(digit);
+      } else if (keyBtn.id === "vel-adult-pin-backspace" || keyBtn.closest("#vel-adult-pin-backspace")) {
+        removeDigit();
+      }
+    };
+
+    if (pinKeydownHandler) {
+      document.removeEventListener("keydown", pinKeydownHandler, true);
+    }
+    pinKeydownHandler = (e) => {
+      if (!modal.classList.contains("is-open")) return;
+      if (e.key >= "0" && e.key <= "9") {
+        e.preventDefault();
+        e.stopPropagation();
+        addDigit(e.key);
+      } else if (e.key === "Backspace") {
+        e.preventDefault();
+        e.stopPropagation();
+        removeDigit();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        closeModal();
+      }
+    };
+    document.addEventListener("keydown", pinKeydownHandler, true);
+
+    clearError();
+    currentPin = "";
+    firstPin = "";
+    updateView();
+    modal.classList.add("is-open");
+  }
+
+  // Open the Adult Portal page with High Security PIN Gate
+  async function openAdultPortal() {
+    promptAdultPinGate(() => {
+      showAdultView();
+    });
   }
 
   function closeActivePlayers() {
@@ -1546,7 +1862,13 @@
     currentAdultView = null; // Unselected by default
     document.body.classList.add("vel-adult-active");
     document.body.dataset.velActiveTab = "adult";
-    document.body.classList.remove("vel-home-empty-active");
+    document.body.dataset.velTopLevel = "adult";
+    document.body.classList.remove("vel-home-empty-active", "vel-home-choice-picked");
+
+    // Clear active highlight from Accueil and other bottom tabs
+    if (typeof window.veloraSetBottomNavActive === "function") {
+      window.veloraSetBottomNavActive("adult");
+    }
 
     const homePage = document.getElementById("vel-home-empty-page");
     const primeContainer = document.getElementById("vel-prime-carousels-container");
@@ -1592,6 +1914,11 @@
     const header = document.querySelector(".vel-header");
     if (header) header.style.removeProperty("display");
 
+    document.dispatchEvent(new CustomEvent("velora-show-home"));
+    if (typeof window.veloraSetBottomNavActive === "function") {
+      window.veloraSetBottomNavActive("home");
+    }
+    
     document.dispatchEvent(new CustomEvent("velora-return-home"));
   }
 
@@ -1655,6 +1982,26 @@
   });
 
   fetchAssignedAdultPackages();
+
+  document.addEventListener("velora-show-home", () => {
+    isAdultOpen = false;
+    currentAdultView = null;
+    delete document.body.dataset.veloraReturnAdult;
+  });
+
+  document.addEventListener("velora-tab-changed", (e) => {
+    if (e.detail?.tab !== "adult") {
+      isAdultOpen = false;
+      currentAdultView = null;
+      delete document.body.dataset.veloraReturnAdult;
+    }
+  });
+
+  document.addEventListener("velora-return-favorites", () => {
+    isAdultOpen = false;
+    currentAdultView = null;
+    delete document.body.dataset.veloraReturnAdult;
+  });
 
   window.veloraOpenAdultPortal = openAdultPortal;
   window.veloraCloseAdultPortal = closeAdultView;

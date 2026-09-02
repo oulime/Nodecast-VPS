@@ -10,7 +10,7 @@
   width: 100%;
   min-height: calc(100vh - var(--vel-bottom-nav-height, 76px));
   box-sizing: border-box;
-  padding: clamp(16px, 2.5vw, 36px) clamp(16px, 3vw, 48px);
+  padding: clamp(14px, 2.5vw, 36px) clamp(12px, 3vw, 48px);
   background: radial-gradient(circle at 50% 0%, rgba(225, 29, 72, 0.12) 0%, rgba(11, 11, 15, 0.98) 70%);
   color: #fff;
   z-index: 10;
@@ -632,13 +632,17 @@ body.vel-adult-portal-open #vel-home-empty-page {
    Adult Dedicated Video Player (Series-Style Listed Layout)
    -------------------------------------------------------------------------- */
 .vel-adult-player-container {
+  position: -webkit-sticky !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 40 !important;
   width: 100%;
   max-width: 960px;
-  margin: 0 auto 18px;
+  margin: 0 auto 12px;
   background: #000;
   border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.65), 0 0 24px rgba(225, 29, 72, 0.2);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.75), 0 0 24px rgba(225, 29, 72, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   flex-direction: column;
@@ -850,19 +854,22 @@ body.vel-adult-portal-open #vel-home-empty-page {
    Adult Movies Playlist View under VOD Player
    -------------------------------------------------------------------------- */
 #dynamic-list.vel-adult-list-mode,
-#dynamic-list:has(> .vel-adult-movie-list-wrap) {
+#dynamic-list:has(> .vel-adult-movie-list-wrap),
+.main--velora #content-view:has(.vel-adult-movie-list-wrap) #dynamic-list {
   display: block !important;
   grid-template-columns: none !important;
   width: 100% !important;
   max-width: 100% !important;
   padding: 0 !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
 }
 
 .vel-adult-movie-list-wrap {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 12px clamp(12px, 3vw, 24px) 80px;
+  gap: 12px;
+  padding: 12px 16px 80px;
   width: 100% !important;
   max-width: 1080px;
   margin: 0 auto !important;
@@ -1324,3 +1331,467 @@ body.vel-adult-portal-open #vel-home-empty-page {
   pointer-events: none;
   display: block;
 }
+
+/* --------------------------------------------------------------------------
+   Mobile Full Horizontal Expansion (< 768px): Zero Wasted Side Margins
+   -------------------------------------------------------------------------- */
+@media (max-width: 767.98px) {
+  /* Landing portal: expand full width with minimal horizontal padding */
+  .vel-adult-portal {
+    padding: 10px 8px calc(var(--vel-bottom-nav-height, 76px) + 20px) 8px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .vel-adult-header {
+    gap: 10px !important;
+    padding-bottom: 12px !important;
+    margin-bottom: 14px !important;
+  }
+
+  .vel-adult-actions {
+    max-width: 100% !important;
+    width: 100% !important;
+    gap: 8px !important;
+    margin: 4px 0 8px 0 !important;
+  }
+
+  .vel-adult-action-btn {
+    min-width: 0 !important;
+    width: 100% !important;
+    flex: 1 1 100% !important;
+    padding: 10px 14px !important;
+    border-radius: 12px !important;
+  }
+
+  .vel-adult-packages-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+
+  /* Parent containers: full width and no horizontal padding/margins when adult list is active */
+  body:has(#dynamic-list.vel-adult-list-mode) .main--velora .vel-dashboard,
+  .main--velora:has(#dynamic-list.vel-adult-list-mode) .vel-dashboard {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  body:has(#dynamic-list.vel-adult-list-mode) .main--velora .vel-body,
+  .main--velora:has(#dynamic-list.vel-adult-list-mode) .vel-body {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  body:has(#dynamic-list.vel-adult-list-mode) .main--velora #content-view,
+  .main--velora:has(#dynamic-list.vel-adult-list-mode) #content-view {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* VOD Movie List & Player wrapper: stretch to 100% of mobile screen width */
+  .vel-adult-movie-list-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 0 calc(var(--vel-bottom-nav-height, 76px) + 24px) 0 !important;
+    gap: 8px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Dedicated Adult Video Player: edge-to-edge flush and sticky on mobile */
+  .vel-adult-player-container {
+    position: -webkit-sticky !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 40 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 0 6px 0 !important;
+    border-radius: 0 0 12px 12px !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-top: none !important;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.8), 0 0 16px rgba(225, 29, 72, 0.25) !important;
+  }
+
+  .vel-adult-video-wrapper {
+    width: 100% !important;
+    max-height: 34vh !important;
+    aspect-ratio: 16 / 9;
+  }
+
+  .vel-adult-video-wrapper video {
+    max-height: 34vh !important;
+    object-fit: contain !important;
+  }
+
+  .vel-adult-now-playing-title {
+    padding: 8px 12px !important;
+    font-size: 0.88rem !important;
+  }
+
+  /* Header filter & count with comfortable side margins */
+  .vel-adult-movie-list-header {
+    padding: 6px 12px 10px 12px !important;
+    margin: 0 !important;
+    gap: 8px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .vel-adult-movie-search-wrap {
+    max-width: 100% !important;
+    width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+
+  /* Movie items container: comfortable 10px side margins */
+  .vel-adult-movie-list-items {
+    padding: 0 10px !important;
+    gap: 8px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Individual VOD row: rounded card with side breathing room */
+  .vel-adult-movie-row {
+    padding: 8px 12px !important;
+    gap: 12px !important;
+    border-radius: 12px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+  }
+
+  .vel-adult-movie-row__index {
+    min-width: 18px !important;
+    font-size: 0.8rem !important;
+  }
+
+  .vel-adult-movie-row__poster {
+    width: 44px !important;
+    height: 62px !important;
+    border-radius: 6px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .vel-adult-movie-row__info {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+  }
+
+  .vel-adult-movie-row__title {
+    font-size: 0.88rem !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .vel-adult-movie-row__meta {
+    font-size: 0.72rem !important;
+    gap: 6px !important;
+  }
+
+  .vel-adult-movie-row .vel-favorite-heart {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+  }
+
+  /* Live TV Playlist in Adult Section */
+  .vel-adult-channel-list-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 4px 4px calc(var(--vel-bottom-nav-height, 76px) + 24px) 4px !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .vel-adult-channel-list-header {
+    padding: 6px 12px 10px 12px !important;
+  }
+
+  .vel-adult-channel-list-items {
+    padding: 0 10px !important;
+    gap: 8px !important;
+  }
+
+  .vel-adult-channel-row {
+    padding: 10px 12px !important;
+    gap: 10px !important;
+    border-radius: 10px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .vel-adult-channel-row__title {
+    font-size: 0.9rem !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .vel-adult-movie-list-items {
+    padding: 0 8px !important;
+    gap: 6px !important;
+  }
+
+  .vel-adult-movie-row {
+    padding: 8px 10px !important;
+    gap: 10px !important;
+    border-radius: 10px !important;
+  }
+
+  .vel-adult-movie-row__poster {
+    width: 40px !important;
+    height: 56px !important;
+  }
+
+  .vel-adult-movie-row__title {
+    font-size: 0.84rem !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   High-Security 4-Digit Parental PIN Gate Modal
+   -------------------------------------------------------------------------- */
+.vel-adult-pin-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 6, 12, 0.88);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.vel-adult-pin-modal.is-open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.vel-adult-pin-card {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  background: linear-gradient(165deg, rgba(26, 18, 32, 0.96) 0%, rgba(12, 10, 16, 0.98) 100%);
+  border: 1px solid rgba(225, 29, 72, 0.4);
+  box-shadow: 0 0 60px rgba(225, 29, 72, 0.2), 0 24px 48px rgba(0, 0, 0, 0.9);
+  border-radius: 24px;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-sizing: border-box;
+  animation: velAdultCardPop 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes velAdultCardPop {
+  0% { transform: scale(0.92) translateY(12px); opacity: 0; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.vel-adult-pin-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.vel-adult-pin-close-btn:hover {
+  color: #fff;
+  background: rgba(225, 29, 72, 0.3);
+  border-color: rgba(244, 63, 94, 0.6);
+  transform: rotate(90deg);
+}
+
+.vel-adult-pin-icon-wrap {
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(225, 29, 72, 0.25) 0%, rgba(138, 43, 226, 0.2) 100%);
+  border: 1px solid rgba(244, 63, 94, 0.5);
+  box-shadow: 0 0 24px rgba(225, 29, 72, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+  color: #fb7185;
+}
+
+.vel-adult-pin-icon-wrap svg {
+  width: 28px;
+  height: 28px;
+  fill: currentColor;
+}
+
+.vel-adult-pin-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #fff;
+  margin: 0 0 6px 0;
+  letter-spacing: -0.01em;
+}
+
+.vel-adult-pin-subtitle {
+  font-size: 0.84rem;
+  color: rgba(226, 232, 240, 0.78);
+  line-height: 1.4;
+  margin: 0 0 16px 0;
+  max-width: 290px;
+}
+
+.vel-adult-pin-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 6px 0 14px 0;
+}
+
+.vel-adult-pin-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.04);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-sizing: border-box;
+}
+
+.vel-adult-pin-dot.is-filled {
+  background: #e11d48;
+  border-color: #f43f5e;
+  box-shadow: 0 0 16px rgba(244, 63, 94, 0.9), 0 0 6px #fff;
+  transform: scale(1.15);
+}
+
+.vel-adult-pin-error {
+  min-height: 22px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #f87171;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: all 0.2s ease;
+}
+
+.vel-adult-pin-error.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.vel-adult-pin-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 280px;
+  user-select: none;
+}
+
+.vel-adult-pin-key {
+  height: 52px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 1.35rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.14s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.vel-adult-pin-key:hover {
+  background: rgba(225, 29, 72, 0.22);
+  border-color: rgba(244, 63, 94, 0.5);
+  color: #fff;
+  transform: scale(1.04);
+}
+
+.vel-adult-pin-key:active {
+  transform: scale(0.94);
+  background: rgba(225, 29, 72, 0.4);
+}
+
+.vel-adult-pin-key--action {
+  font-size: 0.95rem;
+  color: #94a3b8;
+}
+
+.vel-adult-pin-key--action:hover {
+  color: #fff;
+}
+
+.vel-adult-pin-key--action svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+.vel-adult-pin-card.is-shaking {
+  animation: velAdultPinShake 0.4s ease;
+}
+
+@keyframes velAdultPinShake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-10px); }
+  40%, 80% { transform: translateX(10px); }
+}
+
+.vel-adult-pin-reset-link {
+  margin-top: 14px;
+  font-size: 0.78rem;
+  color: #94a3b8;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.18s ease;
+}
+
+.vel-adult-pin-reset-link:hover {
+  color: #fda4af;
+}
+

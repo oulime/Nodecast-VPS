@@ -267,9 +267,13 @@ async function syncAllChannelLogos(options = {}) {
             updateTransaction(batch);
         }
 
+        // Auto-assign Package Spinner Covers from upgraded channel icons
+        const packagesUpdated = syncAllPackageCovers(db);
+        syncProgress.packagesUpdated = packagesUpdated;
+
         syncProgress.running = false;
         syncProgress.endTime = Date.now();
-        console.log(`[ChannelLogoMatcher] Sync completed: ${syncProgress.updated} channels updated out of ${syncProgress.total}.`);
+        console.log(`[ChannelLogoMatcher] Sync completed: ${syncProgress.updated} channels and ${packagesUpdated} package covers updated out of ${syncProgress.total}.`);
     } catch (err) {
         console.error('[ChannelLogoMatcher] Sync error:', err);
         syncProgress.running = false;
@@ -282,6 +286,79 @@ async function syncAllChannelLogos(options = {}) {
     return syncProgress;
 }
 
+const DISCOVERED_COVERS_FILE = path.join(__dirname, '..', '..', 'data', 'package-discovered-covers.json');
+
+function syncAllPackageCovers(db) {
+    try {
+        let discovered = {};
+        try {
+            if (fs.existsSync(DISCOVERED_COVERS_FILE)) {
+                discovered = JSON.parse(fs.readFileSync(DISCOVERED_COVERS_FILE, 'utf8')) || {};
+            }
+        } catch (_) { discovered = {}; }
+
+        // Get all distinct Live categories
+        const liveCategories = db.prepare(`
+            SELECT category_id, MIN(name) as sample_name
+            FROM playlist_items
+            WHERE type = 'live' AND category_id IS NOT NULL AND is_hidden = 0
+            GROUP BY category_id
+        `).all();
+
+        const channelLookupStmt = db.prepare(`
+            SELECT stream_icon, name
+            FROM playlist_items
+            WHERE type = 'live' AND category_id = ? AND stream_icon IS NOT NULL AND length(stream_icon) > 5 AND is_hidden = 0
+            LIMIT 10
+        `);
+
+        let coversUpdated = 0;
+
+        for (const cat of liveCategories) {
+            const catId = String(cat.category_id || '').trim();
+            if (!catId) continue;
+
+            const existing = typeof discovered[catId] === 'string' ? discovered[catId] : discovered[catId]?.coverUrl;
+            if (existing && !existing.includes('tmdb.org') && !existing.includes('image.tmdb')) {
+                continue;
+            }
+
+            const channels = channelLookupStmt.all(catId);
+            let bestLogo = '';
+
+            const officialMatch = channels.find(ch => 
+                ch.stream_icon && (
+                    ch.stream_icon.includes('imgur') ||
+                    ch.stream_icon.includes('wikimedia') ||
+                    ch.stream_icon.includes('wikia') ||
+                    ch.stream_icon.includes('github') ||
+                    ch.stream_icon.includes('.png') ||
+                    ch.stream_icon.includes('.svg')
+                ) && !ch.stream_icon.includes('tmdb.org')
+            );
+
+            if (officialMatch) {
+                bestLogo = officialMatch.stream_icon;
+            } else if (channels[0]?.stream_icon && !channels[0].stream_icon.includes('tmdb.org')) {
+                bestLogo = channels[0].stream_icon;
+            }
+
+            if (bestLogo) {
+                discovered[catId] = bestLogo;
+                coversUpdated++;
+            }
+        }
+
+        fs.mkdirSync(path.dirname(DISCOVERED_COVERS_FILE), { recursive: true });
+        fs.writeFileSync(DISCOVERED_COVERS_FILE, JSON.stringify(discovered, null, 2), 'utf8');
+        console.log(`[ChannelLogoMatcher] Auto-assigned ${coversUpdated} package spinner covers.`);
+        return coversUpdated;
+    } catch (err) {
+        console.warn('[ChannelLogoMatcher] Failed to auto-sync package covers:', err.message);
+        return 0;
+    }
+}
+
 function getSyncStatus() {
     return syncProgress;
 }
@@ -291,5 +368,6 @@ module.exports = {
     matchChannelLogo,
     loadOrBuildLogoIndex,
     syncAllChannelLogos,
+    syncAllPackageCovers,
     getSyncStatus
 };

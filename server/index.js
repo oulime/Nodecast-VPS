@@ -326,13 +326,17 @@ function findFFmpeg() {
         if (ffmpegPath && ffmpegPath.includes('app.asar')) {
             ffmpegPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
         }
-        console.log('FFmpeg binary configured at:', ffmpegPath);
-        return ffmpegPath;
+        if (ffmpegPath && fs.existsSync(ffmpegPath)) {
+            console.log('FFmpeg binary configured at:', ffmpegPath);
+            return ffmpegPath;
+        }
     } catch (err) {
-        console.warn('FFmpeg not available - transcoding/remuxing will be disabled.');
-        console.warn('Install FFmpeg via your package manager or npm install ffmpeg-static');
-        return null;
+        // Ignored
     }
+
+    console.warn('FFmpeg not available - transcoding/remuxing will be disabled.');
+    console.warn('Install FFmpeg via your package manager or npm install ffmpeg-static');
+    return null;
 }
 
 function findFFprobe() {
@@ -348,7 +352,7 @@ function findFFprobe() {
     // Try @ffprobe-installer/ffprobe package
     try {
         const ffprobePath = require('@ffprobe-installer/ffprobe').path;
-        if (ffprobePath) {
+        if (ffprobePath && fs.existsSync(ffprobePath)) {
             console.log('FFprobe binary configured at:', ffprobePath);
             return ffprobePath;
         }
@@ -567,4 +571,12 @@ const server = app.listen(PORT, () => {
 server.once('error', err => {
     console.error(`Server failed to listen on port ${PORT}:`, err);
     process.exitCode = 1;
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('[Process] Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[Process] Unhandled Rejection at:', promise, 'reason:', reason);
 });

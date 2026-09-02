@@ -12,7 +12,6 @@ const fs = require('fs');
 const http = require('http');
 const https = require('https');
 const { spawn } = require('child_process');
-const ffmpegPath = require('ffmpeg-static');
 const { Readable } = require('stream');
 
 // Default cache max age in hours
@@ -1354,10 +1353,13 @@ router.get('/stream', async (req, res) => {
 
         } catch (err) {
             lastError = err;
-            if (err.name === 'AbortError') {
+            if (err.name === 'AbortError' || req.destroyed || res.destroyed || res.writableEnded) {
                 return;
             }
             console.error(`Stream proxy error (attempt ${attempt}/${maxRetries}):`, err.message);
+            if (res.headersSent) {
+                return;
+            }
             if (attempt < maxRetries) {
                 console.log('[Proxy] Retrying after error...');
                 await new Promise(r => setTimeout(r, 500));
@@ -1367,7 +1369,7 @@ router.get('/stream', async (req, res) => {
     }
 
     // All retries failed
-    if (!res.headersSent) {
+    if (!res.headersSent && !res.destroyed && !res.writableEnded) {
         res.status(500).json({ error: lastError?.message || 'Stream proxy failed after retries' });
     }
 });

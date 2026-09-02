@@ -31,10 +31,7 @@ router.get('/', async (req, res) => {
         return res.status(400).json({ error: 'URL parameter is required' });
     }
 
-    const ffmpegPath = req.app.locals.ffmpegPath;
-    if (!ffmpegPath) {
-        return res.status(503).json({ error: 'FFmpeg is not available on this server' });
-    }
+    const ffmpegPath = req.app.locals.ffmpegPath || 'ffmpeg';
 
     // Get User-Agent from settings
     const settings = await db.settings.get();

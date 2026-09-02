@@ -309,20 +309,31 @@ app.use(express.static(publicDir, {
 const { execSync } = require('child_process');
 
 function findFFmpeg() {
-    // Try system FFmpeg first (better Docker compatibility)
+    // Try system FFmpeg first (better Docker and Linux compatibility)
     try {
         execSync('ffmpeg -version', { stdio: 'ignore' });
         console.log('FFmpeg binary configured at: ffmpeg (system)');
         return 'ffmpeg';
     } catch (e) {
-        // System FFmpeg not found, try ffmpeg-static
+        // System FFmpeg not in PATH, try common locations
+    }
+
+    const commonPaths = [
+        '/usr/bin/ffmpeg',
+        '/usr/local/bin/ffmpeg',
+        '/bin/ffmpeg',
+        '/snap/bin/ffmpeg'
+    ];
+    for (const p of commonPaths) {
+        if (fs.existsSync(p)) {
+            console.log('FFmpeg binary configured at:', p);
+            return p;
+        }
     }
 
     // Try ffmpeg-static npm package
     try {
         let ffmpegPath = require('ffmpeg-static');
-        // In packaged Electron apps, ffmpeg-static returns path inside .asar archive
-        // but the binary is actually unpacked to app.asar.unpacked
         if (ffmpegPath && ffmpegPath.includes('app.asar')) {
             ffmpegPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
         }
@@ -334,9 +345,8 @@ function findFFmpeg() {
         // Ignored
     }
 
-    console.warn('FFmpeg not available - transcoding/remuxing will be disabled.');
-    console.warn('Install FFmpeg via your package manager or npm install ffmpeg-static');
-    return null;
+    console.warn('FFmpeg binary not verified - defaulting to "ffmpeg"');
+    return 'ffmpeg';
 }
 
 function findFFprobe() {
@@ -347,6 +357,19 @@ function findFFprobe() {
         return 'ffprobe';
     } catch (e) {
         // Not found in system
+    }
+
+    const commonPaths = [
+        '/usr/bin/ffprobe',
+        '/usr/local/bin/ffprobe',
+        '/bin/ffprobe',
+        '/snap/bin/ffprobe'
+    ];
+    for (const p of commonPaths) {
+        if (fs.existsSync(p)) {
+            console.log('FFprobe binary configured at:', p);
+            return p;
+        }
     }
 
     // Try @ffprobe-installer/ffprobe package
@@ -360,8 +383,8 @@ function findFFprobe() {
         // Package not available
     }
 
-    console.warn('FFprobe not available - auto transcode will fallback to always transcode');
-    return null;
+    console.warn('FFprobe binary not verified - defaulting to "ffprobe"');
+    return 'ffprobe';
 }
 
 app.locals.ffmpegPath = findFFmpeg();

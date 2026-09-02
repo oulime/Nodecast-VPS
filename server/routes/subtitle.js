@@ -15,10 +15,7 @@ router.get('/', (req, res) => {
         return res.status(400).json({ error: 'URL and index parameters are required' });
     }
 
-    const ffmpegPath = req.app.locals.ffmpegPath;
-    if (!ffmpegPath) {
-        return res.status(503).json({ error: 'FFmpeg is not available on this server' });
-    }
+    const ffmpegPath = req.app.locals.ffmpegPath || 'ffmpeg';
     // console.log(`[Subtitle] Extracting track ${index} from: ${url}`);
 
     const args = [

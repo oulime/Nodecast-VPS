@@ -79,6 +79,21 @@ function rawVodIdentity(item, routeSourceId) {
     return sourceId && vodId ? { sourceId, vodId } : null;
 }
 
+async function resolvePlayableSource(sourceId) {
+    let source = await sources.getById(sourceId);
+    if (!source || !source.enabled) {
+        const all = await sources.getAll();
+        const active = all.filter(s => s.type === 'xtream' && s.enabled);
+        if (active.length === 1) {
+            source = active[0];
+        } else if (active.length > 1 && sourceId) {
+            const byStr = active.find(s => String(s.id) === String(sourceId));
+            if (byStr) source = byStr;
+        }
+    }
+    return source;
+}
+
 async function enrichRemoteVodPosters(items, routeSourceId, headers) {
     const initiallyMissing = items.map((item, index) => ({ item, index, identity: rawVodIdentity(item, routeSourceId) }))
         .filter(entry => entry.identity && !String(entry.item.stream_icon || entry.item.cover || entry.item.cover_big || '').trim());
@@ -516,7 +531,7 @@ router.get('/xtream/stream/:globalStreamId/:type?', async (req, res) => {
             return res.status(404).json({ error: 'Stream not found' });
         }
 
-        const source = await sources.getById(item.source_id);
+        const source = await resolvePlayableSource(item.source_id);
         if (!source || !source.enabled) {
             return res.status(404).json({ error: 'Source not found or disabled' });
         }
@@ -754,8 +769,8 @@ router.get('/xtream/:sourceId/series/:categoryId', async (req, res) => {
 // Proxy series info request
 router.get('/xtream/:sourceId/series_info', async (req, res) => {
     try {
-        const source = await sources.getById(req.params.sourceId);
-        if (!source) return res.status(404).send('Source not found');
+        const source = await resolvePlayableSource(req.params.sourceId);
+        if (!source || !source.enabled) return res.status(404).send('Source not found or disabled');
 
         const seriesId = req.query.series_id;
         if (!seriesId) return res.status(400).send('series_id required');
@@ -766,7 +781,9 @@ router.get('/xtream/:sourceId/series_info', async (req, res) => {
 
         const api = xtreamApi.createFromSource(source);
         const data = await api.getSeriesInfo(seriesId);
-        cache.set('xtream', source.id, cacheKey, data);
+        if (data && (data.episodes || data.info)) {
+            cache.set('xtream', source.id, cacheKey, data);
+        }
         res.json(data);
     } catch (err) {
         res.status(502).json({ error: 'Upstream error', details: err.message });
@@ -776,8 +793,8 @@ router.get('/xtream/:sourceId/series_info', async (req, res) => {
 // VOD Info
 router.get('/xtream/:sourceId/vod_info', async (req, res) => {
     try {
-        const source = await sources.getById(req.params.sourceId);
-        if (!source) return res.status(404).send('Source not found');
+        const source = await resolvePlayableSource(req.params.sourceId);
+        if (!source || !source.enabled) return res.status(404).send('Source not found or disabled');
 
         const vodId = req.query.vod_id;
         if (!vodId) return res.status(400).send('vod_id required');
@@ -788,7 +805,9 @@ router.get('/xtream/:sourceId/vod_info', async (req, res) => {
 
         const api = xtreamApi.createFromSource(source);
         const data = await api.getVodInfo(vodId);
-        cache.set('xtream', source.id, cacheKey, data);
+        if (data && (data.info || data.movie_data)) {
+            cache.set('xtream', source.id, cacheKey, data);
+        }
         res.json(data);
     } catch (err) {
         res.status(502).json({ error: 'Upstream error', details: err.message });
@@ -799,7 +818,7 @@ router.get('/xtream/:sourceId/vod_info', async (req, res) => {
 // Returns the direct stream URL for a given stream ID
 router.get('/xtream/:sourceId/stream/:streamId/:type', async (req, res) => {
     try {
-        const source = await sources.getById(req.params.sourceId);
+        const source = await resolvePlayableSource(req.params.sourceId);
         if (!source || source.type !== 'xtream' || !source.enabled) {
             return res.status(404).json({ error: 'Xtream source not found or disabled' });
         }
@@ -1047,7 +1066,7 @@ router.get('/xtream/:sourceId/:action', async (req, res) => {
  */
 router.get('/xtream/:sourceId/stream/:streamId/:type?', async (req, res) => {
     try {
-        const source = await sources.getById(req.params.sourceId);
+        const source = await resolvePlayableSource(req.params.sourceId);
         if (!source || source.type !== 'xtream' || !source.enabled) {
             return res.status(404).json({ error: 'Xtream source not found or disabled' });
         }
@@ -1299,6 +1318,10 @@ router.get('/stream', async (req, res) => {
                 const finalUrlObj = new URL(finalUrl);
                 const baseUrl = finalUrlObj.origin + finalUrlObj.pathname.substring(0, finalUrlObj.pathname.lastIndexOf('/') + 1);
 
+                const proto = req.get('x-forwarded-proto') || req.protocol || 'https';
+                const host = req.get('x-forwarded-host') || req.get('host');
+                const baseUrlPrefix = `${proto}://${host}${req.baseUrl}/stream?url=`;
+
                 manifest = manifest.split('\n').map(line => {
                     const trimmed = line.trim();
                     if (trimmed === '' || trimmed.startsWith('#')) {
@@ -1308,7 +1331,7 @@ router.get('/stream', async (req, res) => {
                             return line.replace(/URI=["']([^"']+)["']/g, (match, p1) => {
                                 try {
                                     const absoluteUrl = new URL(p1, baseUrl).href;
-                                    return `URI="${req.protocol}://${req.get('host')}${req.baseUrl}/stream?url=${encodeURIComponent(absoluteUrl)}"`;
+                                    return `URI="${baseUrlPrefix}${encodeURIComponent(absoluteUrl)}"`;
                                 } catch (e) {
                                     return match;
                                 }
@@ -1325,7 +1348,7 @@ router.get('/stream', async (req, res) => {
                         } else {
                             absoluteUrl = new URL(trimmed, baseUrl).href;
                         }
-                        return `${req.protocol}://${req.get('host')}${req.baseUrl}/stream?url=${encodeURIComponent(absoluteUrl)}`;
+                        return `${baseUrlPrefix}${encodeURIComponent(absoluteUrl)}`;
                     } catch (e) { return line; }
                 }).join('\n');
 

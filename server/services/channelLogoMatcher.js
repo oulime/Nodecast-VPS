@@ -297,7 +297,83 @@ function syncAllPackageCovers(db) {
             }
         } catch (_) { discovered = {}; }
 
-        // Get all distinct Live categories
+        let veloraData = null;
+        try { veloraData = require('../routes/veloraData'); } catch (_) {}
+
+        // 1. Fetch all admin_packages
+        let allPackages = [];
+        if (veloraData && typeof veloraData.allRows === 'function') {
+            allPackages = veloraData.allRows('admin_packages') || [];
+        } else {
+            try {
+                allPackages = db.prepare('SELECT * FROM admin_packages').all();
+            } catch (_) { allPackages = []; }
+        }
+
+        const channelLookupStmt = db.prepare(`
+            SELECT stream_icon, name
+            FROM playlist_items
+            WHERE type = 'live' AND category_id = ? AND stream_icon IS NOT NULL AND length(stream_icon) > 5 AND is_hidden = 0
+            LIMIT 15
+        `);
+
+        let coversUpdated = 0;
+
+        for (const pkg of allPackages) {
+            if (pkg.kind && pkg.kind !== 'live') continue;
+
+            const pkgId = String(pkg.id || '').trim();
+            const catId = String(pkg.category_id || '').trim();
+            const pkgName = String(pkg.name || pkg.original_name || '').trim();
+
+            let bestLogo = pkg.cover_url && !pkg.cover_url.includes('tmdb.org') ? pkg.cover_url : '';
+
+            // Step A: Brand name match on the package name (e.g. "FR| DAZN PPV" -> DAZN logo, "FR| CANAL+" -> Canal+ logo)
+            if (!bestLogo && pkgName) {
+                const brandMatch = matchChannelLogo(pkgName);
+                if (brandMatch && brandMatch.logo) {
+                    bestLogo = brandMatch.logo;
+                }
+            }
+
+            // Step B: If no brand match, check channels inside this category
+            if (!bestLogo && catId) {
+                const channels = channelLookupStmt.all(catId);
+                const officialMatch = channels.find(ch => 
+                    ch.stream_icon && (
+                        ch.stream_icon.includes('imgur') ||
+                        ch.stream_icon.includes('wikimedia') ||
+                        ch.stream_icon.includes('wikia') ||
+                        ch.stream_icon.includes('github') ||
+                        ch.stream_icon.includes('.png') ||
+                        ch.stream_icon.includes('.svg')
+                    ) && !ch.stream_icon.includes('tmdb.org')
+                );
+
+                if (officialMatch) {
+                    bestLogo = officialMatch.stream_icon;
+                } else if (channels[0]?.stream_icon && !channels[0].stream_icon.includes('tmdb.org')) {
+                    bestLogo = channels[0].stream_icon;
+                }
+            }
+
+            if (bestLogo) {
+                if (pkgId) discovered[pkgId] = bestLogo;
+                if (catId) discovered[catId] = bestLogo;
+                if (pkgName) discovered[pkgName] = bestLogo;
+
+                // Update package row if cover changed
+                if (pkg.cover_url !== bestLogo) {
+                    pkg.cover_url = bestLogo;
+                    if (veloraData && typeof veloraData.saveRow === 'function') {
+                        veloraData.saveRow('admin_packages', pkg);
+                    }
+                    coversUpdated++;
+                }
+            }
+        }
+
+        // 2. Also map raw category_ids from playlist_items
         const liveCategories = db.prepare(`
             SELECT category_id, MIN(name) as sample_name
             FROM playlist_items
@@ -305,27 +381,11 @@ function syncAllPackageCovers(db) {
             GROUP BY category_id
         `).all();
 
-        const channelLookupStmt = db.prepare(`
-            SELECT stream_icon, name
-            FROM playlist_items
-            WHERE type = 'live' AND category_id = ? AND stream_icon IS NOT NULL AND length(stream_icon) > 5 AND is_hidden = 0
-            LIMIT 10
-        `);
-
-        let coversUpdated = 0;
-
         for (const cat of liveCategories) {
             const catId = String(cat.category_id || '').trim();
-            if (!catId) continue;
-
-            const existing = typeof discovered[catId] === 'string' ? discovered[catId] : discovered[catId]?.coverUrl;
-            if (existing && !existing.includes('tmdb.org') && !existing.includes('image.tmdb')) {
-                continue;
-            }
+            if (!catId || discovered[catId]) continue;
 
             const channels = channelLookupStmt.all(catId);
-            let bestLogo = '';
-
             const officialMatch = channels.find(ch => 
                 ch.stream_icon && (
                     ch.stream_icon.includes('imgur') ||
@@ -336,21 +396,28 @@ function syncAllPackageCovers(db) {
                     ch.stream_icon.includes('.svg')
                 ) && !ch.stream_icon.includes('tmdb.org')
             );
-
             if (officialMatch) {
-                bestLogo = officialMatch.stream_icon;
+                discovered[catId] = officialMatch.stream_icon;
             } else if (channels[0]?.stream_icon && !channels[0].stream_icon.includes('tmdb.org')) {
-                bestLogo = channels[0].stream_icon;
-            }
-
-            if (bestLogo) {
-                discovered[catId] = bestLogo;
-                coversUpdated++;
+                discovered[catId] = channels[0].stream_icon;
             }
         }
 
         fs.mkdirSync(path.dirname(DISCOVERED_COVERS_FILE), { recursive: true });
         fs.writeFileSync(DISCOVERED_COVERS_FILE, JSON.stringify(discovered, null, 2), 'utf8');
+
+        if (veloraData) {
+            if (typeof veloraData.invalidateCountryPackageCache === 'function') {
+                veloraData.invalidateCountryPackageCache();
+            }
+            if (typeof veloraData.buildCountryPackageCache === 'function') {
+                veloraData.buildCountryPackageCache();
+            }
+            if (typeof veloraData.buildHomeCache === 'function') {
+                veloraData.buildHomeCache();
+            }
+        }
+
         console.log(`[ChannelLogoMatcher] Auto-assigned ${coversUpdated} package spinner covers.`);
         return coversUpdated;
     } catch (err) {

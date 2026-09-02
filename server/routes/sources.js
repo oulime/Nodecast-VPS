@@ -72,9 +72,9 @@ router.get('/status', async (req, res) => {
 router.get('/catalog', async (req, res) => {
     try {
         const local = await sources.getAll();
-        const activeLocal = local.filter(source => source.enabled && source.type === 'xtream');
-        if (activeLocal.length) {
-            return res.json(activeLocal.map(({ password, ...source }) => source));
+        const xtreamLocal = local.filter(source => source.type === 'xtream');
+        if (xtreamLocal.length) {
+            return res.json(xtreamLocal.map(({ password, ...source }) => source));
         }
         const upstream = await fetch('https://nodecast.veloravip.net/api/sources', {
             headers: { accept: 'application/json' },

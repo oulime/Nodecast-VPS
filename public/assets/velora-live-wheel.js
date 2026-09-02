@@ -522,7 +522,7 @@
       })();
       let updated = false;
       for (const pkg of this.packages) {
-        const cover = logos[pkg.id];
+        const cover = logos[pkg.id] || logos[pkg.category_id] || logos[pkg.name] || logos[pkg.display_name];
         if (cover && !pkg.cover_url) {
           pkg.cover_url = toProxiedImageUrl(cover);
           updated = true;
@@ -684,9 +684,17 @@
         const titleEl = card.querySelector(".vel-package-card__title");
         const title = titleEl ? titleEl.textContent.trim() : card.getAttribute("aria-label") || `Bouquet ${i+1}`;
         const apiPkg = this.cachedApiPackages.find(p => String(p.id) === id);
-        const savedLogo = window.__veloraCustomPackageLogos?.[id] || (function () {
-          try { return JSON.parse(localStorage.getItem("velora_package_covers") || "{}")[id] || ""; } catch (_) { return ""; }
-        })();
+        const catId = apiPkg?.category_id || card.dataset.categoryId || "";
+        const savedLogo = window.__veloraCustomPackageLogos?.[id]
+          || window.__veloraCustomPackageLogos?.[catId]
+          || window.__veloraCustomPackageLogos?.[apiPkg?.name]
+          || window.__veloraCustomPackageLogos?.[title]
+          || (function () {
+            try {
+              const l = JSON.parse(localStorage.getItem("velora_package_covers") || "{}");
+              return l[id] || l[catId] || l[apiPkg?.name] || l[title] || "";
+            } catch (_) { return ""; }
+          })();
         const imgEl = card.querySelector(":scope > img, .vel-package-card__live-logo");
         const rawCover = imgEl ? (imgEl.getAttribute("src") || "") : (apiPkg?.cover_url || savedLogo || "");
         const cover_url = toProxiedImageUrl(rawCover);
@@ -1407,7 +1415,12 @@
         const isCenter = absDist < 0.45;
 
         const pkg = this.packages[i];
-        const rawCover = pkg.cover_url || window.__veloraCustomPackageLogos?.[pkg.id] || "";
+        const rawCover = pkg.cover_url
+          || window.__veloraCustomPackageLogos?.[pkg.id]
+          || window.__veloraCustomPackageLogos?.[pkg.category_id]
+          || window.__veloraCustomPackageLogos?.[pkg.name]
+          || window.__veloraCustomPackageLogos?.[pkg.display_name]
+          || "";
         const cover = toProxiedImageUrl(rawCover);
         const logoHtml = cover
           ? `<img src="${cover}" alt="" loading="eager" decoding="async" draggable="false" class="vel-coverflow-card__logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" /><span style="display:none;" class="text-xl">📺</span>`

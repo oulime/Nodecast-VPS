@@ -309,30 +309,44 @@ app.use(express.static(publicDir, {
 const { execSync } = require('child_process');
 
 function findFFmpeg() {
-    // Try system FFmpeg first (better Docker compatibility)
+    // Try system FFmpeg first (better Docker and Linux compatibility)
     try {
         execSync('ffmpeg -version', { stdio: 'ignore' });
         console.log('FFmpeg binary configured at: ffmpeg (system)');
         return 'ffmpeg';
     } catch (e) {
-        // System FFmpeg not found, try ffmpeg-static
+        // System FFmpeg not in PATH, try common locations
+    }
+
+    const commonPaths = [
+        '/usr/bin/ffmpeg',
+        '/usr/local/bin/ffmpeg',
+        '/bin/ffmpeg',
+        '/snap/bin/ffmpeg'
+    ];
+    for (const p of commonPaths) {
+        if (fs.existsSync(p)) {
+            console.log('FFmpeg binary configured at:', p);
+            return p;
+        }
     }
 
     // Try ffmpeg-static npm package
     try {
         let ffmpegPath = require('ffmpeg-static');
-        // In packaged Electron apps, ffmpeg-static returns path inside .asar archive
-        // but the binary is actually unpacked to app.asar.unpacked
         if (ffmpegPath && ffmpegPath.includes('app.asar')) {
             ffmpegPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
         }
-        console.log('FFmpeg binary configured at:', ffmpegPath);
-        return ffmpegPath;
+        if (ffmpegPath && fs.existsSync(ffmpegPath)) {
+            console.log('FFmpeg binary configured at:', ffmpegPath);
+            return ffmpegPath;
+        }
     } catch (err) {
-        console.warn('FFmpeg not available - transcoding/remuxing will be disabled.');
-        console.warn('Install FFmpeg via your package manager or npm install ffmpeg-static');
-        return null;
+        // Ignored
     }
+
+    console.warn('FFmpeg binary not verified - defaulting to "ffmpeg"');
+    return 'ffmpeg';
 }
 
 function findFFprobe() {
@@ -345,10 +359,23 @@ function findFFprobe() {
         // Not found in system
     }
 
+    const commonPaths = [
+        '/usr/bin/ffprobe',
+        '/usr/local/bin/ffprobe',
+        '/bin/ffprobe',
+        '/snap/bin/ffprobe'
+    ];
+    for (const p of commonPaths) {
+        if (fs.existsSync(p)) {
+            console.log('FFprobe binary configured at:', p);
+            return p;
+        }
+    }
+
     // Try @ffprobe-installer/ffprobe package
     try {
         const ffprobePath = require('@ffprobe-installer/ffprobe').path;
-        if (ffprobePath) {
+        if (ffprobePath && fs.existsSync(ffprobePath)) {
             console.log('FFprobe binary configured at:', ffprobePath);
             return ffprobePath;
         }
@@ -356,8 +383,8 @@ function findFFprobe() {
         // Package not available
     }
 
-    console.warn('FFprobe not available - auto transcode will fallback to always transcode');
-    return null;
+    console.warn('FFprobe binary not verified - defaulting to "ffprobe"');
+    return 'ffprobe';
 }
 
 app.locals.ffmpegPath = findFFmpeg();
@@ -567,4 +594,12 @@ const server = app.listen(PORT, () => {
 server.once('error', err => {
     console.error(`Server failed to listen on port ${PORT}:`, err);
     process.exitCode = 1;
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('[Process] Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[Process] Unhandled Rejection at:', promise, 'reason:', reason);
 });

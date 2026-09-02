@@ -12,8 +12,24 @@
   function pageLoading(active,label="Chargement"){st.loadingCount=Math.max(0,st.loadingCount+(active?1:-1));const loader=$("mp-heading-loader"),heading=loader?.closest("h2"),busy=st.loadingCount>0;if(loader){loader.classList.toggle("is-active",busy);loader.setAttribute("aria-hidden",busy?"false":"true");loader.title=busy?label:""}heading?.setAttribute("aria-busy",busy?"true":"false")}
   const escapeRegex=value=>String(value).replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
   const visibilityKey=value=>String(value??"").trim().normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^\p{L}\p{N}]+/gu," ").replace(/\s+/g," ").trim();
-  function textMatches(value,term,whole){const text=String(value??"").toLowerCase(),needle=String(term??"").trim().toLowerCase();if(!needle)return true;if(!whole)return text.includes(needle);return new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegex(needle)}(?=$|[^\\p{L}\\p{N}])`,"u").test(text)}
-  function drawSources(){const all=`<button type="button" class="manual-pays__stream manual-pays__stream--all${String(st.source?.id)==="all"?" is-active":""}" data-source="all"><span><strong>Tous les streams</strong><br><small>${st.sources.length} stream(s) actif(s)</small></span><span>›</span></button>`;$("mp-stream-list").innerHTML=st.sources.length?all+st.sources.map(x=>`<button type="button" class="manual-pays__stream${String(st.source?.id)===String(x.id)?" is-active":""}" data-source="${esc(x.id)}"><span><strong>${esc(x.name||`Stream ${x.id}`)}</strong><br><small>${esc(x.type)}</small></span><span>›</span></button>`).join(""):'<div class="manual-pays__empty">Aucun stream Xtream actif.</div>'}
+  function drawSources(){
+    const activeCount=st.sources.filter(x=>x.enabled!==false&&x.enabled!==0).length;
+    const all=`<button type="button" class="manual-pays__stream manual-pays__stream--all${String(st.source?.id)==="all"?" is-active":""}" data-source="all"><span><strong>Tous les streams</strong><br><small>${activeCount} stream(s) actif(s) sur ${st.sources.length}</small></span><span class="manual-pays__stream-chevron">›</span></button>`;
+    $("mp-stream-list").innerHTML=st.sources.length?all+st.sources.map(x=>{
+      const isSelected=String(st.source?.id)===String(x.id);
+      const isEnabled=x.enabled!==false&&x.enabled!==0;
+      return `<div class="manual-pays__stream${isSelected?" is-active":""}${!isEnabled?" is-disabled-stream":""}" data-source="${esc(x.id)}" role="button" tabindex="0">
+        <div class="manual-pays__stream-info">
+          <strong>${esc(x.name||`Stream ${x.id}`)}</strong>
+          <small>${esc(x.type)} · <span class="manual-pays__stream-badge ${isEnabled?"is-active":"is-inactive"}">${isEnabled?"Actif":"Inactif"}</span></small>
+        </div>
+        <div class="manual-pays__stream-actions">
+          <button type="button" class="manual-pays__stream-toggle ${isEnabled?"is-active":"is-inactive"}" data-toggle-source="${esc(x.id)}" title="${isEnabled?"Désactiver ce provider":"Activer ce provider"}" aria-label="${isEnabled?"Désactiver":"Activer"}">${isEnabled?"Désactiver":"Activer"}</button>
+          <span class="manual-pays__stream-chevron" aria-hidden="true">›</span>
+        </div>
+      </div>`;
+    }).join(""):'<div class="manual-pays__empty">Aucun stream Xtream trouvé.</div>';
+  }
   function packageMatchesCatalog(row,p){const hasIdentity=String(row.source_id??"").trim()&&String(row.category_id??"").trim();return hasIdentity?String(row.source_id)===String(p.sourceId)&&String(row.category_id)===String(p.categoryId)&&String(row.kind||st.kind)===String(st.kind):row.name.trim().toLowerCase()===p.name.trim().toLowerCase()}
   function packageCountryNames(p){const names=[];for(const[countryId,packages]of st.assigned.entries())if(packages.some(x=>packageMatchesCatalog(x,p))){const c=st.countries.find(x=>x.id===countryId);if(c)names.push(c.name)}return names.sort((a,b)=>a.localeCompare(b,"fr"))}
   function drawPackages(){const q=($("mp-package-filter")?.value||"").trim(),searchWhole=$("mp-package-filter-whole")?.checked!==false,excluded=($("mp-package-exclude")?.value||"").split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean),excludeWhole=$("mp-package-exclude-whole")?.checked!==false,rows=st.packages.filter(x=>(!q||textMatches(x.name,q,searchWhole))&&!excluded.some(term=>textMatches(x.name,term,excludeWhole))),pageCount=Math.max(1,Math.ceil(rows.length/PACKAGE_PAGE_SIZE));st.packagePage=Math.min(Math.max(1,st.packagePage),pageCount);const start=(st.packagePage-1)*PACKAGE_PAGE_SIZE,rendered=rows.slice(start,start+PACKAGE_PAGE_SIZE),filtered=q||excluded.length,bulk=rows.length>1?`<article class="manual-pays__package manual-pays__package--bulk" draggable="true" data-packages="${esc(JSON.stringify(rows.map(x=>x.key)))}"><strong>Glisser les ${rows.length} packages ${filtered?"filtrés":"affichés"}</strong><small>Déposez ce bloc sur un pays pour tout ajouter</small></article>`:"",pagination=pageCount>1?`<nav class="manual-pays__pagination" aria-label="Pagination des packages"><button type="button" data-package-page="${st.packagePage-1}" ${st.packagePage===1?"disabled":""}>Précédent</button><span>Page ${st.packagePage} sur ${pageCount} · ${rows.length} packages</span><button type="button" data-package-page="${st.packagePage+1}" ${st.packagePage===pageCount?"disabled":""}>Suivant</button></nav>`:"";$("mp-package-list").innerHTML=rows.length?bulk+rendered.map(x=>{const assigned=packageCountryNames(x);return `<article class="manual-pays__package${assigned.length?" is-assigned":""}" draggable="true" data-package="${esc(x.key)}"><strong>${esc(x.name)}</strong><small>${x.label}${assigned.length?` · Ajouté à ${esc(assigned.join(", "))}`:""}</small></article>`}).join("")+pagination:`<div class="manual-pays__empty">${st.source?"Aucun package trouvé.":"Sélectionnez un stream."}</div>`}
@@ -315,6 +331,7 @@
   previewAssignedPackage=async function(id){const row=(st.assigned.get(st.activeCountry)||[]).find(item=>String(item.id)===String(id));if(!row)return;if(st.kind==="live")await openLiveChannelEditor(row);else await openMediaContentEditor(row)};
   const baseDecorateAssignedPackagePreviews=decorateAssignedPackagePreviews;decorateAssignedPackagePreviews=function(){baseDecorateAssignedPackagePreviews();document.querySelectorAll("#mp-dialog-package-list [data-order-child]").forEach(child=>{if(child.querySelector("[data-preview-assigned]"))return;const button=document.createElement("button");button.type="button";button.className="manual-pays-dialog__preview";button.dataset.previewAssigned=child.dataset.orderChild;const label=st.kind==="live"?"Afficher et modifier les chaînes":`Afficher et modifier les ${st.kind==="vod"?"films":"séries"}`;button.setAttribute("aria-label",label);button.title=label;button.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.4 12s3.5-6 9.6-6 9.6 6 9.6 6-3.5 6-9.6 6-9.6-6-9.6-6Zm9.6 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" fill="currentColor"/></svg>';button.draggable=false;child.appendChild(button)})};
   async function loadSourceCatalog(source,kind){
+    if(source.enabled===false||source.enabled===0)return[];
     const[label,cp]=catalogDefinitions[kind],cats=await api(`/proxy/xtream/${source.id}/${cp}?includeHidden=true`).catch(()=>[]);
     return cats.map(c=>{const id=String(c.category_id??c.id??"");return{key:`${kind}:${source.id}:${id}`,sourceId:String(source.id),categoryId:id,label,name:String(c.category_name??c.name??`Package ${id}`)}}).sort((a,b)=>a.name.localeCompare(b.name,"fr"))
   }
@@ -322,6 +339,28 @@
     if(st.loadedKinds.has(kind)&&!force)return;if(st.loadingKinds.has(kind))return st.loadingKinds.get(kind);
     const label=catalogDefinitions[kind][0];pageLoading(true,`Chargement ${label}`);const job=(async()=>{status(`Chargement ${label} de tous les streams...`);const groups=await Promise.all(st.sources.map(source=>loadSourceCatalog(source,kind)));st.allPackages[kind]=groups.flat().sort((a,b)=>a.name.localeCompare(b.name,"fr"));st.loadedKinds.add(kind);drawCountries();status(`${st.allPackages[kind].length} packages ${label} chargés depuis ${st.sources.length} stream(s).`)})().finally(()=>{st.loadingKinds.delete(kind);pageLoading(false)});
     st.loadingKinds.set(kind,job);return job
+  }
+  async function toggleSource(id){
+    const s=st.sources.find(x=>String(x.id)===String(id));if(!s)return;
+    const currentlyEnabled=s.enabled!==false&&s.enabled!==0;
+    const actionLabel=currentlyEnabled?"Désactivation":"Activation";
+    status(`${actionLabel} de « ${s.name||`Stream ${s.id}`} »...`);
+    try{
+      const updated=await api(`/sources/${encodeURIComponent(id)}/toggle`,{method:"POST"});
+      s.enabled=updated?.enabled??!currentlyEnabled;
+      drawSources();
+      st.loadedKinds.clear();
+      st.loadingKinds.clear();
+      st.allPackages={live:[],vod:[],series:[]};
+      await loadKind(st.kind,true);
+      if(st.source)await source(st.source.id);
+      await countries();
+      window.dispatchEvent(new CustomEvent("velora-admin-curation-changed"));
+      window.dispatchEvent(new CustomEvent("velora-home-cache-invalidated"));
+      status(`Fournisseur « ${s.name||`Stream ${s.id}`} » ${s.enabled?"activé":"désactivé"}.`);
+    }catch(err){
+      status(`Impossible de modifier l'état du fournisseur : ${err.message}`,true);
+    }
   }
   async function source(id){
     const all=String(id)==="all";st.packagePage=1;st.source=all?{id:"all",name:"Tous les streams",type:"xtream"}:st.sources.find(x=>String(x.id)===String(id))||null;st.packages=[];drawSources();drawPackages();if(!st.source)return;
@@ -351,12 +390,19 @@
     if(elsewhere.length&&!confirm(`${elsewhere.length} package(s) filtré(s) sont déjà ajoutés à un autre pays.\n\nVoulez-vous aussi les ajouter à ${country.name} ?`))return;
     await assignMany(countryId,pending)
   }
-  async function init(force=false){if(st.loaded&&!force)return;st.loaded=true;pageLoading(true,"Chargement des Pays");try{status("Chargement des streams, pays et packages Live...");const sources=await api("/sources/catalog");st.sources=sources.filter(x=>x.enabled!==0&&x.type==="xtream");if(force){st.kind="live";st.source=null;st.loadedKinds.clear();st.loadingKinds.clear();st.allPackages={live:[],vod:[],series:[]};document.querySelectorAll("[data-mp-kind]").forEach(x=>{const active=x.dataset.mpKind==="live";x.classList.toggle("is-active",active);x.setAttribute("aria-selected",active?"true":"false")})}drawSources();await Promise.all([countries(),loadKind("live",force)]);drawCountries();if(st.sources[0])await source(st.source?.id||"all");else status("Aucun stream Xtream actif.",true)}catch(e){st.loaded=false;status(`Chargement impossible : ${e.message}`,true)}finally{pageLoading(false)}}
+  async function init(force=false){if(st.loaded&&!force)return;st.loaded=true;pageLoading(true,"Chargement des Pays");try{status("Chargement des streams, pays et packages Live...");const sources=await api("/sources/catalog");st.sources=sources.filter(x=>x.type==="xtream");if(force){st.kind="live";st.source=null;st.loadedKinds.clear();st.loadingKinds.clear();st.allPackages={live:[],vod:[],series:[]};document.querySelectorAll("[data-mp-kind]").forEach(x=>{const active=x.dataset.mpKind==="live";x.classList.toggle("is-active",active);x.setAttribute("aria-selected",active?"true":"false")})}drawSources();await Promise.all([countries(),loadKind("live",force)]);drawCountries();if(st.sources[0])await source(st.source?.id||"all");else status("Aucun stream Xtream actif.",true)}catch(e){st.loaded=false;status(`Chargement impossible : ${e.message}`,true)}finally{pageLoading(false)}}
   async function syncAndRefreshAll(){const button=$("mp-sync-all");if(button?.disabled)return;button.disabled=true;pageLoading(true,"Synchronisation et actualisation");try{status("Synchronisation du contenu des fournisseurs Xtream...");const catalog=await api("/sources/sync-catalog");status(`${catalog.sources?.length||0} fournisseur(s) synchronisé(s). Mise à jour de tous les packages...`);const packages=await req(`${SURL}/admin/sync-packages`,{method:"POST",headers:{apikey:KEY,Authorization:`Bearer ${KEY}`,"Content-Type":"application/json"},body:"{}"});await init(true);window.dispatchEvent(new CustomEvent("velora-admin-curation-changed"));window.dispatchEvent(new CustomEvent("velora-home-cache-invalidated"));status(`${catalog.sources?.length||0} fournisseur(s), ${packages.packages||0} package(s) et ${packages.items||0} élément(s) synchronisé(s).`)}catch(e){status(`Synchronisation impossible : ${e.message}`,true)}finally{pageLoading(false);button.disabled=false}}
   async function syncChannelLogos(){const button=$("mp-sync-channel-logos");if(button?.disabled)return;if(!confirm("Voulez-vous synchroniser et mettre à jour automatiquement les logos de vos chaînes TV en haute définition (PNG transparents) ?"))return;button.disabled=true;pageLoading(true,"Synchronisation des logos TV");try{status("Lancement de la synchronisation automatique des logos TV...");await req(`${SURL}/admin/sync-channel-logos`,{method:"POST",headers:{apikey:KEY,Authorization:`Bearer ${KEY}`,"Content-Type":"application/json"},body:"{}"});status("Synchronisation des logos en cours en arrière-plan...");const pollTimer=setInterval(async()=>{try{const pollRes=await req(`${SURL}/admin/sync-channel-logos-status`);const p=pollRes?.progress;if(p){status(`Logos TV : ${p.updated||0} mis à jour, ${p.skipped||0} inchangés (${p.processed||0}/${p.total||0})...`);if(!p.running){clearInterval(pollTimer);button.disabled=false;pageLoading(false);status(`✨ Synchronisation terminée avec succès ! ${p.updated||0} logos mis à jour sur ${p.total||0} chaînes.`);await init(true);window.dispatchEvent(new CustomEvent("velora-admin-curation-changed"))}}}catch(_){clearInterval(pollTimer);button.disabled=false;pageLoading(false)}},1500)}catch(e){status(`Erreur synchronisation logos : ${e.message}`,true);button.disabled=false;pageLoading(false)}}
   document.addEventListener("click",e=>{
     if(e.target.closest("[data-settings-tab='countries']"))setTimeout(init,0);
-    const s=e.target.closest("[data-source]");if(s)source(s.dataset.source).catch(x=>status(x.message,true));
+    const toggleSourceBtn=e.target.closest("[data-toggle-source]");
+    if(toggleSourceBtn){
+      e.preventDefault();
+      e.stopPropagation();
+      toggleSource(toggleSourceBtn.dataset.toggleSource);
+      return;
+    }
+    const s=e.target.closest("[data-source]");if(s&&!e.target.closest("[data-toggle-source]"))source(s.dataset.source).catch(x=>status(x.message,true));
     const page=e.target.closest("[data-package-page]");if(page&&!page.disabled){st.packagePage=Number(page.dataset.packagePage)||1;drawPackages();$("mp-package-list")?.scrollTo({top:0,behavior:"smooth"})}
     const d=e.target.closest("[data-delete-country]");if(d)askDeleteCountry(d.dataset.deleteCountry);
     const toggle=e.target.closest("[data-toggle-country]");if(toggle)toggleCountry(toggle.dataset.toggleCountry).catch(x=>status(x.message,true));

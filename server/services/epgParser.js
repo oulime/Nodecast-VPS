@@ -233,7 +233,18 @@ async function fetchAndParse(url) {
  * @yields {{ channels: Array|null, programmes: Array, isLast: boolean }}
  */
 async function* fetchAndParseStreaming(url, batchSize = 1000) {
-    const response = await fetch(url);
+    const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        'Accept': 'application/xml, text/xml, */*'
+    };
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 90000);
+    let response;
+    try {
+        response = await fetch(url, { headers, signal: controller.signal });
+    } finally {
+        clearTimeout(timeout);
+    }
     if (!response.ok) {
         throw new Error(`Failed to fetch EPG: ${response.status} ${response.statusText}`);
     }

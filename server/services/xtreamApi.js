@@ -3,6 +3,19 @@
  * Handles authentication and API calls to Xtream servers
  */
 
+const { settings, getUserAgent } = require('../db');
+
+const DEFAULT_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36';
+
+async function getEffectiveUserAgent() {
+    try {
+        const s = await settings.get();
+        return getUserAgent(s);
+    } catch (_) {
+        return DEFAULT_USER_AGENT;
+    }
+}
+
 class XtreamApi {
     constructor(baseUrl, username, password) {
         // Clean up base URL
@@ -34,7 +47,16 @@ class XtreamApi {
      */
     async request(action, params = {}, options = {}) {
         const url = this.buildApiUrl(action, params);
-        const response = await fetch(url, { signal: options.signal });
+        const ua = options.userAgent || (await getEffectiveUserAgent());
+        const headers = {
+            'User-Agent': ua,
+            'Accept': 'application/json, text/plain, */*',
+            ...(options.headers || {})
+        };
+        const response = await fetch(url, { 
+            signal: options.signal,
+            headers
+        });
         if (!response.ok) {
             throw new Error(`Xtream API error: ${response.status} ${response.statusText}`);
         }

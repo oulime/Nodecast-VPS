@@ -1561,9 +1561,9 @@
     <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-54"></script>
     <link rel="stylesheet" href="/assets/velora-favorites.css?v=instant-nav-v20260821-54" />
-    <script defer src="/assets/velora-favorites.js?v=instant-nav-v20260821-54"></script>
+    <script defer src="/assets/velora-favorites.js?v=20260902-scroll-top-v2"></script>
     <script defer src="/assets/velora-watch-history.js?v=instant-nav-v20260828-152"></script>
-    <script defer src="/assets/velora-catalog-scroll-memory.js?v=instant-nav-v20260821-54"></script>
+    <script defer src="/assets/velora-catalog-scroll-memory.js?v=20260902-scroll-top-v2"></script>
     <script defer src="/assets/velora-cache-inventory.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/manual-pays-visible-memberships.js?v=instant-nav-v20260821-149"></script>
     <script defer src="/assets/country-logos-admin.js?v=instant-nav-v20260821-145"></script>
@@ -7889,6 +7889,9 @@
               homePage.classList.add("hidden");
               homePage.setAttribute("aria-hidden", "true");
             }
+            var main = document.querySelector(".main--velora");
+            if (main) main.scrollTop = 0;
+            window.scrollTo(0, 0);
             document.dispatchEvent(
               new CustomEvent("velora-home-tab", {
                 detail: { tab: tabName }
@@ -7950,12 +7953,12 @@
               document.body.classList.remove("vel-home-choice-catalog-pending");
               document.body.classList.add("vel-home-choice-picked");
               document.body.classList.add("vel-home-empty-active");
-              window.scrollTo(0, 0);
               var main = document.querySelector(".main--velora");
               if (main) {
                 main.classList.remove("main--velora-in-package", "main--velora-live-package");
                 main.scrollTop = 0;
               }
+              window.scrollTo(0, 0);
               document.querySelectorAll("[data-bottom-nav]").forEach(function (button) {
                 var active = button.getAttribute("data-bottom-nav") === "home";
                 button.classList.toggle("is-active", active);
@@ -14190,6 +14193,11 @@ if (target.closest(".trial-offer-button")) {
               window.history.pushState(Object.assign({}, state, { veloraNav: "tab:" + tab }), "", window.location.href);
             }
           } catch (_) {}
+          var main = document.querySelector(".main--velora");
+          if (main) main.scrollTop = 0;
+          window.scrollTo(0, 0);
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
           document.dispatchEvent(new CustomEvent("velora-top-level-tab", { detail: { tab: tab } }));
           if (typeof window.veloraBlockCountryPickerAfterPageChange === "function") {
             window.veloraBlockCountryPickerAfterPageChange();
@@ -14252,12 +14260,14 @@ if (target.closest(".trial-offer-button")) {
           document.body.classList.remove("vel-home-choice-catalog-pending");
           document.body.classList.add("vel-home-choice-picked");
           document.body.classList.add("vel-home-empty-active");
-          window.scrollTo(0, 0);
           var main = document.querySelector(".main--velora");
           if (main) {
             main.classList.remove("main--velora-in-package", "main--velora-live-package");
             main.scrollTop = 0;
           }
+          window.scrollTo(0, 0);
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
           setActive("home");
         }
 

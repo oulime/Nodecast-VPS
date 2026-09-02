@@ -748,6 +748,9 @@
     state.open = true;
     document.body.classList.add("vel-favorites-open");
     page.hidden = false;
+    var main = document.querySelector(".main--velora");
+    if (main) main.scrollTop = 0;
+    window.scrollTo(0, 0);
 
     // Instant render from cache (0ms latency)
     if (state.items.size > 0) {

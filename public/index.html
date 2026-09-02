@@ -294,11 +294,7 @@
           return startupCountryRestored;
         };
         window.veloraIsStartupContentReady = function (select) {
-          return window.veloraIsStartupCountryReady(select) &&
-            (
-              document.querySelectorAll(".vel-package-card[data-package-id]").length > 0 ||
-              document.querySelectorAll("#vel-home-sections .vel-home-section__card").length > 0
-            );
+          return window.veloraIsStartupCountryReady(select);
         };
         window.veloraBlockCountryPickerUntil = 0;
         window.veloraBlockCountryPickerAfterPageChange = function () {
@@ -1572,7 +1568,7 @@
     <script defer src="/assets/direct-media-packages.js?v=20260830-roller-v34"></script>
     <script defer src="/assets/pkg-hub-selector.js?v=20260830-visibility-fix-v43"></script>
     <script defer src="/assets/home-package-link.js?v=instant-nav-v20260831-58"></script>
-    <script defer src="/assets/country-switch-loader.js?v=instant-nav-v20260821-54"></script>
+    <script defer src="/assets/country-switch-loader.js?v=20260902-loader-fix-v1"></script>
     <script defer src="/assets/paid-users-admin.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/ios-native-fullscreen.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/velora-hero-slider.js?v=20260902-hero-v9"></script>
@@ -6480,24 +6476,8 @@
                 </div>
 
                 <div class="vel-adult-actions" aria-label="Choix de contenu adulte">
-                  <button type="button" id="vel-adult-btn-live" class="vel-adult-action-btn vel-adult-action-btn--live">
-                    <div class="vel-adult-action-btn__icon">
-                      <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
-                    </div>
-                    <div class="vel-adult-action-btn__text">
-                      <span class="vel-adult-action-btn__title">TV en Direct</span>
-                      <span class="vel-adult-action-btn__subtitle">Ouvrir le lecteur TV</span>
-                    </div>
-                  </button>
-
-                  <button type="button" id="vel-adult-btn-vod" class="vel-adult-action-btn vel-adult-action-btn--vod">
-                    <div class="vel-adult-action-btn__icon">
-                      <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                    </div>
-                    <div class="vel-adult-action-btn__text">
-                      <span class="vel-adult-action-btn__title">Films</span>
-                      <span class="vel-adult-action-btn__subtitle">Ouvrir le lecteur de films</span>
-                    </div>
+                  <button type="button" id="vel-adult-pin-settings-btn" class="vel-adult-back-btn" title="Gérer le code PIN de sécurité">
+                    <span>🔐 Code PIN</span>
                   </button>
                 </div>
 
@@ -7307,7 +7287,9 @@
 
           function hasPackageCards() {
             var view = document.getElementById("packages-view");
-            return !!(view && view.querySelector(".vel-package-card[data-package-id]"));
+            var hasPackages = !!(view && view.querySelector(".vel-package-card[data-package-id]"));
+            var hasHomeFeed = !!(document.getElementById("vel-home-empty-page") || document.querySelector(".vel-prime-row-card") || document.getElementById("vel-prime-carousels-container"));
+            return hasPackages || hasHomeFeed;
           }
 
           function showHomeChoiceWhenReady() {
@@ -7319,7 +7301,7 @@
 
             var finished = false;
             var started = Date.now();
-            var maxWait = 45000;
+            var maxWait = 3500;
 
             function setLoadingStatus(text) {
               if (catalogLoadingOverlay && catalogLoadingOverlay.querySelector) {
@@ -7758,46 +7740,9 @@
             homeAdultBtn.addEventListener("click", function (event) {
               event.preventDefault();
               event.stopPropagation();
-              homeChoiceRunId += 1;
-              document.body.classList.remove("vel-home-choice-loading");
-              var adultButton = document.getElementById("btn-adult-portal");
-              var adultDialog = document.getElementById("vel-adult-confirm-dialog");
-              var adultConfirmYes = document.getElementById("vel-adult-confirm-yes");
-              try {
-                window.sessionStorage.removeItem("velora_adult_confirmed_v1");
-              } catch (error) {
-                // The dialog still works when session storage is unavailable.
+              if (typeof window.veloraOpenAdultPortal === "function") {
+                window.veloraOpenAdultPortal();
               }
-              if (adultConfirmYes) {
-                adultConfirmYes.addEventListener("click", function () {
-                  document.body.classList.add("vel-home-choice-picked");
-                }, { once: true });
-              }
-              var restoreHomeIfAdultCancelled = function () {
-                window.setTimeout(function () {
-                  var main = document.querySelector(".main--velora");
-                  var adultIsOpen = !!(
-                    main &&
-                    main.classList.contains("main--velora-adult")
-                  );
-                  var adultButtonIsActive = !!(
-                    adultButton &&
-                    adultButton.classList.contains("active")
-                  );
-                  if (!adultIsOpen && !adultButtonIsActive) {
-                    homeChoiceRunId += 1;
-                    document.body.classList.remove("vel-home-choice-loading");
-                    document.body.classList.remove("vel-home-choice-picked");
-                    window.scrollTo(0, 0);
-                    if (main) main.scrollTop = 0;
-                  }
-                }, 140);
-              };
-              if (adultDialog) {
-                adultDialog.addEventListener("cancel", restoreHomeIfAdultCancelled, { once: true });
-                adultDialog.addEventListener("close", restoreHomeIfAdultCancelled, { once: true });
-              }
-              if (adultButton) adultButton.click();
             });
           }
 
@@ -13520,7 +13465,7 @@ if (target.closest(".trial-offer-button")) {
       body.vel-home-empty-active #vel-packages-section-heading,
       body.vel-home-empty-active #packages-view,
       body.vel-home-empty-active #content-view,
-      body.vel-home-empty-active #adult-view,
+      body.vel-home-empty-active:not(.vel-adult-active) #adult-view,
       body.vel-home-empty-active #player-container,
       body.vel-home-empty-active #vod-player-container,
       body.vel-home-empty-active #now-playing,
@@ -13806,6 +13751,7 @@ if (target.closest(".trial-offer-button")) {
           delete window._veloraFavoriteReturnTab;
           delete document.body.dataset.veloraSearchMediaOpen;
           document.body.classList.remove("vel-favorites-open", "vel-favorites-player-active");
+          document.body.classList.remove("vel-adult-active", "vel-adult-player-active");
           if (typeof window.veloraCloseFavoritesPage === "function") {
             try { window.veloraCloseFavoritesPage(false); } catch (_) {}
           }
@@ -13813,6 +13759,11 @@ if (target.closest(".trial-offer-button")) {
           if (homePage) {
             homePage.classList.remove("hidden");
             homePage.setAttribute("aria-hidden", "false");
+            homePage.style.removeProperty("display");
+          }
+          var primeContainer = document.getElementById("vel-prime-carousels-container");
+          if (primeContainer) {
+            primeContainer.style.removeProperty("display");
           }
           stopHomeMedia();
           ["content-view", "packages-view", "adult-view"].forEach(function (id) {
@@ -14137,12 +14088,6 @@ if (target.closest(".trial-offer-button")) {
             showHome();
           }, true);
         });
-
-        document.addEventListener("click", function (event) {
-          if (event.target && event.target.closest("#btn-adult-portal, #home-adult-btn")) {
-            document.body.classList.remove("vel-home-empty-active");
-          }
-        }, true);
       })();
     </script>
     <script>
@@ -14303,8 +14248,8 @@ if (target.closest(".trial-offer-button")) {
     <script defer src="/assets/velora-live-wheel.js?v=instant-nav-v20260821-151"></script>
     <link rel="stylesheet" href="/assets/velora-prime-carousel.css?v=20260902-feed-v5" />
     <script defer src="/assets/velora-prime-carousels.js?v=20260902-feed-v5"></script>
-    <link rel="stylesheet" href="/assets/velora-adult.css?v=20260902-adult-pin-storage-v9" />
-    <script defer src="/assets/velora-adult.js?v=20260902-adult-pin-storage-v9"></script>
+    <link rel="stylesheet" href="/assets/velora-adult.css?v=20260902-adult-clean-v26" />
+    <script defer src="/assets/velora-adult.js?v=20260902-adult-clean-v26"></script>
   </body>
 </html>
 

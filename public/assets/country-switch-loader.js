@@ -76,13 +76,12 @@
 
   async function finishWhenStable(id) {
     const started = Date.now();
-    while (id === runId && Date.now() - started < 5000) {
-      const skeletons = document.querySelector("#vel-home-sections .vel-home-section__skeleton, #packages-view .vel-package-skeleton, .item-list--media-loading");
-      const homeFinished = lastHomeRenderedAt > 0 || Date.now() - started >= 1500;
-      if (homeFinished && !skeletons && Date.now() - lastMutationAt >= 180) break;
-      await new Promise(resolve => setTimeout(resolve, 80));
+    while (id === runId && Date.now() - started < 2000) {
+      const skeletons = document.querySelector(".item-list--media-loading, .vel-prime-loading-spinner");
+      const homeFinished = lastHomeRenderedAt > 0 || Date.now() - started >= 700;
+      if (homeFinished && !skeletons && Date.now() - lastMutationAt >= 150) break;
+      await new Promise(resolve => setTimeout(resolve, 60));
     }
-    // Posters are lazy and must never keep the whole application blocked.
     const remainingMinimum = MIN_VISIBLE_MS - (Date.now() - switchStartedAt);
     if (remainingMinimum > 0) await new Promise(resolve => setTimeout(resolve, remainingMinimum));
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -94,9 +93,7 @@
     if (!document.body.classList.contains("vel-home-choice-loading")) return true;
     const select = document.getElementById("country-select");
     const hasCountry = !!select && [...select.options].some(option => !option.disabled && String(option.value || "").trim());
-    const hasContent = !!document.querySelector("#packages-view .vel-package-card[data-package-id], #vel-home-sections .vel-home-section__card");
-    const stillRendering = !!document.querySelector("#vel-home-sections .vel-home-section__skeleton, #packages-view .vel-package-skeleton, .item-list--media-loading");
-    if (!hasCountry || !hasContent || stillRendering) return false;
+    if (!hasCountry) return false;
     const node = overlay();
     node?.classList.add("hidden");
     node?.setAttribute("aria-hidden", "true");

@@ -1958,28 +1958,169 @@
     modal.classList.add("is-open");
   }
 
-  // Open the Adult Portal page with High Security PIN Gate
-  async function openAdultPortal() {
-    const wasHome = document.body.classList.contains("vel-home-empty-active") || document.body.dataset.velActiveTab === "home";
-    promptAdultPinGate(
-      () => {
-        showAdultView();
-      },
-      {
-        onCancel: () => {
-          if (wasHome) {
-            const homePage = document.getElementById("vel-home-empty-page");
-            if (homePage) {
-              homePage.classList.remove("hidden");
-              homePage.setAttribute("aria-hidden", "false");
-            }
-            document.body.classList.add("vel-home-empty-active");
-            if (typeof window.veloraSetBottomNavActive === "function") {
-              window.veloraSetBottomNavActive("home");
-            }
+  // ---------------------------------------------------------------------------
+  // Lifetime Adult +18 Age Confirmation Gate (Shown only once in lifetime)
+  // ---------------------------------------------------------------------------
+  function isAdultAgeConfirmed() {
+    try {
+      const uid = getVeloraUserId();
+      if (localStorage.getItem(ADULT_CONFIRMED_KEY) === "1") return true;
+      if (uid && localStorage.getItem(`${ADULT_CONFIRMED_KEY}_${uid}`) === "1") return true;
+      if (sessionStorage.getItem(ADULT_CONFIRMED_KEY) === "1") return true;
+      const storedPin = getStoredPinRecord();
+      if (storedPin && storedPin.adult_confirmed === true) return true;
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function setAdultAgeConfirmed(confirmed) {
+    try {
+      const uid = getVeloraUserId();
+      if (confirmed) {
+        localStorage.setItem(ADULT_CONFIRMED_KEY, "1");
+        if (uid) localStorage.setItem(`${ADULT_CONFIRMED_KEY}_${uid}`, "1");
+        sessionStorage.setItem(ADULT_CONFIRMED_KEY, "1");
+
+        // Lifetime persistence on VPS for user
+        if (uid) {
+          fetch(`${REST_BASE}/admin_settings?key=eq.adult_confirmed_${encodeURIComponent(uid)}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Prefer": "resolution=merge-duplicates,return=representation"
+            },
+            body: JSON.stringify({
+              key: `adult_confirmed_${uid}`,
+              value: JSON.stringify({
+                confirmed: true,
+                user_id: uid,
+                updated_at: new Date().toISOString()
+              })
+            })
+          }).catch(() => {});
+        }
+      }
+    } catch (_) {}
+  }
+
+  async function fetchServerAdultConfirmed() {
+    try {
+      const uid = getVeloraUserId();
+      if (!uid) return;
+      const res = await fetch(`${REST_BASE}/admin_settings?key=eq.adult_confirmed_${encodeURIComponent(uid)}`, {
+        headers: { "Content-Type": "application/json" }
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        if (Array.isArray(rows) && rows[0] && rows[0].value) {
+          const parsed = JSON.parse(rows[0].value);
+          if (parsed && parsed.confirmed) {
+            localStorage.setItem(ADULT_CONFIRMED_KEY, "1");
+            localStorage.setItem(`${ADULT_CONFIRMED_KEY}_${uid}`, "1");
+            sessionStorage.setItem(ADULT_CONFIRMED_KEY, "1");
           }
         }
       }
+    } catch (_) {}
+  }
+
+  function promptAdultAgeConfirmation(onSuccess, onCancel) {
+    if (isAdultAgeConfirmed()) {
+      if (typeof onSuccess === "function") onSuccess();
+      return;
+    }
+
+    const dialog = document.getElementById("vel-adult-confirm-dialog");
+    const yesBtn = document.getElementById("vel-adult-confirm-yes");
+    const noBtn = document.getElementById("vel-adult-confirm-no");
+
+    if (!dialog || !yesBtn || !noBtn) {
+      const confirmed = window.confirm("Cette section est reservee aux personnes majeures. Confirmez que vous avez 18 ans ou plus pour continuer.");
+      if (confirmed) {
+        setAdultAgeConfirmed(true);
+        if (typeof onSuccess === "function") onSuccess();
+      } else {
+        if (typeof onCancel === "function") onCancel();
+      }
+      return;
+    }
+
+    let settled = false;
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    function cleanup() {
+      controller.abort();
+    }
+
+    function handleYes(e) {
+      if (e) e.preventDefault();
+      if (settled) return;
+      settled = true;
+      setAdultAgeConfirmed(true);
+      try { dialog.close(); } catch (_) {}
+      cleanup();
+      if (typeof onSuccess === "function") onSuccess();
+    }
+
+    function handleNo(e) {
+      if (e) e.preventDefault();
+      if (settled) return;
+      settled = true;
+      try { dialog.close(); } catch (_) {}
+      cleanup();
+      if (typeof onCancel === "function") onCancel();
+    }
+
+    yesBtn.addEventListener("click", handleYes, { signal });
+    noBtn.addEventListener("click", handleNo, { signal });
+    dialog.addEventListener("cancel", handleNo, { signal });
+    dialog.addEventListener("close", () => {
+      if (!settled) {
+        settled = true;
+        cleanup();
+        if (typeof onCancel === "function") onCancel();
+      }
+    }, { once: true });
+
+    try {
+      dialog.showModal();
+    } catch (_) {
+      dialog.setAttribute("open", "");
+    }
+  }
+
+  // Open the Adult Portal page with Lifetime Age Gate + PIN Gate
+  async function openAdultPortal() {
+    const wasHome = document.body.classList.contains("vel-home-empty-active") || document.body.dataset.velActiveTab === "home";
+    const cancelCallback = () => {
+      if (wasHome) {
+        const homePage = document.getElementById("vel-home-empty-page");
+        if (homePage) {
+          homePage.classList.remove("hidden");
+          homePage.setAttribute("aria-hidden", "false");
+        }
+        document.body.classList.add("vel-home-empty-active");
+        if (typeof window.veloraSetBottomNavActive === "function") {
+          window.veloraSetBottomNavActive("home");
+        }
+      }
+    };
+
+    promptAdultAgeConfirmation(
+      () => {
+        promptAdultPinGate(
+          () => {
+            showAdultView();
+          },
+          {
+            onCancel: cancelCallback
+          }
+        );
+      },
+      cancelCallback
     );
   }
 
@@ -2203,6 +2344,7 @@
 
   fetchAssignedAdultPackages();
   fetchServerPinRecord();
+  fetchServerAdultConfirmed();
 
   document.addEventListener("velora-show-home", () => {
     isAdultOpen = false;

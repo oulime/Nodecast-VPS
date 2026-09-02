@@ -6,6 +6,7 @@ const { getDb } = require('../db/sqlite');
 const { sources } = require('../db');
 const xtreamApi = require('../services/xtreamApi');
 const veloraCatalogCache = require('../services/veloraCatalogCache');
+const channelLogoMatcher = require('../services/channelLogoMatcher');
 
 const router = express.Router();
 const homeCachePath = path.join(__dirname, '..', '..', 'data', 'velora-cache', 'home-sections.json');
@@ -2744,6 +2745,36 @@ router.post('/admin/sync-packages', (req, res) => {
         });
     } catch (error) {
         console.error('[Velora data] Package synchronization failed:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/admin/sync-channel-logos', async (req, res) => {
+    try {
+        const forceRefresh = req.body?.forceRefresh === true;
+        // Start background sync
+        channelLogoMatcher.syncAllChannelLogos({ forceRefresh }).catch(err => {
+            console.error('[Velora data] Channel logo sync background error:', err);
+        });
+
+        return res.json({
+            ok: true,
+            message: 'Synchronisation des logos TV lancée en arrière-plan.',
+            progress: channelLogoMatcher.getSyncStatus()
+        });
+    } catch (error) {
+        console.error('[Velora data] Channel logo sync initiation failed:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+router.get('/admin/sync-channel-logos-status', (req, res) => {
+    try {
+        return res.json({
+            ok: true,
+            progress: channelLogoMatcher.getSyncStatus()
+        });
+    } catch (error) {
         return res.status(500).json({ error: error.message });
     }
 });

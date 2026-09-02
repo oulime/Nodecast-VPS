@@ -204,6 +204,8 @@ if (USE_VPS_DATA_API) {
             delete headers.host;
             delete headers['content-length'];
             delete headers['accept-encoding'];
+            delete headers['transfer-encoding'];
+            delete headers.connection;
 
             if (req.method === 'POST' && req.path === '/api/velora-db/home-cache/rebuild') {
                 // Force the VPS data service to derive Home entries from its
@@ -233,6 +235,8 @@ if (USE_VPS_DATA_API) {
             });
             res.setHeader('X-Nodecast-Data-Source', VPS_DATA_API_BASE);
 
+            const contentType = String(upstream.headers.get('content-type') || '').toLowerCase();
+
             if (upstream.ok && req.path === '/api/package-covers/all' && contentType.includes('application/json')) {
                 const data = await upstream.json().catch(() => null);
                 if (data && data.covers) {
@@ -248,7 +252,6 @@ if (USE_VPS_DATA_API) {
             }
 
             const vodRoute = req.path.match(/^\/api\/proxy\/xtream\/([^/]+)\/vod_streams$/i);
-            const contentType = String(upstream.headers.get('content-type') || '').toLowerCase();
 
             if (upstream.ok && vodRoute && (req.query.category_id || req.query.cat_id) && contentType.includes('application/json')) {
                 const items = await upstream.json().catch(() => null);

@@ -112,7 +112,7 @@
 
 /* Transparent PNG Title Logo (Prime Video / Netflix style) */
 .vel-hero-title-art {
-  margin: 0 0 0.35rem 0;
+  margin: 0 0 0.5rem 0;
   padding: 0;
   display: flex;
   align-items: flex-end;
@@ -121,21 +121,28 @@
 }
 
 .vel-hero-title-logo {
-  max-width: min(400px, 85%);
-  max-height: clamp(65px, 11vw, 130px);
+  max-width: min(560px, 88%);
+  max-height: clamp(90px, 15vw, 175px);
   width: auto;
   height: auto;
   object-fit: contain;
   object-position: left bottom;
-  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.95)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.8));
+  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.95)) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.85));
   user-select: none;
   pointer-events: none;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .vel-hero-title-logo {
-    max-width: min(270px, 90%);
-    max-height: clamp(48px, 14vw, 75px);
+    max-width: min(380px, 90%);
+    max-height: clamp(65px, 16vw, 115px);
+  }
+}
+
+@media (max-width: 480px) {
+  .vel-hero-title-logo {
+    max-width: min(290px, 92%);
+    max-height: clamp(55px, 18vw, 90px);
   }
 }
 

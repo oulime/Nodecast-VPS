@@ -271,6 +271,29 @@
     }
   }
 
+  async function autoDiscoverAndAssignAdultPackages() {
+    if (assignedAdultPackages.size > 0) return assignedAdultPackages;
+    if (allCatalogPackages.length === 0) {
+      await fetchAllCatalogPackages();
+    }
+    const matched = allCatalogPackages.filter(pkg => {
+      const name = String(pkg.name || "");
+      return ADULT_KEYWORDS.test(name);
+    });
+
+    if (matched.length > 0) {
+      matched.forEach(pkg => {
+        const id = String(pkg.package_id || pkg.id);
+        if (id) assignedAdultPackages.set(id, pkg);
+        if (pkg.kind && pkg.source_id && pkg.category_id) {
+          assignedAdultPackages.set(makePackageKey(pkg.kind, pkg.source_id, pkg.category_id), pkg);
+        }
+      });
+      await persistAssignedAdultPackages();
+    }
+    return assignedAdultPackages;
+  }
+
   function isPackageSelected(pkg) {
     if (!pkg) return false;
     const id = String(pkg.id || pkg.package_id);
@@ -752,9 +775,12 @@
 
   async function openAdultLivePlayerDirectly() {
     await fetchAssignedAdultPackages();
+    if (assignedAdultPackages.size === 0) {
+      await autoDiscoverAndAssignAdultPackages();
+    }
     const livePackages = Array.from(assignedAdultPackages.values()).filter(p => p.kind === "live");
     if (!livePackages.length) {
-      alert("Aucun bouquet TV adulte n'a été configuré par l'administrateur.");
+      alert("Aucun bouquet TV adulte n'a été configuré.");
       return;
     }
 
@@ -787,6 +813,17 @@
 
     window._veloraAdultLiveChannels = uniqueChannels;
     window._veloraAdultLiveCurrentIndex = 0;
+
+    delete document.body.dataset.veloraReturnFavorites;
+    delete window._veloraFavoriteReturnTab;
+    delete document.body.dataset.veloraReturnHome;
+    document.body.dataset.veloraReturnAdult = "true";
+    document.body.dataset.velActiveTab = "adult";
+    document.body.dataset.velTopLevel = "adult";
+    document.body.classList.remove("vel-adult-active", "vel-home-empty-active", "vel-home-choice-picked");
+    if (typeof window.veloraSetBottomNavActive === "function") {
+      window.veloraSetBottomNavActive("adult");
+    }
 
     await playAdultChannelByIndex(0);
   }
@@ -1343,9 +1380,18 @@
 
   async function openAdultMoviesPlayerDirectly() {
     await fetchAssignedAdultPackages();
+    if (assignedAdultPackages.size === 0) {
+      await autoDiscoverAndAssignAdultPackages();
+    }
     const vodPackages = Array.from(assignedAdultPackages.values()).filter(p => p.kind === "movies" || p.kind === "vod");
     if (!vodPackages.length) {
-      alert("Aucun bouquet de films adultes n'a été configuré par l'administrateur.");
+      // Fallback: If no movies found, try opening Live TV channels
+      const livePackages = Array.from(assignedAdultPackages.values()).filter(p => p.kind === "live");
+      if (livePackages.length > 0) {
+        await openAdultLivePlayerDirectly();
+        return;
+      }
+      alert("Aucun bouquet adulte n'a été trouvé.");
       return;
     }
 
@@ -1353,7 +1399,12 @@
     const allMovies = movieGroups.flat();
 
     if (!allMovies.length) {
-      alert("Aucun film trouvé dans les bouquets adultes sélectionnés.");
+      const livePackages = Array.from(assignedAdultPackages.values()).filter(p => p.kind === "live");
+      if (livePackages.length > 0) {
+        await openAdultLivePlayerDirectly();
+        return;
+      }
+      alert("Aucun film adulte trouvé.");
       return;
     }
 
@@ -1374,7 +1425,12 @@
     delete window._veloraFavoriteReturnTab;
     delete document.body.dataset.veloraReturnHome;
     document.body.dataset.veloraReturnAdult = "true";
-    document.body.classList.remove("vel-adult-active");
+    document.body.dataset.velActiveTab = "adult";
+    document.body.dataset.velTopLevel = "adult";
+    document.body.classList.remove("vel-adult-active", "vel-home-empty-active", "vel-home-choice-picked");
+    if (typeof window.veloraSetBottomNavActive === "function") {
+      window.veloraSetBottomNavActive("adult");
+    }
 
     const adultView = document.getElementById("adult-view");
     if (adultView) adultView.classList.add("hidden");
@@ -1396,54 +1452,39 @@
   async function renderAdultPortal() {
     const portal = document.getElementById("adult-view");
     const container = document.getElementById("vel-adult-packages-container");
-    const searchWrap = document.getElementById("vel-adult-search-wrap");
-    const searchInput = document.getElementById("vel-adult-search-input");
     if (!portal || !container) return;
 
     await fetchAssignedAdultPackages();
+    if (assignedAdultPackages.size === 0) {
+      await autoDiscoverAndAssignAdultPackages();
+    }
 
     const packages = Array.from(assignedAdultPackages.values());
-    const uniquePackages = [];
-    const seen = new Set();
-    packages.forEach(p => {
-      const key = `${p.kind}:${p.source_id}:${p.category_id || p.package_id || p.id}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        uniquePackages.push(p);
-      }
-    });
+    const vodPackages = packages.filter(p => p.kind === "movies" || p.kind === "vod");
+    const livePackages = packages.filter(p => p.kind === "live");
 
-    function updateView() {
-      container.replaceChildren();
+    // Automatically launch adult movies directly if available
+    if (vodPackages.length > 0) {
+      await openAdultMoviesPlayerDirectly();
+      return;
+    }
 
-      // Default state when opening portal: Neither is active, prompt to choose
-      if (searchWrap) searchWrap.style.display = "none";
-      container.innerHTML = `
-        <div style="text-align:center;padding:50px 20px;color:#94a3b8;">
-          <div style="font-size:1.15rem;font-weight:700;color:#f1f5f9;margin-bottom:8px;">Bienvenue dans votre Espace Adulte +18</div>
-          <div>Sélectionnez <strong>TV en Direct</strong> pour lancer le lecteur TV ou <strong>Films</strong> pour lancer le lecteur de films.</div>
+    // If only live TV channels configured, launch live player directly
+    if (livePackages.length > 0) {
+      await openAdultLivePlayerDirectly();
+      return;
+    }
+
+    container.replaceChildren();
+    container.innerHTML = `
+      <div style="text-align:center;padding:60px 20px;color:#94a3b8;">
+        <div style="font-size:1.3rem;font-weight:800;color:#f43f5e;margin-bottom:12px;">🔒 Espace Adulte +18</div>
+        <div style="max-width:420px;margin:0 auto;line-height:1.6;font-size:0.92rem;">
+          Aucun bouquet adulte n'est encore sélectionné.<br>
+          Activez des bouquets TV ou Films depuis l'onglet <strong>Adulte +18</strong> dans les Paramètres (Admin).
         </div>
-      `;
-    }
-
-    if (searchInput) {
-      searchInput.oninput = updateView;
-    }
-
-    const liveBtn = document.getElementById("vel-adult-btn-live");
-    const vodBtn = document.getElementById("vel-adult-btn-vod");
-    if (liveBtn) {
-      liveBtn.onclick = () => {
-        openAdultLivePlayerDirectly();
-      };
-    }
-    if (vodBtn) {
-      vodBtn.onclick = () => {
-        openAdultMoviesPlayerDirectly();
-      };
-    }
-
-    updateView();
+      </div>
+    `;
   }
 
   // Open an adult VOD package
@@ -1506,12 +1547,36 @@
     };
   }
 
+  let cachedPinRecord = null;
+
+  async function fetchServerPinRecord() {
+    try {
+      const res = await fetch(`${REST_BASE}/admin_settings?key=eq.adult_pin_record`, {
+        headers: { "Content-Type": "application/json" }
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        if (Array.isArray(rows) && rows[0] && rows[0].value) {
+          const parsed = JSON.parse(rows[0].value);
+          if (parsed && (parsed.hash || parsed.disabled)) {
+            cachedPinRecord = parsed;
+            try { localStorage.setItem(ADULT_PIN_STORAGE_KEY, JSON.stringify(parsed)); } catch (_) {}
+            return parsed;
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   function getStoredPinRecord() {
+    if (cachedPinRecord) return cachedPinRecord;
     try {
       const data = localStorage.getItem(ADULT_PIN_STORAGE_KEY);
       if (!data) return null;
       const parsed = JSON.parse(data);
-      if (parsed && typeof parsed.hash === "string" && typeof parsed.salt === "string") {
+      if (parsed && (parsed.hash || parsed.disabled)) {
+        cachedPinRecord = parsed;
         return parsed;
       }
       return null;
@@ -1520,10 +1585,27 @@
     }
   }
 
-  function savePinRecord(record) {
+  async function savePinRecord(record) {
+    cachedPinRecord = record;
     try {
       localStorage.setItem(ADULT_PIN_STORAGE_KEY, JSON.stringify(record));
     } catch (_) {}
+
+    try {
+      await fetch(`${REST_BASE}/admin_settings?key=eq.adult_pin_record`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Prefer": "resolution=merge-duplicates,return=representation"
+        },
+        body: JSON.stringify({
+          key: "adult_pin_record",
+          value: JSON.stringify(record)
+        })
+      });
+    } catch (e) {
+      console.warn("[Velora Adult] Error persisting adult_pin_record:", e.message);
+    }
   }
 
   function isAdultSessionUnlocked() {
@@ -1591,6 +1673,10 @@
             <svg viewBox="0 0 24 24"><path d="M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3 12.59L17.59 17 14 13.41 10.41 17 9 15.59 12.59 12 9 8.41 10.41 7 14 10.59 17.59 7 19 8.41 15.41 12 19 15.59z"/></svg>
           </button>
         </div>
+
+        <button type="button" id="vel-adult-pin-skip-btn" class="vel-adult-pin-skip-btn" style="display: none;">
+          🔓 Accéder sans code de sécurité
+        </button>
       </div>
     `;
 
@@ -1599,6 +1685,15 @@
   }
 
   function promptAdultPinGate(onSuccess, options = {}) {
+    const storedRecord = getStoredPinRecord();
+
+    // If user previously chose to leave adult section without a security code
+    if (storedRecord && storedRecord.disabled === true && !options.forceSetup) {
+      setAdultSessionUnlocked(true);
+      if (typeof onSuccess === "function") onSuccess();
+      return;
+    }
+
     if (isAdultSessionUnlocked() && !options.forceSetup) {
       if (typeof onSuccess === "function") onSuccess();
       return;
@@ -1610,23 +1705,26 @@
     const subtitleEl = document.getElementById("vel-adult-pin-subtitle");
     const dotsWrap = document.getElementById("vel-adult-pin-dots");
     const errorEl = document.getElementById("vel-adult-pin-error");
+    const skipBtn = document.getElementById("vel-adult-pin-skip-btn");
     const dots = dotsWrap ? dotsWrap.querySelectorAll(".vel-adult-pin-dot") : [];
 
     let currentPin = "";
     let firstPin = ""; // For setup step 1
-    const storedRecord = getStoredPinRecord();
-    let mode = (storedRecord && !options.forceSetup) ? "UNLOCK" : "CREATE_1";
+    let mode = (storedRecord && storedRecord.hash && !options.forceSetup) ? "UNLOCK" : "CREATE_1";
 
     function updateView() {
       if (mode === "CREATE_1") {
-        titleEl.textContent = "🔐 Créer le code d'accès (+18)";
-        subtitleEl.textContent = "Choisissez un code PIN à 4 chiffres pour restreindre l'accès aux enfants.";
+        titleEl.textContent = "🔐 Code Parental (+18)";
+        subtitleEl.textContent = "Définissez un code PIN à 4 chiffres pour restreindre l'accès aux enfants, ou accédez sans code.";
+        if (skipBtn) skipBtn.style.display = "inline-flex";
       } else if (mode === "CREATE_2") {
         titleEl.textContent = "🔐 Confirmez le code PIN";
         subtitleEl.textContent = "Ressaisissez votre code PIN à 4 chiffres pour confirmer.";
+        if (skipBtn) skipBtn.style.display = "none";
       } else {
-        titleEl.textContent = "🔒 Zone Verrouillée (+18)";
-        subtitleEl.textContent = "Entrez votre code PIN à 4 chiffres pour accéder au contenu adulte.";
+        titleEl.textContent = "🔒 Confirmation de Sécurité";
+        subtitleEl.textContent = "Entrez votre code PIN à 4 chiffres pour confirmer votre identité.";
+        if (skipBtn) skipBtn.style.display = "none";
       }
 
       dots.forEach((dot, index) => {
@@ -1684,12 +1782,14 @@
       if (mode === "CREATE_2") {
         if (currentPin === firstPin) {
           const newRecord = await hashPin(currentPin);
-          savePinRecord(newRecord);
+          newRecord.disabled = false;
+          newRecord.createdAt = new Date().toISOString();
+          await savePinRecord(newRecord);
           setAdultSessionUnlocked(true);
           failedAttempts = 0;
           clearError();
-          if (titleEl) titleEl.textContent = "✓ Code PIN créé !";
-          if (subtitleEl) subtitleEl.textContent = "Accès adulte sécurisé avec succès.";
+          if (titleEl) titleEl.textContent = "✓ Code PIN enregistré !";
+          if (subtitleEl) subtitleEl.textContent = "Votre code à 4 chiffres est sauvegardé.";
           setTimeout(() => {
             closeModal();
             if (typeof onSuccess === "function") onSuccess();
@@ -1706,7 +1806,7 @@
 
       if (mode === "UNLOCK") {
         const isValid = await (async () => {
-          if (!storedRecord) return true;
+          if (!storedRecord || !storedRecord.hash) return true;
           const computed = await hashPin(currentPin, storedRecord.salt);
           return computed.hash === storedRecord.hash;
         })();
@@ -1715,7 +1815,7 @@
           setAdultSessionUnlocked(true);
           failedAttempts = 0;
           clearError();
-          if (titleEl) titleEl.textContent = "✓ Accès Déverrouillé";
+          if (titleEl) titleEl.textContent = "✓ Accès Confirmé";
           setTimeout(() => {
             closeModal();
             if (typeof onSuccess === "function") onSuccess();
@@ -1728,7 +1828,7 @@
             lockoutUntil = Date.now() + 30000;
             showError("❌ Trop d'essais erronés. Verrouillé 30 secondes.");
           } else {
-            showError(`❌ Code PIN incorrect (${5 - failedAttempts} essai(s) restant(s))`);
+            showError(`❌ Code incorrect (${5 - failedAttempts} essai(s) restant(s))`);
           }
         }
       }
@@ -1756,9 +1856,16 @@
       }
     }
 
-    modal.onclick = (e) => {
+    modal.onclick = async (e) => {
       if (e.target === modal || e.target.closest("#vel-adult-pin-close") || e.target.closest("#vel-adult-pin-cancel")) {
         closeModal();
+        return;
+      }
+      if (e.target.closest("#vel-adult-pin-skip-btn")) {
+        await savePinRecord({ disabled: true, createdAt: new Date().toISOString() });
+        setAdultSessionUnlocked(true);
+        closeModal();
+        if (typeof onSuccess === "function") onSuccess();
         return;
       }
       const keyBtn = e.target.closest(".vel-adult-pin-key");
@@ -1982,6 +2089,7 @@
   });
 
   fetchAssignedAdultPackages();
+  fetchServerPinRecord();
 
   document.addEventListener("velora-show-home", () => {
     isAdultOpen = false;

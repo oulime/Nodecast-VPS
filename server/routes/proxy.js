@@ -599,7 +599,7 @@ router.get('/xtream/:sourceId/live_streams', async (req, res) => {
             const cacheKey = categoryId ? `live_streams_${categoryId}` : 'live_streams';
             const cached = cache.get('xtream', sourceId, cacheKey, 24 * 60 * 60 * 1000);
             if (cached) return res.json(cached);
-            const source = sources.get(sourceId);
+            const source = await sources.getById(sourceId);
             if (source && source.type === 'xtream') {
                 const api = xtreamApi.createFromSource(source);
                 streams = await api.getLiveStreams(categoryId);
@@ -626,7 +626,7 @@ router.get('/xtream/:sourceId/live_streams/:categoryId', async (req, res) => {
             const cacheKey = categoryId ? `live_streams_${categoryId}` : 'live_streams';
             const cached = cache.get('xtream', sourceId, cacheKey, 24 * 60 * 60 * 1000);
             if (cached) return res.json(cached);
-            const source = sources.get(sourceId);
+            const source = await sources.getById(sourceId);
             if (source && source.type === 'xtream') {
                 const api = xtreamApi.createFromSource(source);
                 streams = await api.getLiveStreams(categoryId);
@@ -667,7 +667,7 @@ router.get('/xtream/:sourceId/vod_streams', async (req, res) => {
             const cacheKey = categoryId ? `vod_streams_${categoryId}` : 'vod_streams';
             const cached = cache.get('xtream', sourceId, cacheKey, 24 * 60 * 60 * 1000);
             if (cached) return res.json(cached);
-            const source = sources.get(sourceId);
+            const source = await sources.getById(sourceId);
             if (source && source.type === 'xtream') {
                 const api = xtreamApi.createFromSource(source);
                 streams = await api.getVodStreams(categoryId);
@@ -694,7 +694,7 @@ router.get('/xtream/:sourceId/vod_streams/:categoryId', async (req, res) => {
             const cacheKey = categoryId ? `vod_streams_${categoryId}` : 'vod_streams';
             const cached = cache.get('xtream', sourceId, cacheKey, 24 * 60 * 60 * 1000);
             if (cached) return res.json(cached);
-            const source = sources.get(sourceId);
+            const source = await sources.getById(sourceId);
             if (source && source.type === 'xtream') {
                 const api = xtreamApi.createFromSource(source);
                 streams = await api.getVodStreams(categoryId);

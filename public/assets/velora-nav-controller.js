@@ -62,24 +62,21 @@
       return;
     }
 
-    // 3. Natural browser back
-    if (window.history.length > 1) {
-      window.history.back();
-      return;
+    // 3. Delegate to in-app back navigation
+    if (typeof window.veloraAppGoBack === "function") {
+      var contentView = document.getElementById("content-view");
+      var livePlayer = document.getElementById("player-container");
+      var vodPlayer = document.getElementById("vod-player-container");
+      if ((contentView && !contentView.classList.contains("hidden")) ||
+          (livePlayer && !livePlayer.classList.contains("hidden")) ||
+          (vodPlayer && !vodPlayer.classList.contains("hidden"))) {
+        window.veloraAppGoBack();
+        return;
+      }
     }
 
-    // Fallback if no history
-    var contentView = document.getElementById("content-view");
-    if (contentView && !contentView.classList.contains("hidden")) {
-      if (typeof window.veloraAppGoBack === "function") window.veloraAppGoBack();
-      else {
-        contentView.classList.add("hidden");
-        var pkg = document.getElementById("packages-view");
-        if (pkg) pkg.classList.remove("hidden");
-      }
-      return;
-    }
-    document.dispatchEvent(new CustomEvent("velora-show-home"));
+    // 4. Dispatch canonical header back event
+    document.dispatchEvent(new CustomEvent("velora-header-back"));
   }
 
   window.veloraNavigateBack = handleBack;
@@ -124,14 +121,6 @@
 
   // Catch clicks on ANY back button in the UI
   document.addEventListener("click", function (event) {
-    var backBtn = event.target && event.target.closest("#btn-header-back, .vel-header-back-btn, .vel-parent-package-bar__back, .vel-parent-package-view__back, #btn-back-home, .vel-vod-detail-back, [data-vel-nav-back]");
-    if (backBtn) {
-      handleBack(event);
-    }
-  }, true);
-
-  document.addEventListener("pointerdown", function (event) {
-    if (event.button !== 0) return;
     var backBtn = event.target && event.target.closest("#btn-header-back, .vel-header-back-btn, .vel-parent-package-bar__back, .vel-parent-package-view__back, #btn-back-home, .vel-vod-detail-back, [data-vel-nav-back]");
     if (backBtn) {
       handleBack(event);

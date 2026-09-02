@@ -8135,8 +8135,6 @@
                 return;
               }
 
-              if (!document.body.classList.contains("vel-home-choice-picked")) return;
-
               var livePlayer = document.getElementById("player-container");
               var vodPlayer = document.getElementById("vod-player-container");
               var contentView = document.getElementById("content-view");
@@ -8161,17 +8159,7 @@
                   }));
                   var adultContentBack = document.getElementById("btn-back-home");
                   if (adultContentBack) {
-                    if (typeof PointerEvent === "function") {
-                      adultContentBack.dispatchEvent(new PointerEvent("pointerdown", {
-                        bubbles: true,
-                        cancelable: true,
-                        button: 0,
-                        pointerId: 1,
-                        pointerType: "mouse"
-                      }));
-                    } else {
-                      adultContentBack.click();
-                    }
+                    adultContentBack.click();
                   }
                   return;
                 }
@@ -8199,46 +8187,20 @@
               }
 
               if (contentView && !contentView.classList.contains("hidden")) {
-                var isCustomPackage = document.body.dataset.velCustomPackageOpen === "true";
-                var isCustomBackHome = isCustomPackage && document.body.dataset.velCustomPackageHome === "true";
-                var isDirectDetailOpen = document.body.dataset.veloraDirectDetailOpen === "true";
-                var isLiveSection = (document.body.dataset.velActiveTab || "live") === "live";
-
-                if (isCustomPackage) {
-                  delete document.body.dataset.velCustomPackageOpen;
-                  delete document.body.dataset.velCustomPackageHome;
-                  if (isCustomBackHome) {
-                    document.dispatchEvent(new CustomEvent("velora-return-home"));
-                    return;
-                  }
-                }
-
-                if (isDirectDetailOpen) {
-                  delete document.body.dataset.veloraDirectDetailOpen;
-                  delete document.body.dataset.veloraDirectDetailHome;
-                  document.dispatchEvent(new CustomEvent("velora-return-home"));
+                if (typeof window.veloraAppGoBack === "function") {
+                  window.veloraAppGoBack();
                   return;
                 }
-
-                if (isLiveSection) {
-                  document.dispatchEvent(new CustomEvent("velora-return-home"));
-                  return;
-                }
-
                 var contentBack = document.getElementById("btn-back-home");
                 if (contentBack) {
-                  if (typeof PointerEvent === "function") {
-                    contentBack.dispatchEvent(new PointerEvent("pointerdown", {
-                      bubbles: true,
-                      cancelable: true,
-                      button: 0,
-                      pointerId: 1,
-                      pointerType: "mouse"
-                    }));
-                  } else {
-                    contentBack.click();
-                  }
+                  contentBack.click();
+                  return;
                 }
+              }
+
+              var activeTab = document.body.dataset.velActiveTab || "home";
+              if (activeTab === "movies" || activeTab === "series") {
+                document.dispatchEvent(new CustomEvent("velora-show-home"));
                 return;
               }
 
@@ -8251,6 +8213,16 @@
             };
 
             document.addEventListener("velora-header-back", goBack);
+            headerBack.addEventListener("click", goBack);
+            headerBack.addEventListener("pointerdown", function (event) {
+              if (event.button === 0) goBack(event);
+            });
+            document.addEventListener("click", function (event) {
+              var btn = event.target && event.target.closest && event.target.closest("#btn-header-back, .vel-header-back-btn");
+              if (btn) {
+                goBack(event);
+              }
+            }, true);
             headerBack.addEventListener("keydown", function (event) {
               if (
                 event.key === "Enter" ||

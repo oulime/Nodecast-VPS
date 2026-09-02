@@ -223,12 +223,41 @@
 
   // Open / Play Item
   function openItem(tab, pkg, item, cardEl) {
-    if (typeof window.veloraOpenCachedHomeItem === "function") {
-      window.veloraOpenCachedHomeItem({ id: pkg.id, content_type: tab, package_id: pkg.id }, item);
+    if (!item) return;
+    const rawId = item.streamId ?? item.seriesId ?? item.id ?? item.stream_id ?? item.series_id;
+    const normalizedItem = {
+      ...item,
+      id: item.id || `feed:${pkg.id}:${rawId}`,
+      streamId: rawId,
+      stream_id: rawId,
+      seriesId: rawId,
+      series_id: rawId,
+      raw_stream_id: rawId,
+      raw_series_id: rawId,
+      name: item.name || item.title || "",
+      thumbUrl: item.posterUrl || item.thumbUrl || item.poster || item.cover || "",
+      cover: item.posterUrl || item.thumbUrl || item.poster || item.cover || "",
+      sourceId: item.sourceId ?? pkg.source_id ?? "",
+      packageId: String(pkg.id || ""),
+      package_id: String(pkg.id || ""),
+      contentType: tab,
+      content_type: tab
+    };
+
+    const section = {
+      id: pkg.id,
+      content_type: tab,
+      contentType: tab,
+      package_id: pkg.id,
+      packageId: pkg.id
+    };
+
+    if (typeof window.veloraOpenHomeCacheEntry === "function") {
+      window.veloraOpenHomeCacheEntry(section, normalizedItem, cardEl);
       return;
     }
-    if (typeof window.veloraOpenHomeCacheEntry === "function") {
-      window.veloraOpenHomeCacheEntry({ id: pkg.id, content_type: tab, package_id: pkg.id }, item, cardEl);
+    if (typeof window.veloraOpenCachedHomeItem === "function") {
+      window.veloraOpenCachedHomeItem(section, normalizedItem);
       return;
     }
   }

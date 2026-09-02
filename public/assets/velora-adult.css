@@ -16,6 +16,11 @@
   z-index: 10;
 }
 
+body.vel-adult-player-active .vel-adult-portal,
+.vel-adult-portal:has(.vel-adult-sticky-top) {
+  padding-top: 0 !important;
+}
+
 /* Adult Portal Visibility & Dashboard Layout */
 .vel-adult-portal.hidden,
 #adult-view.hidden {
@@ -42,48 +47,51 @@ body.vel-adult-active .main--velora {
   min-height: 100vh !important;
   height: auto !important;
   overflow-y: auto !important;
-  overflow-x: hidden !important;
+  overflow-x: clip !important;
   padding: 0 !important;
   margin: 0 !important;
   background: #06050e !important;
 }
 
-body.vel-adult-active .main--velora .vel-dashboard {
+body.vel-adult-active .main--velora .vel-dashboard,
+body.vel-adult-player-active .main--velora .vel-dashboard {
   display: block !important;
   grid-template-columns: 1fr !important;
   width: 100% !important;
   max-width: 100% !important;
   height: auto !important;
   min-height: 100vh !important;
-  overflow-y: visible !important;
-  overflow-x: hidden !important;
+  overflow: visible !important;
+  overflow-x: clip !important;
   margin: 0 !important;
   padding: 0 !important;
   box-sizing: border-box !important;
 }
 
-body.vel-adult-active .main--velora .vel-body {
+body.vel-adult-active .main--velora .vel-body,
+body.vel-adult-player-active .main--velora .vel-body {
   display: block !important;
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
   height: auto !important;
-  overflow-y: visible !important;
-  overflow-x: hidden !important;
+  overflow: visible !important;
+  overflow-x: clip !important;
   margin: 0 !important;
   padding: 0 !important;
   box-sizing: border-box !important;
 }
 
-body.vel-adult-active #adult-view:not(.hidden) {
+body.vel-adult-active #adult-view:not(.hidden),
+body.vel-adult-player-active #adult-view:not(.hidden) {
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
   position: relative !important;
   height: auto !important;
   min-height: 100vh !important;
-  overflow-y: visible !important;
-  overflow-x: hidden !important;
+  overflow: visible !important;
+  overflow-x: clip !important;
   z-index: 10 !important;
 }
 
@@ -712,16 +720,40 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
 }
 
 /* --------------------------------------------------------------------------
-   Adult Dedicated Video Player (Series-Style Listed Layout)
+   Adult Dedicated Video Player & Sticky Upper Section
    -------------------------------------------------------------------------- */
-.vel-adult-player-container {
+.vel-adult-sticky-top {
   position: -webkit-sticky !important;
   position: sticky !important;
   top: 0 !important;
-  z-index: 40 !important;
+  z-index: 100 !important;
   width: 100%;
   max-width: 960px;
-  margin: 0 auto 12px;
+  margin: 0 auto 12px !important;
+  padding: 8px 0 4px 0 !important;
+  background: #06050e !important;
+  background: radial-gradient(circle at 50% 0%, rgba(225, 29, 72, 0.14) 0%, rgba(6, 5, 14, 0.98) 78%) !important;
+  box-sizing: border-box !important;
+}
+
+.vel-adult-sub-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 14px !important;
+  width: 100% !important;
+  max-width: 960px !important;
+  margin: 0 auto 10px !important;
+  padding: 2px 2px !important;
+  box-sizing: border-box !important;
+}
+
+.vel-adult-player-container {
+  position: relative;
+  z-index: 40;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
   background: #000;
   border-radius: 14px;
   overflow: hidden;
@@ -1055,6 +1087,7 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
   touch-action: pan-y;
+  scroll-margin-top: clamp(260px, 38vh, 440px);
 }
 
 .vel-adult-movie-row:hover {
@@ -1345,6 +1378,7 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
   touch-action: pan-y;
+  scroll-margin-top: clamp(260px, 38vh, 440px);
 }
 
 .vel-adult-channel-row:hover {
@@ -1486,29 +1520,52 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
     max-width: 100% !important;
   }
 
-  /* VOD Movie List & Player wrapper: stretch to 100% of mobile screen width */
-  .vel-adult-movie-list-wrap {
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 0 0 calc(var(--vel-bottom-nav-height, 76px) + 24px) 0 !important;
-    gap: 8px !important;
-    box-sizing: border-box !important;
-  }
-
-  /* Dedicated Adult Video Player: edge-to-edge flush and sticky on mobile */
-  .vel-adult-player-container {
+  /* Sticky upper section on mobile: pins back button + search + player together at top */
+  .vel-adult-sticky-top {
     position: -webkit-sticky !important;
     position: sticky !important;
     top: 0 !important;
-    z-index: 40 !important;
+    z-index: 100 !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 0 6px 0 !important;
-    border-radius: 0 0 12px 12px !important;
+    padding: 6px 8px 6px 8px !important;
+    background: #06050e !important;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.8) !important;
+    box-sizing: border-box !important;
+  }
+
+  .vel-adult-sub-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    margin: 0 auto 6px auto !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .vel-adult-sub-header .vel-adult-back-btn {
+    padding: 6px 12px !important;
+    font-size: 0.82rem !important;
+    white-space: nowrap !important;
+  }
+
+  .vel-adult-sub-header .vel-adult-movie-search-wrap {
+    max-width: 100% !important;
+    flex: 1 1 auto !important;
+  }
+
+  .vel-adult-player-container {
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    border-radius: 10px !important;
     border-left: none !important;
     border-right: none !important;
-    border-top: none !important;
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.8), 0 0 16px rgba(225, 29, 72, 0.25) !important;
   }
 
@@ -1524,28 +1581,14 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
   }
 
   .vel-adult-now-playing-title {
-    padding: 8px 12px !important;
-    font-size: 0.88rem !important;
+    padding: 7px 10px !important;
+    font-size: 0.84rem !important;
   }
 
-  /* Header filter & count with comfortable side margins */
-  .vel-adult-movie-list-header {
-    padding: 6px 12px 10px 12px !important;
-    margin: 0 !important;
-    gap: 8px !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-  }
-
-  .vel-adult-movie-search-wrap {
-    max-width: 100% !important;
-    width: 100% !important;
-    flex: 1 1 100% !important;
-  }
-
-  /* Movie items container: comfortable 10px side margins */
-  .vel-adult-movie-list-items {
-    padding: 0 10px !important;
+  /* Items container: comfortable side margins and scrollable below sticky header */
+  .vel-adult-movie-list-items,
+  .vel-adult-channel-list-items {
+    padding: 4px 8px calc(var(--vel-bottom-nav-height, 76px) + 24px) 8px !important;
     gap: 8px !important;
     width: 100% !important;
     box-sizing: border-box !important;
@@ -1559,6 +1602,7 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
     width: 100% !important;
     box-sizing: border-box !important;
     margin: 0 !important;
+    scroll-margin-top: clamp(180px, 42vh, 320px) !important;
   }
 
   .vel-adult-movie-row__index {
@@ -1597,30 +1641,14 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
     min-height: 32px !important;
   }
 
-  /* Live TV Playlist in Adult Section */
-  .vel-adult-channel-list-wrap {
-    width: 100% !important;
-    max-width: 100% !important;
-    padding: 4px 4px calc(var(--vel-bottom-nav-height, 76px) + 24px) 4px !important;
-    margin: 0 !important;
-    box-sizing: border-box !important;
-  }
-
-  .vel-adult-channel-list-header {
-    padding: 6px 12px 10px 12px !important;
-  }
-
-  .vel-adult-channel-list-items {
-    padding: 0 10px !important;
-    gap: 8px !important;
-  }
-
+  /* Individual Channel row */
   .vel-adult-channel-row {
     padding: 10px 12px !important;
     gap: 10px !important;
     border-radius: 10px !important;
     width: 100% !important;
     box-sizing: border-box !important;
+    scroll-margin-top: clamp(180px, 42vh, 320px) !important;
   }
 
   .vel-adult-channel-row__title {

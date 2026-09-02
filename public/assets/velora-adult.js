@@ -960,8 +960,11 @@
       };
     }
 
-    container.appendChild(subHeader);
-    container.appendChild(createAdultPlayerWidget(true));
+    const stickyTop = document.createElement("div");
+    stickyTop.className = "vel-adult-sticky-top";
+    stickyTop.appendChild(subHeader);
+    stickyTop.appendChild(createAdultPlayerWidget(true));
+    container.appendChild(stickyTop);
 
     const itemsContainer = document.createElement("div");
     itemsContainer.className = "vel-adult-channel-list-items";
@@ -1235,8 +1238,11 @@
       };
     }
 
-    container.appendChild(subHeader);
-    container.appendChild(createAdultPlayerWidget(false));
+    const stickyTop = document.createElement("div");
+    stickyTop.className = "vel-adult-sticky-top";
+    stickyTop.appendChild(subHeader);
+    stickyTop.appendChild(createAdultPlayerWidget(false));
+    container.appendChild(stickyTop);
 
     const itemsContainer = document.createElement("div");
     itemsContainer.className = "vel-adult-movie-list-items";

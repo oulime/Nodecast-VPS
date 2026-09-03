@@ -1075,6 +1075,55 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
   gap: 8px;
 }
 
+/* Skeleton Placeholder Cards during initial streaming */
+.vel-adult-movie-skeleton {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  min-height: 88px;
+  box-sizing: border-box;
+  animation: velAdultSkeletonPulse 1.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes velAdultSkeletonPulse {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.75; transform: scale(1.002); }
+}
+
+.vel-adult-movie-skeleton__poster {
+  width: 48px;
+  height: 68px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.vel-adult-movie-skeleton__info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.vel-adult-movie-skeleton__line1 {
+  width: 65%;
+  height: 14px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.vel-adult-movie-skeleton__line2 {
+  width: 35%;
+  height: 10px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .vel-adult-movie-row {
   display: flex;
   align-items: center;
@@ -1084,10 +1133,14 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 12px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
   user-select: none;
   touch-action: pan-y;
   scroll-margin-top: clamp(260px, 38vh, 440px);
+  content-visibility: auto;
+  contain-intrinsic-size: 88px;
+  contain: layout style paint;
+  will-change: transform;
 }
 
 .vel-adult-movie-row:hover {
@@ -1100,6 +1153,14 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
   background: linear-gradient(90deg, rgba(225, 29, 72, 0.25) 0%, rgba(138, 43, 226, 0.15) 100%);
   border-color: rgba(244, 63, 94, 0.6);
   box-shadow: 0 0 16px rgba(225, 29, 72, 0.25);
+}
+
+.vel-adult-sentinel {
+  height: 24px;
+  width: 100%;
+  pointer-events: none;
+  visibility: hidden;
+  margin: 4px 0;
 }
 
 .vel-adult-movie-row__index {
@@ -1130,7 +1191,7 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: opacity 0.25s ease;
+  transition: opacity 0.2s ease;
   background: #18181b;
 }
 
@@ -1375,10 +1436,14 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 12px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
   user-select: none;
   touch-action: pan-y;
   scroll-margin-top: clamp(260px, 38vh, 440px);
+  content-visibility: auto;
+  contain-intrinsic-size: 56px;
+  contain: layout style paint;
+  will-change: transform;
 }
 
 .vel-adult-channel-row:hover {
@@ -1685,7 +1750,7 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
   position: fixed;
   inset: 0;
   z-index: 99999;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   background: rgba(8, 6, 12, 0.88);
@@ -1693,14 +1758,22 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
   -webkit-backdrop-filter: blur(28px);
   opacity: 0;
   visibility: hidden;
+  pointer-events: none !important;
   transition: opacity 0.25s ease, visibility 0.25s ease;
   padding: 16px;
   box-sizing: border-box;
 }
 
 .vel-adult-pin-modal.is-open {
-  opacity: 1;
-  visibility: visible;
+  display: flex !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+dialog:not([open]) {
+  display: none !important;
+  pointer-events: none !important;
 }
 
 .vel-adult-pin-card {

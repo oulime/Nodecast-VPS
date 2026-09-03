@@ -6461,7 +6461,7 @@
             <section id="adult-view" class="vel-adult-portal hidden" aria-label="Contenu adulte +18">
               <div class="vel-adult-header">
                 <div class="vel-adult-header__left">
-                  <button type="button" id="btn-adult-back-home" class="vel-adult-back-btn" title="Retour à l'accueil">
+                  <button type="button" id="btn-adult-back-home" class="vel-adult-back-btn" title="Retour à l'accueil" onclick="if(window.veloraCloseAdultPortal){window.veloraCloseAdultPortal();}else if(window.veloraCloseAdultView){window.veloraCloseAdultView();}else{document.getElementById('adult-view').classList.add('hidden');document.body.classList.remove('vel-adult-active');var h=document.getElementById('vel-home-empty-page');if(h){h.classList.remove('hidden');h.style.removeProperty('display');}document.body.classList.add('vel-home-empty-active');document.dispatchEvent(new CustomEvent('velora-return-home'));}">
                     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2">
                       <path d="M19 12H5M12 19l-7-7 7-7"/>
                     </svg>
@@ -6487,7 +6487,31 @@
               </div>
 
               <div id="vel-adult-packages-container" class="vel-adult-packages-container">
-                <div id="vel-adult-packages-grid" class="vel-adult-packages-grid"></div>
+                <div class="vel-adult-portal-hub" style="display:flex;flex-wrap:wrap;gap:24px;justify-content:center;align-items:center;padding:40px 20px;max-width:860px;margin:0 auto;">
+                  
+                  <div id="vel-adult-hub-live" class="vel-adult-hub-card" onclick="if(window.veloraOpenAdultLiveDirectly)window.veloraOpenAdultLiveDirectly();" style="flex:1 1 320px;max-width:380px;background:linear-gradient(145deg,rgba(16,185,129,0.12),rgba(15,23,42,0.6));border:1px solid rgba(16,185,129,0.3);border-radius:20px;padding:32px 24px;text-align:center;cursor:pointer;transition:all 0.25s cubic-bezier(0.16,1,0.3,1);box-shadow:0 12px 36px rgba(0,0,0,0.4);">
+                    <div style="width:72px;height:72px;border-radius:20px;background:rgba(16,185,129,0.2);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;border:1px solid rgba(16,185,129,0.4);color:#10b981;">
+                      <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
+                    </div>
+                    <h2 style="font-size:1.35rem;font-weight:800;color:#fff;margin:0 0 8px;">TV en Direct</h2>
+                    <p style="font-size:0.9rem;color:#94a3b8;margin:0 0 24px;line-height:1.5;">Accéder aux chaînes de télévision adultes en direct.</p>
+                    <button type="button" id="btn-launch-adult-live" onclick="if(window.veloraOpenAdultLiveDirectly)window.veloraOpenAdultLiveDirectly();" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-weight:800;font-size:0.95rem;cursor:pointer;">
+                      ▶ Lancer la TV en Direct
+                    </button>
+                  </div>
+
+                  <div id="vel-adult-hub-vod" class="vel-adult-hub-card" onclick="if(window.veloraOpenAdultMoviesDirectly)window.veloraOpenAdultMoviesDirectly();" style="flex:1 1 320px;max-width:380px;background:linear-gradient(145deg,rgba(225,29,72,0.14),rgba(15,23,42,0.6));border:1px solid rgba(225,29,72,0.35);border-radius:20px;padding:32px 24px;text-align:center;cursor:pointer;transition:all 0.25s cubic-bezier(0.16,1,0.3,1);box-shadow:0 12px 36px rgba(0,0,0,0.4);">
+                    <div style="width:72px;height:72px;border-radius:20px;background:rgba(225,29,72,0.2);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;border:1px solid rgba(244,63,94,0.4);color:#f43f5e;">
+                      <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    </div>
+                    <h2 style="font-size:1.35rem;font-weight:800;color:#fff;margin:0 0 8px;">Films & VOD</h2>
+                    <p style="font-size:0.9rem;color:#94a3b8;margin:0 0 24px;line-height:1.5;">Accéder au lecteur et au catalogue des films adultes.</p>
+                    <button type="button" id="btn-launch-adult-vod" onclick="if(window.veloraOpenAdultMoviesDirectly)window.veloraOpenAdultMoviesDirectly();" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:linear-gradient(135deg,#e11d48,#be123c);color:#fff;font-weight:800;font-size:0.95rem;cursor:pointer;">
+                      ▶ Lancer les Films (VOD)
+                    </button>
+                  </div>
+
+                </div>
               </div>
             </section>
             <header id="vel-packages-section-heading" class="vel-category-heading vel-category-heading--comedy">
@@ -7859,6 +7883,8 @@
               });
               document.body.classList.remove("vel-home-choice-loading");
               document.body.classList.remove("vel-home-choice-catalog-pending");
+              document.body.classList.remove("vel-adult-active", "vel-adult-player-active");
+              delete document.body.dataset.veloraReturnAdult;
               document.body.classList.add("vel-home-choice-picked");
               document.body.classList.add("vel-home-empty-active");
               var main = document.querySelector(".main--velora");
@@ -13775,6 +13801,8 @@ if (target.closest(".trial-offer-button")) {
           });
           document.body.classList.remove("vel-home-choice-loading");
           document.body.classList.remove("vel-home-choice-catalog-pending");
+          document.body.classList.remove("vel-adult-active", "vel-adult-player-active");
+          delete document.body.dataset.veloraReturnAdult;
           document.body.classList.add("vel-home-choice-picked");
           document.body.classList.add("vel-home-empty-active");
           var main = document.querySelector(".main--velora");
@@ -14248,8 +14276,51 @@ if (target.closest(".trial-offer-button")) {
     <script defer src="/assets/velora-live-wheel.js?v=20260902-wheel-covers-v1"></script>
     <link rel="stylesheet" href="/assets/velora-prime-carousel.css?v=20260902-feed-v5" />
     <script defer src="/assets/velora-prime-carousels.js?v=20260902-feed-v5"></script>
-    <link rel="stylesheet" href="/assets/velora-adult.css?v=20260902-adult-confirm-v1" />
-    <script defer src="/assets/velora-adult.js?v=20260902-adult-confirm-v1"></script>
+    <script>
+      (() => {
+        document.addEventListener("click", function (e) {
+          if (e.target && e.target.closest("#btn-adult-back-home")) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof window.veloraCloseAdultPortal === "function") {
+              window.veloraCloseAdultPortal();
+            } else if (typeof window.veloraCloseAdultView === "function") {
+              window.veloraCloseAdultView();
+            } else {
+              var adultView = document.getElementById("adult-view");
+              if (adultView) adultView.classList.add("hidden");
+              document.body.classList.remove("vel-adult-active");
+              var home = document.getElementById("vel-home-empty-page");
+              if (home) {
+                home.classList.remove("hidden");
+                home.style.removeProperty("display");
+              }
+              document.body.classList.add("vel-home-empty-active");
+              document.dispatchEvent(new CustomEvent("velora-return-home"));
+            }
+            return;
+          }
+          if (e.target && e.target.closest("#vel-adult-hub-live, #btn-launch-adult-live")) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof window.veloraOpenAdultLiveDirectly === "function") {
+              window.veloraOpenAdultLiveDirectly();
+            }
+            return;
+          }
+          if (e.target && e.target.closest("#vel-adult-hub-vod, #btn-launch-adult-vod")) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof window.veloraOpenAdultMoviesDirectly === "function") {
+              window.veloraOpenAdultMoviesDirectly();
+            }
+            return;
+          }
+        }, true);
+      })();
+    </script>
+    <link rel="stylesheet" href="/assets/velora-adult.css?v=20260903-adult-header-fix-v10" />
+    <script defer src="/assets/velora-adult.js?v=20260903-adult-header-fix-v10"></script>
   </body>
 </html>
 

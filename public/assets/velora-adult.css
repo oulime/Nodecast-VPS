@@ -809,6 +809,14 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
   to { transform: rotate(360deg); }
 }
 
+.vel-adult-touch-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
 .vel-adult-center-controls {
   position: absolute;
   inset: 0;
@@ -821,6 +829,7 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
   opacity: 1;
   transition: opacity 0.25s ease;
   pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .vel-adult-center-controls.idle {

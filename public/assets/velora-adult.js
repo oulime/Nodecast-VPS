@@ -694,6 +694,7 @@
     container.innerHTML = `
       <div class="vel-adult-video-wrapper">
         <video id="vel-adult-video" playsinline webkit-playsinline preload="auto"></video>
+        <div id="vel-adult-touch-overlay" class="vel-adult-touch-overlay"></div>
         <div id="vel-adult-player-buffering" class="vel-adult-buffering hidden">
           <div class="vel-adult-spinner"></div>
         </div>
@@ -760,31 +761,53 @@
     const buffering = container.querySelector("#vel-adult-player-buffering");
 
     let idleTimer = null;
-    function showControls() {
+
+    function hideControls() {
+      if (idleTimer) clearTimeout(idleTimer);
+      if (centerControls) centerControls.classList.add("idle");
+      if (toolbar) toolbar.classList.add("idle");
+    }
+
+    function showControls(autoHide = true) {
       if (idleTimer) clearTimeout(idleTimer);
       if (centerControls) centerControls.classList.remove("idle");
       if (toolbar) toolbar.classList.remove("idle");
-      if (video && !video.paused) {
+      if (autoHide && video && !video.paused) {
         idleTimer = setTimeout(() => {
-          if (centerControls) centerControls.classList.add("idle");
-          if (toolbar) toolbar.classList.add("idle");
-        }, 3000);
+          hideControls();
+        }, 3500);
       }
+    }
+
+    function toggleControls() {
+      const isVisible = centerControls && !centerControls.classList.contains("idle");
+      if (isVisible) {
+        hideControls();
+      } else {
+        showControls(true);
+      }
+    }
+
+    let lastTapTime = 0;
+    function handleScreenTap(e) {
+      const now = Date.now();
+      if (now - lastTapTime < 220) return;
+      lastTapTime = now;
+
+      // If clicking directly on an interactive button or seekbar, keep controls awake
+      if (e && e.target && (e.target.closest("button") || e.target.closest(".vel-adult-seek-track"))) {
+        showControls(true);
+        return;
+      }
+
+      // Toggle controls on/off
+      toggleControls();
     }
 
     const wrapper = container.querySelector(".vel-adult-video-wrapper");
     if (wrapper) {
-      wrapper.onmousemove = showControls;
-      wrapper.onclick = (e) => {
-        if (!e.target.closest("button") && !e.target.closest(".vel-adult-seek-track")) {
-          if (video.paused) {
-            video.play().catch(() => {});
-          } else {
-            video.pause();
-          }
-        }
-        showControls();
-      };
+      wrapper.onmousemove = () => showControls(true);
+      wrapper.addEventListener("click", handleScreenTap);
     }
 
     function togglePlay(e) {

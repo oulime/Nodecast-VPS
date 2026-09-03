@@ -1183,11 +1183,36 @@ router.post('/epg/:sourceId/channels', async (req, res) => {
 /**
  * Proxy stream for playback
  * This handles CORS for streams that don't allow cross-origin
- * Supports HTTP Range requests for video seeking
+ * Supports HTTP Range requests for video seeking and live HLS manifest deduplication/resilience
  */
+const liveManifestCache = new Map();
+const LIVE_MANIFEST_CACHE_TTL_MS = 1200;
+const LIVE_MANIFEST_STALE_TTL_MS = 10000;
+
 router.get('/stream', async (req, res) => {
-    const maxRetries = 2;
+    const maxRetries = 4;
+    const retryDelays = [250, 600, 1200, 2000];
     let lastError = null;
+
+    let { url } = req.query;
+    if (!url) {
+        return res.status(400).json({ error: 'URL required' });
+    }
+
+    const isM3u8Url = /\.m3u8(\?|$)/i.test(url);
+
+    // Fast-path: return freshly cached live manifest to avoid hammering upstream IPTV server concurrently
+    if (isM3u8Url && liveManifestCache.has(url)) {
+        const cached = liveManifestCache.get(url);
+        if (Date.now() - cached.timestamp < LIVE_MANIFEST_CACHE_TTL_MS) {
+            res.set('Access-Control-Allow-Origin', '*');
+            res.set('X-Accel-Buffering', 'no');
+            res.set('Content-Type', 'application/vnd.apple.mpegurl');
+            res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+            res.set('X-Velora-Manifest-Cache', 'HIT');
+            return res.send(cached.manifest);
+        }
+    }
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
@@ -1203,26 +1228,31 @@ router.get('/stream', async (req, res) => {
             };
             req.on('close', onClose);
 
-            let { url } = req.query;
-            if (!url) {
-                req.off('close', onClose);
-                return res.status(400).json({ error: 'URL required' });
-            }
-
-            // Forward some headers to be more "transparent" back to the origin
-            // Pluto TV uses multiple domains for content delivery
+            // Forward headers to origin
             const plutoDomains = ['pluto.tv', 'pluto.io', 'plutotv.net', 'siloh.pluto.tv', 'service-stitcher'];
             const isPluto = plutoDomains.some(domain => url.includes(domain));
             const userAgent = await getStreamProxyUserAgent();
 
+            const isIptvStream = /\/(live|movie|series|hls)\//i.test(url) || /\.(m3u8|ts|mp4|mkv)(\?|$)/i.test(url);
+
             const headers = {
-                'User-Agent': userAgent,
+                'User-Agent': userAgent || 'VLC/3.0.18 LibVLC/3.0.18',
                 'Accept': '*/*',
-                'Accept-Language': 'en-US,en;q=0.9',
-                // Using https and matching the origin of the request
-                'Origin': isPluto ? 'https://pluto.tv' : new URL(url).origin,
-                'Referer': isPluto ? 'https://pluto.tv/' : new URL(url).origin + '/'
+                'Accept-Language': 'en-US,en;q=0.9'
             };
+
+            // Only send Origin/Referer when required (Pluto or non-IPTV).
+            // IPTV / Xtream servers often block/rate-limit requests that send browser Origin/Referer.
+            if (isPluto) {
+                headers['Origin'] = 'https://pluto.tv';
+                headers['Referer'] = 'https://pluto.tv/';
+            } else if (!isIptvStream) {
+                try {
+                    const parsedUrl = new URL(url);
+                    headers['Origin'] = parsedUrl.origin;
+                    headers['Referer'] = parsedUrl.origin + '/';
+                } catch {}
+            }
 
             // Forward Range header for video seeking support
             const rangeHeader = req.get('range');
@@ -1235,12 +1265,26 @@ router.get('/stream', async (req, res) => {
 
             // Retry on 5xx errors or transient burst rate limits (458, 429)
             if ((response.status >= 500 || response.status === 458 || response.status === 429) && attempt < maxRetries) {
-                console.log(`[Proxy] Upstream transient status ${response.status} (attempt ${attempt}/${maxRetries}), retrying in 600ms...`);
-                await new Promise(r => setTimeout(r, 600));
+                const delay = retryDelays[attempt - 1] || 800;
+                console.log(`[Proxy] Upstream transient status ${response.status} for ${url.substring(0, 60)} (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms...`);
+                await new Promise(r => setTimeout(r, delay));
                 continue;
             }
 
             if (!response.ok) {
+                // If upstream failed with 458/429/5xx and we have a stale manifest, serve it to prevent player stutter
+                if (isM3u8Url && liveManifestCache.has(url)) {
+                    const cached = liveManifestCache.get(url);
+                    if (Date.now() - cached.timestamp < LIVE_MANIFEST_STALE_TTL_MS) {
+                        req.off('close', onClose);
+                        res.set('Access-Control-Allow-Origin', '*');
+                        res.set('X-Accel-Buffering', 'no');
+                        res.set('Content-Type', 'application/vnd.apple.mpegurl');
+                        res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+                        res.set('X-Velora-Manifest-Fallback', 'STALE_200');
+                        return res.send(cached.manifest);
+                    }
+                }
                 req.off('close', onClose);
                 console.error(`Upstream error for ${url.substring(0, 80)}...: ${response.status} ${response.statusText}`);
                 if (response.status === 403) {
@@ -1269,8 +1313,6 @@ router.get('/stream', async (req, res) => {
             if (acceptRanges) {
                 res.set('Accept-Ranges', acceptRanges);
             } else if (contentLength && !contentRange) {
-                // If server supports content-length but didn't explicitly state accept-ranges,
-                // we can safely assume it supports byte ranges
                 res.set('Accept-Ranges', 'bytes');
             }
             if (upstreamCacheControl) {
@@ -1336,7 +1378,6 @@ router.get('/stream', async (req, res) => {
                     if (trimmed === '' || trimmed.startsWith('#')) {
                         // Handle both URI="..." and URI='...' formats
                         if (trimmed.includes('URI=')) {
-                            // Replace both double and single quoted URIs
                             return line.replace(/URI=["']([^"']+)["']/g, (match, p1) => {
                                 try {
                                     const absoluteUrl = new URL(p1, baseUrl).href;
@@ -1360,6 +1401,18 @@ router.get('/stream', async (req, res) => {
                         return `${baseUrlPrefix}${encodeURIComponent(absoluteUrl)}`;
                     } catch (e) { return line; }
                 }).join('\n');
+
+                // Cache rewritten live manifest for short deduplication
+                liveManifestCache.set(url, {
+                    manifest,
+                    timestamp: Date.now()
+                });
+                if (liveManifestCache.size > 200) {
+                    const now = Date.now();
+                    for (const [k, v] of liveManifestCache.entries()) {
+                        if (now - v.timestamp > 30000) liveManifestCache.delete(k);
+                    }
+                }
 
                 req.off('close', onClose);
                 return res.send(manifest);
@@ -1397,8 +1450,9 @@ router.get('/stream', async (req, res) => {
                 return;
             }
             if (attempt < maxRetries) {
-                console.log('[Proxy] Retrying after error...');
-                await new Promise(r => setTimeout(r, 500));
+                const delay = retryDelays[attempt - 1] || 500;
+                console.log(`[Proxy] Retrying after error in ${delay}ms...`);
+                await new Promise(r => setTimeout(r, delay));
                 continue;
             }
         }

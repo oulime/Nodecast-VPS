@@ -533,8 +533,11 @@
 
   // ---------------------------------------------------------------------------
   // Dedicated Adult Portal View Controller (#adult-view)
-  // ---------------------------------------------------------------------------
+  const resolvedStreamUrlCache = new Map();
   async function resolveStreamMediaUrl(endpoint) {
+    if (resolvedStreamUrlCache.has(endpoint)) {
+      return resolvedStreamUrlCache.get(endpoint);
+    }
     try {
       const token = localStorage.getItem("authToken");
       const headers = { "Content-Type": "application/json" };
@@ -544,10 +547,12 @@
         const json = await res.json();
         if (json && json.url) {
           let directUrl = String(json.url).trim();
+          let finalProxyUrl = directUrl;
           if (/^https?:\/\//i.test(directUrl)) {
-            return `/api/proxy/stream?url=${encodeURIComponent(directUrl)}`;
+            finalProxyUrl = `/api/proxy/stream?url=${encodeURIComponent(directUrl)}`;
           }
-          return directUrl;
+          resolvedStreamUrlCache.set(endpoint, finalProxyUrl);
+          return finalProxyUrl;
         }
       }
     } catch (e) {
@@ -698,6 +703,13 @@
         <div id="vel-adult-player-buffering" class="vel-adult-buffering hidden">
           <div class="vel-adult-spinner"></div>
         </div>
+        <div id="vel-adult-player-error" class="vel-adult-player-error hidden">
+          <div class="vel-adult-player-error-content">
+            <div class="vel-adult-player-error-icon">📡</div>
+            <div class="vel-adult-player-error-title">Chaîne momentanément indisponible</div>
+            <div class="vel-adult-player-error-desc">Ce flux sera de retour très bientôt sur le serveur. Veuillez sélectionner une autre chaîne.</div>
+          </div>
+        </div>
         <div id="vel-adult-center-controls" class="vel-adult-center-controls">
           ${!isLive ? `
           <button id="vel-adult-btn-back-10" class="vel-adult-center-btn" title="−10s" aria-label="−10 secondes">
@@ -813,10 +825,27 @@
     function togglePlay(e) {
       if (e) e.stopPropagation();
       if (!video) return;
-      if (video.paused) {
+      if (video.paused || (isLive && !video.hls)) {
+        if (isLive) {
+          // When clicking Play on paused live stream: restart fresh with newest m3u8 pack
+          if (window._veloraAdultLiveChannels && window._veloraAdultLiveCurrentIndex !== undefined) {
+            playAdultLiveChannelByIndex(window._veloraAdultLiveCurrentIndex).catch(() => {});
+            showControls();
+            return;
+          }
+        }
         video.play().catch(() => {});
       } else {
         video.pause();
+        if (isLive) {
+          // Live stream paused: completely tear down HLS and stop all network requests
+          if (video.hls && typeof video.hls.destroy === "function") {
+            try { video.hls.destroy(); } catch (_) {}
+            video.hls = null;
+          }
+          video.removeAttribute("src");
+          try { video.load(); } catch (_) {}
+        }
       }
       showControls();
     }
@@ -911,7 +940,18 @@
         if (buffering) buffering.classList.add("hidden");
       };
 
+      video.onloadeddata = () => {
+        if (buffering) buffering.classList.add("hidden");
+      };
+
+      video.oncanplay = () => {
+        if (buffering) buffering.classList.add("hidden");
+      };
+
       video.ontimeupdate = () => {
+        if (buffering && video.currentTime > 0) {
+          buffering.classList.add("hidden");
+        }
         if (!isLive && curTime && durTime && seekFill && seekHandle) {
           if (!Number.isFinite(video.duration) || video.duration <= 0) {
             curTime.textContent = formatAdultPlayerClock(video.currentTime);
@@ -1127,7 +1167,12 @@
     if (titleEl) titleEl.textContent = `📺 ${channel.name}`;
 
     const video = document.getElementById("vel-adult-video");
+    const buffering = document.getElementById("vel-adult-player-buffering");
+    const errEl = document.getElementById("vel-adult-player-error");
     if (!video) return;
+
+    if (errEl) errEl.classList.add("hidden");
+    if (buffering) buffering.classList.remove("hidden");
 
     const apiUrl = `/api/proxy/xtream/${encodeURIComponent(channel.source_id)}/stream/${encodeURIComponent(channel.stream_id)}/live`;
     const resolvedUrl = await resolveStreamMediaUrl(apiUrl);
@@ -1138,19 +1183,102 @@
       video.hls = null;
     }
 
-    const isHls = finalUrl.includes(".m3u8") || finalUrl.includes("/live");
+    const isHls = finalUrl.includes(".m3u8") || finalUrl.includes("/live") || finalUrl.includes("/stream");
     if (isHls && window.Hls && window.Hls.isSupported()) {
-      const hls = new window.Hls({ enableWorker: true, lowLatencyMode: true });
+      const hls = new window.Hls({
+        enableWorker: true,
+        maxBufferLength: 60,
+        maxMaxBufferLength: 120,
+        maxBufferSize: 60 * 1000 * 1000,
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 10,
+        manifestLoadingMaxRetry: 10,
+        manifestLoadingRetryDelay: 2000,
+        manifestLoadingMaxRetryTimeout: 30000,
+        levelLoadingMaxRetry: 10,
+        levelLoadingRetryDelay: 2000,
+        levelLoadingMaxRetryTimeout: 30000,
+        fragLoadingMaxRetry: 10,
+        fragLoadingRetryDelay: 2000,
+        fragLoadingMaxRetryTimeout: 30000
+      });
       hls.loadSource(finalUrl);
       hls.attachMedia(video);
       video.hls = hls;
+
       hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(e => console.warn("[Adult Live] Autoplay prevented:", e));
+        if (errEl) errEl.classList.add("hidden");
+        const p = video.play();
+        if (p && typeof p.catch === "function") {
+          p.catch(() => {
+            video.muted = true;
+            video.play().catch(e => console.warn("[Adult Live] Autoplay fallback notice:", e));
+          });
+        }
+      });
+
+      hls.on(window.Hls.Events.FRAG_BUFFERED, () => {
+        if (buffering) buffering.classList.add("hidden");
+        if (errEl) errEl.classList.add("hidden");
+      });
+
+      hls.on(window.Hls.Events.FRAG_LOADED, () => {
+        if (buffering) buffering.classList.add("hidden");
+        if (errEl) errEl.classList.add("hidden");
+      });
+
+      hls.on(window.Hls.Events.ERROR, (event, data) => {
+        console.warn("[Adult Live] HLS notice:", data.type, data.details, data.response?.code);
+        const statusCode = data.response?.code;
+
+        // HTTP 500 / 404 / 410 -> Stream unavailable on upstream server: do NOT retry, show message
+        if (statusCode === 500 || statusCode === 404 || statusCode === 410) {
+          console.log("[Adult Live] Channel unavailable at source (Status " + statusCode + "). Stopping retries.");
+          try { hls.destroy(); } catch (_) {}
+          video.hls = null;
+          if (buffering) buffering.classList.add("hidden");
+          if (errEl) errEl.classList.remove("hidden");
+          return;
+        }
+
+        if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR || statusCode === 503 || statusCode === 458 || statusCode === 429) {
+          setTimeout(() => {
+            if (video && video.hls === hls) {
+              hls.startLoad();
+            }
+          }, 1500);
+          return;
+        }
+        if (data.fatal) {
+          switch (data.type) {
+            case window.Hls.ErrorTypes.NETWORK_ERROR:
+              hls.startLoad();
+              break;
+            case window.Hls.ErrorTypes.MEDIA_ERROR:
+              hls.recoverMediaError();
+              break;
+            default:
+              hls.destroy();
+              if (buffering) buffering.classList.add("hidden");
+              if (errEl) errEl.classList.remove("hidden");
+              break;
+          }
+        } else if (data.details === "bufferStalledError") {
+          if (video && !video.paused) {
+            video.currentTime = video.currentTime + 0.1;
+          }
+        }
       });
     } else {
       video.src = finalUrl;
       video.load();
-      video.play().catch(e => console.warn("[Adult Live] Play notice:", e));
+      const p = video.play();
+      if (p && typeof p.catch === "function") {
+        p.catch(() => {
+          video.muted = true;
+          video.play().catch(e => console.warn("[Adult Live] Direct play notice:", e));
+        });
+      }
     }
   }
 
@@ -1327,7 +1455,12 @@
     if (titleEl) titleEl.textContent = `🎬 ${movie.name}`;
 
     const video = document.getElementById("vel-adult-video");
+    const buffering = document.getElementById("vel-adult-player-buffering");
+    const errEl = document.getElementById("vel-adult-player-error");
     if (!video) return;
+
+    if (errEl) errEl.classList.add("hidden");
+    if (buffering) buffering.classList.remove("hidden");
 
     const ext = movie.container_extension || "mp4";
     const apiUrl = `/api/proxy/xtream/${encodeURIComponent(movie.source_id)}/stream/${encodeURIComponent(movie.stream_id)}/movie?container=${encodeURIComponent(ext)}`;
@@ -1341,17 +1474,77 @@
 
     const isHls = finalUrl.includes(".m3u8") || finalUrl.includes("m3u8");
     if (isHls && window.Hls && window.Hls.isSupported()) {
-      const hls = new window.Hls();
+      const hls = new window.Hls({
+        enableWorker: true,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        maxBufferSize: 60 * 1000 * 1000
+      });
       hls.loadSource(finalUrl);
       hls.attachMedia(video);
       video.hls = hls;
+
       hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(e => console.warn("[Adult VOD] Autoplay prevented:", e));
+        if (errEl) errEl.classList.add("hidden");
+        const p = video.play();
+        if (p && typeof p.catch === "function") {
+          p.catch(() => {
+            video.muted = true;
+            video.play().catch(e => console.warn("[Adult VOD] Autoplay fallback notice:", e));
+          });
+        }
+      });
+
+      hls.on(window.Hls.Events.FRAG_BUFFERED, () => {
+        if (buffering) buffering.classList.add("hidden");
+        if (errEl) errEl.classList.add("hidden");
+      });
+
+      hls.on(window.Hls.Events.FRAG_LOADED, () => {
+        if (buffering) buffering.classList.add("hidden");
+        if (errEl) errEl.classList.add("hidden");
+      });
+
+      hls.on(window.Hls.Events.ERROR, (event, data) => {
+        const statusCode = data.response?.code;
+        if (statusCode === 500 || statusCode === 404 || statusCode === 410) {
+          console.log("[Adult VOD] Video unavailable at source (Status " + statusCode + ").");
+          try { hls.destroy(); } catch (_) {}
+          video.hls = null;
+          if (buffering) buffering.classList.add("hidden");
+          if (errEl) errEl.classList.remove("hidden");
+          return;
+        }
+        if (data.fatal) {
+          switch (data.type) {
+            case window.Hls.ErrorTypes.NETWORK_ERROR:
+              hls.startLoad();
+              break;
+            case window.Hls.ErrorTypes.MEDIA_ERROR:
+              hls.recoverMediaError();
+              break;
+            default:
+              hls.destroy();
+              if (buffering) buffering.classList.add("hidden");
+              if (errEl) errEl.classList.remove("hidden");
+              break;
+          }
+        }
       });
     } else {
       video.src = finalUrl;
       video.load();
-      video.play().catch(e => console.warn("[Adult VOD] Play notice:", e));
+      video.onerror = () => {
+        if (buffering) buffering.classList.add("hidden");
+        if (errEl) errEl.classList.remove("hidden");
+      };
+      const p = video.play();
+      if (p && typeof p.catch === "function") {
+        p.catch(() => {
+          video.muted = true;
+          video.play().catch(e => console.warn("[Adult VOD] Direct play notice:", e));
+        });
+      }
     }
   }
 
@@ -2460,6 +2653,25 @@
     renderAdultPortal();
   }
 
+  function stopAllActiveStreams() {
+    try {
+      const videos = document.querySelectorAll("video");
+      videos.forEach(v => {
+        try {
+          v.pause();
+          if (v.hls && typeof v.hls.destroy === "function") {
+            try { v.hls.stopLoad(); } catch (_) {}
+            try { v.hls.destroy(); } catch (_) {}
+            v.hls = null;
+          }
+          v.removeAttribute("src");
+          try { v.load(); } catch (_) {}
+        } catch (_) {}
+      });
+    } catch (_) {}
+  }
+  window.veloraStopAllStreams = stopAllActiveStreams;
+
   function closeAdultView() {
     isAdultOpen = false;
     currentAdultView = null;
@@ -2477,18 +2689,7 @@
     if (window._veloraAdultLiveScrollHandler) {
       window.removeEventListener("scroll", window._veloraAdultLiveScrollHandler);
     }
-    const adultVideo = document.getElementById("vel-adult-video");
-    if (adultVideo) {
-      try {
-        adultVideo.pause();
-        if (adultVideo.hls && typeof adultVideo.hls.destroy === "function") {
-          adultVideo.hls.destroy();
-          adultVideo.hls = null;
-        }
-        adultVideo.removeAttribute("src");
-        adultVideo.load();
-      } catch (_) {}
-    }
+    stopAllActiveStreams();
     setAdultPlayerHeaderVisible(true);
     document.body.classList.remove("vel-adult-active", "vel-adult-player-active");
     delete document.body.dataset.veloraReturnAdult;
@@ -2540,7 +2741,16 @@
   // ---------------------------------------------------------------------------
   // Global Lifecycle & Triggers
   // ---------------------------------------------------------------------------
+  document.addEventListener("velora-return-home", stopAllActiveStreams);
+  document.addEventListener("velora-show-home", stopAllActiveStreams);
+  window.addEventListener("popstate", stopAllActiveStreams);
+
   document.addEventListener("click", (e) => {
+    // Stop streams when clicking global navigation or back buttons
+    if (e.target && e.target.closest("[id^='nav-btn-'], #btn-adult-back-home, #btn-adult-back-to-hub, #btn-adult-back-to-hub-live, #vel-adult-back-hub-empty, #btn-close-player, #btn-close-vod-player")) {
+      stopAllActiveStreams();
+    }
+
     // Back button in adult portal
     if (e.target && e.target.closest("#btn-adult-back-home")) {
       e.preventDefault();
@@ -2576,16 +2786,7 @@
         activeLiveSentinelObserver.disconnect();
         activeLiveSentinelObserver = null;
       }
-      const adultVideo = document.getElementById("vel-adult-video");
-      if (adultVideo) {
-        try {
-          adultVideo.pause();
-          if (adultVideo.hls && typeof adultVideo.hls.destroy === "function") {
-            adultVideo.hls.destroy();
-            adultVideo.hls = null;
-          }
-        } catch (_) {}
-      }
+      stopAllActiveStreams();
       renderAdultPortal();
       return;
     }

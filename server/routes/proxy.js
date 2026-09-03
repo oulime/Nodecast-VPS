@@ -1186,8 +1186,8 @@ router.post('/epg/:sourceId/channels', async (req, res) => {
  * Supports HTTP Range requests for video seeking and live HLS manifest deduplication/resilience
  */
 const liveManifestCache = new Map();
-const LIVE_MANIFEST_CACHE_TTL_MS = 1200;
-const LIVE_MANIFEST_STALE_TTL_MS = 10000;
+const LIVE_MANIFEST_CACHE_TTL_MS = 6000;
+const LIVE_MANIFEST_STALE_TTL_MS = 25000;
 
 router.get('/stream', async (req, res) => {
     const maxRetries = 4;
@@ -1291,7 +1291,11 @@ router.get('/stream', async (req, res) => {
                     const errorBody = await response.text().catch(() => 'N/A');
                     console.error(`403 Response body: ${errorBody.substring(0, 200)}`);
                 }
-                return res.status(response.status).send(`Failed to fetch stream: ${response.statusText}`);
+                const clientStatus = (response.status === 458 || response.status === 429) ? 503 : response.status;
+                if (clientStatus === 503) {
+                    res.set('Retry-After', '2');
+                }
+                return res.status(clientStatus).send(`Failed to fetch stream: ${response.statusText || 'Upstream connection throttle'}`);
             }
 
             const contentType = response.headers.get('content-type') || '';
@@ -1369,9 +1373,7 @@ router.get('/stream', async (req, res) => {
                 const finalUrlObj = new URL(finalUrl);
                 const baseUrl = finalUrlObj.origin + finalUrlObj.pathname.substring(0, finalUrlObj.pathname.lastIndexOf('/') + 1);
 
-                const proto = req.get('x-forwarded-proto') || req.protocol || 'https';
-                const host = req.get('x-forwarded-host') || req.get('host');
-                const baseUrlPrefix = `${proto}://${host}${req.baseUrl}/stream?url=`;
+                const baseUrlPrefix = `${req.baseUrl || '/api/proxy'}/stream?url=`;
 
                 manifest = manifest.split('\n').map(line => {
                     const trimmed = line.trim();

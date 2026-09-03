@@ -10,6 +10,26 @@ const veloraCatalogCache = require('./services/veloraCatalogCache');
 
 const app = express();
 const PORT = Number.parseInt(process.env.PORT, 10) || 3000;
+
+// Configure global proxy dispatcher if UPSTREAM_PROXY, HTTP_PROXY, or db.json upstreamProxy is set
+try {
+    const { ProxyAgent, setGlobalDispatcher } = require('undici');
+    let proxyUrl = process.env.UPSTREAM_PROXY || process.env.HTTP_PROXY || process.env.http_proxy;
+    if (!proxyUrl) {
+        try {
+            const dbData = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'db.json'), 'utf8'));
+            if (dbData?.settings?.upstreamProxy && String(dbData.settings.upstreamProxy).trim()) {
+                proxyUrl = String(dbData.settings.upstreamProxy).trim();
+            }
+        } catch (_) {}
+    }
+    if (proxyUrl) {
+        setGlobalDispatcher(new ProxyAgent(proxyUrl));
+        console.log(`[Proxy] Global undici dispatcher configured with ${proxyUrl}`);
+    }
+} catch (e) {
+    console.warn('[Proxy] Failed to configure global undici dispatcher:', e.message);
+}
 const VPS_DATA_API_BASE = String(
     process.env.VPS_DATA_API_BASE || 'https://nodecast.veloravip.net'
 ).trim().replace(/\/+$/, '');

@@ -1192,7 +1192,15 @@ router.get('/stream', async (req, res) => {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             const abortController = new AbortController();
-            const onClose = () => abortController.abort();
+            let activeResponse = null;
+            const onClose = () => {
+                try {
+                    abortController.abort();
+                } catch {}
+                try {
+                    activeResponse?.body?.cancel?.();
+                } catch {}
+            };
             req.on('close', onClose);
 
             let { url } = req.query;
@@ -1223,11 +1231,12 @@ router.get('/stream', async (req, res) => {
             }
 
             const response = await fetch(url, { headers, signal: abortController.signal });
+            activeResponse = response;
 
-            // Retry on 5xx errors (transient upstream issues)
-            if (response.status >= 500 && attempt < maxRetries) {
-                console.log(`[Proxy] Upstream 5xx error (attempt ${attempt}/${maxRetries}), retrying in 500ms...`);
-                await new Promise(r => setTimeout(r, 500));
+            // Retry on 5xx errors or transient burst rate limits (458, 429)
+            if ((response.status >= 500 || response.status === 458 || response.status === 429) && attempt < maxRetries) {
+                console.log(`[Proxy] Upstream transient status ${response.status} (attempt ${attempt}/${maxRetries}), retrying in 600ms...`);
+                await new Promise(r => setTimeout(r, 600));
                 continue;
             }
 
@@ -1365,6 +1374,10 @@ router.get('/stream', async (req, res) => {
 
             let result = await iterator.next();
             while (!result.done) {
+                if (req.destroyed || res.destroyed || res.writableEnded) {
+                    try { response.body?.cancel?.(); } catch {}
+                    break;
+                }
                 if (!res.write(Buffer.from(result.value))) {
                     await new Promise(resolve => res.once('drain', resolve));
                 }

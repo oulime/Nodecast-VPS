@@ -318,29 +318,50 @@ router.options('/', (req, res) => {
     res.status(204).end();
 });
 
+const TRANSPARENT_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
+const deadHostCache = new Map();
+
 router.all('/', async (req, res) => {
     const parsed = parseProxyTarget(req, res);
     if (!parsed) return;
 
     const { target, from } = parsed;
     const method = (req.method || 'GET').toUpperCase();
-    const targetPath = new URL(target).pathname;
+    const targetUrl = new URL(target);
+    const targetPath = targetUrl.pathname;
     const isPlaylistRequest = /\.m3u8$/i.test(targetPath);
     const isImageRequest = /\.(?:avif|gif|heic|jpeg|jpg|png|svg|webp)$/i.test(targetPath);
     const isMediaSegmentRequest =
         /\.(ts|m4s|mp4|m4v|aac|mp3|webm|mkv)$/i.test(targetPath) ||
         /\/segment\//i.test(targetPath);
 
-    const abortMs = isMediaSegmentRequest ? 180000 : isPlaylistRequest ? 45000 : isImageRequest ? 8000 : 60000;
+    // Fast-path: if this image host recently timed out or failed (e.g. dead picon server 51.158.145.100),
+    // immediately return a transparent 1x1 PNG so the browser queue is never blocked.
+    if (isImageRequest && deadHostCache.has(targetUrl.host)) {
+        if (deadHostCache.get(targetUrl.host) > Date.now()) {
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Content-Type', 'image/png');
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+            return res.status(200).send(TRANSPARENT_PNG);
+        } else {
+            deadHostCache.delete(targetUrl.host);
+        }
+    }
+
+    const abortMs = isMediaSegmentRequest ? 180000 : isPlaylistRequest ? 45000 : isImageRequest ? 2500 : 60000;
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), abortMs);
 
+    let upstreamRef = null;
     res.once('close', () => {
         try {
             ac.abort();
         } catch {
             // Already aborted.
         }
+        try {
+            upstreamRef?.body?.cancel?.();
+        } catch {}
     });
 
     try {
@@ -361,6 +382,7 @@ router.all('/', async (req, res) => {
             body,
             signal: ac.signal
         });
+        upstreamRef = upstream;
         ingestUpstreamSetCookies(upstream, target);
 
         const contentType = upstream.headers.get('content-type')?.split(';')[0]?.trim() || '';
@@ -392,11 +414,14 @@ router.all('/', async (req, res) => {
             return;
         }
 
+        if (isImageRequest && !upstream.ok) {
+            res.setHeader('Content-Type', 'image/png');
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+            return res.status(200).send(TRANSPARENT_PNG);
+        }
+
         res.status(upstream.status);
         copyUpstreamHeaders(upstream, res);
-        if (isImageRequest && !upstream.ok) {
-            res.setHeader('Cache-Control', 'public, max-age=900');
-        }
         if (!res.getHeader('Content-Type') && contentType) res.setHeader('Content-Type', contentType);
         if (!res.getHeader('Accept-Ranges')) {
             const acceptRanges = upstream.headers.get('accept-ranges');
@@ -421,10 +446,15 @@ router.all('/', async (req, res) => {
             res.destroy();
             return;
         }
+        if (isImageRequest) {
+            deadHostCache.set(targetUrl.host, Date.now() + 5 * 60 * 1000);
+            res.setHeader('Content-Type', 'image/png');
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+            return res.status(200).send(TRANSPARENT_PNG);
+        }
         const msg = err && err.name === 'AbortError'
             ? `Upstream request timed out (${Math.round(abortMs / 1000)}s).`
             : err?.message || 'Proxy error';
-        if (isImageRequest) res.setHeader('Cache-Control', 'public, max-age=300');
         res.status(502).send(msg);
     } finally {
         clearTimeout(timer);

@@ -276,6 +276,25 @@ router.get('/', async (req, res) => {
 
     console.log(`[Probe] Probing: ${url.substring(0, 80)}... ${ua ? `(UA: ${ua})` : ''}`);
 
+    // Fast-path for live HLS streams: live TV channels are HLS (.m3u8) streams.
+    // Probing them with ffprobe and byte-range checks wastes outbound connections
+    // and trips IPTV provider burst limits (Error 458). Live HLS is handled natively by the player.
+    const isLiveHls = (url.includes('.m3u8') || url.includes('/live/')) && !url.includes('/movie/') && !url.includes('/series/') && !url.includes('/vod/');
+    if (isLiveHls) {
+        const liveAnalysis = {
+            video: 'h264',
+            audio: 'aac',
+            container: 'hls',
+            compatible: true,
+            needsRemux: false,
+            needsTranscode: false,
+            seekable: false,
+            subtitles: []
+        };
+        probeCache.set(cacheKey, { result: liveAnalysis, timestamp: Date.now() });
+        return res.json(liveAnalysis);
+    }
+
     try {
         const streamUrl = db.resolveStreamUrl(url);
         const [probeResult, rangeInfo] = await Promise.all([

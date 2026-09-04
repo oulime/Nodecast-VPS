@@ -779,14 +779,16 @@
       const select = document.getElementById("country-select") || document.getElementById("home-country-select");
       const countryName = (select?.options?.[select?.selectedIndex]?.text || "").replace(/^[^a-zA-ZÀ-ÿ]+/, "").trim();
 
+      const cleanName = cleanChannelTitle(pkg.name || pkg.display_name || "");
       const savedLogo = window.__veloraCustomPackageLogos?.[pkg.id]
         || window.__veloraCustomPackageLogos?.[pkg.category_id]
         || window.__veloraCustomPackageLogos?.[pkg.name]
         || window.__veloraCustomPackageLogos?.[pkg.display_name]
+        || window.__veloraCustomPackageLogos?.[cleanName]
         || (function () {
           try {
             const l = JSON.parse(localStorage.getItem("velora_package_covers") || "{}");
-            return l[pkg.id] || l[pkg.category_id] || l[pkg.name] || l[pkg.display_name] || "";
+            return l[pkg.id] || l[pkg.category_id] || l[pkg.name] || l[pkg.display_name] || l[cleanName] || "";
           } catch (_) { return ""; }
         })();
 
@@ -804,7 +806,7 @@
 
       // If no candidate OR candidate is just a country flag fallback, prioritize brand match
       if (!candidate || isCountryFlagUrl(candidate)) {
-        const brandMatch = getBrandLogoForName(pkg.name || pkg.display_name);
+        const brandMatch = getBrandLogoForName(pkg.name || pkg.display_name) || getBrandLogoForName(cleanName);
         if (brandMatch) {
           candidate = brandMatch;
         }

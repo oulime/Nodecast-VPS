@@ -95,21 +95,53 @@ function isLowPriorityCallsign(channel) {
     return false;
 }
 
+function getAdminPrefixesList() {
+    try {
+        const veloraData = require('../routes/veloraData');
+        if (veloraData && typeof veloraData.allRows === 'function') {
+            const rows = veloraData.allRows('admin_channel_name_prefixes');
+            if (Array.isArray(rows)) {
+                return rows.map(r => String(r.prefix || '').trim()).filter(Boolean).sort((a, b) => b.length - a.length);
+            }
+        }
+    } catch (_) {}
+    return [];
+}
+
 function cleanChannelName(raw) {
     if (!raw) return '';
     let name = String(raw).trim();
 
-    // Remove decorative symbols, emojis and border characters
-    name = name.replace(/^[#*=\-_~+•|/\\:;!?,.()\[\]{}◉●★☆▲▼◆◇■□✪✦✧✔✓🔴🎬🍿⚽🏆🥇🥈🥉📺📡🔴⚪🟢🟡🟣🔵⚫\s]+|[#*=\-_~+•|/\\:;!?,.()\[\]{}◉●★☆▲▼◆◇■□✪✦✧✔✓🔴🎬🍿⚽🏆🥇🥈🥉📺📡🔴⚪🟢🟡🟣🔵⚫\s]+$/g, '');
+    const adminPrefixes = getAdminPrefixesList();
 
-    // Normalize unicode characters (e.g. superscript ᵁᴴᴰ ³⁸⁴⁰ᴾ, accents)
+    // Multi-pass cleaner (up to 12 passes) to cleanly peel away nested or stacked prefixes
+    for (let pass = 0; pass < 12; pass++) {
+        const prev = name;
+
+        // 1. Remove admin configured prefixes (e.g. "FR -", "FR|", "####", etc.)
+        for (const p of adminPrefixes) {
+            if (p && name.toLowerCase().startsWith(p.toLowerCase())) {
+                name = name.slice(p.length).trim();
+            }
+        }
+
+        // 2. Strip bracketed/piped country or provider codes: |EU|, [FR], (AR), |VIP|, |4K|, etc.
+        name = name.replace(/^(\|[A-Za-z0-9_\- ]{1,6}\|+|\[[A-Za-z0-9_\- ]{1,6}\]|\([A-Za-z0-9_\- ]{1,6}\))\s*/i, '');
+
+        // 3. Strip 2-4 letter country/region prefixes followed by colon/pipe/dash: e.g. "EU:", "EU|", "EU -", "FR:", "USA|", etc.
+        name = name.replace(/^([A-Za-z0-9]{2,4})\s*[:|\-–—]\s*/i, '');
+
+        // 4. Strip leading/trailing resolution & IPTV keywords
+        name = name.replace(/^(4k|fhd|uhd|hd|sd|hevc|h265|vip|raw|premium|live|vod|series|event)[\s:|\-_]+/i, '');
+
+        // 5. Remove decorative symbols, emojis and border characters from start/end (preserving + for Canal+, Disney+, etc.)
+        name = name.replace(/^[#*=\-_~•|/\\:;!?,.()\[\]{}◉●★☆▲▼◆◇■□✪✦✧✔✓🔴🎬🍿⚽🏆🥇🥈🥉📺📡🔴⚪🟢🟡🟣🔵⚫\s]+|[#*=\-_~•|/\\:;!?,.()\[\]{}◉●★☆▲▼◆◇■□✪✦✧✔✓🔴🎬🍿⚽🏆🥇🥈🥉📺📡🔴⚪🟢🟡🟣🔵⚫\s]+$/g, '');
+
+        if (name === prev) break;
+    }
+
+    // Normalize unicode characters (e.g. accents)
     name = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
-
-    // Strip common IPTV provider prefixes (e.g. "4K: ", "FR| ", "AR - ", "UK:", "[VIP]", "|FR|")
-    name = name.replace(/^(\[.*?\]|\(.*?\)|\|.*?\|)\s*/i, '');
-    name = name.replace(/^(4k|fhd|uhd|hd|sd|hevc|h265|vip|raw|premium|live|vod|series|event)[\s:|\-_]+/i, '');
-    name = name.replace(/^(fr|ar|uk|us|es|it|de|pt|nl|be|ch|pl|tr|ca|ru|in|ma|dz|tn|sa|ae|eg|qa|kw)[\s:|\-_]+/i, '');
-    name = name.replace(/^(4k|fhd|uhd|hd|sd|hevc|h265|vip)[\s:|\-_]+/i, '');
 
     // Strip common trailing resolution/event/codec badges
     name = name.replace(/[\s:|\-_]+(4k|fhd|uhd|hd|sd|hevc|h265|event|live|backup|vip|\(\d+\)|\[.*?\]|\(.*?\)).*$/i, '');

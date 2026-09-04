@@ -390,6 +390,158 @@ async function syncAllChannelLogos(options = {}) {
     return syncProgress;
 }
 
+const COUNTRY_FLAG_CODES = {
+    afghanistan: 'af',
+    afrique_du_sud: 'za',
+    albanie: 'al',
+    algerie: 'dz',
+    allemagne: 'de',
+    angleterre: 'gb',
+    arabie_saoudite: 'sa',
+    argentine: 'ar',
+    armenie: 'am',
+    australie: 'au',
+    autriche: 'at',
+    azerbaidjan: 'az',
+    bahrein: 'bh',
+    bangladesh: 'bd',
+    belgique: 'be',
+    bielorussie: 'by',
+    bolivie: 'bo',
+    bosnie: 'ba',
+    bosnie_herzegovine: 'ba',
+    bresil: 'br',
+    bulgarie: 'bg',
+    cameroun: 'cm',
+    canada: 'ca',
+    chili: 'cl',
+    chine: 'cn',
+    chypre: 'cy',
+    colombie: 'co',
+    congo: 'cg',
+    congo_gabon: 'cg',
+    coree_du_sud: 'kr',
+    costa_rica: 'cr',
+    croatie: 'hr',
+    cuba: 'cu',
+    danemark: 'dk',
+    ecosse: 'gb-sct',
+    egypte: 'eg',
+    emirats_arabes_unis: 'ae',
+    equateur: 'ec',
+    espagne: 'es',
+    estonie: 'ee',
+    etats_unis: 'us',
+    usa: 'us',
+    finlande: 'fi',
+    france: 'fr',
+    gabon: 'ga',
+    georgie: 'ge',
+    ghana: 'gh',
+    grece: 'gr',
+    guatemala: 'gt',
+    honduras: 'hn',
+    hong_kong: 'hk',
+    hongrie: 'hu',
+    inde: 'in',
+    indonesie: 'id',
+    irak: 'iq',
+    iran: 'ir',
+    irlande: 'ie',
+    islande: 'is',
+    israel: 'il',
+    italie: 'it',
+    japon: 'jp',
+    jordanie: 'jo',
+    kazakhstan: 'kz',
+    kosovo: 'xk',
+    koweit: 'kw',
+    kurdistan: 'iq',
+    laos: 'la',
+    lettonie: 'lv',
+    liban: 'lb',
+    libye: 'ly',
+    lituanie: 'lt',
+    luxembourg: 'lu',
+    macedoine: 'mk',
+    macedoine_du_nord: 'mk',
+    malaisie: 'my',
+    mali: 'ml',
+    malte: 'mt',
+    maroc: 'ma',
+    maurice: 'mu',
+    mauritanie: 'mr',
+    mexique: 'mx',
+    monaco: 'mc',
+    montenegro: 'me',
+    namibie: 'na',
+    nepal: 'np',
+    nicaragua: 'ni',
+    nigeria: 'ng',
+    norvege: 'no',
+    nouvelle_zelande: 'nz',
+    oman: 'om',
+    ouzbekistan: 'uz',
+    pakistan: 'pk',
+    palestine: 'ps',
+    panama: 'pa',
+    paraguay: 'py',
+    pays_bas: 'nl',
+    pays_de_galles: 'gb-wls',
+    perou: 'pe',
+    philippines: 'ph',
+    pologne: 'pl',
+    portugal: 'pt',
+    qatar: 'qa',
+    republique_dominicaine: 'do',
+    republique_tcheque: 'cz',
+    roumanie: 'ro',
+    royaume_uni: 'gb',
+    uk: 'gb',
+    russie: 'ru',
+    salvador: 'sv',
+    senegal: 'sn',
+    serbie: 'rs',
+    slovaquie: 'sk',
+    slovenie: 'si',
+    somalie: 'so',
+    soudan: 'sd',
+    sri_lanka: 'lk',
+    suede: 'se',
+    suisse: 'ch',
+    suriname: 'sr',
+    syrie: 'sy',
+    taiwan: 'tw',
+    thailande: 'th',
+    tunisie: 'tn',
+    turquie: 'tr',
+    ukraine: 'ua',
+    uruguay: 'uy',
+    venezuela: 've',
+    vietnam: 'vn',
+    yemen: 'ye'
+};
+
+const COUNTRY_LOGOS_FILE = path.join(__dirname, '..', '..', 'data', 'country-logos.json');
+
+function getCountryFlagOrLogo(countryId, countryName = '') {
+    try {
+        if (fs.existsSync(COUNTRY_LOGOS_FILE)) {
+            const map = JSON.parse(fs.readFileSync(COUNTRY_LOGOS_FILE, 'utf8'));
+            if (countryId && map[countryId]?.path) return map[countryId].path;
+            if (countryName && map[countryName]?.path) return map[countryName].path;
+        }
+    } catch (_) {}
+
+    const raw = String(countryName || countryId || '').replace(/^country_/, '');
+    const k = raw.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
+    if (k === 'arabe') return '/logos/arabe.svg';
+    const code = COUNTRY_FLAG_CODES[k];
+    if (code) return `https://flagcdn.com/w160/${code}.png`;
+    return '';
+}
+
 const DISCOVERED_COVERS_FILE = path.join(__dirname, '..', '..', 'data', 'package-discovered-covers.json');
 
 function syncAllPackageCovers(db) {
@@ -404,21 +556,25 @@ function syncAllPackageCovers(db) {
         let veloraData = null;
         try { veloraData = require('../routes/veloraData'); } catch (_) {}
 
-        // 1. Fetch all admin_packages
+        // 1. Fetch all admin_packages and admin_countries
         let allPackages = [];
+        let allCountries = [];
         if (veloraData && typeof veloraData.allRows === 'function') {
             allPackages = veloraData.allRows('admin_packages') || [];
+            allCountries = veloraData.allRows('admin_countries') || [];
         } else {
             try {
                 allPackages = db.prepare('SELECT * FROM admin_packages').all();
             } catch (_) { allPackages = []; }
         }
 
+        const countryById = new Map(allCountries.map(c => [String(c.id), c]));
+
         const channelLookupStmt = db.prepare(`
             SELECT stream_icon, name
             FROM playlist_items
-            WHERE type = 'live' AND category_id = ? AND stream_icon IS NOT NULL AND length(stream_icon) > 5 AND is_hidden = 0
-            LIMIT 15
+            WHERE type = 'live' AND category_id = ? AND is_hidden = 0
+            LIMIT 25
         `);
 
         let coversUpdated = 0;
@@ -429,36 +585,45 @@ function syncAllPackageCovers(db) {
             const pkgId = String(pkg.id || '').trim();
             const catId = String(pkg.category_id || '').trim();
             const pkgName = String(pkg.name || pkg.original_name || '').trim();
+            const countryName = countryById.get(String(pkg.country_id))?.name || pkg.country_name || '';
 
-            let bestLogo = pkg.cover_url && !pkg.cover_url.includes('tmdb.org') ? pkg.cover_url : '';
+            let bestLogo = '';
 
             // Step A: Brand name match on the package name (e.g. "FR| DAZN PPV" -> DAZN logo, "FR| CANAL+" -> Canal+ logo)
-            if (!bestLogo && pkgName) {
+            if (pkgName) {
                 const brandMatch = matchChannelLogo(pkgName);
                 if (brandMatch && brandMatch.logo) {
                     bestLogo = brandMatch.logo;
                 }
             }
 
-            // Step B: If no brand match, check channels inside this category
+            // Step B: If no brand match, check channels inside this category for official logos
             if (!bestLogo && catId) {
                 const channels = channelLookupStmt.all(catId);
-                const officialMatch = channels.find(ch => 
-                    ch.stream_icon && (
+                for (const ch of channels) {
+                    if (ch.stream_icon && (
                         ch.stream_icon.includes('imgur') ||
                         ch.stream_icon.includes('wikimedia') ||
                         ch.stream_icon.includes('wikia') ||
                         ch.stream_icon.includes('github') ||
-                        ch.stream_icon.includes('.png') ||
-                        ch.stream_icon.includes('.svg')
-                    ) && !ch.stream_icon.includes('tmdb.org')
-                );
-
-                if (officialMatch) {
-                    bestLogo = officialMatch.stream_icon;
-                } else if (channels[0]?.stream_icon && !channels[0].stream_icon.includes('tmdb.org')) {
-                    bestLogo = channels[0].stream_icon;
+                        ch.stream_icon.includes('flagcdn.com') ||
+                        ch.stream_icon.includes('/uploads/') ||
+                        ch.stream_icon.includes('/logos/')
+                    ) && !ch.stream_icon.includes('tmdb.org')) {
+                        bestLogo = ch.stream_icon;
+                        break;
+                    }
+                    const chMatch = matchChannelLogo(ch.name);
+                    if (chMatch && chMatch.logo) {
+                        bestLogo = chMatch.logo;
+                        break;
+                    }
                 }
+            }
+
+            // Step C: Fallback to country flag / logo if not found in JSON or channels
+            if (!bestLogo) {
+                bestLogo = getCountryFlagOrLogo(pkg.country_id, countryName);
             }
 
             if (bestLogo) {
@@ -490,20 +655,24 @@ function syncAllPackageCovers(db) {
             if (!catId || discovered[catId]) continue;
 
             const channels = channelLookupStmt.all(catId);
-            const officialMatch = channels.find(ch => 
-                ch.stream_icon && (
+            for (const ch of channels) {
+                if (ch.stream_icon && (
                     ch.stream_icon.includes('imgur') ||
                     ch.stream_icon.includes('wikimedia') ||
                     ch.stream_icon.includes('wikia') ||
                     ch.stream_icon.includes('github') ||
-                    ch.stream_icon.includes('.png') ||
-                    ch.stream_icon.includes('.svg')
-                ) && !ch.stream_icon.includes('tmdb.org')
-            );
-            if (officialMatch) {
-                discovered[catId] = officialMatch.stream_icon;
-            } else if (channels[0]?.stream_icon && !channels[0].stream_icon.includes('tmdb.org')) {
-                discovered[catId] = channels[0].stream_icon;
+                    ch.stream_icon.includes('flagcdn.com') ||
+                    ch.stream_icon.includes('/uploads/') ||
+                    ch.stream_icon.includes('/logos/')
+                ) && !ch.stream_icon.includes('tmdb.org')) {
+                    discovered[catId] = ch.stream_icon;
+                    break;
+                }
+                const chMatch = matchChannelLogo(ch.name);
+                if (chMatch && chMatch.logo) {
+                    discovered[catId] = chMatch.logo;
+                    break;
+                }
             }
         }
 
@@ -522,7 +691,7 @@ function syncAllPackageCovers(db) {
             }
         }
 
-        console.log(`[ChannelLogoMatcher] Auto-assigned ${coversUpdated} package spinner covers.`);
+        console.log(`[ChannelLogoMatcher] Auto-assigned ${coversUpdated} package spinner covers (with country flag fallback).`);
         return coversUpdated;
     } catch (err) {
         console.warn('[ChannelLogoMatcher] Failed to auto-sync package covers:', err.message);
@@ -540,6 +709,7 @@ module.exports = {
     loadOrBuildLogoIndex,
     syncAllChannelLogos,
     syncAllPackageCovers,
+    getCountryFlagOrLogo,
     getSyncStatus
 };
 

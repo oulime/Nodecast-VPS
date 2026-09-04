@@ -203,7 +203,7 @@ function isOfficialLogoUrl(url) {
     if (!url || typeof url !== 'string') return false;
     const trimmed = url.trim();
     if (!trimmed) return false;
-    if (trimmed.startsWith('data:image/') || trimmed.startsWith('/uploads/')) return true;
+    if (trimmed.startsWith('data:image/') || trimmed.startsWith('/uploads/') || trimmed.startsWith('/logos/')) return true;
     try {
         const parsed = new URL(trimmed);
         const host = parsed.hostname.toLowerCase();
@@ -215,6 +215,7 @@ function isOfficialLogoUrl(url) {
             host.includes('wikipedia.org') ||
             host.includes('wikidata.org') ||
             host.includes('imgur.com') ||
+            host.includes('flagcdn.com') ||
             host.includes('themoviedb.org') ||
             host.includes('tmdb.org') ||
             host.includes('thetvdb.com') ||
@@ -849,13 +850,35 @@ function buildCountryPackageCache() {
         ...DEFAULT_CHANNEL_HIDDEN_FILTERS,
         ...allRows('admin_hidden_filters').map(row => String(row.needle || '').trim()).filter(Boolean)
     ])];
+
+    const officialOnly = isOfficialLogosOnly();
+    const countryById = new Map(countries.map(c => [String(c.id), c]));
+    const sanitizedPackages = packages.map(pkg => {
+        const countryName = countryById.get(String(pkg.country_id))?.name || pkg.country_name || '';
+        let cover = String(pkg.cover_url || '').trim();
+        if (officialOnly && cover && !isOfficialLogoUrl(cover)) {
+            cover = '';
+        }
+        if (!cover) {
+            const pkgName = String(pkg.name || pkg.original_name || '').trim();
+            if (pkgName) {
+                const brandMatch = channelLogoMatcher.matchChannelLogo(pkgName);
+                if (brandMatch && brandMatch.logo) cover = brandMatch.logo;
+            }
+            if (!cover) {
+                cover = channelLogoMatcher.getCountryFlagOrLogo(pkg.country_id, countryName);
+            }
+        }
+        return cover ? { ...pkg, cover_url: cover } : pkg;
+    });
+
     const payload = {
         version: 3,
         generatedAt: new Date().toISOString(),
         catalogSnapshotVersion: veloraCatalogCache.getStatus().snapshotVersion || null,
         countries,
         canonicalCountries: allRows('canonical_countries'),
-        packages,
+        packages: sanitizedPackages,
         packageOrders: allRows('admin_country_package_order'),
         packageChannelOrders: allRows('admin_package_channel_order'),
         packageCovers: allRows('admin_package_covers'),
@@ -864,7 +887,7 @@ function buildCountryPackageCache() {
         memberships,
         counts: {
             countries: countries.length,
-            packages: packages.length,
+            packages: sanitizedPackages.length,
             memberships: memberships.rows.length
         }
     };
@@ -3069,3 +3092,6 @@ module.exports.getCountryPackageCache = getCountryPackageCache;
 module.exports.expandMemberships = expandMemberships;
 module.exports.saveRow = saveRow;
 module.exports.allRows = allRows;
+module.exports.isOfficialLogosOnly = isOfficialLogosOnly;
+module.exports.isOfficialLogoUrl = isOfficialLogoUrl;
+module.exports.sanitizeChannelIcon = sanitizeChannelIcon;

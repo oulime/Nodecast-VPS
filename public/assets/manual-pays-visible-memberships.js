@@ -188,6 +188,40 @@
   function contentPackageGroups(editor){
     const rows=st.assigned.get(editor.countryId)||[],byId=new Map(rows.map(row=>[String(row.id),row])),groupId=channel=>{const current=String(channel.package_id||editor.packageId),origin=String(channel.origin_package_id||"");return editor.isParent?current:(origin&&origin!==editor.packageId?origin:editor.packageId)},ids=[],seen=new Set,append=id=>{id=String(id||"");if(id&&!seen.has(id)){seen.add(id);ids.push(id)}};if(editor.isParent)for(const id of editor.childPackageIds||[])append(id);else append(editor.packageId);for(const channel of editor.channels)append(groupId(channel));return{groupId,groups:ids.map(id=>{const row=byId.get(id),matched=editor.channels.find(channel=>groupId(channel)===id),matchedName=String(matched?.package_id||"")===id?matched?.package_name:"",provider=!!String(row?.source_id??"").trim()&&!!String(row?.category_id??"").trim();return{id,row,name:String(row?.name||matchedName||id),type:provider?"Package original":"Package ajouté"}})}
   }
+  const COUNTRY_FLAG_MAP = {
+    afghanistan: 'af', afrique_du_sud: 'za', albanie: 'al', algerie: 'dz', allemagne: 'de',
+    angleterre: 'gb', arabie_saoudite: 'sa', argentine: 'ar', armenie: 'am', australie: 'au',
+    autriche: 'at', azerbaidjan: 'az', bahrein: 'bh', bangladesh: 'bd', belgique: 'be',
+    bielorussie: 'by', bolivie: 'bo', bosnie: 'ba', bosnie_herzegovine: 'ba', bresil: 'br',
+    bulgarie: 'bg', cameroun: 'cm', canada: 'ca', chili: 'cl', chine: 'cn', chypre: 'cy',
+    colombie: 'co', congo: 'cg', coree: 'kr', coree_du_sud: 'kr', costa_rica: 'cr',
+    cote_d_ivoire: 'ci', croatie: 'hr', cuba: 'cu', danemark: 'dk', egypte: 'eg',
+    emirats_arabes_unis: 'ae', uae: 'ae', equateur: 'ec', espagne: 'es', estonie: 'ee',
+    etats_unis: 'us', usa: 'us', finlande: 'fi', france: 'fr', georgie: 'ge', ghana: 'gh',
+    grece: 'gr', guatemala: 'gt', haiti: 'ht', honduras: 'hn', hongrie: 'hu', inde: 'in',
+    indonesie: 'id', irak: 'iq', iran: 'ir', irlande: 'ie', islande: 'is', israel: 'il',
+    italie: 'it', jamaique: 'jm', japon: 'jp', jordanie: 'jo', kazakhstan: 'kz', kenya: 'ke',
+    koweit: 'kw', lettonie: 'lv', liban: 'lb', libye: 'ly', lituanie: 'lt', luxembourg: 'lu',
+    macedoine: 'mk', madagascar: 'mg', malaisie: 'my', mali: 'ml', malte: 'mt', maroc: 'ma',
+    maurice: 'mu', mauritanie: 'mr', mexique: 'mx', moldavie: 'md', monaco: 'mc',
+    montenegro: 'me', mozambique: 'mz', namibie: 'na', nepal: 'np', nicaragua: 'ni',
+    nigeria: 'ng', norvege: 'no', nouvelle_zelande: 'nz', oman: 'om', pakistan: 'pk',
+    palestine: 'ps', panama: 'pa', paraguay: 'py', pays_bas: 'nl', perou: 'pe',
+    philippines: 'ph', pologne: 'pl', porto_rico: 'pr', portugal: 'pt', qatar: 'qa',
+    republique_dominicaine: 'do', republique_tcheque: 'cz', roumanie: 'ro', royaume_uni: 'gb',
+    uk: 'gb', russie: 'ru', salvador: 'sv', senegal: 'sn', serbie: 'rs', slovaquie: 'sk',
+    slovenie: 'si', somalie: 'so', soudan: 'sd', sri_lanka: 'lk', suede: 'se', suisse: 'ch',
+    suriname: 'sr', syrie: 'sy', taiwan: 'tw', thailande: 'th', tunisie: 'tn', turquie: 'tr',
+    ukraine: 'ua', uruguay: 'uy', venezuela: 've', vietnam: 'vn', yemen: 'ye'
+  };
+  function getCountryFlagUrl(countryId, countryName = '') {
+    const raw = String(countryName || countryId || '').replace(/^country_/, '');
+    const k = raw.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    if (k === 'arabe') return '/logos/arabe.svg';
+    const code = COUNTRY_FLAG_MAP[k];
+    if (code) return `https://flagcdn.com/w160/${code}.png`;
+    return '';
+  }
   function updateContentDialogLogoPreview(){
     const editor=st.contentEditor;if(!editor)return;
     const live=editor.kind==="live",customCover=String(editor.coverUrl||"").trim(),firstLogoChannel=live?editor.channels.find(c=>String(c.stream_icon||"").trim()):null,firstMedia=!live&&editor.channels.length?editor.channels[0]:null;
@@ -199,8 +233,20 @@
       else{badgeLabel="📁 Importé depuis PC";badgeType="uploaded"}
     }else{
       if(live){
-        if(firstLogoChannel){activeLogo=String(firstLogoChannel.stream_icon||"").trim();badgeLabel=`⚙ Auto · 1re chaîne (${firstLogoChannel.name})`}
-        else{badgeLabel="⚙ Auto · 1re chaîne"}
+        if(firstLogoChannel){
+          activeLogo=String(firstLogoChannel.stream_icon||"").trim();
+          badgeLabel=`⚙ Auto · 1re chaîne (${firstLogoChannel.name})`;
+        } else {
+          const country = st.countries?.find(x=>x.id===editor.countryId);
+          const countryName = country?.name || '';
+          const countryFlag = getCountryFlagUrl(editor.countryId, countryName);
+          if (countryFlag) {
+            activeLogo = countryFlag;
+            badgeLabel = `⚙ Auto · Logo du pays (${countryName || 'Pays'})`;
+          } else {
+            badgeLabel = "⚙ Auto · 1re chaîne";
+          }
+        }
       }else{
         if(firstMedia){activeLogo=String(firstMedia.stream_icon||firstMedia.cover||firstMedia.cover_big||"").trim();badgeLabel=`⚙ Auto · ${editor.kind==="vod"?"1er film":"1re série"}`}
         else{badgeLabel="⚙ Auto"}
@@ -420,19 +466,23 @@
   }
   async function toggleOfficialLogosOnly(checked){
     localStorage.setItem("velora_official_logos_only",checked?"1":"0");
+    try{localStorage.removeItem("velora_package_covers");}catch(_){}
     const input=$("mp-iptv-logos-only");
     if(input)input.checked=checked;
     try{
       status(checked?"Mode logos officiels activé...":"Mode tous les logos activé...");
       await sb("admin_settings","?on_conflict=key",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id:"official_logos_only",key:"official_logos_only",value:checked?"1":"0",updated_at:new Date().toISOString()})});
+      window.dispatchEvent(new CustomEvent("velora-official-logos-toggled",{detail:{officialOnly:checked}}));
       window.dispatchEvent(new CustomEvent("velora-admin-curation-changed"));
       window.dispatchEvent(new CustomEvent("velora-home-cache-invalidated"));
-      status(checked?"Logos officiels activés : les liens des fournisseurs ne seront plus appelés.":"Logos des fournisseurs réactivés.")
+      window.dispatchEvent(new CustomEvent("velora-package-covers-updated"));
+      if(typeof window.veloraReloadPackageCovers==="function")window.veloraReloadPackageCovers(true);
+      status(checked?"Logos officiels activés : les logos officiels et drapeaux des pays sont utilisés.":"Logos des fournisseurs réactivés.")
     }catch(e){status(`Erreur enregistrement paramètre : ${e.message}`,true)}
   }
   async function init(force=false){if(st.loaded&&!force)return;st.loaded=true;pageLoading(true,"Chargement des Pays");try{status("Chargement des streams, pays et packages Live...");loadLogoSettings();const sources=await api("/sources/catalog");st.sources=sources.filter(x=>x.type==="xtream");if(force){st.kind="live";st.source=null;st.loadedKinds.clear();st.loadingKinds.clear();st.allPackages={live:[],vod:[],series:[]};document.querySelectorAll("[data-mp-kind]").forEach(x=>{const active=x.dataset.mpKind==="live";x.classList.toggle("is-active",active);x.setAttribute("aria-selected",active?"true":"false")})}drawSources();await Promise.all([countries(),loadKind("live",force)]);drawCountries();if(st.sources[0])await source(st.source?.id||"all");else status("Aucun stream Xtream actif.",true)}catch(e){st.loaded=false;status(`Chargement impossible : ${e.message}`,true)}finally{pageLoading(false)}}
   async function syncAndRefreshAll(){const button=$("mp-sync-all");if(button?.disabled)return;button.disabled=true;pageLoading(true,"Synchronisation et actualisation");try{status("Synchronisation du contenu des fournisseurs Xtream...");const catalog=await api("/sources/sync-catalog");status(`${catalog.sources?.length||0} fournisseur(s) synchronisé(s). Mise à jour de tous les packages...`);const packages=await req(`${SURL}/admin/sync-packages`,{method:"POST",headers:{apikey:KEY,Authorization:`Bearer ${KEY}`,"Content-Type":"application/json"},body:"{}"});await init(true);window.dispatchEvent(new CustomEvent("velora-admin-curation-changed"));window.dispatchEvent(new CustomEvent("velora-home-cache-invalidated"));status(`${catalog.sources?.length||0} fournisseur(s), ${packages.packages||0} package(s) et ${packages.items||0} élément(s) synchronisé(s).`)}catch(e){status(`Synchronisation impossible : ${e.message}`,true)}finally{pageLoading(false);button.disabled=false}}
-  async function syncChannelLogos(){const button=$("mp-sync-channel-logos");if(button?.disabled)return;if(!confirm("Voulez-vous synchroniser et mettre à jour automatiquement les logos de vos chaînes TV en haute définition (PNG transparents) ?"))return;button.disabled=true;pageLoading(true,"Synchronisation des logos TV");try{status("Lancement de la synchronisation automatique des logos TV...");await req(`${SURL}/admin/sync-channel-logos`,{method:"POST",headers:{apikey:KEY,Authorization:`Bearer ${KEY}`,"Content-Type":"application/json"},body:"{}"});status("Synchronisation des logos en cours en arrière-plan...");const pollTimer=setInterval(async()=>{try{const pollRes=await req(`${SURL}/admin/sync-channel-logos-status`);const p=pollRes?.progress;if(p){status(`Logos TV : ${p.updated||0} mis à jour, ${p.skipped||0} inchangés (${p.processed||0}/${p.total||0})...`);if(!p.running){clearInterval(pollTimer);button.disabled=false;pageLoading(false);status(`✨ Synchronisation terminée avec succès ! ${p.updated||0} logos mis à jour sur ${p.total||0} chaînes.`);await init(true);window.dispatchEvent(new CustomEvent("velora-admin-curation-changed"))}}}catch(_){clearInterval(pollTimer);button.disabled=false;pageLoading(false)}},1500)}catch(e){status(`Erreur synchronisation logos : ${e.message}`,true);button.disabled=false;pageLoading(false)}}
+  async function syncChannelLogos(){const button=$("mp-sync-channel-logos");if(button?.disabled)return;if(!confirm("Voulez-vous synchroniser et mettre à jour automatiquement les logos de vos chaînes TV et packages en haute définition (PNG transparents) ?"))return;button.disabled=true;pageLoading(true,"Synchronisation des logos TV");try{status("Lancement de la synchronisation automatique des logos TV et packages...");await req(`${SURL}/admin/sync-channel-logos`,{method:"POST",headers:{apikey:KEY,Authorization:`Bearer ${KEY}`,"Content-Type":"application/json"},body:"{}"});status("Synchronisation des logos en cours en arrière-plan...");const pollTimer=setInterval(async()=>{try{const pollRes=await req(`${SURL}/admin/sync-channel-logos-status`);const p=pollRes?.progress;if(p){status(`Logos TV : ${p.updated||0} chaînes et ${p.packagesUpdated||0} packages mis à jour (${p.processed||0}/${p.total||0})...`);if(!p.running){clearInterval(pollTimer);button.disabled=false;pageLoading(false);try{localStorage.removeItem("velora_package_covers");}catch(_){}if(typeof window.veloraReloadPackageCovers==="function")window.veloraReloadPackageCovers(true);status(`✨ Synchronisation terminée avec succès ! ${p.updated||0} logos chaînes et ${p.packagesUpdated||0} logos packages mis à jour.`);await init(true);window.dispatchEvent(new CustomEvent("velora-admin-curation-changed"));window.dispatchEvent(new CustomEvent("velora-package-covers-updated"))}}}catch(_){clearInterval(pollTimer);button.disabled=false;pageLoading(false)}},1500)}catch(e){status(`Erreur synchronisation logos : ${e.message}`,true);button.disabled=false;pageLoading(false)}}
   document.addEventListener("click",e=>{
     if(e.target.closest("[data-settings-tab='countries']")){loadLogoSettings();setTimeout(init,0);}
     const toggleSourceBtn=e.target.closest("[data-toggle-source]");

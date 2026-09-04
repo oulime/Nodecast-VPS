@@ -273,8 +273,9 @@ router.get('/package-covers/all', async (_req, res) => {
         }
 
         // 2. Add or override with admin explicit covers from SQLite DB
+        let veloraData = null;
         try {
-            const veloraData = require('./veloraData');
+            veloraData = require('./veloraData');
             const adminCovers = veloraData.allRows('admin_package_covers') || [];
             for (const row of adminCovers) {
                 const id = String(row.package_id || '');
@@ -284,6 +285,57 @@ router.get('/package-covers/all', async (_req, res) => {
                 }
             }
         } catch (_) {}
+
+        // 3. Official logos filtering & Country flag fallback for packages
+        try {
+            const channelLogoMatcher = require('../services/channelLogoMatcher');
+            const officialOnly = veloraData && typeof veloraData.isOfficialLogosOnly === 'function' && veloraData.isOfficialLogosOnly();
+            const isOfficial = (url) => veloraData && typeof veloraData.isOfficialLogoUrl === 'function' ? veloraData.isOfficialLogoUrl(url) : true;
+
+            const allPackages = veloraData && typeof veloraData.allRows === 'function' ? (veloraData.allRows('admin_packages') || []) : [];
+            const allCountries = veloraData && typeof veloraData.allRows === 'function' ? (veloraData.allRows('admin_countries') || []) : [];
+            const countryById = new Map(allCountries.map(c => [String(c.id), c]));
+
+            for (const pkg of allPackages) {
+                const pkgId = String(pkg.id || '').trim();
+                const catId = String(pkg.category_id || '').trim();
+                const pkgName = String(pkg.name || pkg.original_name || '').trim();
+                const countryName = countryById.get(String(pkg.country_id))?.name || pkg.country_name || '';
+
+                let existingCover = covers[pkgId] || (catId ? covers[catId] : '') || '';
+
+                if (officialOnly && existingCover && !isOfficial(existingCover)) {
+                    existingCover = '';
+                }
+
+                if (!existingCover) {
+                    if (pkgName) {
+                        const brandMatch = channelLogoMatcher.matchChannelLogo(pkgName);
+                        if (brandMatch && brandMatch.logo) {
+                            existingCover = brandMatch.logo;
+                        }
+                    }
+                    if (!existingCover) {
+                        existingCover = channelLogoMatcher.getCountryFlagOrLogo(pkg.country_id, countryName);
+                    }
+                }
+
+                if (existingCover) {
+                    if (pkgId) covers[pkgId] = existingCover;
+                    if (catId) covers[catId] = existingCover;
+                }
+            }
+
+            if (officialOnly) {
+                for (const [id, url] of Object.entries(covers)) {
+                    if (!isOfficial(url)) {
+                        delete covers[id];
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn('[package-cover] error in official/country fallback:', err.message);
+        }
 
         res.set('Cache-Control', 'no-cache');
         return res.json({ ok: true, covers, count: Object.keys(covers).length });
@@ -316,6 +368,12 @@ router.post('/package-covers/auto-backfill', express.json(), async (req, res) =>
         for (const item of items) {
             const packageId = String(item.packageId || '').trim();
             let coverUrl = String(item.coverUrl || '').trim();
+
+            if (veloraData && typeof veloraData.isOfficialLogosOnly === 'function' && veloraData.isOfficialLogosOnly()) {
+                if (!veloraData.isOfficialLogoUrl(coverUrl)) {
+                    continue;
+                }
+            }
 
             // Unwrap nested /proxy?target=
             while (coverUrl.includes('/proxy?target=') || coverUrl.includes('/api/proxy?target=')) {

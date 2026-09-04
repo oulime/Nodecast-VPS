@@ -6,12 +6,18 @@
     r = Math.round(Math.max(0, Math.min(255, r)));
     g = Math.round(Math.max(0, Math.min(255, g)));
     b = Math.round(Math.max(0, Math.min(255, b)));
-    const primary = `rgb(${r}, ${g}, ${b})`;
-    const glow = `rgba(${r}, ${g}, ${b}, 0.65)`;
-    const border = `rgba(${r}, ${g}, ${b}, 0.45)`;
-    const subtle = `rgba(${r}, ${g}, ${b}, 0.16)`;
-    const arenaBg = `radial-gradient(circle at 50% 35%, rgba(${Math.round(r * 0.4)}, ${Math.round(g * 0.4)}, ${Math.round(b * 0.4)}, 0.45) 0%, rgba(6, 6, 10, 0.98) 75%)`;
-    const centerBg = `linear-gradient(145deg, rgba(${Math.round(r * 0.3)}, ${Math.round(g * 0.3)}, ${Math.round(b * 0.3)}, 0.96), rgba(8, 8, 12, 0.98))`;
+
+    const isBlack = (r + g + b) / 3 < 38;
+    const primary = isBlack ? `rgb(22, 22, 28)` : `rgb(${r}, ${g}, ${b})`;
+    const glow = isBlack ? `rgba(0, 0, 0, 0.92)` : `rgba(${r}, ${g}, ${b}, 0.65)`;
+    const border = isBlack ? `rgba(35, 35, 45, 0.8)` : `rgba(${r}, ${g}, ${b}, 0.45)`;
+    const subtle = isBlack ? `rgba(0, 0, 0, 0.4)` : `rgba(${r}, ${g}, ${b}, 0.16)`;
+    const arenaBg = isBlack
+      ? `radial-gradient(circle at 50% 35%, rgba(0, 0, 0, 0.95) 0%, rgba(4, 4, 7, 0.98) 75%)`
+      : `radial-gradient(circle at 50% 35%, rgba(${Math.round(r * 0.4)}, ${Math.round(g * 0.4)}, ${Math.round(b * 0.4)}, 0.45) 0%, rgba(6, 6, 10, 0.98) 75%)`;
+    const centerBg = isBlack
+      ? `linear-gradient(145deg, rgba(14, 14, 18, 0.98), rgba(6, 6, 9, 0.98))`
+      : `linear-gradient(145deg, rgba(${Math.round(r * 0.3)}, ${Math.round(g * 0.3)}, ${Math.round(b * 0.3)}, 0.96), rgba(8, 8, 12, 0.98))`;
     const cardBg = `linear-gradient(145deg, rgba(20, 20, 26, 0.94), rgba(8, 8, 12, 0.96))`;
 
     return {
@@ -84,8 +90,108 @@
     return clean;
   }
 
-  // Color Extraction Canvas Cache
+  // Color Extraction Canvas Cache & Darkness Detector
   const colorCache = new Map();
+  const logoToneCache = new Map();
+
+  function isCountryFlagUrl(url) {
+    if (!url || typeof url !== "string") return false;
+    const lower = String(url).toLowerCase();
+    return lower.includes("flagcdn.com") || lower.includes("/flags/") || lower.includes("country_") || lower.includes("/logos/arabe.svg") || lower.includes("flag");
+  }
+
+  function detectImageToneFromCanvas(data) {
+    let visiblePixels = 0;
+    let totalLuminance = 0;
+    let darkPixels = 0;
+    let lightPixels = 0;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const a = data[i + 3];
+      if (a < 50) continue; // Skip transparent background
+      visiblePixels++;
+
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      // Perceived standard luminance (0-255)
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      totalLuminance += lum;
+
+      if (lum < 85) darkPixels++;
+      else if (lum > 175) lightPixels++;
+    }
+
+    if (visiblePixels < 6) return { tone: "neutral", isDark: false, isLight: false };
+
+    const avgLum = totalLuminance / visiblePixels;
+    const darkRatio = darkPixels / visiblePixels;
+    const isDark = avgLum < 90 || darkRatio > 0.55;
+    const isLight = avgLum > 180 || (lightPixels / visiblePixels) > 0.65;
+
+    return {
+      tone: isDark ? "dark" : (isLight ? "light" : "color"),
+      isDark,
+      isLight,
+      avgLum
+    };
+  }
+
+  // Global helper to analyze and apply dark logo contrast mode
+  window.veloraDetectLogoDarkness = function(imgElement, container) {
+    if (!imgElement || !imgElement.src) return;
+    const src = imgElement.currentSrc || imgElement.src;
+
+    // NEVER put white background on country flags
+    if (isCountryFlagUrl(src) || isCountryFlagUrl(decodeURIComponent(src))) {
+      return;
+    }
+
+    const target = container || imgElement.closest(".vel-coverflow-card") || imgElement.closest(".media-item__thumb") || imgElement.parentElement;
+    if (!target) return;
+
+    const applyDark = () => {
+      target.classList.add("vel-dark-logo-mode");
+      const card = target.closest(".vel-coverflow-card");
+      if (card) card.classList.add("vel-dark-logo-mode");
+      const thumb = target.closest(".media-item__thumb");
+      if (thumb) thumb.classList.add("vel-dark-logo-mode");
+    };
+
+    if (logoToneCache.has(src)) {
+      if (logoToneCache.get(src) === "dark") {
+        applyDark();
+      }
+      return;
+    }
+
+    const runAnalysis = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        const size = 32;
+        canvas.width = size;
+        canvas.height = size;
+        ctx.drawImage(imgElement, 0, 0, size, size);
+        const imgData = ctx.getImageData(0, 0, size, size).data;
+        const result = detectImageToneFromCanvas(imgData);
+
+        logoToneCache.set(src, result.tone);
+        if (result.isDark) {
+          applyDark();
+        }
+      } catch (_) {
+        logoToneCache.set(src, "unknown");
+      }
+    };
+
+    if (imgElement.complete && imgElement.naturalWidth > 0) {
+      runAnalysis();
+    } else {
+      imgElement.addEventListener("load", runAnalysis, { once: true });
+    }
+  };
+
   function extractColorFromImage(imageUrl, callback) {
     if (!imageUrl) return;
     if (colorCache.has(imageUrl)) {
@@ -106,6 +212,10 @@
         canvas.height = 40;
         ctx.drawImage(img, 0, 0, 40, 40);
         const data = ctx.getImageData(0, 0, 40, 40).data;
+
+        const toneResult = detectImageToneFromCanvas(data);
+        logoToneCache.set(imageUrl, toneResult.tone);
+        if (proxiedUrl !== imageUrl) logoToneCache.set(proxiedUrl, toneResult.tone);
 
         let visiblePixels = 0;
         let chromaticPixels = 0;
@@ -139,13 +249,6 @@
           bins[qKey].score += score;
         }
 
-        if (chromaticPixels < 20 || (visiblePixels > 0 && (chromaticPixels / visiblePixels) < 0.04)) {
-          const bwTheme = buildThemeFromRgb(210, 215, 225);
-          colorCache.set(imageUrl, bwTheme);
-          callback(bwTheme);
-          return;
-        }
-
         for (const key in bins) {
           const bin = bins[key];
           const totalScore = bin.score * Math.sqrt(bin.count);
@@ -159,11 +262,23 @@
           }
         }
 
-        if (bestColor) {
-          const theme = buildThemeFromRgb(bestColor.r, bestColor.g, bestColor.b);
-          colorCache.set(imageUrl, theme);
-          callback(theme);
+        let theme;
+        if (bestColor && chromaticPixels >= 10) {
+          // Color in logo -> chromatic theme & effect
+          theme = buildThemeFromRgb(bestColor.r, bestColor.g, bestColor.b);
+        } else if (toneResult.isDark) {
+          // Black logo -> exact pure Black theme & effect around the wheel
+          theme = buildThemeFromRgb(10, 10, 15);
+        } else if (toneResult.isLight) {
+          // White logo -> White glow theme
+          theme = buildThemeFromRgb(240, 240, 250);
+        } else {
+          theme = buildThemeFromRgb(56, 189, 248);
         }
+
+        theme.isDarkLogo = toneResult.isDark;
+        colorCache.set(imageUrl, theme);
+        callback(theme);
       } catch (_) {}
     };
   }
@@ -949,10 +1064,13 @@
 
     getPackageTheme(pkg) {
       if (!pkg) return buildThemeFromRgb(56, 189, 248);
-      if (pkg._cachedTheme) return pkg._cachedTheme;
+      if (pkg._cachedTheme && typeof pkg._cachedTheme.r === "number") return pkg._cachedTheme;
       if (pkg.cover_url && colorCache.has(pkg.cover_url)) {
-        pkg._cachedTheme = colorCache.get(pkg.cover_url);
-        return pkg._cachedTheme;
+        const cached = colorCache.get(pkg.cover_url);
+        if (cached && typeof cached.r === "number") {
+          pkg._cachedTheme = cached;
+          return pkg._cachedTheme;
+        }
       }
       return getBrandThemeByName(pkg.name);
     }
@@ -1306,8 +1424,20 @@
           img.className = "vel-image-loaded vel-image-fade is-ready";
           img.loading = globalIdx < 16 ? "eager" : "lazy";
           img.decoding = "async";
+          img.crossOrigin = "anonymous";
           img.src = logo;
           img.alt = "";
+
+          // Auto-detect dark logo on transparent background (skip country flags)
+          const isFlag = isCountryFlagUrl(logo) || isCountryFlagUrl(decodeURIComponent(logo || ""));
+          if (!isFlag) {
+            if (logoToneCache.get(logo) === "dark") {
+              thumbWrap.classList.add("vel-dark-logo-mode");
+            } else if (window.veloraDetectLogoDarkness) {
+              window.veloraDetectLogoDarkness(img, thumbWrap);
+            }
+          }
+
           img.onerror = () => {
             if (!img.dataset.retried && rawLogo && !rawLogo.startsWith("/api/proxy") && !rawLogo.startsWith("/proxy")) {
               img.dataset.retried = "true";
@@ -1317,6 +1447,7 @@
               img.src = toProxiedImageUrl(pkgCover);
             } else {
               img.remove();
+              thumbWrap.classList.remove("vel-dark-logo-mode");
               thumbWrap.classList.add("media-item__thumb--empty");
               thumbWrap.setAttribute("aria-hidden", "true");
               thumbWrap.textContent = "📺";
@@ -1534,18 +1665,21 @@
 
         const pkg = this.packages[i];
         const cover = this.resolvePackageCover(pkg) || toProxiedImageUrl(pkg.cover_url);
+        const isFlag = isCountryFlagUrl(cover) || isCountryFlagUrl(pkg.cover_url) || isCountryFlagUrl(decodeURIComponent(cover || ""));
+        const isDark = !isFlag && ((cover && logoToneCache.get(cover) === 'dark') || pkg._isDarkLogo || (pkg._cachedTheme && pkg._cachedTheme.isDarkLogo));
+        const darkWrapClass = isDark ? 'vel-dark-logo-mode' : '';
         const logoHtml = cover
-          ? `<img src="${cover}" alt="" loading="eager" decoding="async" draggable="false" class="vel-coverflow-card__logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" /><span style="display:none;" class="text-xl">📺</span>`
+          ? `<img src="${cover}" alt="" loading="eager" decoding="async" draggable="false" class="vel-coverflow-card__logo" onload="window.veloraDetectLogoDarkness &amp;&amp; window.veloraDetectLogoDarkness(this, this.parentElement)" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" /><span style="display:none;" class="text-xl">📺</span>`
           : `<span class="text-xl">📺</span>`;
 
         html += `
           <div
-            class="vel-coverflow-card ${isCenter ? 'is-center-card' : ''}"
+            class="vel-coverflow-card ${isCenter ? 'is-center-card' : ''} ${darkWrapClass}"
             data-index="${i}"
             style="transform: translate3d(calc(-50% + ${tx.toFixed(2)}px), -50%, ${finalTz.toFixed(2)}px) rotateY(${rotY.toFixed(2)}deg) scale(${scaleFactor.toFixed(3)}); opacity: ${opacity.toFixed(3)}; z-index: ${zIndex}; pointer-events: auto;"
           >
             <div class="vel-coverflow-card__inner">
-              <div class="vel-coverflow-card__logo-wrap">
+              <div class="vel-coverflow-card__logo-wrap ${darkWrapClass}">
                 ${logoHtml}
               </div>
             </div>

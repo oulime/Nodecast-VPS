@@ -340,6 +340,39 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active):not(.vel-favorites-o
   transform: translateZ(0.1px);
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
+  transition: filter 0.24s ease, transform 0.24s ease;
+}
+
+/* =========================================================
+   Direct White Background Switching:
+   - Dark / Black Logos -> Card background becomes pure White (#ffffff)
+   - White / Color Logos -> Card background stays Dark / Gradient
+   ========================================================= */
+.vel-coverflow-card.vel-dark-logo-mode .vel-coverflow-card__inner {
+  background: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45) !important;
+}
+
+.vel-coverflow-card.vel-dark-logo-mode.is-center-card .vel-coverflow-card__inner {
+  background: #ffffff !important;
+  border-color: var(--theme-primary, #c084fc) !important;
+  box-shadow: 0 0 26px var(--theme-glow, rgba(168, 85, 247, 0.65)), 0 8px 24px rgba(0, 0, 0, 0.75) !important;
+}
+
+.vel-coverflow-card.vel-dark-logo-mode .vel-coverflow-card__logo {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15)) !important;
+}
+
+/* Dark logo treatment for channel thumbnail rows -> Solid White tile */
+.media-item__thumb.vel-dark-logo-mode {
+  background: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.85) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35) !important;
+}
+
+.media-item__thumb.vel-dark-logo-mode img {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15)) !important;
 }
 
 /* Optimize Dynamic List Spacing & Safe Scroll */

@@ -536,7 +536,7 @@ async function syncAllChannelLogos(options = {}) {
         const db = getDb();
 
         const channels = db.prepare(`
-            SELECT id, name, stream_icon
+            SELECT id, name, stream_icon, category_id
             FROM playlist_items
             WHERE type = 'live' AND is_hidden = 0
         `).all();
@@ -556,6 +556,7 @@ async function syncAllChannelLogos(options = {}) {
             }
         });
 
+        const matchedChannels = new Set();
         let batch = [];
         for (let i = 0; i < channels.length; i++) {
             const ch = channels[i];
@@ -563,6 +564,7 @@ async function syncAllChannelLogos(options = {}) {
 
             const match = matchChannelLogo(ch.name);
             if (match && match.logo) {
+                matchedChannels.add(ch.id);
                 // Only update if icon is missing or different
                 if (ch.stream_icon !== match.logo) {
                     batch.push({ id: ch.id, logo: match.logo });
@@ -582,11 +584,50 @@ async function syncAllChannelLogos(options = {}) {
 
         if (batch.length > 0) {
             updateTransaction(batch);
+            batch = [];
         }
 
         // Auto-assign Package Spinner Covers from upgraded channel icons
         const packagesUpdated = syncAllPackageCovers(db);
         syncProgress.packagesUpdated = packagesUpdated;
+
+        // Fallback pass: Channels that still don't have a logo inherit their package's cover
+        let discovered = {};
+        try {
+            if (fs.existsSync(DISCOVERED_COVERS_FILE)) {
+                discovered = JSON.parse(fs.readFileSync(DISCOVERED_COVERS_FILE, 'utf8')) || {};
+            }
+        } catch (_) {}
+
+        for (const ch of channels) {
+            if (matchedChannels.has(ch.id)) continue;
+            const currentIcon = String(ch.stream_icon || '').trim();
+            const hasExplicitIcon = currentIcon && (
+                currentIcon.includes('iptv-org') ||
+                currentIcon.includes('github') ||
+                currentIcon.includes('wikimedia') ||
+                currentIcon.includes('/uploads/') ||
+                isCustomLogoUrl(currentIcon)
+            );
+
+            if (!hasExplicitIcon) {
+                const catId = String(ch.category_id || '').trim();
+                const pkgCover = (catId && discovered[catId]) ? (typeof discovered[catId] === 'string' ? discovered[catId] : discovered[catId]?.coverUrl) : '';
+                if (pkgCover && pkgCover !== currentIcon) {
+                    batch.push({ id: ch.id, logo: pkgCover });
+                    syncProgress.updated++;
+                }
+            }
+
+            if (batch.length >= BATCH_SIZE) {
+                updateTransaction(batch);
+                batch = [];
+            }
+        }
+
+        if (batch.length > 0) {
+            updateTransaction(batch);
+        }
 
         syncProgress.running = false;
         syncProgress.endTime = Date.now();

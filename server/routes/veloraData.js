@@ -256,19 +256,24 @@ function isOfficialLogosOnly() {
     return isOfficialChannelsLogosOnly();
 }
 
-function sanitizeChannelIcon(name, streamIcon) {
+function sanitizeChannelIcon(name, streamIcon, packageCover = '') {
     const rawIcon = String(streamIcon || '').trim();
-    if (!isOfficialChannelsLogosOnly()) {
-        return rawIcon;
-    }
     if (rawIcon && isOfficialLogoUrl(rawIcon)) {
         return rawIcon;
     }
     const matched = channelLogoMatcher.matchChannelLogo(name);
     if (matched) {
-        return typeof matched === 'string' ? matched : (matched.logo || '');
+        const url = typeof matched === 'string' ? matched : (matched.logo || '');
+        if (url) return url;
     }
-    return '';
+    const cleanPkgCover = String(packageCover || '').trim();
+    if (cleanPkgCover && isOfficialLogoUrl(cleanPkgCover)) {
+        return cleanPkgCover;
+    }
+    if (!isOfficialChannelsLogosOnly()) {
+        return rawIcon || cleanPkgCover || '';
+    }
+    return cleanPkgCover || '';
 }
 const HOME_CHANNEL_RULE_TABLES = new Set([
     'admin_channel_name_prefixes',
@@ -952,16 +957,18 @@ function liveChannelsForCurations(curations, packageById) {
         const item = findItem.get(sourceId, streamId);
         if (!item) continue;
         seen.add(key);
+        const pkgRow = packageById.get(packageId);
+        const pkgCover = pkgRow?.cover_url || '';
         channels.push({
             stream_id: streamId,
             source_id: sourceId,
             kind: 'live',
             origin_package_id: String(curation.origin_package_id || ''),
             name: item.name,
-            stream_icon: sanitizeChannelIcon(item.name, item.stream_icon),
+            stream_icon: sanitizeChannelIcon(item.name, item.stream_icon, pkgCover),
             provider_order: item.provider_order,
             package_id: packageId,
-            package_name: packageById.get(packageId)?.name || packageId
+            package_name: pkgRow?.name || packageId
         });
     }
     return channels.sort((left, right) => {

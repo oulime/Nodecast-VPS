@@ -1313,7 +1313,8 @@
         const globalIdx = start + idx;
         const streamId = String(ch.stream_id || ch.id || "");
         const name = String(ch.name || ch.title || "Chaîne");
-        const rawLogo = String(ch.stream_icon || ch.logo || ch.cover || "").trim();
+        const pkgCover = this.activePackage ? this.resolvePackageCover(this.activePackage) : "";
+        let rawLogo = String(ch.stream_icon || ch.logo || ch.cover || "").trim() || pkgCover;
         const logo = toProxiedImageUrl(rawLogo);
         const isActive = this.currentPlayingStreamId === streamId;
 
@@ -1345,6 +1346,9 @@
             if (!img.dataset.retried && rawLogo && !rawLogo.startsWith("/api/proxy") && !rawLogo.startsWith("/proxy")) {
               img.dataset.retried = "true";
               img.src = `/api/proxy/image?url=${encodeURIComponent(rawLogo)}`;
+            } else if (pkgCover && !img.dataset.pkgCoverTried && pkgCover !== logo) {
+              img.dataset.pkgCoverTried = "true";
+              img.src = toProxiedImageUrl(pkgCover);
             } else {
               img.remove();
               thumbWrap.classList.add("media-item__thumb--empty");
@@ -1492,8 +1496,8 @@
         stream_id: /^\d+$/.test(streamId) ? Number(streamId) : streamId,
         raw_stream_id: /^\d+$/.test(streamId) ? Number(streamId) : streamId,
         name: ch.name || ch.title || "Chaîne",
-        stream_icon: ch.stream_icon || ch.logo || ch.cover || "",
-        cover: ch.stream_icon || ch.logo || ch.cover || "",
+        stream_icon: ch.stream_icon || ch.logo || ch.cover || (this.activePackage ? this.resolvePackageCover(this.activePackage) : ""),
+        cover: ch.stream_icon || ch.logo || ch.cover || (this.activePackage ? this.resolvePackageCover(this.activePackage) : ""),
         nodecast_source_id: String(ch.nodecast_source_id || ch.source_id || "1"),
         nodecast_media: "live"
       };

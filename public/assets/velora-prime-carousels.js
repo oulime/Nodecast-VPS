@@ -686,16 +686,19 @@
           ? '<span class="vel-home-row-badge vel-home-row-badge--movies" aria-hidden="true">🎬</span>'
           : '<span class="vel-home-row-badge vel-home-row-badge--series" aria-hidden="true">🍿</span>')
       : "";
-    h2.innerHTML = `<span data-testid="carousel-title">${typeBadge}<span>${pkgTitle}</span></span>`;
+    h2.innerHTML = `<span data-testid="carousel-title" class="">${typeBadge}<span>${pkgTitle}</span></span>`;
     h2.style.cursor = "pointer";
 
     const seeMore = document.createElement("a");
     seeMore.href = "#";
     seeMore.className = "toEceS";
+    seeMore.dataset.testid = "see-more";
+    seeMore.setAttribute("aria-label", pkgTitle);
     seeMore.innerHTML = `
       <span class="IcIpJ_">Voir plus</span>
-      <svg class="_22qEau" viewBox="0 0 24 24" height="24" width="24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M9.5 17.5l5-5-5-5"></path>
+      <svg class="_22qEau" viewBox="0 0 24 24" height="24" width="24" role="img" aria-hidden="true">
+        <title>Link Arrow</title>
+        <path stroke="currentColor" stroke-width="2" d="M9.5 17.5l5-5-5-5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
       </svg>
     `;
 

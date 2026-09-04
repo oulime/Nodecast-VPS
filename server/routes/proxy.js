@@ -1186,7 +1186,7 @@ router.post('/epg/:sourceId/channels', async (req, res) => {
  * Supports HTTP Range requests for video seeking and live HLS manifest deduplication/resilience
  */
 const liveManifestCache = new Map();
-const LIVE_MANIFEST_CACHE_TTL_MS = 6000;
+const LIVE_MANIFEST_CACHE_TTL_MS = 1000;
 const LIVE_MANIFEST_STALE_TTL_MS = 25000;
 
 router.get('/stream', async (req, res) => {

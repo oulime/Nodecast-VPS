@@ -693,7 +693,7 @@
     seeMore.href = "#";
     seeMore.className = "toEceS";
     seeMore.innerHTML = `
-      <span class="IcIpJ_">Voir tout (${pkg.totalCount || items.length})</span>
+      <span class="IcIpJ_">Voir plus</span>
       <svg class="_22qEau" viewBox="0 0 24 24" height="24" width="24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M9.5 17.5l5-5-5-5"></path>
       </svg>

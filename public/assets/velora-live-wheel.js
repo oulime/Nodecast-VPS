@@ -945,98 +945,104 @@
       const rawCards = [...packagesView.querySelectorAll(":scope > .vel-package-card[data-package-id]")];
       if (rawCards.length === 0 && this.cachedApiPackages.length === 0) return;
 
-      const list = [];
-      const childMap = new Map();
+      const rawCardIds = rawCards.map(c => String(c.dataset.packageId || "")).join(",");
+      const currentPkgIds = this.packages.map(p => String(p.id || "")).join(",");
+      const packagesListChanged = rawCardIds !== currentPkgIds || this.packages.length === 0;
 
-      rawCards.forEach((card, i) => {
-        const id = String(card.dataset.packageId || "");
-        const titleEl = card.querySelector(".vel-package-card__title");
-        const title = titleEl ? titleEl.textContent.trim() : card.getAttribute("aria-label") || `Bouquet ${i+1}`;
-        const apiPkg = this.cachedApiPackages.find(p => String(p.id) === id);
-        const catId = apiPkg?.category_id || card.dataset.categoryId || "";
-        const savedLogo = window.__veloraCustomPackageLogos?.[id]
-          || window.__veloraCustomPackageLogos?.[catId]
-          || window.__veloraCustomPackageLogos?.[apiPkg?.name]
-          || window.__veloraCustomPackageLogos?.[title]
-          || (function () {
-            try {
-              const l = JSON.parse(localStorage.getItem("velora_package_covers") || "{}");
-              return l[id] || l[catId] || l[apiPkg?.name] || l[title] || "";
-            } catch (_) { return ""; }
-          })();
-        const imgEl = card.querySelector(":scope > img, .vel-package-card__live-logo");
-        const rawCover = imgEl ? (imgEl.getAttribute("src") || "") : (apiPkg?.cover_url || savedLogo || "");
-        const is_parent = card.classList.contains("vel-package-card--parent") || Boolean(apiPkg?.is_parent) || (Array.isArray(apiPkg?.child_package_ids) && apiPkg.child_package_ids.length > 0);
-        const childIds = apiPkg?.child_package_ids || [];
+      if (packagesListChanged) {
+        const list = [];
+        const childMap = new Map();
 
-        const tempPkg = {
-          id,
-          name: title,
-          display_name: title,
-          category_id: catId,
-          cover_url: rawCover
-        };
-        const cover_url = this.resolvePackageCover(tempPkg);
+        rawCards.forEach((card, i) => {
+          const id = String(card.dataset.packageId || "");
+          const titleEl = card.querySelector(".vel-package-card__title");
+          const title = titleEl ? titleEl.textContent.trim() : card.getAttribute("aria-label") || `Bouquet ${i+1}`;
+          const apiPkg = this.cachedApiPackages.find(p => String(p.id) === id);
+          const catId = apiPkg?.category_id || card.dataset.categoryId || "";
+          const savedLogo = window.__veloraCustomPackageLogos?.[id]
+            || window.__veloraCustomPackageLogos?.[catId]
+            || window.__veloraCustomPackageLogos?.[apiPkg?.name]
+            || window.__veloraCustomPackageLogos?.[title]
+            || (function () {
+              try {
+                const l = JSON.parse(localStorage.getItem("velora_package_covers") || "{}");
+                return l[id] || l[catId] || l[apiPkg?.name] || l[title] || "";
+              } catch (_) { return ""; }
+            })();
+          const imgEl = card.querySelector(":scope > img, .vel-package-card__live-logo");
+          const rawCover = imgEl ? (imgEl.getAttribute("src") || "") : (apiPkg?.cover_url || savedLogo || "");
+          const is_parent = card.classList.contains("vel-package-card--parent") || Boolean(apiPkg?.is_parent) || (Array.isArray(apiPkg?.child_package_ids) && apiPkg.child_package_ids.length > 0);
+          const childIds = apiPkg?.child_package_ids || [];
 
-        const pkgObj = {
-          id,
-          name: title,
-          display_name: title,
-          cover_url,
-          is_parent,
-          child_package_ids: childIds,
-          originalCard: card,
-          source_id: apiPkg?.source_id,
-          category_id: apiPkg?.category_id || catId
-        };
-        list.push(pkgObj);
+          const tempPkg = {
+            id,
+            name: title,
+            display_name: title,
+            category_id: catId,
+            cover_url: rawCover
+          };
+          const cover_url = this.resolvePackageCover(tempPkg);
 
-        // Build child packages list
-        const children = [];
-        if (childIds.length > 0) {
-          childIds.forEach(cid => {
-            const childApi = this.cachedApiPackages.find(p => String(p.id) === String(cid));
-            if (childApi) {
-              const childTemp = {
-                id: String(childApi.id),
-                name: childApi.name,
-                display_name: childApi.name,
-                category_id: childApi.category_id,
-                cover_url: childApi.cover_url || cover_url || ""
-              };
-              children.push({
-                id: String(childApi.id),
-                name: childApi.name,
-                display_name: childApi.name,
-                cover_url: this.resolvePackageCover(childTemp) || cover_url,
-                source_id: childApi.source_id,
-                category_id: childApi.category_id
-              });
-            }
-          });
-        }
-        if (children.length > 0) {
-          childMap.set(id, children);
-        }
-      });
+          const pkgObj = {
+            id,
+            name: title,
+            display_name: title,
+            cover_url,
+            is_parent,
+            child_package_ids: childIds,
+            originalCard: card,
+            source_id: apiPkg?.source_id,
+            category_id: apiPkg?.category_id || catId
+          };
+          list.push(pkgObj);
 
-      this.packages = list;
-      this.childPackagesMap = childMap;
+          // Build child packages list
+          const children = [];
+          if (childIds.length > 0) {
+            childIds.forEach(cid => {
+              const childApi = this.cachedApiPackages.find(p => String(p.id) === String(cid));
+              if (childApi) {
+                const childTemp = {
+                  id: String(childApi.id),
+                  name: childApi.name,
+                  display_name: childApi.name,
+                  category_id: childApi.category_id,
+                  cover_url: childApi.cover_url || cover_url || ""
+                };
+                children.push({
+                  id: String(childApi.id),
+                  name: childApi.name,
+                  display_name: childApi.name,
+                  cover_url: this.resolvePackageCover(childTemp) || cover_url,
+                  source_id: childApi.source_id,
+                  category_id: childApi.category_id
+                });
+              }
+            });
+          }
+          if (children.length > 0) {
+            childMap.set(id, children);
+          }
+        });
+
+        this.packages = list;
+        this.childPackagesMap = childMap;
+
+        // Pre-extract colors in background for instant fluid transitions
+        this.packages.forEach(pkg => {
+          if (pkg.cover_url && !pkg._cachedTheme) {
+            extractColorFromImage(pkg.cover_url, (extractedTheme) => {
+              pkg._cachedTheme = extractedTheme;
+            });
+          }
+        });
+      }
 
       const isLive = this.isLiveActive();
       const showWheel = isLive && this.packages.length >= 1;
       if (this.wrapper) {
         this.wrapper.style.display = showWheel ? "block" : "none";
       }
-
-      // Pre-extract colors in background for instant fluid transitions
-      this.packages.forEach(pkg => {
-        if (pkg.cover_url && !pkg._cachedTheme) {
-          extractColorFromImage(pkg.cover_url, (extractedTheme) => {
-            pkg._cachedTheme = extractedTheme;
-          });
-        }
-      });
 
       if (this.packages.length > 0) {
         const targetIdx = (this.settledPackageIndex >= 0 && this.settledPackageIndex < this.packages.length)
@@ -1062,9 +1068,9 @@
         if (needsLoad) {
           this.hasLoadedInitialLiveChannel = true;
           this.currentLoadedPkgId = currentPkg ? currentPkg.id : "";
-          this.onPackageSettled(currentPkg, { isInitialLoad: isFirstOpen });
+          this.onPackageSettled(currentPkg, { isInitialLoad: isFirstOpen, skipScroll: true });
         }
-        if (this.packages.length >= 1) {
+        if (packagesListChanged && this.packages.length >= 1) {
           this.renderMainCards();
         }
       } else {
@@ -1189,7 +1195,8 @@
     async onPackageSettled(pkg, options = {}) {
       if (!pkg || !this.isLiveActive()) return;
 
-      if (!options.skipScroll && !options.isInitialLoad) {
+      // Only auto-scroll when explicitly triggered by intentional user wheel interaction/swipe
+      if ((options.isUserWheelInteraction === true || options.resetScroll === true) && !options.skipScroll) {
         this.autoScrollUp();
       }
 
@@ -1732,7 +1739,7 @@
         this.currentIndex = 0;
         this.settledPackageIndex = 0;
         this.renderMainCards();
-        this.onPackageSettled(this.packages[0]);
+        this.onPackageSettled(this.packages[0], { isUserWheelInteraction: false, skipScroll: true });
         this.isSpinning = false;
         return;
       }
@@ -1772,7 +1779,7 @@
           this.isSpinning = false;
           this.isDragging = false;
           this.renderMainCards();
-          this.onPackageSettled(this.packages[finalIdx]);
+          this.onPackageSettled(this.packages[finalIdx], { isUserWheelInteraction: true, resetScroll: true });
         }
       };
 

@@ -83,8 +83,7 @@
 @media (max-width: 768px) {
   .vel-hero-slide__overlay {
     background: 
-      linear-gradient(90deg, rgba(9, 8, 19, 0.75) 0%, rgba(9, 8, 19, 0.2) 60%, transparent 100%),
-      linear-gradient(0deg, rgba(9, 8, 19, 0.95) 0%, rgba(9, 8, 19, 0.35) 40%, transparent 70%);
+      linear-gradient(0deg, rgba(9, 8, 19, 0.88) 0%, rgba(9, 8, 19, 0.3) 25%, transparent 50%);
   }
 }
 

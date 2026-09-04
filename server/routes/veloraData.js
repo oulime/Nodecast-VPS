@@ -2999,6 +2999,25 @@ router.post('/admin/custom-logos/test-match', express.json(), (req, res) => {
     }
 });
 
+router.all('/admin/custom-logos/search', express.json(), async (req, res) => {
+    try {
+        const query = String(req.query?.q || req.body?.q || req.body?.query || '').trim();
+        const limit = Number.parseInt(req.query?.limit || req.body?.limit || '60', 10) || 60;
+        if (!query) {
+            return res.json({ ok: true, results: [], total: 0 });
+        }
+        const results = await channelLogoMatcher.searchLogos(query, Math.min(limit, 100));
+        return res.json({
+            ok: true,
+            query,
+            total: results.length,
+            results
+        });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
 router.post('/admin/assign-package', (req, res) => {
     try {
         const countryId = String(req.body?.countryId || '').trim();

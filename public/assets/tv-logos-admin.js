@@ -457,11 +457,12 @@
 
       if (res && res.matched && res.result && res.result.logo) {
         const r = res.result;
+        const testThumbSrc = (r.logo && r.logo.startsWith('/')) ? r.logo : ('/proxy?target=' + encodeURIComponent(r.logo));
         resultEl.innerHTML = '<div class="vel-logos-test-matched">' +
           '<div class="vel-logos-test-badge-success">✅ CORRESPONDANCE TROUVÉE</div>' +
           '<div class="vel-logos-test-details">' +
             '<div class="vel-logos-test-thumb-wrap">' +
-              '<img src="/proxy?target=' + encodeURIComponent(r.logo) + '" alt="" class="vel-logos-test-thumb" />' +
+              '<img src="' + testThumbSrc + '" alt="" class="vel-logos-test-thumb" onerror="this.style.opacity=\'0.4\';" />' +
             '</div>' +
             '<div class="vel-logos-test-meta">' +
               '<div><strong>Nom nettoyé :</strong> <code>' + esc(res.cleaned || term) + '</code></div>' +
@@ -537,6 +538,163 @@
     if (inputUrl) inputUrl.focus();
   }
 
+  let pickerSearchTimer = null;
+
+  function togglePicker(forceState) {
+    const wrap = getEl('logos-picker-wrap');
+    if (!wrap) return;
+    const shouldShow = typeof forceState === 'boolean' ? forceState : (wrap.style.display === 'none');
+    wrap.style.display = shouldShow ? 'block' : 'none';
+    if (shouldShow) {
+      const input = getEl('logos-picker-input');
+      if (input) {
+        const nameInp = getEl('logos-input-name');
+        if (!input.value.trim() && nameInp && nameInp.value.trim()) {
+          input.value = nameInp.value.trim();
+          handlePickerSearch(input.value);
+        }
+        input.focus();
+      }
+    }
+  }
+
+  function quickSearch(term) {
+    const input = getEl('logos-picker-input');
+    if (input) {
+      input.value = term;
+      handlePickerSearch(term);
+      togglePicker(true);
+    }
+  }
+
+  let clientLogosData = null;
+  let isFetchingClientLogos = false;
+
+  async function loadClientLogosDirect() {
+    if (clientLogosData && clientLogosData.length) return clientLogosData;
+    if (isFetchingClientLogos) return [];
+    isFetchingClientLogos = true;
+    try {
+      const response = await fetch('https://iptv-org.github.io/api/logos.json');
+      if (response.ok) {
+        clientLogosData = await response.json();
+      }
+    } catch (_) {}
+    isFetchingClientLogos = false;
+    return clientLogosData || [];
+  }
+
+  function searchClientLogos(term, limit = 50) {
+    const t = term.toLowerCase();
+    const results = [];
+    const seen = new Set();
+
+    for (const item of customLogosList) {
+      if (
+        (item.name && item.name.toLowerCase().includes(t)) ||
+        (item.country && item.country.toLowerCase().includes(t)) ||
+        (item.aliases || []).some(a => String(a).toLowerCase().includes(t)) ||
+        (item.url && item.url.toLowerCase().includes(t))
+      ) {
+        if (!seen.has(item.url)) {
+          seen.add(item.url);
+          results.push({
+            name: item.name,
+            id: 'custom.' + item.name,
+            url: item.url,
+            country: item.country || 'CUSTOM'
+          });
+        }
+      }
+    }
+
+    if (Array.isArray(clientLogosData)) {
+      for (const l of clientLogosData) {
+        if (!l || !l.url) continue;
+        if (seen.has(l.url)) continue;
+        const ch = String(l.channel || '');
+        const u = String(l.url || '');
+        if (ch.toLowerCase().includes(t) || u.toLowerCase().includes(t)) {
+          seen.add(l.url);
+          const name = ch.replace(/\.[a-z]{2,3}$/i, '').replace(/[-_.]+/g, ' ');
+          results.push({
+            name: name || ch,
+            id: ch,
+            url: l.url,
+            country: (ch.match(/\.([a-z]{2,3})$/i) || [])[1]?.toUpperCase() || ''
+          });
+          if (results.length >= limit) break;
+        }
+      }
+    }
+    return results;
+  }
+
+  async function handlePickerSearch(query) {
+    clearTimeout(pickerSearchTimer);
+    const resultsEl = getEl('logos-picker-results');
+    if (!resultsEl) return;
+    const term = (query || '').trim();
+    if (!term) {
+      resultsEl.innerHTML = '<div class="vel-logos-picker-hint">💡 Tapez un nom de chaîne ou de marque ci-dessus pour afficher et choisir son logo.</div>';
+      return;
+    }
+
+    resultsEl.innerHTML = '<div class="vel-logos-picker-hint">⏳ Recherche des logos en cours...</div>';
+
+    pickerSearchTimer = setTimeout(async function() {
+      let list = [];
+      try {
+        const res = await req(SURL + '/admin/custom-logos/search?q=' + encodeURIComponent(term));
+        if (res && Array.isArray(res.results) && res.results.length > 0) {
+          list = res.results;
+        }
+      } catch (_) {}
+
+      if (!list || !list.length) {
+        await loadClientLogosDirect();
+        list = searchClientLogos(term, 60);
+      }
+
+      if (!list.length) {
+        resultsEl.innerHTML = '<div class="vel-logos-picker-hint">❌ Aucun logo trouvé pour « ' + esc(term) + ' ».</div>';
+        return;
+      }
+
+      resultsEl.innerHTML = list.map(function(item) {
+        const thumbSrc = item.url.startsWith('/') ? item.url : ('/proxy?target=' + encodeURIComponent(item.url));
+        const nameSafe = esc(item.name || item.id);
+        const countrySafe = esc(item.country || '');
+        const urlSafe = esc(item.url);
+
+        return '<div class="vel-logos-picker-item" data-picker-url="' + urlSafe + '" data-picker-name="' + nameSafe + '" data-picker-country="' + countrySafe + '" onclick="window.veloraLogosAdmin &amp;&amp; window.veloraLogosAdmin.selectPickerLogo(this.getAttribute(\'data-picker-url\'), this.getAttribute(\'data-picker-name\'), this.getAttribute(\'data-picker-country\'))" title="Cliquer pour choisir ce logo">' +
+          '<img src="' + thumbSrc + '" alt="' + nameSafe + '" class="vel-logos-picker-item__thumb" onerror="this.style.opacity=\'0.2\';" />' +
+          '<div class="vel-logos-picker-item__title">' + nameSafe + '</div>' +
+          (countrySafe ? '<span class="vel-logos-picker-item__country">' + countrySafe + '</span>' : '') +
+        '</div>';
+      }).join('');
+    }, 200);
+  }
+
+  function selectPickerLogo(url, name, country) {
+    if (!url) return;
+    const inputUrl = getEl('logos-input-url');
+    if (inputUrl) {
+      inputUrl.value = url;
+      updatePreview(url);
+    }
+    const inputName = getEl('logos-input-name');
+    if (inputName && !inputName.value.trim() && name) {
+      inputName.value = name;
+    }
+    const inputCountry = getEl('logos-input-country');
+    if (inputCountry && !inputCountry.value.trim() && country && country !== 'CUSTOM' && country !== 'N/A') {
+      inputCountry.value = country;
+    }
+    setStatus('✨ Logo « ' + (name || 'sélectionné') + ' » choisi ! Cliquez sur « Enregistrer le logo » pour confirmer.');
+    togglePicker(false);
+  }
+
   // Expose on global window object for direct onclick / programmatic access
   window.veloraLogosAdmin = {
     showLogosTab: showLogosTab,
@@ -555,7 +713,11 @@
     toggleChannelsOnly: toggleChannelsOnly,
     togglePackagesOnly: togglePackagesOnly,
     syncAllChannelLogos: syncAllChannelLogos,
-    loadCustomLogos: loadCustomLogos
+    loadCustomLogos: loadCustomLogos,
+    togglePicker: togglePicker,
+    quickSearch: quickSearch,
+    handlePickerSearch: handlePickerSearch,
+    selectPickerLogo: selectPickerLogo
   };
 
   // Global listeners

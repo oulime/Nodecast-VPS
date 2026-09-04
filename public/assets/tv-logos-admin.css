@@ -576,3 +576,153 @@
   justify-content: flex-end;
   gap: 0.75rem;
 }
+
+/* Interactive Logo Picker */
+.vel-logos-picker-wrap {
+  margin: 0.5rem 0 1rem 0;
+  border-radius: 12px;
+  background: #090d16;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 16px rgba(56, 189, 248, 0.15);
+  overflow: hidden;
+  animation: velFadeSlideIn 0.2s ease-out;
+}
+
+@keyframes velFadeSlideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.vel-logos-picker-box {
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.vel-logos-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 0.35rem 0.65rem;
+}
+
+.vel-logos-picker-input {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  color: #fff !important;
+  font-size: 0.9rem !important;
+  width: 100% !important;
+  padding: 0.3rem 0 !important;
+  box-shadow: none !important;
+}
+
+.vel-logos-picker-close {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+}
+
+.vel-logos-picker-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.vel-logos-picker-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.vel-logos-chip {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  user-select: none;
+}
+
+.vel-logos-chip:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+.vel-logos-picker-results {
+  max-height: 260px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.65rem;
+  padding: 0.25rem 0.1rem;
+}
+
+.vel-logos-picker-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.65rem 0.45rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  text-align: center;
+  position: relative;
+}
+
+.vel-logos-picker-item:hover {
+  transform: translateY(-2px);
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.vel-logos-picker-item__thumb {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 6px;
+  padding: 4px;
+}
+
+.vel-logos-picker-item__title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 115px;
+}
+
+.vel-logos-picker-item__country {
+  font-size: 0.65rem;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+.vel-logos-picker-hint {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 1.5rem 0.5rem;
+  color: #64748b;
+  font-size: 0.8rem;
+}

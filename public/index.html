@@ -1580,8 +1580,8 @@
     <link rel="stylesheet" href="/assets/direct-media-packages.css?v=20260830-roller-v34">
     <link rel="stylesheet" href="/assets/velora-hero-slider.css?v=20260902-hero-v9">
     <link rel="stylesheet" href="/assets/velora-hero-slider-admin.css?v=20260902-hero-v9">
-    <link rel="stylesheet" href="/assets/tv-logos-admin.css?v=20260904-logos-v8">
-    <script defer src="/assets/tv-logos-admin.js?v=20260904-logos-v8"></script>
+    <link rel="stylesheet" href="/assets/tv-logos-admin.css?v=20260904-logos-v11">
+    <script defer src="/assets/tv-logos-admin.js?v=20260904-logos-v11"></script>
     <style>
       .manual-pays__pagination{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding:.7rem;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:rgba(14,11,20,.96);color:#aaa4b5;font-size:.75rem}
       .manual-pays__pagination button{border:1px solid rgba(167,139,250,.45);border-radius:8px;background:rgba(124,58,237,.2);color:#fff;padding:.45rem .7rem;cursor:pointer}
@@ -6013,10 +6013,39 @@
 
                     <div class="vel-logos-field">
                       <label for="logos-input-url">URL du logo ou Importer une image *</label>
-                      <div style="display:flex;gap:0.5rem;align-items:center;">
-                        <input id="logos-input-url" type="text" placeholder="https://... ou cliquez sur Importer" style="flex:1;" required oninput="window.veloraLogosAdmin && window.veloraLogosAdmin.updatePreview(this.value)" />
+                      <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+                        <input id="logos-input-url" type="text" placeholder="https://... ou cliquez sur Importer / Chercher" style="flex:1;min-width:180px;" required oninput="window.veloraLogosAdmin && window.veloraLogosAdmin.updatePreview(this.value)" />
                         <button id="logos-btn-upload" type="button" class="vel-logo-btn" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;padding:0.6rem 0.9rem;white-space:nowrap;font-weight:600;display:flex;align-items:center;gap:0.35rem;cursor:pointer;" onclick="var fi=document.getElementById('logos-input-file'); if(fi) fi.click();">📁 Importer</button>
+                        <button id="logos-btn-toggle-picker" type="button" class="vel-logo-btn" style="background:linear-gradient(135deg,#0284c7,#0ea5e9);color:#fff;border:none;padding:0.6rem 0.9rem;white-space:nowrap;font-weight:600;display:flex;align-items:center;gap:0.35rem;cursor:pointer;" onclick="window.veloraLogosAdmin && window.veloraLogosAdmin.togglePicker()">🔍 Chercher</button>
                         <input id="logos-input-file" type="file" accept="image/png,image/svg+xml,image/webp,image/jpeg,image/gif" style="display:none;" onchange="window.veloraLogosAdmin && window.veloraLogosAdmin.handleFileSelect(this)" />
+                      </div>
+                    </div>
+
+                    <!-- Interactive Logo Search & Picker Box -->
+                    <div id="logos-picker-wrap" class="vel-logos-picker-wrap" style="display:none;">
+                      <div class="vel-logos-picker-box">
+                        <div class="vel-logos-picker-header">
+                          <div style="display:flex;align-items:center;gap:0.5rem;flex:1;">
+                            <span style="font-size:1.1rem;">🔍</span>
+                            <input id="logos-picker-input" type="text" class="vel-logos-picker-input" placeholder="Taper pour chercher (ex: netflix, bein, canal, dazn, tf1...)" oninput="window.veloraLogosAdmin && window.veloraLogosAdmin.handlePickerSearch(this.value)" />
+                          </div>
+                          <button type="button" class="vel-logos-picker-close" onclick="window.veloraLogosAdmin && window.veloraLogosAdmin.togglePicker(false)" title="Fermer">✕</button>
+                        </div>
+                        <div class="vel-logos-picker-chips">
+                          <span class="vel-logos-chip" onclick="window.veloraLogosAdmin && window.veloraLogosAdmin.quickSearch('netflix')">Netflix</span>
+                          <span class="vel-logos-chip" onclick="window.veloraLogosAdmin && window.veloraLogosAdmin.quickSearch('canal')">Canal+</span>
+                          <span class="vel-logos-chip" onclick="window.veloraLogosAdmin && window.veloraLogosAdmin.quickSearch('bein')">beIN Sports</span>
+                          <span class="vel-logos-chip" onclick="window.veloraLogosAdmin && window.veloraLogosAdmin.quickSearch('dazn')">DAZN</span>
+                          <span class="vel-logos-chip" onclick="window.veloraLogosAdmin && window.veloraLogosAdmin.quickSearch('tf1')">TF1</span>
+                          <span class="vel-logos-chip" onclick="window.veloraLogosAdmin && window.veloraLogosAdmin.quickSearch('amazon')">Amazon Prime</span>
+                          <span class="vel-logos-chip" onclick="window.veloraLogosAdmin && window.veloraLogosAdmin.quickSearch('disney')">Disney+</span>
+                          <span class="vel-logos-chip" onclick="window.veloraLogosAdmin && window.veloraLogosAdmin.quickSearch('max')">Max / HBO</span>
+                          <span class="vel-logos-chip" onclick="window.veloraLogosAdmin && window.veloraLogosAdmin.quickSearch('eurosport')">Eurosport</span>
+                          <span class="vel-logos-chip" onclick="window.veloraLogosAdmin && window.veloraLogosAdmin.quickSearch('rmc')">RMC</span>
+                        </div>
+                        <div id="logos-picker-results" class="vel-logos-picker-results">
+                          <div class="vel-logos-picker-hint">💡 Tapez un nom de chaîne ou de marque ci-dessus pour afficher et choisir son logo.</div>
+                        </div>
                       </div>
                     </div>
 
@@ -14438,7 +14467,7 @@ if (target.closest(".trial-offer-button")) {
       })();
     </script>
     <script defer src="/assets/cast-bridge.js?v=20260821-cast-airplay-v1"></script>
-    <script defer src="/assets/velora-live-wheel.js?v=20260902-wheel-covers-v1"></script>
+    <script defer src="/assets/velora-live-wheel.js?v=20260904-wheel-covers-v2"></script>
     <link rel="stylesheet" href="/assets/velora-prime-carousel.css?v=20260902-feed-v5" />
     <script defer src="/assets/velora-prime-carousels.js?v=20260902-feed-v5"></script>
     <script>

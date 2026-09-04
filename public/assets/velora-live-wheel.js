@@ -250,6 +250,11 @@
     return '';
   }
 
+  function isCountryFlagUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    return url.includes('flagcdn.com') || url.includes('/flags/') || url.includes('country_') || url.includes('/logos/arabe.svg');
+  }
+
   const COMMON_BRAND_LOGOS = [
     { match: /canal\s*\+|c\+/i, logo: 'https://i.imgur.com/5HcyMnW.png' },
     { match: /bein\s*sport/i, logo: 'https://i.imgur.com/8Qh1mR4.png' },
@@ -646,7 +651,7 @@
           } catch (_) { return ""; }
         })();
 
-      let candidate = pkg.cover_url || savedLogo || "";
+      let candidate = savedLogo || pkg.cover_url || "";
 
       // Reject TMDB movie posters
       if (candidate.includes("image.tmdb.org") || candidate.includes("tmdb.org") || candidate.includes("/w600_and_h900_bestv2/") || candidate.includes("/w500/") || candidate.includes("/w300/")) {
@@ -658,9 +663,12 @@
         candidate = "";
       }
 
-      // If no candidate, match brand logo from package name
-      if (!candidate && (pkg.name || pkg.display_name)) {
-        candidate = getBrandLogoForName(pkg.name || pkg.display_name);
+      // If no candidate OR candidate is just a country flag fallback, prioritize brand match
+      if (!candidate || isCountryFlagUrl(candidate)) {
+        const brandMatch = getBrandLogoForName(pkg.name || pkg.display_name);
+        if (brandMatch) {
+          candidate = brandMatch;
+        }
       }
 
       // Fallback: If still no image, use the country logo / flag!
@@ -1083,7 +1091,7 @@
       const officialOnly = isOfficialLogosOnlyActive();
       let currentCover = this.resolvePackageCover(pkg);
 
-      if (!currentCover) {
+      if (!currentCover || isCountryFlagUrl(currentCover)) {
         const firstWithLogo = channels.find(ch => {
           const icon = String(ch.stream_icon || ch.logo || ch.cover || "").trim();
           if (!icon || icon.includes("tmdb.org") || icon.includes("image.tmdb")) return false;

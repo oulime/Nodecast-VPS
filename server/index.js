@@ -555,6 +555,11 @@ app.get('/nodecast-admin/', (req, res) => {
 // Trial mode was removed. All viewers authenticate with username/password.
 app.get('/trial', (req, res) => res.redirect(302, '/login'));
 
+// Never return index.html for unhandled /api/* endpoints
+app.all('/api/*', (req, res) => {
+    res.status(404).json({ error: 'Endpoint API introuvable', path: req.path });
+});
+
 // SPA fallback - Velora is the public frontend; Nodecast remains the backend/API engine.
 app.get('*', sendVeloraApp);
 

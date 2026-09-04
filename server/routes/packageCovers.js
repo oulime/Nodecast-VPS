@@ -310,7 +310,9 @@ router.get('/package-covers/all', async (_req, res) => {
                     existingCover = '';
                 }
 
-                if (!existingCover) {
+                const isFlag = (url) => typeof url === 'string' && (url.includes('flagcdn.com') || url.includes('/flags/') || url.includes('country_') || url.includes('/logos/arabe.svg'));
+
+                if (!existingCover || isFlag(existingCover)) {
                     if (pkgName) {
                         const brandMatch = channelLogoMatcher.matchChannelLogo(pkgName);
                         if (brandMatch && brandMatch.logo) {

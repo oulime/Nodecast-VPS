@@ -912,6 +912,89 @@ function syncAllPackageCovers(db) {
     }
 }
 
+async function searchLogos(query, limit = 60) {
+    const term = String(query || '').trim().toLowerCase();
+    if (!term) return [];
+
+    try {
+        await loadOrBuildLogoIndex(false);
+    } catch (_) {}
+
+    let cacheData = null;
+    if (fs.existsSync(CACHE_FILE)) {
+        try {
+            cacheData = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+        } catch (_) {}
+    }
+
+    const channelById = new Map();
+    if (cacheData && Array.isArray(cacheData.channels)) {
+        for (const c of cacheData.channels) {
+            if (c && c.id) channelById.set(c.id, c);
+        }
+    }
+
+    const results = [];
+    const seenUrls = new Set();
+
+    // 1. First priority: Search in custom logos
+    const customEntries = getCustomLogos();
+    for (const item of customEntries) {
+        if (!item || !item.url) continue;
+        const nMatch = (item.name && item.name.toLowerCase().includes(term));
+        const aMatch = (item.aliases || []).some(a => String(a).toLowerCase().includes(term));
+        const cMatch = (item.country && item.country.toLowerCase().includes(term));
+        const uMatch = (item.url && item.url.toLowerCase().includes(term));
+
+        if (nMatch || aMatch || cMatch || uMatch) {
+            if (!seenUrls.has(item.url)) {
+                seenUrls.add(item.url);
+                results.push({
+                    name: item.name,
+                    id: `custom.${item.name}`,
+                    url: item.url,
+                    country: item.country || 'CUSTOM',
+                    source: 'custom'
+                });
+            }
+        }
+    }
+
+    // 2. Second priority: Search in iptv-org logos
+    if (cacheData && Array.isArray(cacheData.logos)) {
+        for (const l of cacheData.logos) {
+            if (!l || !l.url || JUNK_LOGO_URLS.has(l.url)) continue;
+            if (seenUrls.has(l.url)) continue;
+
+            const ch = l.channel ? channelById.get(l.channel) : null;
+            const chName = ch ? String(ch.name || '') : '';
+            const chId = String(l.channel || '');
+            const chCountry = ch ? String(ch.country || '') : '';
+            const altNames = ch && Array.isArray(ch.alt_names) ? ch.alt_names : [];
+
+            let matches = false;
+            if (chName.toLowerCase().includes(term)) matches = true;
+            else if (chId.toLowerCase().includes(term)) matches = true;
+            else if (altNames.some(a => String(a).toLowerCase().includes(term))) matches = true;
+            else if (l.url.toLowerCase().includes(term)) matches = true;
+
+            if (matches) {
+                seenUrls.add(l.url);
+                results.push({
+                    name: chName || chId,
+                    id: chId,
+                    url: l.url,
+                    country: chCountry,
+                    source: 'iptv-org'
+                });
+                if (results.length >= limit) break;
+            }
+        }
+    }
+
+    return results;
+}
+
 function getSyncStatus() {
     return syncProgress;
 }
@@ -929,7 +1012,8 @@ module.exports = {
     saveCustomLogo,
     deleteCustomLogo,
     saveCustomLogosBulk,
-    readRawCustomLogosFile
+    readRawCustomLogosFile,
+    searchLogos
 };
 
 // Preload index immediately on startup

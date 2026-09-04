@@ -299,6 +299,10 @@ function parseProxyTarget(req, res) {
     }
 
     if (!from && target) from = target;
+    if (target && typeof target === 'string' && target.startsWith('/')) {
+        res.redirect(302, target);
+        return null;
+    }
     if (!target || !isHttpUrl(target)) {
         res.status(400).send('Bad target');
         return null;

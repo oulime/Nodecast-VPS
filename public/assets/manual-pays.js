@@ -252,20 +252,32 @@
     await assignMany(countryId,pending)
   }
   async function loadLogoSettings(){
+    const input=$("mp-iptv-logos-only");
+    const cached=localStorage.getItem("velora_official_logos_only");
+    if(cached!==null&&input){
+      input.checked=cached==="1";
+    }
     try{
       const rows=await sb("admin_settings","?key=eq.official_logos_only");
-      const val=rows?.[0]?.value;
-      const checked=val!==undefined?(val==="1"||val===1||val===true||val==="true"):(localStorage.getItem("velora_official_logos_only")==="1");
-      const input=$("mp-iptv-logos-only");
-      if(input)input.checked=checked;
-      localStorage.setItem("velora_official_logos_only",checked?"1":"0")
+      let val=rows?.[0]?.value;
+      if(val===undefined){
+        const all=await sb("admin_settings","");
+        val=Array.isArray(all)?all.find(r=>r.key==="official_logos_only"||r.id==="official_logos_only")?.value:undefined;
+      }
+      if(val!==undefined){
+        const checked=(val==="1"||val===1||val===true||val==="true");
+        if(input)input.checked=checked;
+        localStorage.setItem("velora_official_logos_only",checked?"1":"0");
+      }
     }catch(_){}
   }
   async function toggleOfficialLogosOnly(checked){
     localStorage.setItem("velora_official_logos_only",checked?"1":"0");
+    const input=$("mp-iptv-logos-only");
+    if(input)input.checked=checked;
     try{
       status(checked?"Mode logos officiels activé...":"Mode tous les logos activé...");
-      await sb("admin_settings","?on_conflict=key",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({key:"official_logos_only",value:checked?"1":"0",updated_at:new Date().toISOString()})});
+      await sb("admin_settings","?on_conflict=key",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id:"official_logos_only",key:"official_logos_only",value:checked?"1":"0",updated_at:new Date().toISOString()})});
       window.dispatchEvent(new CustomEvent("velora-admin-curation-changed"));
       window.dispatchEvent(new CustomEvent("velora-home-cache-invalidated"));
       status(checked?"Logos officiels activés : les liens des fournisseurs ne seront plus appelés.":"Logos des fournisseurs réactivés.")
@@ -275,7 +287,7 @@
   async function syncAndRefreshAll(){const button=$("mp-sync-all");if(button?.disabled)return;button.disabled=true;pageLoading(true,"Synchronisation et actualisation");try{status("Synchronisation du contenu des fournisseurs Xtream...");const catalog=await api("/sources/sync-catalog");status(`${catalog.sources?.length||0} fournisseur(s) synchronisé(s). Mise à jour de tous les packages...`);const packages=await req(`${SURL}/admin/sync-packages`,{method:"POST",headers:{apikey:KEY,Authorization:`Bearer ${KEY}`,"Content-Type":"application/json"},body:"{}"});await init(true);window.dispatchEvent(new CustomEvent("velora-admin-curation-changed"));window.dispatchEvent(new CustomEvent("velora-home-cache-invalidated"));status(`${catalog.sources?.length||0} fournisseur(s), ${packages.packages||0} package(s) et ${packages.items||0} élément(s) synchronisé(s).`)}catch(e){status(`Synchronisation impossible : ${e.message}`,true)}finally{pageLoading(false);button.disabled=false}}
   async function syncChannelLogos(){const button=$("mp-sync-channel-logos");if(button?.disabled)return;if(!confirm("Voulez-vous synchroniser et mettre à jour automatiquement les logos de vos chaînes TV en haute définition (PNG transparents) ?"))return;button.disabled=true;pageLoading(true,"Synchronisation des logos TV");try{status("Lancement de la synchronisation automatique des logos TV...");await req(`${SURL}/admin/sync-channel-logos`,{method:"POST",headers:{apikey:KEY,Authorization:`Bearer ${KEY}`,"Content-Type":"application/json"},body:"{}"});status("Synchronisation des logos en cours en arrière-plan...");const pollTimer=setInterval(async()=>{try{const pollRes=await req(`${SURL}/admin/sync-channel-logos-status`);const p=pollRes?.progress;if(p){status(`Logos TV : ${p.updated||0} mis à jour, ${p.skipped||0} inchangés (${p.processed||0}/${p.total||0})...`);if(!p.running){clearInterval(pollTimer);button.disabled=false;pageLoading(false);status(`✨ Synchronisation terminée avec succès ! ${p.updated||0} logos mis à jour sur ${p.total||0} chaînes.`);await init(true);window.dispatchEvent(new CustomEvent("velora-admin-curation-changed"))}}}catch(_){clearInterval(pollTimer);button.disabled=false;pageLoading(false)}},1500)}catch(e){status(`Erreur synchronisation logos : ${e.message}`,true);button.disabled=false;pageLoading(false)}}
   document.addEventListener("click",e=>{
-    if(e.target.closest("[data-settings-tab='countries']"))setTimeout(init,0);
+    if(e.target.closest("[data-settings-tab='countries']")){loadLogoSettings();setTimeout(init,0);}
     const toggleSourceBtn=e.target.closest("[data-toggle-source]");
     if(toggleSourceBtn){
       e.preventDefault();
@@ -335,4 +347,5 @@
   document.addEventListener("drop",e=>{const x=e.target.closest("[data-country]");if(x){e.preventDefault();x.classList.remove("is-over");const bulk=e.dataTransfer.getData("application/x-velora-packages");if(bulk){let keys=[];try{keys=JSON.parse(bulk)}catch{}dropPackages(x.dataset.country,keys).catch(y=>status(`Affectation groupée impossible : ${y.message}`,true))}else dropPackage(x.dataset.country,e.dataTransfer.getData("text/plain")).catch(y=>status(`Affectation impossible : ${y.message}`,true))}})
   const visibilityObserver=new MutationObserver(()=>{applyVisibility();decorateVisibilityButtons()});const observeVisibility=()=>{if(document.documentElement){visibilityObserver.observe(document.documentElement,{childList:true,subtree:true});decorateVisibilityButtons()}};document.documentElement?observeVisibility():document.addEventListener("DOMContentLoaded",observeVisibility,{once:true});loadVisibility();
   const previewObserver=new MutationObserver(decoratePackagePreviews);const observePackagePreviews=()=>{const list=$("mp-package-list");if(list){previewObserver.observe(list,{childList:true});decoratePackagePreviews()}};document.readyState==="loading"?document.addEventListener("DOMContentLoaded",observePackagePreviews,{once:true}):observePackagePreviews();
+  document.readyState==="loading"?document.addEventListener("DOMContentLoaded",loadLogoSettings,{once:true}):loadLogoSettings();
 })();

@@ -228,12 +228,10 @@ function isOfficialLogoUrl(url) {
 
 function isOfficialLogosOnly() {
     try {
-        const row = getDb().prepare(
-            `SELECT data FROM velora_admin_rows WHERE table_name = 'admin_settings' AND row_id = 'official_logos_only'`
-        ).get();
-        if (row?.data) {
-            const parsed = JSON.parse(row.data);
-            const val = parsed.value;
+        const rows = allRows('admin_settings');
+        const setting = rows.find(r => r.key === 'official_logos_only' || r.id === 'official_logos_only');
+        if (setting) {
+            const val = setting.value;
             return val === '1' || val === 1 || val === true || val === 'true';
         }
     } catch (_) {}
@@ -250,7 +248,7 @@ function sanitizeChannelIcon(name, streamIcon) {
     }
     const matched = channelLogoMatcher.matchChannelLogo(name);
     if (matched) {
-        return matched;
+        return typeof matched === 'string' ? matched : (matched.logo || '');
     }
     return '';
 }

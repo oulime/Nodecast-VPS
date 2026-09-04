@@ -120,41 +120,8 @@ function normalizeKey(str) {
         .replace(/[^a-z0-9]/g, '');
 }
 
-async function loadOrBuildLogoIndex(forceRefresh = false) {
-    if (inMemoryIndex && !forceRefresh) {
-        return inMemoryIndex;
-    }
-
-    let cacheData = null;
-    if (!forceRefresh && fs.existsSync(CACHE_FILE)) {
-        try {
-            const stats = fs.statSync(CACHE_FILE);
-            if (Date.now() - stats.mtimeMs < CACHE_MAX_AGE_MS) {
-                cacheData = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
-            }
-        } catch (_) {}
-    }
-
-    if (!cacheData || !cacheData.channels || !cacheData.logos) {
-        console.log('[ChannelLogoMatcher] Downloading fresh TV channels and logos from iptv-org...');
-        try {
-            const [channels, logos] = await Promise.all([
-                fetchJson('https://iptv-org.github.io/api/channels.json'),
-                fetchJson('https://iptv-org.github.io/api/logos.json')
-            ]);
-            cacheData = { channels, logos, timestamp: Date.now() };
-            fs.mkdirSync(path.dirname(CACHE_FILE), { recursive: true });
-            fs.writeFileSync(CACHE_FILE, JSON.stringify(cacheData));
-        } catch (e) {
-            console.warn('[ChannelLogoMatcher] Failed to download iptv-org dataset, checking existing cache:', e.message);
-            if (fs.existsSync(CACHE_FILE)) {
-                cacheData = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
-            } else {
-                throw e;
-            }
-        }
-    }
-
+function buildIndexFromCacheData(cacheData) {
+    if (!cacheData || !cacheData.channels || !cacheData.logos) return null;
     const logoById = new Map();
     for (const l of cacheData.logos || []) {
         if (l.channel && l.url && !logoById.has(l.channel)) {
@@ -203,7 +170,57 @@ async function loadOrBuildLogoIndex(forceRefresh = false) {
     return inMemoryIndex;
 }
 
+function ensureIndexLoaded() {
+    if (inMemoryIndex) return inMemoryIndex;
+    if (fs.existsSync(CACHE_FILE)) {
+        try {
+            const cacheData = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+            return buildIndexFromCacheData(cacheData);
+        } catch (_) {}
+    }
+    return null;
+}
+
+async function loadOrBuildLogoIndex(forceRefresh = false) {
+    if (inMemoryIndex && !forceRefresh) {
+        return inMemoryIndex;
+    }
+
+    let cacheData = null;
+    if (!forceRefresh && fs.existsSync(CACHE_FILE)) {
+        try {
+            const stats = fs.statSync(CACHE_FILE);
+            if (Date.now() - stats.mtimeMs < CACHE_MAX_AGE_MS) {
+                cacheData = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+            }
+        } catch (_) {}
+    }
+
+    if (!cacheData || !cacheData.channels || !cacheData.logos) {
+        console.log('[ChannelLogoMatcher] Downloading fresh TV channels and logos from iptv-org...');
+        try {
+            const [channels, logos] = await Promise.all([
+                fetchJson('https://iptv-org.github.io/api/channels.json'),
+                fetchJson('https://iptv-org.github.io/api/logos.json')
+            ]);
+            cacheData = { channels, logos, timestamp: Date.now() };
+            fs.mkdirSync(path.dirname(CACHE_FILE), { recursive: true });
+            fs.writeFileSync(CACHE_FILE, JSON.stringify(cacheData));
+        } catch (e) {
+            console.warn('[ChannelLogoMatcher] Failed to download iptv-org dataset, checking existing cache:', e.message);
+            if (fs.existsSync(CACHE_FILE)) {
+                cacheData = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+            } else {
+                throw e;
+            }
+        }
+    }
+
+    return buildIndexFromCacheData(cacheData);
+}
+
 function matchChannelLogo(rawName, countryHint = '') {
+    if (!inMemoryIndex) ensureIndexLoaded();
     if (!inMemoryIndex) return null;
     const { exactMap, cleanMap } = inMemoryIndex;
 
@@ -525,3 +542,12 @@ module.exports = {
     syncAllPackageCovers,
     getSyncStatus
 };
+
+// Preload index immediately on startup
+try {
+    ensureIndexLoaded();
+    if (!inMemoryIndex) {
+        loadOrBuildLogoIndex().catch(() => {});
+    }
+} catch (_) {}
+

@@ -227,10 +227,10 @@ function isOfficialLogoUrl(url) {
     }
 }
 
-function isOfficialLogosOnly() {
+function isOfficialChannelsLogosOnly() {
     try {
         const rows = allRows('admin_settings');
-        const setting = rows.find(r => r.key === 'official_logos_only' || r.id === 'official_logos_only');
+        const setting = rows.find(r => r.key === 'official_channels_logos_only' || r.id === 'official_channels_logos_only' || r.key === 'official_logos_only' || r.id === 'official_logos_only');
         if (setting) {
             const val = setting.value;
             return val === '1' || val === 1 || val === true || val === 'true';
@@ -239,9 +239,25 @@ function isOfficialLogosOnly() {
     return false;
 }
 
+function isOfficialPackagesLogosOnly() {
+    try {
+        const rows = allRows('admin_settings');
+        const setting = rows.find(r => r.key === 'official_packages_logos_only' || r.id === 'official_packages_logos_only');
+        if (setting) {
+            const val = setting.value;
+            return val === '1' || val === 1 || val === true || val === 'true';
+        }
+    } catch (_) {}
+    return false;
+}
+
+function isOfficialLogosOnly() {
+    return isOfficialChannelsLogosOnly();
+}
+
 function sanitizeChannelIcon(name, streamIcon) {
     const rawIcon = String(streamIcon || '').trim();
-    if (!isOfficialLogosOnly()) {
+    if (!isOfficialChannelsLogosOnly()) {
         return rawIcon;
     }
     if (rawIcon && isOfficialLogoUrl(rawIcon)) {
@@ -851,7 +867,7 @@ function buildCountryPackageCache() {
         ...allRows('admin_hidden_filters').map(row => String(row.needle || '').trim()).filter(Boolean)
     ])];
 
-    const officialOnly = isOfficialLogosOnly();
+    const officialOnly = isOfficialPackagesLogosOnly();
     const countryById = new Map(countries.map(c => [String(c.id), c]));
     const sanitizedPackages = packages.map(pkg => {
         const countryName = countryById.get(String(pkg.country_id))?.name || pkg.country_name || '';
@@ -3093,5 +3109,7 @@ module.exports.expandMemberships = expandMemberships;
 module.exports.saveRow = saveRow;
 module.exports.allRows = allRows;
 module.exports.isOfficialLogosOnly = isOfficialLogosOnly;
+module.exports.isOfficialChannelsLogosOnly = isOfficialChannelsLogosOnly;
+module.exports.isOfficialPackagesLogosOnly = isOfficialPackagesLogosOnly;
 module.exports.isOfficialLogoUrl = isOfficialLogoUrl;
 module.exports.sanitizeChannelIcon = sanitizeChannelIcon;

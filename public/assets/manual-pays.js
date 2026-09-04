@@ -252,40 +252,73 @@
     await assignMany(countryId,pending)
   }
   async function loadLogoSettings(){
-    const input=$("mp-iptv-logos-only");
-    const cached=localStorage.getItem("velora_official_logos_only");
-    if(cached!==null&&input){
-      input.checked=cached==="1";
+    const channelsInput=$("mp-iptv-channels-logos-only")||$("mp-iptv-logos-only");
+    const packagesInput=$("mp-iptv-packages-logos-only");
+    const cachedChannels=localStorage.getItem("velora_official_channels_logos_only")??localStorage.getItem("velora_official_logos_only");
+    const cachedPackages=localStorage.getItem("velora_official_packages_logos_only");
+    if(cachedChannels!==null&&channelsInput){
+      channelsInput.checked=cachedChannels==="1";
+    }
+    if(cachedPackages!==null&&packagesInput){
+      packagesInput.checked=cachedPackages==="1";
     }
     try{
-      const rows=await sb("admin_settings","?key=eq.official_logos_only");
-      let val=rows?.[0]?.value;
-      if(val===undefined){
-        const all=await sb("admin_settings","");
-        val=Array.isArray(all)?all.find(r=>r.key==="official_logos_only"||r.id==="official_logos_only")?.value:undefined;
-      }
-      if(val!==undefined){
-        const checked=(val==="1"||val===1||val===true||val==="true");
-        if(input)input.checked=checked;
-        localStorage.setItem("velora_official_logos_only",checked?"1":"0");
+      const all=await sb("admin_settings","");
+      if(Array.isArray(all)){
+        const chRow=all.find(r=>r.key==="official_channels_logos_only"||r.id==="official_channels_logos_only"||r.key==="official_logos_only"||r.id==="official_logos_only");
+        if(chRow?.value!==undefined){
+          const checked=(chRow.value==="1"||chRow.value===1||chRow.value===true||chRow.value==="true");
+          if(channelsInput)channelsInput.checked=checked;
+          localStorage.setItem("velora_official_channels_logos_only",checked?"1":"0");
+          localStorage.setItem("velora_official_logos_only",checked?"1":"0");
+        }
+        const pkgRow=all.find(r=>r.key==="official_packages_logos_only"||r.id==="official_packages_logos_only");
+        if(pkgRow?.value!==undefined){
+          const checked=(pkgRow.value==="1"||pkgRow.value===1||pkgRow.value===true||pkgRow.value==="true");
+          if(packagesInput)packagesInput.checked=checked;
+          localStorage.setItem("velora_official_packages_logos_only",checked?"1":"0");
+        }
       }
     }catch(_){}
   }
-  async function toggleOfficialLogosOnly(checked){
+
+  async function toggleOfficialChannelsLogosOnly(checked){
+    localStorage.setItem("velora_official_channels_logos_only",checked?"1":"0");
     localStorage.setItem("velora_official_logos_only",checked?"1":"0");
-    try{localStorage.removeItem("velora_package_covers");}catch(_){}
-    const input=$("mp-iptv-logos-only");
+    const input=$("mp-iptv-channels-logos-only")||$("mp-iptv-logos-only");
     if(input)input.checked=checked;
     try{
-      status(checked?"Mode logos officiels activé...":"Mode tous les logos activé...");
-      await sb("admin_settings","?on_conflict=key",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id:"official_logos_only",key:"official_logos_only",value:checked?"1":"0",updated_at:new Date().toISOString()})});
-      window.dispatchEvent(new CustomEvent("velora-official-logos-toggled",{detail:{officialOnly:checked}}));
+      status(checked?"Chaînes : mode logos officiels activé...":"Chaînes : tous les logos activés...");
+      await Promise.all([
+        sb("admin_settings","?on_conflict=key",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id:"official_channels_logos_only",key:"official_channels_logos_only",value:checked?"1":"0",updated_at:new Date().toISOString()})}),
+        sb("admin_settings","?on_conflict=key",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id:"official_logos_only",key:"official_logos_only",value:checked?"1":"0",updated_at:new Date().toISOString()})})
+      ]);
+      window.dispatchEvent(new CustomEvent("velora-official-logos-toggled",{detail:{officialOnly:checked,type:"channels"}}));
+      window.dispatchEvent(new CustomEvent("velora-admin-curation-changed"));
+      window.dispatchEvent(new CustomEvent("velora-home-cache-invalidated"));
+      status(checked?"Chaînes : logos officiels activés (iptv-org).":"Chaînes : logos des fournisseurs réactivés.");
+    }catch(e){status(`Erreur enregistrement paramètre chaînes : ${e.message}`,true)}
+  }
+
+  async function toggleOfficialPackagesLogosOnly(checked){
+    localStorage.setItem("velora_official_packages_logos_only",checked?"1":"0");
+    try{localStorage.removeItem("velora_package_covers");}catch(_){}
+    const input=$("mp-iptv-packages-logos-only");
+    if(input)input.checked=checked;
+    try{
+      status(checked?"Packages : mode logos officiels activé...":"Packages : tous les logos activés...");
+      await sb("admin_settings","?on_conflict=key",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id:"official_packages_logos_only",key:"official_packages_logos_only",value:checked?"1":"0",updated_at:new Date().toISOString()})});
+      window.dispatchEvent(new CustomEvent("velora-official-logos-toggled",{detail:{officialOnly:checked,type:"packages"}}));
       window.dispatchEvent(new CustomEvent("velora-admin-curation-changed"));
       window.dispatchEvent(new CustomEvent("velora-home-cache-invalidated"));
       window.dispatchEvent(new CustomEvent("velora-package-covers-updated"));
       if(typeof window.veloraReloadPackageCovers==="function")window.veloraReloadPackageCovers(true);
-      status(checked?"Logos officiels activés : les logos officiels et drapeaux des pays sont utilisés.":"Logos des fournisseurs réactivés.")
-    }catch(e){status(`Erreur enregistrement paramètre : ${e.message}`,true)}
+      status(checked?"Packages : logos officiels et drapeaux pays activés.":"Packages : logos des fournisseurs réactivés.");
+    }catch(e){status(`Erreur enregistrement paramètre packages : ${e.message}`,true)}
+  }
+
+  async function toggleOfficialLogosOnly(checked){
+    return toggleOfficialChannelsLogosOnly(checked);
   }
   async function init(force=false){if(st.loaded&&!force)return;st.loaded=true;pageLoading(true,"Chargement des Pays");try{status("Chargement des streams, pays et packages Live...");loadLogoSettings();const sources=await api("/sources/catalog");st.sources=sources.filter(x=>x.type==="xtream");if(force){st.kind="live";st.source=null;st.loadedKinds.clear();st.loadingKinds.clear();st.allPackages={live:[],vod:[],series:[]};document.querySelectorAll("[data-mp-kind]").forEach(x=>{const active=x.dataset.mpKind==="live";x.classList.toggle("is-active",active);x.setAttribute("aria-selected",active?"true":"false")})}drawSources();await Promise.all([countries(),loadKind("live",force)]);drawCountries();if(st.sources[0])await source(st.source?.id||"all");else status("Aucun stream Xtream actif.",true)}catch(e){st.loaded=false;status(`Chargement impossible : ${e.message}`,true)}finally{pageLoading(false)}}
   async function syncAndRefreshAll(){const button=$("mp-sync-all");if(button?.disabled)return;button.disabled=true;pageLoading(true,"Synchronisation et actualisation");try{status("Synchronisation du contenu des fournisseurs Xtream...");const catalog=await api("/sources/sync-catalog");status(`${catalog.sources?.length||0} fournisseur(s) synchronisé(s). Mise à jour de tous les packages...`);const packages=await req(`${SURL}/admin/sync-packages`,{method:"POST",headers:{apikey:KEY,Authorization:`Bearer ${KEY}`,"Content-Type":"application/json"},body:"{}"});await init(true);window.dispatchEvent(new CustomEvent("velora-admin-curation-changed"));window.dispatchEvent(new CustomEvent("velora-home-cache-invalidated"));status(`${catalog.sources?.length||0} fournisseur(s), ${packages.packages||0} package(s) et ${packages.items||0} élément(s) synchronisé(s).`)}catch(e){status(`Synchronisation impossible : ${e.message}`,true)}finally{pageLoading(false);button.disabled=false}}
@@ -333,7 +366,7 @@
     if(e.target.closest("#mp-content-close"))resetContentEditor()
   });
   document.addEventListener("input",e=>{if(e.target.id==="mp-channel-picker-search")renderChannelPool()});
-  document.addEventListener("change",e=>{if(e.target.id==="mp-iptv-logos-only"){toggleOfficialLogosOnly(e.target.checked);return}if(e.target.matches?.("[data-pool-package]")){const packageId=e.target.dataset.packageId;document.querySelectorAll("#mp-channel-picker-list [data-pool-channel]").forEach(input=>{if(input.dataset.packageId===packageId)input.checked=e.target.checked});updatePoolSelectionState();return}if(e.target.matches?.("[data-pool-channel]"))updatePoolSelectionState()});
+  document.addEventListener("change",e=>{if(e.target.id==="mp-iptv-channels-logos-only"||e.target.id==="mp-iptv-logos-only"){toggleOfficialChannelsLogosOnly(e.target.checked);return}if(e.target.id==="mp-iptv-packages-logos-only"){toggleOfficialPackagesLogosOnly(e.target.checked);return}if(e.target.matches?.("[data-pool-package]")){const packageId=e.target.dataset.packageId;document.querySelectorAll("#mp-channel-picker-list [data-pool-channel]").forEach(input=>{if(input.dataset.packageId===packageId)input.checked=e.target.checked});updatePoolSelectionState();return}if(e.target.matches?.("[data-pool-channel]"))updatePoolSelectionState()});
   document.addEventListener("keydown",e=>{const c=e.target.closest?.("[data-country]");if(c&&(e.key==="Enter"||e.key===" ")){e.preventDefault();openCountry(c.dataset.country)}});
   ["input","search"].forEach(type=>document.addEventListener(type,e=>{if(e.target.id==="mp-package-filter"||e.target.id==="mp-package-exclude"){st.packagePage=1;drawPackages()}if(e.target.id==="mp-country-filter")drawCountries()}));
   document.addEventListener("change",e=>{if(e.target.id==="mp-package-filter-whole"||e.target.id==="mp-package-exclude-whole"){st.packagePage=1;drawPackages()}if(e.target.id==="mp-country-visible-only")drawCountries()});

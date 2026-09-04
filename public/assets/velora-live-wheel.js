@@ -168,6 +168,112 @@
     };
   }
 
+  const COUNTRY_FLAG_MAP = {
+    afghanistan: 'af', afrique_du_sud: 'za', albanie: 'al', algerie: 'dz', allemagne: 'de',
+    angleterre: 'gb', arabie_saoudite: 'sa', argentine: 'ar', armenie: 'am', australie: 'au',
+    autriche: 'at', azerbaidjan: 'az', bahrein: 'bh', bangladesh: 'bd', belgique: 'be',
+    bielorussie: 'by', bolivie: 'bo', bosnie: 'ba', bosnie_herzegovine: 'ba', bresil: 'br',
+    bulgarie: 'bg', cameroun: 'cm', canada: 'ca', chili: 'cl', chine: 'cn', chypre: 'cy',
+    colombie: 'co', congo: 'cg', coree: 'kr', coree_du_sud: 'kr', costa_rica: 'cr',
+    cote_d_ivoire: 'ci', croatie: 'hr', cuba: 'cu', danemark: 'dk', egypte: 'eg',
+    emirats_arabes_unis: 'ae', uae: 'ae', equateur: 'ec', espagne: 'es', estonie: 'ee',
+    etats_unis: 'us', usa: 'us', finlande: 'fi', france: 'fr', georgie: 'ge', ghana: 'gh',
+    grece: 'gr', guatemala: 'gt', haiti: 'ht', honduras: 'hn', hongrie: 'hu', inde: 'in',
+    indonesie: 'id', irak: 'iq', iran: 'ir', irlande: 'ie', islande: 'is', israel: 'il',
+    italie: 'it', jamaique: 'jm', japon: 'jp', jordanie: 'jo', kazakhstan: 'kz', kenya: 'ke',
+    koweit: 'kw', lettonie: 'lv', liban: 'lb', libye: 'ly', lituanie: 'lt', luxembourg: 'lu',
+    macedoine: 'mk', madagascar: 'mg', malaisie: 'my', mali: 'ml', malte: 'mt', maroc: 'ma',
+    maurice: 'mu', mauritanie: 'mr', mexique: 'mx', moldavie: 'md', monaco: 'mc',
+    montenegro: 'me', mozambique: 'mz', namibie: 'na', nepal: 'np', nicaragua: 'ni',
+    nigeria: 'ng', norvege: 'no', nouvelle_zelande: 'nz', oman: 'om', pakistan: 'pk',
+    palestine: 'ps', panama: 'pa', paraguay: 'py', pays_bas: 'nl', perou: 'pe',
+    philippines: 'ph', pologne: 'pl', porto_rico: 'pr', portugal: 'pt', qatar: 'qa',
+    republique_dominicaine: 'do', republique_tcheque: 'cz', roumanie: 'ro', royaume_uni: 'gb',
+    uk: 'gb', russie: 'ru', salvador: 'sv', senegal: 'sn', serbie: 'rs', slovaquie: 'sk',
+    slovenie: 'si', somalie: 'so', soudan: 'sd', sri_lanka: 'lk', suede: 'se', suisse: 'ch',
+    suriname: 'sr', syrie: 'sy', taiwan: 'tw', thailande: 'th', tunisie: 'tn', turquie: 'tr',
+    ukraine: 'ua', uruguay: 'uy', venezuela: 've', vietnam: 'vn', yemen: 'ye'
+  };
+
+  function isOfficialLogosOnlyActive() {
+    try { return localStorage.getItem("velora_official_logos_only") === "1"; } catch (_) { return false; }
+  }
+
+  function isOfficialLogoUrl(url) {
+    if (!url || typeof url !== "string") return false;
+    let trimmed = url.trim();
+    if (!trimmed) return false;
+    while (trimmed.includes("/proxy?target=") || trimmed.includes("/api/proxy?target=")) {
+      try {
+        const idx = trimmed.indexOf("target=");
+        if (idx !== -1) {
+          const raw = trimmed.slice(idx + 7).split("&")[0];
+          const decoded = decodeURIComponent(raw);
+          if (decoded && (decoded.startsWith("http://") || decoded.startsWith("https://") || decoded.startsWith("/"))) {
+            trimmed = decoded;
+            continue;
+          }
+        }
+      } catch (_) {}
+      break;
+    }
+    if (trimmed.startsWith("data:image/") || trimmed.startsWith("/uploads/") || trimmed.startsWith("/logos/")) return true;
+    try {
+      const parsed = new URL(trimmed);
+      const host = parsed.hostname.toLowerCase();
+      return (
+        host.includes("iptv-org.github.io") ||
+        host.includes("raw.githubusercontent.com") ||
+        host.includes("github.io") ||
+        host.includes("wikimedia.org") ||
+        host.includes("wikipedia.org") ||
+        host.includes("wikidata.org") ||
+        host.includes("imgur.com") ||
+        host.includes("flagcdn.com") ||
+        host.includes("themoviedb.org") ||
+        host.includes("tmdb.org") ||
+        host.includes("thetvdb.com") ||
+        host.includes("freebox.cdn.scw.iliad.fr") ||
+        host.includes("cloudfront.net")
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  function getCountryFlagUrl(countryId, countryName = '') {
+    const raw = String(countryName || countryId || '').replace(/^country_/, '');
+    const k = raw.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    if (k === 'arabe') return '/logos/arabe.svg';
+    const code = COUNTRY_FLAG_MAP[k];
+    if (code) return `https://flagcdn.com/w160/${code}.png`;
+    return '';
+  }
+
+  const COMMON_BRAND_LOGOS = [
+    { match: /canal\s*\+|c\+/i, logo: 'https://i.imgur.com/5HcyMnW.png' },
+    { match: /bein\s*sport/i, logo: 'https://i.imgur.com/8Qh1mR4.png' },
+    { match: /dazn/i, logo: 'https://i.imgur.com/2Z2EmZF.png' },
+    { match: /rmc\s*sport/i, logo: 'https://i.imgur.com/dK3mK3k.png' },
+    { match: /eurosport/i, logo: 'https://i.imgur.com/k6wMh1r.png' },
+    { match: /prime\s*video|amazon\s*ligue/i, logo: 'https://i.imgur.com/5zN2fP8.png' },
+    { match: /shahid/i, logo: 'https://i.imgur.com/h5fEZy9.png' },
+    { match: /rotana/i, logo: 'https://i.imgur.com/0iH1VzY.png' },
+    { match: /osn/i, logo: 'https://i.imgur.com/y8W6O5q.png' },
+    { match: /netflix/i, logo: 'https://i.imgur.com/rG7bV4Z.png' },
+    { match: /disney/i, logo: 'https://i.imgur.com/K3yZ0V8.png' },
+    { match: /hbo|max/i, logo: 'https://i.imgur.com/yG1r0nN.png' },
+    { match: /apple\s*tv/i, logo: 'https://i.imgur.com/6U4t9oM.png' }
+  ];
+
+  function getBrandLogoForName(name = '') {
+    const n = String(name || '');
+    for (const b of COMMON_BRAND_LOGOS) {
+      if (b.match.test(n)) return b.logo;
+    }
+    return '';
+  }
+
   // Active country resolution
   function getActiveCountryId() {
     if (typeof window.veloraGetActiveCountryId === "function") {
@@ -514,24 +620,70 @@
       window.addEventListener("velora-package-covers-updated", () => {
         this.refreshPackageCovers();
       });
+      window.addEventListener("velora-official-logos-toggled", () => {
+        this.refreshPackageCovers();
+        this.refreshPackages();
+        this.renderMainCards();
+        this.updateCenterDetails();
+      });
+    }
+
+    resolvePackageCover(pkg) {
+      if (!pkg) return "";
+      const officialOnly = isOfficialLogosOnlyActive();
+      const countryId = getActiveCountryId();
+      const select = document.getElementById("country-select") || document.getElementById("home-country-select");
+      const countryName = (select?.options?.[select?.selectedIndex]?.text || "").replace(/^[^a-zA-ZÀ-ÿ]+/, "").trim();
+
+      const savedLogo = window.__veloraCustomPackageLogos?.[pkg.id]
+        || window.__veloraCustomPackageLogos?.[pkg.category_id]
+        || window.__veloraCustomPackageLogos?.[pkg.name]
+        || window.__veloraCustomPackageLogos?.[pkg.display_name]
+        || (function () {
+          try {
+            const l = JSON.parse(localStorage.getItem("velora_package_covers") || "{}");
+            return l[pkg.id] || l[pkg.category_id] || l[pkg.name] || l[pkg.display_name] || "";
+          } catch (_) { return ""; }
+        })();
+
+      let candidate = pkg.cover_url || savedLogo || "";
+
+      // Reject TMDB movie posters
+      if (candidate.includes("image.tmdb.org") || candidate.includes("tmdb.org") || candidate.includes("/w600_and_h900_bestv2/") || candidate.includes("/w500/") || candidate.includes("/w300/")) {
+        candidate = "";
+      }
+
+      // If officialOnly is ON, reject non-official provider URLs
+      if (officialOnly && candidate && !isOfficialLogoUrl(candidate)) {
+        candidate = "";
+      }
+
+      // If no candidate, match brand logo from package name
+      if (!candidate && (pkg.name || pkg.display_name)) {
+        candidate = getBrandLogoForName(pkg.name || pkg.display_name);
+      }
+
+      // Fallback: If still no image, use the country logo / flag!
+      if (!candidate) {
+        candidate = getCountryFlagUrl(countryId, countryName);
+      }
+
+      return candidate ? toProxiedImageUrl(candidate) : "";
     }
 
     refreshPackageCovers() {
-      const logos = window.__veloraCustomPackageLogos || (function () {
-        try { return JSON.parse(localStorage.getItem("velora_package_covers") || "{}"); } catch (_) { return {}; }
-      })();
       let updated = false;
       for (const pkg of this.packages) {
-        const cover = logos[pkg.id] || logos[pkg.category_id] || logos[pkg.name] || logos[pkg.display_name];
-        if (cover && !pkg.cover_url) {
-          pkg.cover_url = toProxiedImageUrl(cover);
+        const cover = this.resolvePackageCover(pkg);
+        if (cover !== pkg.cover_url) {
+          pkg.cover_url = cover;
           updated = true;
-          if (!pkg._cachedTheme) {
+          if (!pkg._cachedTheme && pkg.cover_url) {
             extractColorFromImage(pkg.cover_url, (t) => { pkg._cachedTheme = t; });
           }
         }
       }
-      if (updated) {
+      if (updated || this.packages.length > 0) {
         this.renderMainCards();
         this.updateCenterDetails();
       }
@@ -667,9 +819,17 @@
           })();
         const imgEl = card.querySelector(":scope > img, .vel-package-card__live-logo");
         const rawCover = imgEl ? (imgEl.getAttribute("src") || "") : (apiPkg?.cover_url || savedLogo || "");
-        const cover_url = toProxiedImageUrl(rawCover);
         const is_parent = card.classList.contains("vel-package-card--parent") || Boolean(apiPkg?.is_parent) || (Array.isArray(apiPkg?.child_package_ids) && apiPkg.child_package_ids.length > 0);
         const childIds = apiPkg?.child_package_ids || [];
+
+        const tempPkg = {
+          id,
+          name: title,
+          display_name: title,
+          category_id: catId,
+          cover_url: rawCover
+        };
+        const cover_url = this.resolvePackageCover(tempPkg);
 
         const pkgObj = {
           id,
@@ -680,7 +840,7 @@
           child_package_ids: childIds,
           originalCard: card,
           source_id: apiPkg?.source_id,
-          category_id: apiPkg?.category_id
+          category_id: apiPkg?.category_id || catId
         };
         list.push(pkgObj);
 
@@ -690,11 +850,18 @@
           childIds.forEach(cid => {
             const childApi = this.cachedApiPackages.find(p => String(p.id) === String(cid));
             if (childApi) {
+              const childTemp = {
+                id: String(childApi.id),
+                name: childApi.name,
+                display_name: childApi.name,
+                category_id: childApi.category_id,
+                cover_url: childApi.cover_url || cover_url || ""
+              };
               children.push({
                 id: String(childApi.id),
                 name: childApi.name,
                 display_name: childApi.name,
-                cover_url: toProxiedImageUrl(childApi.cover_url || cover_url || ""),
+                cover_url: this.resolvePackageCover(childTemp) || cover_url,
                 source_id: childApi.source_id,
                 category_id: childApi.category_id
               });
@@ -913,53 +1080,52 @@
     async ensurePackageLogoFromChannels(pkg, channels) {
       if (!pkg || !Array.isArray(channels) || channels.length === 0) return;
 
-      let currentCover = String(pkg.cover_url || window.__veloraCustomPackageLogos?.[pkg.id] || "").trim();
-      // If current cover is a movie poster (TMDB), reject/override it!
-      if (currentCover.includes("image.tmdb.org") || currentCover.includes("tmdb.org") || currentCover.includes("/w600_and_h900_bestv2/")) {
-        currentCover = "";
-      }
+      const officialOnly = isOfficialLogosOnlyActive();
+      let currentCover = this.resolvePackageCover(pkg);
 
       if (!currentCover) {
         const firstWithLogo = channels.find(ch => {
           const icon = String(ch.stream_icon || ch.logo || ch.cover || "").trim();
-          return icon && !icon.includes("tmdb.org") && !icon.includes("image.tmdb");
+          if (!icon || icon.includes("tmdb.org") || icon.includes("image.tmdb")) return false;
+          if (officialOnly && !isOfficialLogoUrl(icon)) return false;
+          return true;
         });
+
+        let rawLogo = "";
         if (firstWithLogo) {
-          const rawLogo = String(firstWithLogo.stream_icon || firstWithLogo.logo || firstWithLogo.cover || "").trim();
+          rawLogo = String(firstWithLogo.stream_icon || firstWithLogo.logo || firstWithLogo.cover || "").trim();
+        } else {
+          // Fallback to brand match or country flag / logo
+          const countryId = getActiveCountryId();
+          const select = document.getElementById("country-select") || document.getElementById("home-country-select");
+          const countryName = (select?.options?.[select?.selectedIndex]?.text || "").replace(/^[^a-zA-ZÀ-ÿ]+/, "").trim();
+          rawLogo = getBrandLogoForName(pkg.name || pkg.display_name) || getCountryFlagUrl(countryId, countryName);
+        }
+
+        if (rawLogo) {
           const proxiedLogo = toProxiedImageUrl(rawLogo);
           pkg.cover_url = proxiedLogo;
 
-          window.__veloraCustomPackageLogos = window.__veloraCustomPackageLogos || {};
-          window.__veloraCustomPackageLogos[pkg.id] = rawLogo;
-          try {
-            localStorage.setItem("velora_package_covers", JSON.stringify(window.__veloraCustomPackageLogos));
-          } catch (_) {}
-
-          // 1. Report to server auto-backfill API so it persists across all users & sessions
-          if (typeof window.veloraReportPackageCover === "function") {
-            window.veloraReportPackageCover(pkg.id, rawLogo);
-          } else {
+          if (isOfficialLogoUrl(rawLogo) || !officialOnly) {
+            window.__veloraCustomPackageLogos = window.__veloraCustomPackageLogos || {};
+            window.__veloraCustomPackageLogos[pkg.id] = rawLogo;
             try {
-              fetch("/api/package-covers/auto-backfill", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ packageId: String(pkg.id), coverUrl: rawLogo })
-              }).catch(() => {});
+              localStorage.setItem("velora_package_covers", JSON.stringify(window.__veloraCustomPackageLogos));
             } catch (_) {}
+
+            if (typeof window.veloraReportPackageCover === "function") {
+              window.veloraReportPackageCover(pkg.id, rawLogo);
+            } else {
+              try {
+                fetch("/api/package-covers/auto-backfill", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ packageId: String(pkg.id), coverUrl: rawLogo })
+                }).catch(() => {});
+              } catch (_) {}
+            }
           }
 
-          // 2. Persist to admin_packages database table if sb is available
-          try {
-            if (typeof sb === "function") {
-              sb("admin_packages", `?id=eq.${encodeURIComponent(pkg.id)}`, {
-                method: "PATCH",
-                headers: { Prefer: "return=minimal" },
-                body: JSON.stringify({ cover_url: rawLogo })
-              }).catch(() => {});
-            }
-          } catch (_) {}
-
-          // 3. Extract colors & update theme
           extractColorFromImage(proxiedLogo, (extractedTheme) => {
             pkg._cachedTheme = extractedTheme;
             if (this.getSettledPackage()?.id === pkg.id) {
@@ -967,12 +1133,10 @@
             }
           });
 
-          // 4. Update the wheel cards immediately so the squircle card shows the logo
           if (this.packages.length >= 1) {
             this.renderMainCards();
           }
 
-          // 5. Notify all listeners
           window.dispatchEvent(new CustomEvent("velora-package-covers-updated", { detail: { packageId: pkg.id, coverUrl: rawLogo, covers: window.__veloraCustomPackageLogos } }));
         }
       }
@@ -1385,13 +1549,7 @@
         const isCenter = absDist < 0.45;
 
         const pkg = this.packages[i];
-        const rawCover = pkg.cover_url
-          || window.__veloraCustomPackageLogos?.[pkg.id]
-          || window.__veloraCustomPackageLogos?.[pkg.category_id]
-          || window.__veloraCustomPackageLogos?.[pkg.name]
-          || window.__veloraCustomPackageLogos?.[pkg.display_name]
-          || "";
-        const cover = toProxiedImageUrl(rawCover);
+        const cover = this.resolvePackageCover(pkg) || toProxiedImageUrl(pkg.cover_url);
         const logoHtml = cover
           ? `<img src="${cover}" alt="" loading="eager" decoding="async" draggable="false" class="vel-coverflow-card__logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" /><span style="display:none;" class="text-xl">📺</span>`
           : `<span class="text-xl">📺</span>`;

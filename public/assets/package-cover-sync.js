@@ -9,6 +9,52 @@
   window.__veloraCustomPackageLogos = window.__veloraCustomPackageLogos || {};
   const sentCovers = new Set();
 
+  function isOfficialLogosOnlyActive() {
+    try { return localStorage.getItem("velora_official_logos_only") === "1"; } catch (_) { return false; }
+  }
+
+  function isOfficialLogoUrl(url) {
+    if (!url || typeof url !== "string") return false;
+    let trimmed = url.trim();
+    if (!trimmed) return false;
+    while (trimmed.includes("/proxy?target=") || trimmed.includes("/api/proxy?target=")) {
+      try {
+        const idx = trimmed.indexOf("target=");
+        if (idx !== -1) {
+          const raw = trimmed.slice(idx + 7).split("&")[0];
+          const decoded = decodeURIComponent(raw);
+          if (decoded && (decoded.startsWith("http://") || decoded.startsWith("https://") || decoded.startsWith("/"))) {
+            trimmed = decoded;
+            continue;
+          }
+        }
+      } catch (_) {}
+      break;
+    }
+    if (trimmed.startsWith("data:image/") || trimmed.startsWith("/uploads/") || trimmed.startsWith("/logos/")) return true;
+    try {
+      const parsed = new URL(trimmed);
+      const host = parsed.hostname.toLowerCase();
+      return (
+        host.includes("iptv-org.github.io") ||
+        host.includes("raw.githubusercontent.com") ||
+        host.includes("github.io") ||
+        host.includes("wikimedia.org") ||
+        host.includes("wikipedia.org") ||
+        host.includes("wikidata.org") ||
+        host.includes("imgur.com") ||
+        host.includes("flagcdn.com") ||
+        host.includes("themoviedb.org") ||
+        host.includes("tmdb.org") ||
+        host.includes("thetvdb.com") ||
+        host.includes("freebox.cdn.scw.iliad.fr") ||
+        host.includes("cloudfront.net")
+      );
+    } catch {
+      return false;
+    }
+  }
+
   function safeUrl(url) {
     if (!url || typeof url !== "string") return "";
     let clean = url.trim();
@@ -32,6 +78,11 @@
 
     // Never accept movie posters (TMDB) as live package covers
     if (clean.includes("image.tmdb.org") || clean.includes("tmdb.org") || clean.includes("/w600_and_h900_bestv2/") || clean.includes("/w500/") || clean.includes("/w300/")) {
+      return "";
+    }
+
+    // If official_logos_only is enabled, reject raw provider URLs
+    if (isOfficialLogosOnlyActive() && !isOfficialLogoUrl(clean)) {
       return "";
     }
 
@@ -217,5 +268,9 @@
 
   window.addEventListener("velora-package-covers-updated", () => {
     applyCoversToDOM();
+  });
+
+  window.addEventListener("velora-official-logos-toggled", () => {
+    loadAllCovers(true);
   });
 })();

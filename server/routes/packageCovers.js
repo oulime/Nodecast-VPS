@@ -289,7 +289,9 @@ router.get('/package-covers/all', async (_req, res) => {
         // 3. Official logos filtering & Country flag fallback for packages
         try {
             const channelLogoMatcher = require('../services/channelLogoMatcher');
-            const officialOnly = veloraData && typeof veloraData.isOfficialLogosOnly === 'function' && veloraData.isOfficialLogosOnly();
+            const officialOnly = veloraData && typeof veloraData.isOfficialPackagesLogosOnly === 'function'
+                ? veloraData.isOfficialPackagesLogosOnly()
+                : (veloraData && typeof veloraData.isOfficialLogosOnly === 'function' && veloraData.isOfficialLogosOnly());
             const isOfficial = (url) => veloraData && typeof veloraData.isOfficialLogoUrl === 'function' ? veloraData.isOfficialLogoUrl(url) : true;
 
             const allPackages = veloraData && typeof veloraData.allRows === 'function' ? (veloraData.allRows('admin_packages') || []) : [];
@@ -369,7 +371,10 @@ router.post('/package-covers/auto-backfill', express.json(), async (req, res) =>
             const packageId = String(item.packageId || '').trim();
             let coverUrl = String(item.coverUrl || '').trim();
 
-            if (veloraData && typeof veloraData.isOfficialLogosOnly === 'function' && veloraData.isOfficialLogosOnly()) {
+            const officialOnly = veloraData && typeof veloraData.isOfficialPackagesLogosOnly === 'function'
+                ? veloraData.isOfficialPackagesLogosOnly()
+                : (veloraData && typeof veloraData.isOfficialLogosOnly === 'function' && veloraData.isOfficialLogosOnly());
+            if (officialOnly) {
                 if (!veloraData.isOfficialLogoUrl(coverUrl)) {
                     continue;
                 }

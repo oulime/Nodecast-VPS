@@ -242,7 +242,7 @@ if (USE_VPS_DATA_API) {
                 signal: controller.signal
             });
 
-            if (!upstream.ok && req.path.startsWith('/api/proxy/')) {
+            if (upstream.status === 404 || (!upstream.ok && (req.path.startsWith('/api/proxy/') || req.path.startsWith('/api/velora-db/admin/custom-logos')))) {
                 clearRequest();
                 return next();
             }

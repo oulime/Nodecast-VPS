@@ -52,9 +52,24 @@ const COUNTRY_WORDS = [
     'INTERNATIONAL', 'NATIONAL', 'MONDE', 'WORLD'
 ];
 
-const COUNTRY_PRIORITY = ['FR', 'MA', 'DZ', 'TN', 'EG', 'SA', 'AE', 'QA', 'UK', 'US', 'ES', 'DE', 'IT'];
+const COUNTRY_PRIORITY = ['FR', 'MA', 'QA', 'DZ', 'TN', 'EG', 'SA', 'AE', 'UK', 'US', 'ES', 'DE', 'IT'];
+
+const JUNK_LOGO_URLS = new Set([
+    'https://upload.wikimedia.org/wikipedia/commons/a/a8/Logo-asn.png',
+    'https://i.imgur.com/ZZEvehR.png'
+]);
 
 const KNOWN_CHANNEL_ALIASES = {
+    'bein': ['beinsports', 'beinsports1', 'beinsport', 'beinsport1', 'beinsports1hdfrance'],
+    'beinsport': ['beinsports', 'beinsport1', 'beinsports1', 'beinsports1hdfrance'],
+    'beinsports': ['beinsports', 'beinsport', 'beinsports1', 'beinsport1', 'beinsports1hdfrance'],
+    'beinsport1': ['beinsports1', 'beinsport1', 'beinsports1hdfrance'],
+    'beinsports1': ['beinsports1', 'beinsport1', 'beinsports1hdfrance'],
+    'canal': ['canalplus', 'canalplusfrance'],
+    'canalplus': ['canalplus', 'canalplusfrance'],
+    'canalplusfoot': ['canalplusfoot', 'canalplusfootfrance'],
+    'canalpluscinema': ['canalpluscinema', 'canalpluscinemas'],
+    'canalpluscinemas': ['canalpluscinemas', 'canalpluscinema'],
     'alaoula': ['alaoula', 'alaoulamaroc', 'snrt1', 'snrtaloula', 'la1ere'],
     'alaoulamaroc': ['alaoula', 'alaoulamaroc', 'snrt1'],
     'arryadia': ['arryadia', 'arriadia', 'snrt3', 'arryadiahd1', 'alriyadia'],
@@ -67,12 +82,17 @@ const KNOWN_CHANNEL_ALIASES = {
     'medi1tv': ['medi1tvmaghreb', 'medi1tv', 'medi1tvarabic', 'medi1tvafrique'],
     'chada': ['chadatv', 'chada'],
     'chadatv': ['chadatv', 'chada'],
-    'telemaroc': ['telemaroc', 'telemaroctv'],
-    'canal': ['canalplus', 'canalplusfrance'],
-    'canalplus': ['canalplus', 'canalplusfrance'],
-    'beinsport': ['beinsports', 'beinsport1', 'beinsports1'],
-    'beinsports': ['beinsports', 'beinsport', 'beinsports1', 'beinsport1']
+    'telemaroc': ['telemaroc', 'telemaroctv']
 };
+
+function isLowPriorityCallsign(channel) {
+    if (!channel) return false;
+    const id = String(channel.id || '');
+    const name = String(channel.name || '');
+    if (/^[A-Z]{3,5}(?:LD|CD|DT|TV|LP)\d*\.[a-z]{2,3}$/i.test(id)) return true;
+    if (/^[A-Z]{3,5}-(?:LD|CD|DT|TV|LP)\s*\d+/i.test(name)) return true;
+    return false;
+}
 
 function cleanChannelName(raw) {
     if (!raw) return '';
@@ -326,14 +346,19 @@ function buildIndexFromCacheData(cacheData) {
 
     for (const c of sortedChannels) {
         const logo = logoById.get(c.id);
-        if (!logo) continue;
+        if (!logo || JUNK_LOGO_URLS.has(logo)) continue;
 
+        const isCallsign = isLowPriorityCallsign(c);
         const idBase = c.id.replace(/\.[a-z]{2,3}$/i, '');
         const names = [c.name, ...(c.alt_names || []), idBase];
         for (const n of names) {
             if (!n) continue;
             const norm = normalizeKey(n);
-            if (norm && (!exactMap.has(norm) || COUNTRY_PRIORITY.includes(c.country))) {
+            if (!norm) continue;
+            // Skip short/generic single-word keys from US local repeater callsigns (e.g. WHDC-LD shouldn't claim "bein")
+            if (isCallsign && (norm.length < 8 || ['bein', 'sports', 'sport', 'plus', 'extra'].includes(norm))) continue;
+
+            if (!exactMap.has(norm) || COUNTRY_PRIORITY.includes(c.country)) {
                 exactMap.set(norm, { id: c.id, name: c.name, logo, country: c.country });
             }
             const clean = normalizeKey(cleanChannelName(n));

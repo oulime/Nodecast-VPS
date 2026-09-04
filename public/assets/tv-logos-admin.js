@@ -1,4 +1,4 @@
-﻿(() => {
+(() => {
   'use strict';
 
   const SURL = '/api/velora-db';
@@ -45,20 +45,35 @@
   }
 
   function showLogosTab() {
-    document.querySelectorAll('#settings-tabs [role="tab"]').forEach(function(tab) {
-      const active = tab.dataset.settingsTab === 'logos';
-      tab.classList.toggle('settings-tabs__tab--active', active);
-      tab.setAttribute('aria-selected', active ? 'true' : 'false');
-      tab.tabIndex = active ? 0 : -1;
-    });
-    document.querySelectorAll('.settings-tab-panel').forEach(function(p) {
-      const active = p.dataset.settingsTab === 'logos';
-      p.classList.toggle('hidden', !active);
-      p.hidden = !active;
-    });
-    loadLogoToggles();
-    loadCustomLogos();
+    try {
+      document.querySelectorAll('#settings-tabs [role="tab"], .settings-tabs [role="tab"], .settings-tabs__tab').forEach(function(tab) {
+        const active = (tab.dataset && tab.dataset.settingsTab === 'logos') || tab.id === 'settings-tab-btn-logos';
+        tab.classList.toggle('settings-tabs__tab--active', active);
+        tab.setAttribute('aria-selected', active ? 'true' : 'false');
+        tab.tabIndex = active ? 0 : -1;
+      });
+      document.querySelectorAll('.settings-tab-panel').forEach(function(p) {
+        const active = (p.dataset && p.dataset.settingsTab === 'logos') || p.id === 'settings-tab-logos';
+        p.classList.toggle('hidden', !active);
+        p.hidden = !active;
+        if (active) {
+          p.removeAttribute('hidden');
+          p.classList.remove('hidden');
+        }
+      });
+      const panel = document.getElementById('settings-tab-logos');
+      if (panel) {
+        panel.classList.remove('hidden');
+        panel.hidden = false;
+        panel.removeAttribute('hidden');
+      }
+      loadLogoToggles();
+      loadCustomLogos();
+    } catch (err) {
+      console.error('Error showing logos tab:', err);
+    }
   }
+  window.veloraShowLogosTab = showLogosTab;
 
   async function loadLogoToggles() {
     const chInput = getEl('logos-tab-channels-only');
@@ -495,11 +510,50 @@
       const countEl = getEl('logos-custom-count');
       if (countEl) countEl.textContent = '(' + customLogosList.length + ')';
       dialog.close();
-      setStatus('✨ Fichier custom-logos.json mis à jour avec succès sur le VPS.');
     } catch (e) {
       alert('Erreur de format JSON : ' + e.message);
     }
   }
+
+  function handleFileSelect(input) {
+    const file = input && input.files && input.files[0];
+    if (file) {
+      uploadLogoFile(file);
+    }
+    if (input) input.value = '';
+  }
+
+  function addFromTest(name) {
+    if (!name) return;
+    resetForm();
+    const inputName = getEl('logos-input-name');
+    if (inputName) inputName.value = name;
+    const formEl = getEl('logos-form');
+    if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const inputUrl = getEl('logos-input-url');
+    if (inputUrl) inputUrl.focus();
+  }
+
+  // Expose on global window object for direct onclick / programmatic access
+  window.veloraLogosAdmin = {
+    showLogosTab: showLogosTab,
+    resetForm: resetForm,
+    updatePreview: updatePreview,
+    handleFileSelect: handleFileSelect,
+    uploadLogoFile: uploadLogoFile,
+    handleSubmit: handleFormSubmit,
+    editLogo: editLogo,
+    deleteLogo: deleteLogo,
+    testMatch: testMatch,
+    runTestMatch: runTestMatch,
+    addFromTest: addFromTest,
+    openJsonEditor: openJsonEditor,
+    saveJsonEditor: saveJsonEditor,
+    toggleChannelsOnly: toggleChannelsOnly,
+    togglePackagesOnly: togglePackagesOnly,
+    syncAllChannelLogos: syncAllChannelLogos,
+    loadCustomLogos: loadCustomLogos
+  };
 
   // Global listeners
   document.addEventListener('click', function(e) {

@@ -591,7 +591,7 @@ async function syncAllChannelLogos(options = {}) {
         const packagesUpdated = syncAllPackageCovers(db);
         syncProgress.packagesUpdated = packagesUpdated;
 
-        // Fallback pass: Channels that still don't have a logo inherit their package's cover
+        // Fallback pass: Channels that still don't have a logo inherit their package's cover (NEVER country flags)
         let discovered = {};
         try {
             if (fs.existsSync(DISCOVERED_COVERS_FILE)) {
@@ -599,10 +599,12 @@ async function syncAllChannelLogos(options = {}) {
             }
         } catch (_) {}
 
+        const isCountryFlag = (url) => typeof url === 'string' && (url.includes('flagcdn.com') || url.includes('/flags/') || url.includes('country_') || url.includes('/logos/arabe.svg'));
+
         for (const ch of channels) {
             if (matchedChannels.has(ch.id)) continue;
             const currentIcon = String(ch.stream_icon || '').trim();
-            const hasExplicitIcon = currentIcon && (
+            const hasExplicitIcon = currentIcon && !isCountryFlag(currentIcon) && (
                 currentIcon.includes('iptv-org') ||
                 currentIcon.includes('github') ||
                 currentIcon.includes('wikimedia') ||
@@ -613,7 +615,7 @@ async function syncAllChannelLogos(options = {}) {
             if (!hasExplicitIcon) {
                 const catId = String(ch.category_id || '').trim();
                 const pkgCover = (catId && discovered[catId]) ? (typeof discovered[catId] === 'string' ? discovered[catId] : discovered[catId]?.coverUrl) : '';
-                if (pkgCover && pkgCover !== currentIcon) {
+                if (pkgCover && !isCountryFlag(pkgCover) && pkgCover !== currentIcon) {
                     batch.push({ id: ch.id, logo: pkgCover });
                     syncProgress.updated++;
                 }

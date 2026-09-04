@@ -1312,10 +1312,12 @@
       nextBatch.forEach((ch, idx) => {
         const globalIdx = start + idx;
         const streamId = String(ch.stream_id || ch.id || "");
-        const name = String(ch.name || ch.title || "Chaîne");
-        const pkgCover = this.activePackage ? this.resolvePackageCover(this.activePackage) : "";
-        let rawLogo = String(ch.stream_icon || ch.logo || ch.cover || "").trim() || pkgCover;
-        const logo = toProxiedImageUrl(rawLogo);
+        const pkgCoverRaw = this.activePackage ? this.resolvePackageCover(this.activePackage) : "";
+        const pkgCover = (!isCountryFlagUrl(pkgCoverRaw)) ? pkgCoverRaw : "";
+        let rawLogo = String(ch.stream_icon || ch.logo || ch.cover || "").trim();
+        if (isCountryFlagUrl(rawLogo)) rawLogo = "";
+        if (!rawLogo && pkgCover) rawLogo = pkgCover;
+        const logo = rawLogo ? toProxiedImageUrl(rawLogo) : "";
         const isActive = this.currentPlayingStreamId === streamId;
 
         const row = document.createElement("div");
@@ -1491,13 +1493,19 @@
         playerContainer.setAttribute("aria-hidden", "false");
       }
 
+      const pkgCoverRaw = this.activePackage ? this.resolvePackageCover(this.activePackage) : "";
+      const pkgCover = (!isCountryFlagUrl(pkgCoverRaw)) ? pkgCoverRaw : "";
+      let safeIcon = String(ch.stream_icon || ch.logo || ch.cover || "").trim();
+      if (isCountryFlagUrl(safeIcon)) safeIcon = "";
+      if (!safeIcon && pkgCover) safeIcon = pkgCover;
+
       const item = {
         ...ch,
         stream_id: /^\d+$/.test(streamId) ? Number(streamId) : streamId,
         raw_stream_id: /^\d+$/.test(streamId) ? Number(streamId) : streamId,
         name: ch.name || ch.title || "Chaîne",
-        stream_icon: ch.stream_icon || ch.logo || ch.cover || (this.activePackage ? this.resolvePackageCover(this.activePackage) : ""),
-        cover: ch.stream_icon || ch.logo || ch.cover || (this.activePackage ? this.resolvePackageCover(this.activePackage) : ""),
+        stream_icon: safeIcon,
+        cover: safeIcon,
         nodecast_source_id: String(ch.nodecast_source_id || ch.source_id || "1"),
         nodecast_media: "live"
       };

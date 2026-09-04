@@ -256,24 +256,30 @@ function isOfficialLogosOnly() {
     return isOfficialChannelsLogosOnly();
 }
 
+function isCountryFlagUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    return url.includes('flagcdn.com') || url.includes('/flags/') || url.includes('country_') || url.includes('/logos/arabe.svg');
+}
+
 function sanitizeChannelIcon(name, streamIcon, packageCover = '') {
     const rawIcon = String(streamIcon || '').trim();
-    if (rawIcon && isOfficialLogoUrl(rawIcon)) {
+    if (rawIcon && isOfficialLogoUrl(rawIcon) && !isCountryFlagUrl(rawIcon)) {
         return rawIcon;
     }
     const matched = channelLogoMatcher.matchChannelLogo(name);
     if (matched) {
         const url = typeof matched === 'string' ? matched : (matched.logo || '');
-        if (url) return url;
+        if (url && !isCountryFlagUrl(url)) return url;
     }
     const cleanPkgCover = String(packageCover || '').trim();
-    if (cleanPkgCover && isOfficialLogoUrl(cleanPkgCover)) {
+    if (cleanPkgCover && isOfficialLogoUrl(cleanPkgCover) && !isCountryFlagUrl(cleanPkgCover)) {
         return cleanPkgCover;
     }
     if (!isOfficialChannelsLogosOnly()) {
-        return rawIcon || cleanPkgCover || '';
+        if (rawIcon && !isCountryFlagUrl(rawIcon)) return rawIcon;
+        if (cleanPkgCover && !isCountryFlagUrl(cleanPkgCover)) return cleanPkgCover;
     }
-    return cleanPkgCover || '';
+    return '';
 }
 const HOME_CHANNEL_RULE_TABLES = new Set([
     'admin_channel_name_prefixes',

@@ -197,6 +197,52 @@
     }
   }
 
+  async function forceSyncAllChannelLogos() {
+    const button = getEl('logos-btn-force-sync');
+    const autoBtn = getEl('logos-btn-auto-sync');
+    if (button && button.disabled) return;
+    if (!confirm('⚠️ ATTENTION : Voulez-vous vraiment TOUT reconstruire depuis zéro ?\n\nCette action va re-télécharger les datasets officiels iptv-org et recalculer entièrement tous les logos des chaînes et des packages.')) return;
+
+    if (button) button.disabled = true;
+    if (autoBtn) autoBtn.disabled = true;
+    setProgressStatus('⏳ Téléchargement des nouveaux datasets iptv-org et recalcul complet de zéro...');
+    try {
+      await req(SURL + '/admin/sync-channel-logos', {
+        method: 'POST',
+        body: JSON.stringify({ forceRefresh: true })
+      });
+      setProgressStatus('Reconstruction intégrale de zéro en cours en arrière-plan...');
+
+      const pollTimer = setInterval(async function() {
+        try {
+          const pollRes = await req(SURL + '/admin/sync-channel-logos-status');
+          const p = pollRes && pollRes.progress;
+          if (p) {
+            setProgressStatus('Reconstruction de zéro : ' + (p.updated || 0) + ' chaînes et ' + (p.packagesUpdated || 0) + ' packages mis à jour (' + (p.processed || 0) + '/' + (p.total || 0) + ')...');
+            if (!p.running) {
+              clearInterval(pollTimer);
+              if (button) button.disabled = false;
+              if (autoBtn) autoBtn.disabled = false;
+              try { localStorage.removeItem('velora_package_covers'); } catch (_) {}
+              if (typeof window.veloraReloadPackageCovers === 'function') window.veloraReloadPackageCovers(true);
+              setProgressStatus('✨ Reconstruction intégrale terminée avec succès ! ' + (p.updated || 0) + ' chaînes et ' + (p.packagesUpdated || 0) + ' packages mis à jour.');
+              window.dispatchEvent(new CustomEvent('velora-admin-curation-changed'));
+              window.dispatchEvent(new CustomEvent('velora-package-covers-updated'));
+            }
+          }
+        } catch (_) {
+          clearInterval(pollTimer);
+          if (button) button.disabled = false;
+          if (autoBtn) autoBtn.disabled = false;
+        }
+      }, 1500);
+    } catch (e) {
+      setProgressStatus('Erreur : ' + e.message, true);
+      if (button) button.disabled = false;
+      if (autoBtn) autoBtn.disabled = false;
+    }
+  }
+
   async function loadCustomLogos() {
     try {
       const res = await req(SURL + '/admin/custom-logos');
@@ -713,6 +759,7 @@
     toggleChannelsOnly: toggleChannelsOnly,
     togglePackagesOnly: togglePackagesOnly,
     syncAllChannelLogos: syncAllChannelLogos,
+    forceSyncAllChannelLogos: forceSyncAllChannelLogos,
     loadCustomLogos: loadCustomLogos,
     togglePicker: togglePicker,
     quickSearch: quickSearch,
@@ -728,6 +775,10 @@
     }
     if (e.target && e.target.closest('#logos-btn-auto-sync')) {
       syncAllChannelLogos();
+      return;
+    }
+    if (e.target && e.target.closest('#logos-btn-force-sync')) {
+      forceSyncAllChannelLogos();
       return;
     }
     if (e.target && e.target.closest('#logos-btn-upload')) {

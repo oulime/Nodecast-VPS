@@ -1580,8 +1580,8 @@
     <link rel="stylesheet" href="/assets/direct-media-packages.css?v=20260830-roller-v34">
     <link rel="stylesheet" href="/assets/velora-hero-slider.css?v=20260902-hero-v9">
     <link rel="stylesheet" href="/assets/velora-hero-slider-admin.css?v=20260902-hero-v9">
-    <link rel="stylesheet" href="/assets/tv-logos-admin.css?v=20260904-logos-v11">
-    <script defer src="/assets/tv-logos-admin.js?v=20260904-logos-v11"></script>
+    <link rel="stylesheet" href="/assets/tv-logos-admin.css?v=20260904-logos-v12">
+    <script defer src="/assets/tv-logos-admin.js?v=20260904-logos-v12"></script>
     <style>
       .manual-pays__pagination{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding:.7rem;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:rgba(14,11,20,.96);color:#aaa4b5;font-size:.75rem}
       .manual-pays__pagination button{border:1px solid rgba(167,139,250,.45);border-radius:8px;background:rgba(124,58,237,.2);color:#fff;padding:.45rem .7rem;cursor:pointer}
@@ -5990,7 +5990,8 @@
                 <p>Gérez vos logos officiels (iptv-org) et ajoutez vos logos personnalisés enregistrés sur le VPS.</p>
               </div>
               <div class="vel-logos-heading-actions">
-                <button id="logos-btn-auto-sync" type="button" class="vel-logos-btn-sync">✨ Auto-Logos TV HD</button>
+                <button id="logos-btn-auto-sync" type="button" class="vel-logos-btn-sync" title="Synchronisation intelligente et différentielle des logos">✨ Auto-Logos TV HD</button>
+                <button id="logos-btn-force-sync" type="button" class="vel-logos-btn-force-sync" title="Re-télécharger iptv-org et recalculer tous les logos et packages depuis zéro" onclick="window.veloraLogosAdmin && window.veloraLogosAdmin.forceSyncAllChannelLogos()">🔄 Tout refaire de zéro</button>
                 <label class="vel-logos-toggle" title="Ne jamais appeler les liens des logos des fournisseurs pour les chaînes TV. Utiliser uniquement les logos officiels HD (iptv-org et custom-logos.json)."><input type="checkbox" id="logos-tab-channels-only" /><span>Logos chaînes officiels</span></label>
                 <label class="vel-logos-toggle" title="Ne jamais appeler les liens des logos des fournisseurs pour les bouquets. Utiliser uniquement les logos officiels HD ou drapeaux de pays."><input type="checkbox" id="logos-tab-packages-only" /><span>Logos packages officiels</span></label>
                 <button id="logos-btn-open-json" type="button" class="vel-logo-btn" style="padding:0.6rem 1rem;">📝 Éditeur JSON</button>
@@ -14467,7 +14468,7 @@ if (target.closest(".trial-offer-button")) {
       })();
     </script>
     <script defer src="/assets/cast-bridge.js?v=20260821-cast-airplay-v1"></script>
-    <script defer src="/assets/velora-live-wheel.js?v=20260904-wheel-covers-v3"></script>
+    <script defer src="/assets/velora-live-wheel.js?v=20260904-wheel-covers-v4"></script>
     <link rel="stylesheet" href="/assets/velora-prime-carousel.css?v=20260902-feed-v5" />
     <script defer src="/assets/velora-prime-carousels.js?v=20260902-feed-v5"></script>
     <script>

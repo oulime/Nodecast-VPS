@@ -239,10 +239,14 @@ body.vel-modal-active {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  line-height: 1;
   text-transform: none !important;
 }
 
 .qwttco [data-testid="carousel-title"] span {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
   text-transform: none !important;
 }
 
@@ -524,9 +528,11 @@ body.vel-modal-active {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.05em;
+  font-size: 0.95em;
   line-height: 1;
   margin-right: 0;
+  position: relative;
+  top: -0.1em;
   vertical-align: middle;
   flex-shrink: 0;
   background: transparent;

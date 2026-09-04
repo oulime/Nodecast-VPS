@@ -541,10 +541,69 @@ function matchChannelLogo(rawName, countryHint = '') {
     const plural = cleanNorm.replace(/cinema(?![a-z])/g, 'cinemas').replace(/sport(?![a-z])/g, 'sports');
     if (plural !== cleanNorm) addCandidate(plural);
 
+const THEMATIC_CATEGORY_LOGOS = [
+    // Big Streaming & TV Brands
+    { match: /canal\s*\+|c\+/i, logo: 'https://i.imgur.com/5HcyMnW.png' },
+    { match: /bein\s*sport/i, logo: 'https://i.imgur.com/8Qh1mR4.png' },
+    { match: /dazn/i, logo: 'https://i.imgur.com/2Z2EmZF.png' },
+    { match: /rmc\s*sport/i, logo: 'https://i.imgur.com/dK3mK3k.png' },
+    { match: /eurosport/i, logo: 'https://i.imgur.com/k6wMh1r.png' },
+    { match: /prime\s*video|amazon\s*ligue|prime\s*ligue/i, logo: 'https://i.imgur.com/5zN2fP8.png' },
+    { match: /shahid/i, logo: 'https://i.imgur.com/h5fEZy9.png' },
+    { match: /rotana/i, logo: 'https://i.imgur.com/0iH1VzY.png' },
+    { match: /osn/i, logo: 'https://i.imgur.com/y8W6O5q.png' },
+    { match: /netflix/i, logo: 'https://i.imgur.com/rG7bV4Z.png' },
+    { match: /disney/i, logo: 'https://i.imgur.com/K3yZ0V8.png' },
+    { match: /hbo|max\b/i, logo: 'https://i.imgur.com/yG1r0nN.png' },
+    { match: /apple\s*tv/i, logo: 'https://i.imgur.com/6U4t9oM.png' },
+    { match: /paramount/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Paramount_Plus.svg/800px-Paramount_Plus.svg.png' },
+    { match: /sky\s*sport|sky\s*cinema|sky\s*show/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Sky_Sports_logo_2020.svg/800px-Sky_Sports_logo_2020.svg.png' },
+    { match: /ligue\s*1|ligue1/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Ligue_1_McDonald%27s_logo.svg/800px-Ligue_1_McDonald%27s_logo.svg.png' },
+    { match: /roland\s*garros/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/Roland-Garros_logo.svg/800px-Roland-Garros_logo.svg.png' },
+    { match: /l\'?equipe/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/L%27%C3%89quipe_2015_logo.svg/800px-L%27%C3%89quipe_2015_logo.svg.png' },
+
+    // Universal IPTV Categories & Thematics
+    { match: /documentaire|documentaires|docu|discovery|science|nature|animaux|geographie|history|histoire|planete/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/National_Geographic_logo.svg/800px-National_Geographic_logo.svg.png' },
+    { match: /caribbean|caraibe|caraibes|antilles|tropical|dom\s*tom|guadeloupe|martinique|guyane|reunion|haiti/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Trace_Tropical_logo.svg/800px-Trace_Tropical_logo.svg.png' },
+    { match: /musique|music|hits|clips|radio|mtv|chanson/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/MTV_Music_Logo.svg/800px-MTV_Music_Logo.svg.png' },
+    { match: /jeunesse|kids|enfant|enfants|cartoon|cartoons|animation|anime|manga|gulli|nickelodeon|junior|baby/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/2022_Disney_Channel_logo.svg/800px-2022_Disney_Channel_logo.svg.png' },
+    { match: /cinema|cinemas|cine|film|films|movie|movies|action|box\s*office|blockbuster/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Canal%2B_Cinema_2023.svg/800px-Canal%2B_Cinema_2023.svg.png' },
+    { match: /information|infos|info|news|actualite|actualites|24\/7|bfm|cnews|lci/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Euronews_2016_logo.svg/800px-Euronews_2016_logo.svg.png' },
+    { match: /sport|sports|football|foot|soccer|champions|arena|combat|mma|ufc/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/BeIN_Sports_logo.svg/800px-BeIN_Sports_logo.svg.png' },
+    { match: /general|generaliste|generalistes|nationaux|tnt|direct|principales|national/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/TF1_logo_2013.svg/800px-TF1_logo_2013.svg.png' },
+    { match: /divertissement|entertainment|spectacle|show|humour|comedy/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/M6_logo_2020.svg/800px-M6_logo_2020.svg.png' },
+    { match: /serie|series|feuilleton|drama/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Netflix_2015_logo.svg/800px-Netflix_2015_logo.svg.png' },
+    { match: /region|regionales|locales|terroir|france3|regions/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/France_3_logo_2018.svg/800px-France_3_logo_2018.svg.png' },
+    { match: /afrique|africa|africaines|africain/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Canal%2B_Pop_logo.svg/800px-Canal%2B_Pop_logo.svg.png' },
+    { match: /arabe|arabic|maghreb|oriental|arab/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/MBC_1_logo_2012.svg/800px-MBC_1_logo_2012.svg.png' }
+];
+
+function getThematicCategoryLogo(name = '') {
+    const raw = String(name || '').trim();
+    if (!raw) return '';
+    const cleaned = cleanChannelName(raw);
+    for (const item of THEMATIC_CATEGORY_LOGOS) {
+        if (item.match.test(raw) || (cleaned && item.match.test(cleaned))) {
+            return item.logo;
+        }
+    }
+    return '';
+}
+
     for (const key of candidates) {
         if (!key) continue;
         if (exactMap.has(key)) return exactMap.get(key);
         if (cleanMap.has(key)) return cleanMap.get(key);
+    }
+
+    // Tier 8: Universal Thematic / Category & Genre Logo matching
+    const thematic = getThematicCategoryLogo(cleaned) || getThematicCategoryLogo(rawName);
+    if (thematic) {
+        return {
+            name: cleaned || rawName,
+            logo: thematic,
+            country: 'THEMATIC'
+        };
     }
 
     return null;
@@ -881,15 +940,29 @@ function syncAllPackageCovers(db) {
 
             let bestLogo = '';
 
-            // Step A: Brand name match on the package name (e.g. "FR| DAZN PPV" -> DAZN logo, "FR| CANAL+" -> Canal+ logo)
+            // Step A: Brand name or thematic category match on the package name
             if (pkgName) {
                 const brandMatch = matchChannelLogo(pkgName);
-                if (brandMatch && brandMatch.logo) {
+                if (brandMatch && brandMatch.logo && !isCountryFlag(brandMatch.logo)) {
                     bestLogo = brandMatch.logo;
                 }
             }
 
-            // Step B: Fallback to country flag / logo if not found in brand match (never channel logos)
+            // Step B: Inherit first high-definition channel logo from inside this package
+            if (!bestLogo && catId) {
+                try {
+                    const firstChannels = channelLookupStmt.all(catId);
+                    for (const ch of firstChannels) {
+                        const icon = String(ch.stream_icon || '').trim();
+                        if (icon && !isCountryFlag(icon) && (icon.includes('iptv-org') || icon.includes('github') || icon.includes('wikimedia') || icon.includes('imgur') || isCustomLogoUrl(icon))) {
+                            bestLogo = icon;
+                            break;
+                        }
+                    }
+                } catch (_) {}
+            }
+
+            // Step C: Fallback to country flag / logo ONLY if absolutely no logo found
             if (!bestLogo) {
                 bestLogo = getCountryFlagOrLogo(pkg.country_id, countryName);
             }

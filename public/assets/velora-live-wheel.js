@@ -51,6 +51,12 @@
     if (n.includes("osn")) return buildThemeFromRgb(239, 68, 68);
     if (n.includes("stc")) return buildThemeFromRgb(79, 70, 229);
     if (n.includes("rotana")) return buildThemeFromRgb(34, 197, 94);
+    if (n.includes("documentaire") || n.includes("discovery") || n.includes("nature")) return buildThemeFromRgb(255, 204, 0);
+    if (n.includes("caribbean") || n.includes("caraibe") || n.includes("antilles") || n.includes("tropical")) return buildThemeFromRgb(0, 180, 216);
+    if (n.includes("musique") || n.includes("music")) return buildThemeFromRgb(236, 72, 153);
+    if (n.includes("cinema") || n.includes("film") || n.includes("movie")) return buildThemeFromRgb(239, 68, 68);
+    if (n.includes("info") || n.includes("news")) return buildThemeFromRgb(14, 165, 233);
+    if (n.includes("sport")) return buildThemeFromRgb(16, 185, 129);
     if (n.includes("eurosport") || n.includes("rmc") || n.includes("tf1")) return buildThemeFromRgb(2, 132, 199);
 
     // Clean neutral slate/cyan default
@@ -395,25 +401,47 @@
   }
 
   const COMMON_BRAND_LOGOS = [
+    // Big Streaming & TV Brands
     { match: /canal\s*\+|c\+/i, logo: 'https://i.imgur.com/5HcyMnW.png' },
     { match: /bein\s*sport/i, logo: 'https://i.imgur.com/8Qh1mR4.png' },
     { match: /dazn/i, logo: 'https://i.imgur.com/2Z2EmZF.png' },
     { match: /rmc\s*sport/i, logo: 'https://i.imgur.com/dK3mK3k.png' },
     { match: /eurosport/i, logo: 'https://i.imgur.com/k6wMh1r.png' },
-    { match: /prime\s*video|amazon\s*ligue/i, logo: 'https://i.imgur.com/5zN2fP8.png' },
+    { match: /prime\s*video|amazon\s*ligue|prime\s*ligue/i, logo: 'https://i.imgur.com/5zN2fP8.png' },
     { match: /shahid/i, logo: 'https://i.imgur.com/h5fEZy9.png' },
     { match: /rotana/i, logo: 'https://i.imgur.com/0iH1VzY.png' },
     { match: /osn/i, logo: 'https://i.imgur.com/y8W6O5q.png' },
     { match: /netflix/i, logo: 'https://i.imgur.com/rG7bV4Z.png' },
     { match: /disney/i, logo: 'https://i.imgur.com/K3yZ0V8.png' },
-    { match: /hbo|max/i, logo: 'https://i.imgur.com/yG1r0nN.png' },
-    { match: /apple\s*tv/i, logo: 'https://i.imgur.com/6U4t9oM.png' }
+    { match: /hbo|max\b/i, logo: 'https://i.imgur.com/yG1r0nN.png' },
+    { match: /apple\s*tv/i, logo: 'https://i.imgur.com/6U4t9oM.png' },
+    { match: /paramount/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Paramount_Plus.svg/800px-Paramount_Plus.svg.png' },
+    { match: /sky\s*sport|sky\s*cinema|sky\s*show/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Sky_Sports_logo_2020.svg/800px-Sky_Sports_logo_2020.svg.png' },
+    { match: /ligue\s*1|ligue1/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Ligue_1_McDonald%27s_logo.svg/800px-Ligue_1_McDonald%27s_logo.svg.png' },
+    { match: /roland\s*garros/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/Roland-Garros_logo.svg/800px-Roland-Garros_logo.svg.png' },
+    { match: /l\'?equipe/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/L%27%C3%89quipe_2015_logo.svg/800px-L%27%C3%89quipe_2015_logo.svg.png' },
+
+    // Universal IPTV Categories & Thematics
+    { match: /documentaire|documentaires|docu|discovery|science|nature|animaux|geographie|history|histoire|planete/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/National_Geographic_logo.svg/800px-National_Geographic_logo.svg.png' },
+    { match: /caribbean|caraibe|caraibes|antilles|tropical|dom\s*tom|guadeloupe|martinique|guyane|reunion|haiti/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Trace_Tropical_logo.svg/800px-Trace_Tropical_logo.svg.png' },
+    { match: /musique|music|hits|clips|radio|mtv|chanson/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/MTV_Music_Logo.svg/800px-MTV_Music_Logo.svg.png' },
+    { match: /jeunesse|kids|enfant|enfants|cartoon|cartoons|animation|anime|manga|gulli|nickelodeon|junior|baby/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/2022_Disney_Channel_logo.svg/800px-2022_Disney_Channel_logo.svg.png' },
+    { match: /cinema|cinemas|cine|film|films|movie|movies|action|box\s*office|blockbuster/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Canal%2B_Cinema_2023.svg/800px-Canal%2B_Cinema_2023.svg.png' },
+    { match: /information|infos|info|news|actualite|actualites|24\/7|bfm|cnews|lci/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Euronews_2016_logo.svg/800px-Euronews_2016_logo.svg.png' },
+    { match: /sport|sports|football|foot|soccer|champions|arena|combat|mma|ufc/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/BeIN_Sports_logo.svg/800px-BeIN_Sports_logo.svg.png' },
+    { match: /general|generaliste|generalistes|nationaux|tnt|direct|principales|national/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/TF1_logo_2013.svg/800px-TF1_logo_2013.svg.png' },
+    { match: /divertissement|entertainment|spectacle|show|humour|comedy/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/M6_logo_2020.svg/800px-M6_logo_2020.svg.png' },
+    { match: /serie|series|feuilleton|drama/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Netflix_2015_logo.svg/800px-Netflix_2015_logo.svg.png' },
+    { match: /region|regionales|locales|terroir|france3|regions/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/France_3_logo_2018.svg/800px-France_3_logo_2018.svg.png' },
+    { match: /afrique|africa|africaines|africain/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Canal%2B_Pop_logo.svg/800px-Canal%2B_Pop_logo.svg.png' },
+    { match: /arabe|arabic|maghreb|oriental|arab/i, logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/MBC_1_logo_2012.svg/800px-MBC_1_logo_2012.svg.png' }
   ];
 
   function getBrandLogoForName(name = '') {
     const n = String(name || '');
+    const cleaned = typeof cleanChannelTitle === 'function' ? cleanChannelTitle(n) : n;
     for (const b of COMMON_BRAND_LOGOS) {
-      if (b.match.test(n)) return b.logo;
+      if (b.match.test(n) || (cleaned && b.match.test(cleaned))) return b.logo;
     }
     return '';
   }
@@ -780,7 +808,7 @@
       const countryName = (select?.options?.[select?.selectedIndex]?.text || "").replace(/^[^a-zA-ZÀ-ÿ]+/, "").trim();
 
       const cleanName = cleanChannelTitle(pkg.name || pkg.display_name || "");
-      const savedLogo = window.__veloraCustomPackageLogos?.[pkg.id]
+      let savedLogo = window.__veloraCustomPackageLogos?.[pkg.id]
         || window.__veloraCustomPackageLogos?.[pkg.category_id]
         || window.__veloraCustomPackageLogos?.[pkg.name]
         || window.__veloraCustomPackageLogos?.[pkg.display_name]
@@ -792,7 +820,15 @@
           } catch (_) { return ""; }
         })();
 
-      let candidate = savedLogo || pkg.cover_url || "";
+      // Never use country flags from savedLogo
+      if (savedLogo && isCountryFlagUrl(savedLogo)) {
+        savedLogo = "";
+      }
+
+      let candidate = (savedLogo && !isCountryFlagUrl(savedLogo)) ? savedLogo : "";
+      if (!candidate && pkg.cover_url && !isCountryFlagUrl(pkg.cover_url)) {
+        candidate = pkg.cover_url;
+      }
 
       // Reject TMDB movie posters
       if (candidate.includes("image.tmdb.org") || candidate.includes("tmdb.org") || candidate.includes("/w600_and_h900_bestv2/") || candidate.includes("/w500/") || candidate.includes("/w300/")) {

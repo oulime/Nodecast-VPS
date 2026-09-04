@@ -1138,19 +1138,24 @@ function buildCountryPackageCache() {
 
     const officialOnly = isOfficialPackagesLogosOnly();
     const countryById = new Map(countries.map(c => [String(c.id), c]));
+    const isFlagUrl = (url) => typeof url === 'string' && (url.includes('flagcdn.com') || url.includes('/flags/') || url.includes('country_') || url.includes('/logos/arabe.svg'));
+
     const sanitizedPackages = packages.map(pkg => {
         const countryName = countryById.get(String(pkg.country_id))?.name || pkg.country_name || '';
         let cover = String(pkg.cover_url || '').trim();
         if (officialOnly && cover && !isOfficialLogoUrl(cover)) {
             cover = '';
         }
-        if (!cover) {
+        // If no cover OR cover is currently a country flag fallback, prioritize custom/brand logo match
+        if (!cover || isFlagUrl(cover)) {
             const pkgName = String(pkg.name || pkg.original_name || '').trim();
             if (pkgName) {
                 const brandMatch = channelLogoMatcher.matchChannelLogo(pkgName);
-                if (brandMatch && brandMatch.logo) cover = brandMatch.logo;
+                if (brandMatch && brandMatch.logo && !isFlagUrl(brandMatch.logo)) {
+                    cover = brandMatch.logo;
+                }
             }
-            if (!cover) {
+            if (!cover || isFlagUrl(cover)) {
                 cover = channelLogoMatcher.getCountryFlagOrLogo(pkg.country_id, countryName);
             }
         }

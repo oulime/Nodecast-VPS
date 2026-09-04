@@ -204,6 +204,7 @@ function isOfficialLogoUrl(url) {
     const trimmed = url.trim();
     if (!trimmed) return false;
     if (trimmed.startsWith('data:image/') || trimmed.startsWith('/uploads/') || trimmed.startsWith('/logos/')) return true;
+    if (channelLogoMatcher && typeof channelLogoMatcher.isCustomLogoUrl === 'function' && channelLogoMatcher.isCustomLogoUrl(trimmed)) return true;
     try {
         const parsed = new URL(trimmed);
         const host = parsed.hostname.toLowerCase();
@@ -2894,6 +2895,104 @@ router.get('/admin/sync-channel-logos-status', (req, res) => {
         return res.json({
             ok: true,
             progress: channelLogoMatcher.getSyncStatus()
+        });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+router.get('/admin/custom-logos', (_req, res) => {
+    try {
+        const logos = typeof channelLogoMatcher.getCustomLogos === 'function' ? channelLogoMatcher.getCustomLogos() : [];
+        const raw = typeof channelLogoMatcher.readRawCustomLogosFile === 'function' ? channelLogoMatcher.readRawCustomLogosFile() : {};
+        return res.json({ ok: true, logos, raw });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/admin/custom-logos', express.json(), (req, res) => {
+    try {
+        const { name, url, aliases, country } = req.body || {};
+        if (!name || !url) {
+            return res.status(400).json({ error: 'Le nom et l’URL du logo sont obligatoires.' });
+        }
+        const updated = channelLogoMatcher.saveCustomLogo({ name, url, aliases, country });
+        invalidateCountryPackageCache();
+        buildCountryPackageCache();
+        buildHomeCache();
+        return res.json({ ok: true, message: 'Logo enregistré avec succès.', logos: updated });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+router.delete('/admin/custom-logos', express.json(), (req, res) => {
+    try {
+        const name = String(req.body?.name || req.query?.name || '').trim();
+        if (!name) {
+            return res.status(400).json({ error: 'Nom de la chaîne ou du package requis.' });
+        }
+        const updated = channelLogoMatcher.deleteCustomLogo(name);
+        invalidateCountryPackageCache();
+        buildCountryPackageCache();
+        buildHomeCache();
+        return res.json({ ok: true, message: 'Logo supprimé.', logos: updated });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/admin/custom-logos/bulk', express.json(), (req, res) => {
+    try {
+        const bulk = req.body?.data || req.body?.jsonText || req.body;
+        const updated = channelLogoMatcher.saveCustomLogosBulk(bulk);
+        invalidateCountryPackageCache();
+        buildCountryPackageCache();
+        buildHomeCache();
+        return res.json({ ok: true, message: 'Logos personnalisés mis à jour.', count: updated.length, logos: updated });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+const CUSTOM_LOGO_UPLOAD_DIR = path.join(__dirname, '..', '..', 'public', 'uploads', 'tv-logos');
+const CUSTOM_LOGO_PUBLIC_PATH = '/uploads/tv-logos';
+
+router.post('/admin/custom-logos/upload', express.json({ limit: '10mb' }), async (req, res) => {
+    try {
+        const encoded = String(req.body?.dataBase64 || '').trim();
+        const rawFileName = String(req.body?.fileName || 'logo').trim();
+        if (!encoded) return res.status(400).json({ error: 'Données image requises.' });
+        const buffer = Buffer.from(encoded.replace(/^data:[^;]+;base64,/, ''), 'base64');
+        if (!buffer.length || buffer.length > 8 * 1024 * 1024) return res.status(413).json({ error: 'L’image ne doit pas dépasser 8 Mo.' });
+        const ext = detectImageExt(buffer, rawFileName);
+        await fs.promises.mkdir(CUSTOM_LOGO_UPLOAD_DIR, { recursive: true });
+        const cleanBase = rawFileName.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40) || 'logo';
+        const fileName = `${cleanBase}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
+        await fs.promises.writeFile(path.join(CUSTOM_LOGO_UPLOAD_DIR, fileName), buffer);
+        const url = `${CUSTOM_LOGO_PUBLIC_PATH}/${fileName}`;
+        return res.json({ ok: true, url, fileName, path: url });
+    } catch (err) {
+        console.error('[veloraData] upload-custom-logo failed:', err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/admin/custom-logos/test-match', express.json(), (req, res) => {
+    try {
+        const name = String(req.body?.name || '').trim();
+        if (!name) {
+            return res.status(400).json({ error: 'Nom à tester requis.' });
+        }
+        const match = channelLogoMatcher.matchChannelLogo(name);
+        const cleaned = channelLogoMatcher.cleanChannelName(name);
+        return res.json({
+            ok: true,
+            input: name,
+            cleaned,
+            matched: Boolean(match),
+            result: match
         });
     } catch (error) {
         return res.status(500).json({ error: error.message });

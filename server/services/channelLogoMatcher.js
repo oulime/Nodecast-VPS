@@ -120,6 +120,188 @@ function normalizeKey(str) {
         .replace(/[^a-z0-9]/g, '');
 }
 
+const CUSTOM_LOGOS_FILES = [
+    path.join(__dirname, '..', '..', 'data', 'custom-logos.json'),
+    path.join(__dirname, '..', '..', 'data', 'logos.json')
+];
+
+let customLogoUrls = new Set();
+let customLogosLastMtime = 0;
+
+function getCustomLogos() {
+    const entries = [];
+    customLogoUrls = new Set();
+    let latestMtime = 0;
+
+    for (const filePath of CUSTOM_LOGOS_FILES) {
+        if (fs.existsSync(filePath)) {
+            try {
+                const stat = fs.statSync(filePath);
+                if (stat.mtimeMs > latestMtime) latestMtime = stat.mtimeMs;
+                const fileContent = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
+                const raw = JSON.parse(fileContent);
+                if (Array.isArray(raw)) {
+                    for (const item of raw) {
+                        if (!item) continue;
+                        const name = String(item.name || item.channel || item.id || '').trim();
+                        const url = String(item.logo || item.url || item.image || '').trim();
+                        const aliases = Array.isArray(item.aliases) ? item.aliases : (item.alt_names || []);
+                        if (name && url) {
+                            entries.push({ name, url, aliases, country: item.country || 'CUSTOM' });
+                            customLogoUrls.add(url);
+                        }
+                    }
+                } else if (typeof raw === 'object' && raw !== null) {
+                    for (const [key, val] of Object.entries(raw)) {
+                        if (!key || key.startsWith('_') || key.startsWith('//') || !val) continue;
+                        if (typeof val === 'string') {
+                            const trimmed = val.trim();
+                            if (trimmed) {
+                                entries.push({ name: key, url: trimmed, aliases: [], country: 'CUSTOM' });
+                                customLogoUrls.add(trimmed);
+                            }
+                        } else if (typeof val === 'object') {
+                            const url = String(val.logo || val.url || val.image || '').trim();
+                            const aliases = Array.isArray(val.aliases) ? val.aliases : [];
+                            if (url) {
+                                entries.push({ name: key, url, aliases, country: val.country || 'CUSTOM' });
+                                customLogoUrls.add(url);
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn(`[ChannelLogoMatcher] Error reading custom logos from ${filePath}:`, e.message);
+            }
+        }
+    }
+    customLogosLastMtime = latestMtime;
+    return entries;
+}
+
+const MAIN_CUSTOM_LOGOS_FILE = path.join(__dirname, '..', '..', 'data', 'custom-logos.json');
+
+function readRawCustomLogosFile() {
+    if (fs.existsSync(MAIN_CUSTOM_LOGOS_FILE)) {
+        try {
+            const content = fs.readFileSync(MAIN_CUSTOM_LOGOS_FILE, 'utf8').replace(/^\uFEFF/, '');
+            return JSON.parse(content);
+        } catch (e) {
+            console.warn('[ChannelLogoMatcher] Error reading raw custom-logos.json:', e.message);
+        }
+    }
+    return {};
+}
+
+function writeRawCustomLogosFile(obj) {
+    fs.mkdirSync(path.dirname(MAIN_CUSTOM_LOGOS_FILE), { recursive: true });
+    fs.writeFileSync(MAIN_CUSTOM_LOGOS_FILE, JSON.stringify(obj, null, 2), 'utf8');
+    customLogosLastMtime = Date.now();
+    if (inMemoryIndex) {
+        applyCustomLogosToIndex(inMemoryIndex.exactMap, inMemoryIndex.cleanMap);
+    }
+}
+
+function saveCustomLogo({ name, url, aliases = [], country = '' }) {
+    if (!name || !url) throw new Error('Le nom et l’URL du logo sont obligatoires.');
+    const raw = readRawCustomLogosFile();
+    const cleanAliases = Array.isArray(aliases)
+        ? aliases.map(a => String(a).trim()).filter(Boolean)
+        : String(aliases || '').split(/[,;\n]+/).map(a => a.trim()).filter(Boolean);
+
+    if (Array.isArray(raw)) {
+        const existingIdx = raw.findIndex(item => item && (String(item.name || item.channel || '').toLowerCase() === name.trim().toLowerCase()));
+        const entry = { name: name.trim(), logo: url.trim(), aliases: cleanAliases };
+        if (country) entry.country = country.trim().toUpperCase();
+        if (existingIdx >= 0) {
+            raw[existingIdx] = entry;
+        } else {
+            raw.push(entry);
+        }
+        writeRawCustomLogosFile(raw);
+    } else {
+        const entryObj = {
+            logo: url.trim(),
+            ...(cleanAliases.length ? { aliases: cleanAliases } : {}),
+            ...(country ? { country: country.trim().toUpperCase() } : {})
+        };
+        raw[name.trim()] = cleanAliases.length || country ? entryObj : url.trim();
+        writeRawCustomLogosFile(raw);
+    }
+    return getCustomLogos();
+}
+
+function deleteCustomLogo(name) {
+    if (!name) throw new Error('Nom requis');
+    const raw = readRawCustomLogosFile();
+    const target = name.trim().toLowerCase();
+    if (Array.isArray(raw)) {
+        const filtered = raw.filter(item => item && String(item.name || item.channel || '').toLowerCase() !== target);
+        writeRawCustomLogosFile(filtered);
+    } else if (typeof raw === 'object' && raw !== null) {
+        for (const key of Object.keys(raw)) {
+            if (key.toLowerCase() === target) {
+                delete raw[key];
+            }
+        }
+        writeRawCustomLogosFile(raw);
+    }
+    return getCustomLogos();
+}
+
+function saveCustomLogosBulk(bulkData) {
+    let parsed = bulkData;
+    if (typeof bulkData === 'string') {
+        parsed = JSON.parse(bulkData.replace(/^\uFEFF/, ''));
+    }
+    if (typeof parsed !== 'object' || parsed === null) throw new Error('Format JSON invalide');
+    writeRawCustomLogosFile(parsed);
+    return getCustomLogos();
+}
+
+function applyCustomLogosToIndex(exactMap, cleanMap) {
+    const customEntries = getCustomLogos();
+    for (const item of customEntries) {
+        const names = [item.name, ...(item.aliases || [])];
+        for (const n of names) {
+            if (!n) continue;
+            const norm = normalizeKey(n);
+            if (norm) {
+                exactMap.set(norm, { id: `custom.${norm}`, name: item.name, logo: item.url, country: item.country });
+            }
+            const clean = normalizeKey(cleanChannelName(n));
+            if (clean) {
+                cleanMap.set(clean, { id: `custom.${clean}`, name: item.name, logo: item.url, country: item.country });
+            }
+            const noCountry = normalizeKey(stripCountry(n));
+            if (noCountry) {
+                cleanMap.set(noCountry, { id: `custom.${noCountry}`, name: item.name, logo: item.url, country: item.country });
+            }
+        }
+    }
+}
+
+function checkCustomLogosUpdate() {
+    let latestMtime = 0;
+    for (const filePath of CUSTOM_LOGOS_FILES) {
+        if (fs.existsSync(filePath)) {
+            try {
+                const stat = fs.statSync(filePath);
+                if (stat.mtimeMs > latestMtime) latestMtime = stat.mtimeMs;
+            } catch (_) {}
+        }
+    }
+    if (latestMtime !== customLogosLastMtime && inMemoryIndex) {
+        applyCustomLogosToIndex(inMemoryIndex.exactMap, inMemoryIndex.cleanMap);
+    }
+}
+
+function isCustomLogoUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    if (!inMemoryIndex) ensureIndexLoaded();
+    return customLogoUrls.has(url.trim());
+}
+
 function buildIndexFromCacheData(cacheData) {
     if (!cacheData || !cacheData.channels || !cacheData.logos) return null;
     const logoById = new Map();
@@ -165,13 +347,19 @@ function buildIndexFromCacheData(cacheData) {
         }
     }
 
+    // Apply custom logos on top with highest priority
+    applyCustomLogosToIndex(exactMap, cleanMap);
+
     inMemoryIndex = { exactMap, cleanMap, totalIndexed: exactMap.size };
-    console.log(`[ChannelLogoMatcher] Indexed ${inMemoryIndex.totalIndexed} TV channel logo mappings.`);
+    console.log(`[ChannelLogoMatcher] Indexed ${inMemoryIndex.totalIndexed} TV channel logo mappings (including custom logos).`);
     return inMemoryIndex;
 }
 
 function ensureIndexLoaded() {
-    if (inMemoryIndex) return inMemoryIndex;
+    if (inMemoryIndex) {
+        checkCustomLogosUpdate();
+        return inMemoryIndex;
+    }
     if (fs.existsSync(CACHE_FILE)) {
         try {
             const cacheData = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
@@ -710,7 +898,13 @@ module.exports = {
     syncAllChannelLogos,
     syncAllPackageCovers,
     getCountryFlagOrLogo,
-    getSyncStatus
+    getSyncStatus,
+    isCustomLogoUrl,
+    getCustomLogos,
+    saveCustomLogo,
+    deleteCustomLogo,
+    saveCustomLogosBulk,
+    readRawCustomLogosFile
 };
 
 // Preload index immediately on startup

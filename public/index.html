@@ -1580,6 +1580,8 @@
     <link rel="stylesheet" href="/assets/direct-media-packages.css?v=20260830-roller-v34">
     <link rel="stylesheet" href="/assets/velora-hero-slider.css?v=20260902-hero-v9">
     <link rel="stylesheet" href="/assets/velora-hero-slider-admin.css?v=20260902-hero-v9">
+    <link rel="stylesheet" href="/assets/tv-logos-admin.css?v=20260904-logos-v2">
+    <script defer src="/assets/tv-logos-admin.js?v=20260904-logos-v2"></script>
     <style>
       .manual-pays__pagination{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding:.7rem;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:rgba(14,11,20,.96);color:#aaa4b5;font-size:.75rem}
       .manual-pays__pagination button{border:1px solid rgba(167,139,250,.45);border-radius:8px;background:rgba(124,58,237,.2);color:#fff;padding:.45rem .7rem;cursor:pointer}
@@ -5317,6 +5319,18 @@
             <button
               type="button"
               role="tab"
+              id="settings-tab-btn-logos"
+              class="settings-tabs__tab"
+              data-settings-tab="logos"
+              aria-selected="false"
+              aria-controls="settings-tab-logos"
+              tabindex="-1"
+            >
+              ✨ Logos TV
+            </button>
+            <button
+              type="button"
+              role="tab"
               id="settings-tab-btn-adult"
               class="settings-tabs__tab"
               data-settings-tab="adult"
@@ -5722,9 +5736,6 @@
               </div>
               <div class="manual-pays__heading-actions">
                 <form id="mp-country-form" class="manual-pays__country-form"><input id="mp-country-name" type="text" placeholder="Nouveau pays" autocomplete="off" /><button type="submit" class="primary">Créer</button></form>
-                <button id="mp-sync-channel-logos" type="button" class="primary" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);border:none;">✨ Auto-Logos TV HD</button>
-                <label class="manual-pays__toggle-logos" title="Ne jamais appeler les liens des logos des fournisseurs pour les chaînes TV. Utiliser uniquement les logos officiels HD (iptv-org)."><input type="checkbox" id="mp-iptv-channels-logos-only" /><span>Logos chaînes officiels</span></label>
-                <label class="manual-pays__toggle-logos" title="Ne jamais appeler les liens des logos des fournisseurs pour les bouquets. Utiliser uniquement les logos officiels HD ou drapeaux de pays."><input type="checkbox" id="mp-iptv-packages-logos-only" /><span>Logos packages officiels</span></label>
                 <button id="mp-sync-all" type="button" class="primary">Synchroniser et actualiser</button>
               </div>
             </div>
@@ -5922,6 +5933,119 @@
                   <button id="mp-delete-country-cancel" type="button" class="secondary">Annuler</button>
                   <button id="mp-delete-country-confirm" type="button" class="manual-pays-confirm__delete">Supprimer définitivement</button>
                 </div>
+              </div>
+            </dialog>
+          </section>
+
+          <section
+            id="settings-tab-logos"
+            class="settings-tab-panel panel countries-admin-form vel-logos-panel hidden"
+            role="tabpanel"
+            aria-labelledby="settings-tab-btn-logos"
+            data-settings-tab="logos"
+            hidden
+          >
+            <div class="vel-logos-heading">
+              <div>
+                <h2><span>✨</span> Logos TV &amp; Packages</h2>
+                <p>Gérez vos logos officiels (iptv-org) et ajoutez vos logos personnalisés enregistrés sur le VPS.</p>
+              </div>
+              <div class="vel-logos-heading-actions">
+                <button id="logos-btn-auto-sync" type="button" class="vel-logos-btn-sync">✨ Auto-Logos TV HD</button>
+                <label class="vel-logos-toggle" title="Ne jamais appeler les liens des logos des fournisseurs pour les chaînes TV. Utiliser uniquement les logos officiels HD (iptv-org et custom-logos.json)."><input type="checkbox" id="logos-tab-channels-only" /><span>Logos chaînes officiels</span></label>
+                <label class="vel-logos-toggle" title="Ne jamais appeler les liens des logos des fournisseurs pour les bouquets. Utiliser uniquement les logos officiels HD ou drapeaux de pays."><input type="checkbox" id="logos-tab-packages-only" /><span>Logos packages officiels</span></label>
+                <button id="logos-btn-open-json" type="button" class="vel-logo-btn" style="padding:0.6rem 1rem;">📝 Éditeur JSON</button>
+              </div>
+            </div>
+
+            <p id="logos-admin-status" class="vel-logos-status" aria-live="polite">Prêt.</p>
+            <p id="logos-sync-status" class="vel-logos-status" style="display:none;" aria-live="polite"></p>
+
+            <div class="vel-logos-grid">
+              <!-- Left Column: Add/Edit Form & Live Matcher Tester -->
+              <div>
+                <div class="vel-logos-card">
+                  <h3 id="logos-form-title">Ajouter un logo personnalisé</h3>
+                  <form id="logos-form" class="vel-logos-form" autocomplete="off">
+                    <div class="vel-logos-field">
+                      <label for="logos-input-name">Nom de la chaîne ou du package *</label>
+                      <input id="logos-input-name" type="text" placeholder="Ex: 2M MAROC, CANAL+ FOOT..." required />
+                    </div>
+
+                    <div class="vel-logos-field">
+                      <label for="logos-input-url">URL du logo ou Importer une image *</label>
+                      <div style="display:flex;gap:0.5rem;align-items:center;">
+                        <input id="logos-input-url" type="url" placeholder="https://... ou cliquez sur Importer" style="flex:1;" required />
+                        <button id="logos-btn-upload" type="button" class="vel-logo-btn" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;padding:0.6rem 0.9rem;white-space:nowrap;font-weight:600;display:flex;align-items:center;gap:0.35rem;">📁 Importer</button>
+                        <input id="logos-input-file" type="file" accept="image/png,image/svg+xml,image/webp,image/jpeg,image/gif" style="display:none;" />
+                      </div>
+                    </div>
+
+                    <div class="vel-logos-form-preview">
+                      <div class="vel-logos-form-preview-box">
+                        <img id="logos-form-preview-img" alt="Aperçu" class="vel-logos-form-preview-img" style="display:none;" />
+                        <span id="logos-form-preview-fallback" class="vel-logos-form-preview-fallback">📺</span>
+                      </div>
+                      <div>
+                        <strong style="font-size:0.85rem;display:block;color:#cbd5e1;">Aperçu direct</strong>
+                        <small style="color:#64748b;font-size:0.75rem;">L'image s'affiche automatiquement dès que vous collez l'URL</small>
+                      </div>
+                    </div>
+
+                    <div class="vel-logos-field">
+                      <label for="logos-input-aliases">Alias / Noms alternatifs (optionnel, séparés par virgules)</label>
+                      <input id="logos-input-aliases" type="text" placeholder="Ex: 2M, 2M HD, 2M MAROC ◉" />
+                    </div>
+
+                    <div class="vel-logos-field">
+                      <label for="logos-input-country">Code Pays / Catégorie (optionnel)</label>
+                      <input id="logos-input-country" type="text" placeholder="Ex: MA, FR, SPORT..." maxlength="10" />
+                    </div>
+
+                    <div class="vel-logos-form-actions">
+                      <button id="logos-form-submit" type="submit" class="vel-logos-btn-submit">➕ Enregistrer le logo</button>
+                      <button id="logos-btn-reset-form" type="button" class="vel-logos-btn-reset">Réinitialiser</button>
+                    </div>
+                  </form>
+                </div>
+
+                <!-- Test Matcher Card -->
+                <div id="logos-test-card" class="vel-logos-card vel-logos-test-card">
+                  <h3>⚡ Tester la détection d'une chaîne</h3>
+                  <form id="logos-test-form" onsubmit="return false;">
+                    <div class="vel-logos-test-input-wrap">
+                      <input id="logos-test-input" type="text" placeholder="Tapez un nom (ex: |FR| BEIN SPORT 1 HD ◉)" autocomplete="off" />
+                    </div>
+                  </form>
+                  <div id="logos-test-result" class="vel-logos-test-result">
+                    <div class="vel-logos-test-hint">Saisissez un nom de chaîne pour tester la détection en direct.</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right Column: List of Custom Logos -->
+              <div class="vel-logos-card">
+                <div class="vel-logos-list-header">
+                  <h3>Vos logos personnalisés <span id="logos-custom-count" style="font-size:0.9rem;color:#8b5cf6;font-weight:400;">(0)</span></h3>
+                  <input id="logos-custom-search" type="search" placeholder="Filtrer les logos..." class="vel-logos-search-input" />
+                </div>
+                <div id="logos-custom-list" class="vel-logos-custom-list">
+                  <div class="vel-logos-empty">Chargement des logos...</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Raw JSON Editor Modal Dialog -->
+            <dialog id="logos-json-dialog" class="vel-logos-dialog">
+              <header>
+                <h3 style="margin:0;">📝 Éditeur brut de custom-logos.json</h3>
+                <button id="logos-json-close" type="button" class="vel-logo-btn" style="padding:0.25rem 0.6rem;">✕</button>
+              </header>
+              <p style="margin:0 0 0.75rem 0;color:#94a3b8;font-size:0.85rem;">Vous pouvez directement visualiser, modifier ou coller vos logos au format JSON sur le VPS.</p>
+              <textarea id="logos-json-textarea" spellcheck="false"></textarea>
+              <div class="vel-logos-dialog-actions">
+                <button id="logos-json-cancel" type="button" class="vel-logos-btn-reset">Annuler</button>
+                <button id="logos-json-save" type="button" class="vel-logos-btn-submit">💾 Enregistrer sur le VPS</button>
               </div>
             </dialog>
           </section>

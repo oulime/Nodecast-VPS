@@ -228,6 +228,13 @@ body.vel-modal-active {
   transition: color 0.2s ease;
 }
 
+.qwttco [data-testid="carousel-title"],
+[data-testid="carousel-title"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .qwttco:hover {
   color: #e50914;
 }
@@ -485,27 +492,21 @@ body.vel-modal-active {
 .vel-home-row-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: clamp(0.68rem, 0.8vw, 0.76rem);
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  padding: 2px 7px;
-  border-radius: 4px;
-  margin-right: 8px;
+  justify-content: center;
+  font-size: 1.05em;
+  line-height: 1;
+  margin-right: 0;
   vertical-align: middle;
-  text-transform: uppercase;
+  flex-shrink: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
 }
 
-.vel-home-row-badge--movies {
-  background: rgba(229, 9, 20, 0.85);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(229, 9, 20, 0.4);
-}
-
+.vel-home-row-badge--movies,
 .vel-home-row-badge--series {
-  background: rgba(99, 102, 241, 0.85);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+  background: transparent;
+  box-shadow: none;
 }
 
 .vel-home-feed-sentinel {

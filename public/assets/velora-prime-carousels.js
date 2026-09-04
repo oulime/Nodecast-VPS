@@ -683,8 +683,8 @@
     h2.className = "qwttco";
     const typeBadge = isHome
       ? (tab === "movies"
-          ? '<span class="vel-home-row-badge vel-home-row-badge--movies">🎬 FILMS</span>'
-          : '<span class="vel-home-row-badge vel-home-row-badge--series">🍿 SÉRIES</span>')
+          ? '<span class="vel-home-row-badge vel-home-row-badge--movies" aria-hidden="true">🎬</span>'
+          : '<span class="vel-home-row-badge vel-home-row-badge--series" aria-hidden="true">🍿</span>')
       : "";
     h2.innerHTML = `<span data-testid="carousel-title">${typeBadge}<span>${pkgTitle}</span></span>`;
     h2.style.cursor = "pointer";
@@ -754,6 +754,8 @@
   let homeRenderedCount = 0;
   let homeSentinelObserver = null;
   let isHomeLoading = false;
+  let lastHomeCountry = null;
+  let homeFeedInitialized = false;
 
   function shuffleArray(arr) {
     const a = arr.slice();
@@ -781,7 +783,7 @@
     return container;
   }
 
-  async function initHomeMixedFeed() {
+  async function initHomeMixedFeed(force = false) {
     const tab = activeTab();
     if (tab !== "home") return;
 
@@ -789,10 +791,16 @@
     const container = getHomeFeedContainer();
     if (!container) return;
 
+    if (!force && homeFeedInitialized && lastHomeCountry === country && container.children.length > 0) {
+      return;
+    }
+
     if (isHomeLoading) return;
     isHomeLoading = true;
 
     try {
+      lastHomeCountry = country;
+      homeFeedInitialized = true;
       container.innerHTML = "";
       homeRenderedCount = 0;
       homeQueue = [];
@@ -929,14 +937,14 @@
   }
 
   // Render the full Netflix-style page feed instantly from precomputed cache
-  async function render() {
+  async function render(force = false) {
     const tab = activeTab();
     const country = getActiveCountryId();
     const container = getContainer();
 
     if (tab === "home") {
       container.style.setProperty("display", "none", "important");
-      initHomeMixedFeed();
+      initHomeMixedFeed(force);
       return;
     }
 
@@ -948,7 +956,7 @@
     container.style.removeProperty("display");
 
     const feedKey = `${country}:${tab}`;
-    if (feedKey === lastFeedKey && container.children.length > 0) {
+    if (!force && feedKey === lastFeedKey && container.children.length > 0) {
       return;
     }
 
@@ -1154,24 +1162,32 @@
   document.addEventListener("velora-home-tab", () => {
     lastFeedKey = "";
     syncHeaderForMediaTabs();
-    setTimeout(render, 30);
+    setTimeout(() => render(false), 30);
   });
 
   document.addEventListener("velora-country-change", () => {
     lastFeedKey = "";
+    lastHomeCountry = null;
+    homeFeedInitialized = false;
     feedCache.clear();
     packageFullItemsCache.clear();
     syncHeaderForMediaTabs();
-    setTimeout(render, 30);
+    setTimeout(() => render(true), 30);
   });
 
   // When Xtream catalog data finishes loading in background, refresh posters if needed
   window.addEventListener("velora-vod-ready", () => {
+    if (activeTab() === "home") {
+      return;
+    }
     lastFeedKey = "";
     syncHeaderForMediaTabs();
     render();
   });
   window.addEventListener("velora-series-ready", () => {
+    if (activeTab() === "home") {
+      return;
+    }
     lastFeedKey = "";
     syncHeaderForMediaTabs();
     render();
@@ -1181,34 +1197,37 @@
   if (countrySelect) {
     countrySelect.addEventListener("change", () => {
       lastFeedKey = "";
+      lastHomeCountry = null;
+      homeFeedInitialized = false;
       feedCache.clear();
       packageFullItemsCache.clear();
       syncHeaderForMediaTabs();
-      setTimeout(render, 30);
+      setTimeout(() => render(true), 30);
     });
   }
 
   document.addEventListener("velora-return-home", () => {
-    setTimeout(initHomeMixedFeed, 50);
+    setTimeout(() => initHomeMixedFeed(false), 50);
   });
 
   let prevObservedTab = "";
   new MutationObserver(() => {
     const tab = activeTab();
-    if (tab !== prevObservedTab) {
+    const tabChanged = tab !== prevObservedTab;
+    if (tabChanged) {
       prevObservedTab = tab;
       lastFeedKey = "";
-    }
-    syncHeaderForMediaTabs();
-    if (MEDIA_TABS.has(tab)) {
-      render();
-    } else if (tab === "home") {
-      const c = document.getElementById("vel-prime-carousels-container");
-      if (c) c.style.display = "none";
-      initHomeMixedFeed();
-    } else {
-      const c = document.getElementById("vel-prime-carousels-container");
-      if (c) c.style.display = "none";
+      syncHeaderForMediaTabs();
+      if (MEDIA_TABS.has(tab)) {
+        render();
+      } else if (tab === "home") {
+        const c = document.getElementById("vel-prime-carousels-container");
+        if (c) c.style.display = "none";
+        initHomeMixedFeed(false);
+      } else {
+        const c = document.getElementById("vel-prime-carousels-container");
+        if (c) c.style.display = "none";
+      }
     }
   }).observe(document.body, {
     attributes: true,

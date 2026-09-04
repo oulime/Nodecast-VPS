@@ -538,14 +538,7 @@
     }
 
     autoScrollUp() {
-      const contentView = document.getElementById("content-view");
-      if (contentView) {
-        try {
-          contentView.scrollTo({ top: 0, behavior: "smooth" });
-        } catch (_) {
-          contentView.scrollTop = 0;
-        }
-      }
+      if (!this.isLiveActive()) return;
       const dynamicList = document.getElementById("dynamic-list");
       if (dynamicList) {
         try {
@@ -554,29 +547,6 @@
           dynamicList.scrollTop = 0;
         }
       }
-      const mainVelora = document.querySelector(".main--velora");
-      if (mainVelora) {
-        try {
-          mainVelora.scrollTo({ top: 0, behavior: "smooth" });
-        } catch (_) {
-          mainVelora.scrollTop = 0;
-        }
-      }
-      const velBody = document.querySelector(".vel-body");
-      if (velBody) {
-        try {
-          velBody.scrollTo({ top: 0, behavior: "smooth" });
-        } catch (_) {
-          velBody.scrollTop = 0;
-        }
-      }
-      try {
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      } catch (_) {
-        window.scrollTo(0, 0);
-      }
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
     }
 
     setupInfiniteScroll() {

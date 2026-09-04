@@ -1187,11 +1187,12 @@
     if (isHls && window.Hls && window.Hls.isSupported()) {
       const hls = new window.Hls({
         enableWorker: true,
-        maxBufferLength: 60,
-        maxMaxBufferLength: 120,
-        maxBufferSize: 60 * 1000 * 1000,
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 10,
+        maxBufferLength: 20,
+        maxMaxBufferLength: 30,
+        maxBufferSize: 30 * 1000 * 1000,
+        liveSyncDurationCount: 5,
+        liveMaxLatencyDurationCount: 8,
+        startFragPrefetch: false,
         manifestLoadingMaxRetry: 10,
         manifestLoadingRetryDelay: 2000,
         manifestLoadingMaxRetryTimeout: 30000,

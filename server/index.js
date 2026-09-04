@@ -184,6 +184,12 @@ function isVpsDataApiRequest(requestPath) {
 
 if (USE_VPS_DATA_API) {
     app.use(async (req, res, next) => {
+        if (req.path.startsWith('/uploads/')) {
+            const localUploadPath = path.join(__dirname, '..', 'public', req.path.replace(/^\/+/, ''));
+            if (fs.existsSync(localUploadPath)) {
+                return res.sendFile(localUploadPath);
+            }
+        }
         if (!isVpsDataApiRequest(req.path)) return next();
 
         const controller = new AbortController();
@@ -256,6 +262,49 @@ if (USE_VPS_DATA_API) {
             res.setHeader('X-Nodecast-Data-Source', VPS_DATA_API_BASE);
 
             const contentType = String(upstream.headers.get('content-type') || '').toLowerCase();
+            if (req.path.startsWith('/uploads/') && contentType.includes('text/html')) {
+                clearRequest();
+                const localUploadPath = path.join(__dirname, '..', 'public', req.path.replace(/^\/+/, ''));
+                if (fs.existsSync(localUploadPath)) {
+                    return res.sendFile(localUploadPath);
+                }
+                return res.status(404).end();
+            }
+
+            if (upstream.ok && req.path === '/api/velora-db/home-cache' && contentType.includes('application/json')) {
+                const data = await upstream.json().catch(() => null);
+                if (data && Array.isArray(data.sections)) {
+                    let logoCache = {};
+                    try { logoCache = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'vod-title-logo-cache.json'), 'utf8')) || {}; } catch (_) {}
+                    for (const section of data.sections) {
+                        if (section.card_orientation === 'horizontal' && Array.isArray(section.entries)) {
+                            const isSeries = section.content_type === 'series';
+                            const type = isSeries ? 'tv' : 'movie';
+                            for (const entry of section.entries) {
+                                if (!entry.title_logo && entry.name) {
+                                    const raw = String(entry.name).trim().toLowerCase();
+                                    let found = logoCache[`${type}:${raw}`];
+                                    if (!found) {
+                                        for (const [k, v] of Object.entries(logoCache)) {
+                                            if (k.startsWith(`${type}:`) && v !== 'NONE') {
+                                                const titlePart = k.slice(type.length + 1);
+                                                if (raw === titlePart || raw.startsWith(titlePart) || titlePart.startsWith(raw)) {
+                                                    found = v;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (found && found !== 'NONE') {
+                                        entry.title_logo = found;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return res.json(data);
+                }
+            }
 
             if (upstream.ok && req.path === '/api/package-covers/all' && contentType.includes('application/json')) {
                 const data = await upstream.json().catch(() => null);

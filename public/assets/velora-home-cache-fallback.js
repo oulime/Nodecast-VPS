@@ -1,6 +1,6 @@
 (function () {
   "use strict";
-  var storageKey = "velora.home-cache.first-paint.v2";
+  var storageKey = "velora.home-cache.first-paint.v4";
   var cachePayload = null;
   var cacheRequests = new Map();
   var cachePayloads = new Map();
@@ -300,6 +300,48 @@
     name.className = "vel-home-section__name";
     name.textContent = cleanTitle || entry.name || "";
     card.append(media, name);
+    if (isHorizontal) {
+      var titleLogoUrl = String(entry.title_logo || entry.titleLogo || entry.logo || "").trim();
+      var applyTitleLogo = function (url) {
+        if (!url || url === "NONE") return;
+        if (card.querySelector(".vel-home-section__title-logo")) return;
+        card.classList.add("has-title-logo");
+        var logoImg = document.createElement("img");
+        logoImg.className = "vel-home-section__title-logo";
+        logoImg.alt = cleanTitle || entry.name || "";
+        logoImg.loading = "lazy";
+        logoImg.decoding = "async";
+        logoImg.onerror = function () {
+          card.classList.remove("has-title-logo");
+          logoImg.remove();
+        };
+        logoImg.src = url;
+        card.appendChild(logoImg);
+      };
+      if (titleLogoUrl) {
+        applyTitleLogo(titleLogoUrl);
+      } else if (cleanTitle && (section.content_type === "movies" || section.content_type === "series" || entry.contentType === "movies" || entry.contentType === "series")) {
+        var cType = section.content_type || entry.contentType || "movies";
+        if (!window.__veloraFetchingLogos) window.__veloraFetchingLogos = new Map();
+        var logoKey = cType + ":" + cleanTitle.toLowerCase();
+        if (!window.__veloraFetchingLogos.has(logoKey)) {
+          var p = fetch("/api/velora-db/title-logo?name=" + encodeURIComponent(cleanTitle) + "&type=" + encodeURIComponent(cType))
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (data) {
+              if (data && data.url) {
+                entry.title_logo = data.url;
+                return data.url;
+              }
+              return null;
+            })
+            .catch(function () { return null; });
+          window.__veloraFetchingLogos.set(logoKey, p);
+        }
+        window.__veloraFetchingLogos.get(logoKey).then(function (resolvedUrl) {
+          if (resolvedUrl) applyTitleLogo(resolvedUrl);
+        });
+      }
+    }
     var logoUrl = String(section && (section.logo_url || section.badge_logo_url) || entry && (entry.section_logo_url || entry.logo_url) || "").trim();
     if (logoUrl) {
       card.classList.add("vel-home-section__card--has-badge");

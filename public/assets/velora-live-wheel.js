@@ -1312,6 +1312,7 @@
       nextBatch.forEach((ch, idx) => {
         const globalIdx = start + idx;
         const streamId = String(ch.stream_id || ch.id || "");
+        const name = String(ch.name || ch.title || ch.stream_name || "Chaîne").trim() || "Chaîne";
         const pkgCoverRaw = this.activePackage ? this.resolvePackageCover(this.activePackage) : "";
         const pkgCover = (!isCountryFlagUrl(pkgCoverRaw)) ? pkgCoverRaw : "";
         let rawLogo = String(ch.stream_icon || ch.logo || ch.cover || "").trim();

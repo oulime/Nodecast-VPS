@@ -181,7 +181,23 @@
       .replace(/^[A-Z0-9]{1,6}-[A-Z0-9]{1,6}\s*[-:|•]\s*/i, "")
       .trim();
 
-    return clean || title || "Catalogue";
+    // 5. Apply sentence casing (only first letter capital)
+    return toSentenceCase(clean || title || "Catalogue");
+  }
+
+  function toSentenceCase(str) {
+    if (!str) return "";
+    const s = String(str).trim();
+    if (!s) return "";
+    const lower = s.toLowerCase();
+    let capitalized = false;
+    return lower.replace(/[a-zA-ZÀ-ÿ]/, (char) => {
+      if (!capitalized) {
+        capitalized = true;
+        return char.toUpperCase();
+      }
+      return char;
+    });
   }
 
   function getContainer() {

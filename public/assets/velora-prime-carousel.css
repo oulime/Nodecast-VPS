@@ -223,12 +223,14 @@ body.vel-modal-active {
 
 .qwttco {
   margin: 0;
-  font-size: clamp(1.15rem, 1.6vw, 1.55rem);
+  font-family: "Amazon Ember", "Amazon Ember Display", "Ember", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: clamp(1.1rem, 1.45vw, 1.45rem);
   font-weight: 700;
-  color: #fff;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
-  transition: color 0.2s ease;
+  color: #ffffff;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  text-transform: none !important;
+  transition: color 0.2s ease, opacity 0.2s ease;
   min-width: 0;
 }
 
@@ -237,42 +239,57 @@ body.vel-modal-active {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  text-transform: none !important;
+}
+
+.qwttco [data-testid="carousel-title"] span {
+  text-transform: none !important;
 }
 
 .qwttco:hover {
-  color: #e50914;
+  color: #ffffff;
+  opacity: 0.85;
 }
 
 .toEceS {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: clamp(0.78rem, 1vw, 0.9rem);
-  font-weight: 600;
-  color: #94a3b8;
+  gap: 5px;
+  font-family: "Amazon Ember", "Amazon Ember Display", "Ember", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: clamp(0.82rem, 1vw, 0.95rem);
+  font-weight: 700;
+  color: #ffffff;
   text-decoration: none;
   cursor: pointer;
   margin-left: auto;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: color 0.2s ease, transform 0.2s ease;
+  text-transform: none !important;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  opacity: 0.95;
 }
 
 .toEceS:hover {
-  color: #fff;
+  opacity: 1;
+  color: #ffffff;
   transform: translateX(3px);
 }
 
 .toEceS .IcIpJ_ {
   display: inline-block;
   line-height: 1;
+  text-transform: none !important;
 }
 
 .toEceS ._22qEau,
 .toEceS svg {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  fill: none;
   flex-shrink: 0;
+  vertical-align: middle;
 }
 
 /* Rail Wrapper */

@@ -1,4 +1,4 @@
-﻿/* Velora VIP - TV Logos Admin Section Styles */
+/* Velora VIP - TV Logos Admin Section Styles */
 .vel-logos-panel {
   display: flex;
   flex-direction: column;
@@ -383,11 +383,12 @@
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 0.85rem 1rem;
+  padding: 0.75rem 1rem;
   background: rgba(15, 23, 42, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   transition: border-color 0.15s ease, transform 0.15s ease;
+  overflow: hidden;
 }
 
 .vel-logo-card:hover {
@@ -396,8 +397,8 @@
 }
 
 .vel-logo-card__thumb-wrap {
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   background: rgba(0, 0, 0, 0.5);
   border-radius: 8px;
   display: flex;
@@ -419,19 +420,20 @@
 }
 
 .vel-logo-card__info {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
 }
 
 .vel-logo-card__title-row {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.2rem;
 }
 
 .vel-logo-card__name {
-  font-size: 1rem;
+  font-size: 0.95rem;
   color: #fff;
   white-space: nowrap;
   overflow: hidden;
@@ -439,12 +441,14 @@
 }
 
 .vel-logo-card__url {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: #64748b;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.25rem;
+  max-width: 280px;
+  display: block;
 }
 
 .vel-logo-card__aliases {

@@ -231,9 +231,11 @@
       const aliasBadges = aliases.map(function(a) { return '<span class="vel-logo-badge vel-logo-badge--alias">' + esc(a) + '</span>'; }).join('');
       const countryBadge = item.country ? '<span class="vel-logo-badge vel-logo-badge--country">' + esc(item.country) + '</span>' : '';
 
+      const thumbSrc = item.url.startsWith('/') ? item.url : ('/proxy?target=' + encodeURIComponent(item.url));
+
       return '<div class="vel-logo-card" data-logo-name="' + esc(item.name) + '">' +
         '<div class="vel-logo-card__thumb-wrap">' +
-          '<img src="/proxy?target=' + encodeURIComponent(item.url) + '" alt="' + esc(item.name) + '" class="vel-logo-card__thumb" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';" />' +
+          '<img src="' + thumbSrc + '" alt="' + esc(item.name) + '" class="vel-logo-card__thumb" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';" />' +
           '<div class="vel-logo-card__thumb-fallback" style="display:none;">📺</div>' +
         '</div>' +
         '<div class="vel-logo-card__info">' +
@@ -245,9 +247,9 @@
           (aliases.length ? '<div class="vel-logo-card__aliases">' + aliasBadges + '</div>' : '') +
         '</div>' +
         '<div class="vel-logo-card__actions">' +
-          '<button type="button" class="vel-logo-btn vel-logo-btn--test" data-test-logo="' + esc(item.name) + '" title="Tester la détection">⚡ Tester</button>' +
-          '<button type="button" class="vel-logo-btn vel-logo-btn--edit" data-edit-logo="' + esc(item.name) + '" title="Modifier ce logo">✏️ Modifier</button>' +
-          '<button type="button" class="vel-logo-btn vel-logo-btn--delete" data-delete-logo="' + esc(item.name) + '" title="Supprimer ce logo">🗑️</button>' +
+          '<button type="button" class="vel-logo-btn vel-logo-btn--test" data-test-logo="' + esc(item.name) + '" onclick="if(window.veloraLogosAdmin&amp;&amp;window.veloraLogosAdmin.testMatch){window.veloraLogosAdmin.testMatch(this.getAttribute(\'data-test-logo\'));}" title="Tester la détection">⚡ Tester</button>' +
+          '<button type="button" class="vel-logo-btn vel-logo-btn--edit" data-edit-logo="' + esc(item.name) + '" onclick="if(window.veloraLogosAdmin&amp;&amp;window.veloraLogosAdmin.editLogo){window.veloraLogosAdmin.editLogo(this.getAttribute(\'data-edit-logo\'));}" title="Modifier ce logo">✏️ Modifier</button>' +
+          '<button type="button" class="vel-logo-btn vel-logo-btn--delete" data-delete-logo="' + esc(item.name) + '" onclick="if(window.veloraLogosAdmin&amp;&amp;window.veloraLogosAdmin.deleteLogo){window.veloraLogosAdmin.deleteLogo(this.getAttribute(\'data-delete-logo\'));}" title="Supprimer ce logo">🗑️</button>' +
         '</div>' +
       '</div>';
     }).join('');
@@ -271,7 +273,8 @@
     const trimmed = (url || '').trim();
     if (img && fallback) {
       if (trimmed) {
-        img.src = '/proxy?target=' + encodeURIComponent(trimmed);
+        const src = trimmed.startsWith('/') ? trimmed : ('/proxy?target=' + encodeURIComponent(trimmed));
+        img.src = src;
         img.style.display = 'block';
         img.onerror = function() { img.style.display = 'none'; fallback.style.display = 'flex'; };
         fallback.style.display = 'none';

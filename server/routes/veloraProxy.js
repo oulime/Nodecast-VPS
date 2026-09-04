@@ -142,13 +142,22 @@ function buildUpstreamHeaders(req, targetUrl, fromPlaylist) {
         /\/get_series_info$/i.test(targetPath) ||
         /\/player_api(\.php)?$/i.test(targetPath);
 
+    const isWikimedia = /wikimedia\.org|wikipedia\.org/i.test(target.hostname);
+    if (isWikimedia) {
+        referer = 'https://en.wikipedia.org/';
+    }
+
+    const defaultUa = isWikimedia || isMediaOrImage(targetUrl, '')
+        ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
+        : (process.env.VELORA_PROXY_USER_AGENT || 'VLC/3.0.18 LibVLC/3.0.18');
+
     const headers = {
         Accept: isXtreamInfoEndpoint
             ? 'application/json, text/plain;q=0.9, */*;q=0.8'
             : req.get('accept') || '*/*',
         'Accept-Language': 'en-US,en;q=0.9',
         Referer: stripDefaultPortHref(referer),
-        'User-Agent': process.env.VELORA_PROXY_USER_AGENT || 'VLC/3.0.18 LibVLC/3.0.18'
+        'User-Agent': defaultUa
     };
 
     const cookie = cookieHeaderForUpstreamUrl(targetUrl);

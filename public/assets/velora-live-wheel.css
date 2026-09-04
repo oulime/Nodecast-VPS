@@ -348,31 +348,24 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active):not(.vel-favorites-o
    - Dark / Black Logos -> Card background becomes pure White (#ffffff)
    - White / Color Logos -> Card background stays Dark / Gradient
    ========================================================= */
-.vel-coverflow-card.vel-dark-logo-mode .vel-coverflow-card__inner {
+.main--velora .vel-coverflow-card.vel-dark-logo-mode .vel-coverflow-card__inner,
+.vel-coverflow-card.vel-dark-logo-mode .vel-coverflow-card__inner,
+.vel-coverflow-card:has(.vel-dark-logo-mode) .vel-coverflow-card__inner {
   background: #ffffff !important;
   border-color: rgba(255, 255, 255, 0.9) !important;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45) !important;
 }
 
-.vel-coverflow-card.vel-dark-logo-mode.is-center-card .vel-coverflow-card__inner {
+.main--velora .vel-coverflow-card.vel-dark-logo-mode.is-center-card .vel-coverflow-card__inner,
+.vel-coverflow-card.vel-dark-logo-mode.is-center-card .vel-coverflow-card__inner,
+.vel-coverflow-card.is-center-card:has(.vel-dark-logo-mode) .vel-coverflow-card__inner {
   background: #ffffff !important;
   border-color: var(--theme-primary, #c084fc) !important;
   box-shadow: 0 0 26px var(--theme-glow, rgba(168, 85, 247, 0.65)), 0 8px 24px rgba(0, 0, 0, 0.75) !important;
 }
 
 .vel-coverflow-card.vel-dark-logo-mode .vel-coverflow-card__logo {
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15)) !important;
-}
-
-/* Dark logo treatment for channel thumbnail rows -> Solid White tile */
-.media-item__thumb.vel-dark-logo-mode {
-  background: #ffffff !important;
-  border-color: rgba(255, 255, 255, 0.85) !important;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35) !important;
-}
-
-.media-item__thumb.vel-dark-logo-mode img {
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15)) !important;
+  filter: none !important;
 }
 
 /* Optimize Dynamic List Spacing & Safe Scroll */
@@ -558,6 +551,34 @@ body[data-vel-top-level="live"] #dynamic-list {
   padding: 0 !important;
   object-fit: cover !important;
   filter: none !important;
+}
+
+/* =========================================================
+   Solid White Tile for Channel Logos in Dark Mode (High Specificity)
+   ========================================================= */
+.main--velora .media-item__thumb.vel-dark-logo-mode,
+.main--velora .media-item__thumb[class*="vel-dark-logo-mode"],
+.media-item__thumb.vel-dark-logo-mode,
+.media-item__thumb[class*="vel-dark-logo-mode"],
+.vel-image-loaded-host.vel-dark-logo-mode {
+  background: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.92) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
+}
+
+.main--velora .media-item__thumb.vel-dark-logo-mode img,
+.media-item__thumb.vel-dark-logo-mode img,
+.vel-image-loaded-host.vel-dark-logo-mode img {
+  filter: none !important;
+}
+
+.main--velora .vel-media-item-row:hover .media-item__thumb.vel-dark-logo-mode,
+.main--velora .vel-media-item-row.vel-media-item-row--active .media-item__thumb.vel-dark-logo-mode,
+.main--velora .media-item__main.selected .media-item__thumb.vel-dark-logo-mode,
+.main--velora .vel-media-item-row:focus-within .media-item__thumb.vel-dark-logo-mode {
+  background: #ffffff !important;
+  border-color: rgba(192, 132, 252, 0.9) !important;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.4), 0 2px 8px rgba(0, 0, 0, 0.35) !important;
 }
 
 

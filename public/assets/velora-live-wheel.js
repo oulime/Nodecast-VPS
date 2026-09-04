@@ -108,7 +108,7 @@
 
     for (let i = 0; i < data.length; i += 4) {
       const a = data[i + 3];
-      if (a < 50) continue; // Skip transparent background
+      if (a < 25) continue; // Skip purely transparent background
       visiblePixels++;
 
       const r = data[i];
@@ -118,16 +118,17 @@
       const lum = 0.299 * r + 0.587 * g + 0.114 * b;
       totalLuminance += lum;
 
-      if (lum < 85) darkPixels++;
-      else if (lum > 175) lightPixels++;
+      if (lum < 135) darkPixels++;
+      else if (lum > 170) lightPixels++;
     }
 
-    if (visiblePixels < 6) return { tone: "neutral", isDark: false, isLight: false };
+    if (visiblePixels < 4) return { tone: "neutral", isDark: false, isLight: false };
 
     const avgLum = totalLuminance / visiblePixels;
     const darkRatio = darkPixels / visiblePixels;
-    const isDark = avgLum < 90 || darkRatio > 0.55;
-    const isLight = avgLum > 180 || (lightPixels / visiblePixels) > 0.65;
+    // Sensitive detection: if average luminance < 140 or more than 35% pixels are dark
+    const isDark = avgLum < 140 || darkRatio > 0.35;
+    const isLight = avgLum > 175 || (lightPixels / visiblePixels) > 0.65;
 
     return {
       tone: isDark ? "dark" : (isLight ? "light" : "color"),
@@ -139,8 +140,9 @@
 
   // Global helper to analyze and apply dark logo contrast mode
   window.veloraDetectLogoDarkness = function(imgElement, container) {
-    if (!imgElement || !imgElement.src) return;
-    const src = imgElement.currentSrc || imgElement.src;
+    if (!imgElement) return;
+    const src = imgElement.currentSrc || imgElement.src || "";
+    if (!src) return;
 
     // NEVER put white background on country flags
     if (isCountryFlagUrl(src) || isCountryFlagUrl(decodeURIComponent(src))) {
@@ -165,14 +167,14 @@
       return;
     }
 
-    const runAnalysis = () => {
+    const runAnalysis = (imageTarget) => {
       try {
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d", { willReadFrequently: true });
         const size = 32;
         canvas.width = size;
         canvas.height = size;
-        ctx.drawImage(imgElement, 0, 0, size, size);
+        ctx.drawImage(imageTarget, 0, 0, size, size);
         const imgData = ctx.getImageData(0, 0, size, size).data;
         const result = detectImageToneFromCanvas(imgData);
 
@@ -181,14 +183,36 @@
           applyDark();
         }
       } catch (_) {
-        logoToneCache.set(src, "unknown");
+        // If tainted canvas due to cross-origin, retry through image proxy
+        if (!src.startsWith("/proxy") && !src.startsWith("/api/proxy")) {
+          const proxied = new Image();
+          proxied.crossOrigin = "anonymous";
+          proxied.onload = () => {
+            try {
+              const canvas = document.createElement("canvas");
+              const ctx = canvas.getContext("2d", { willReadFrequently: true });
+              canvas.width = 32;
+              canvas.height = 32;
+              ctx.drawImage(proxied, 0, 0, 32, 32);
+              const imgData = ctx.getImageData(0, 0, 32, 32).data;
+              const result = detectImageToneFromCanvas(imgData);
+              logoToneCache.set(src, result.tone);
+              if (result.isDark) applyDark();
+            } catch (e) {
+              logoToneCache.set(src, "unknown");
+            }
+          };
+          proxied.src = toProxiedImageUrl(src);
+        } else {
+          logoToneCache.set(src, "unknown");
+        }
       }
     };
 
     if (imgElement.complete && imgElement.naturalWidth > 0) {
-      runAnalysis();
+      runAnalysis(imgElement);
     } else {
-      imgElement.addEventListener("load", runAnalysis, { once: true });
+      imgElement.addEventListener("load", () => runAnalysis(imgElement), { once: true });
     }
   };
 

@@ -331,6 +331,8 @@ router.options('/', (req, res) => {
     res.status(204).end();
 });
 
+const { getOrFetchCachedImage } = require('../services/imageCache');
+
 const TRANSPARENT_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
 const deadHostCache = new Map();
 
@@ -347,6 +349,22 @@ router.all('/', async (req, res) => {
     const isMediaSegmentRequest =
         /\.(ts|m4s|mp4|m4v|aac|mp3|webm|mkv)$/i.test(targetPath) ||
         /\/segment\//i.test(targetPath);
+
+    // Fast-path for images: Check persistent on-disk VPS cache or fetch and cache locally
+    if (isImageRequest && (method === 'GET' || method === 'HEAD')) {
+        try {
+            const cached = await getOrFetchCachedImage(target, 4000);
+            if (cached) {
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.setHeader('Content-Type', cached.mimeType || 'image/png');
+                res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+                res.setHeader('X-Velora-Image-Cache', cached.hit ? 'HIT' : 'MISS');
+                if (method === 'HEAD') return res.status(200).end();
+                if (cached.buffer) return res.status(200).send(cached.buffer);
+                if (cached.filePath) return res.sendFile(cached.filePath);
+            }
+        } catch (_) {}
+    }
 
     // Fast-path: if this image host recently timed out or failed (e.g. dead picon server 51.158.145.100),
     // immediately return a transparent 1x1 PNG so the browser queue is never blocked.

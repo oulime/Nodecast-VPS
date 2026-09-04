@@ -1466,57 +1466,40 @@ router.get('/stream', async (req, res) => {
     }
 });
 
+const { getOrFetchCachedImage } = require('../services/imageCache');
+
 /**
  * Proxy images (channel logos, posters)
  * Fixes mixed content errors when loading HTTP images on HTTPS pages
+ * Caches permanently on VPS disk to prevent rate-limits/quotas.
  * GET /api/proxy/image?url=...
  */
 const TRANSPARENT_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
 
 router.get('/image', async (req, res) => {
     try {
-        const url = String(req.query.url || '').trim();
+        const url = String(req.query.url || req.query.target || '').trim();
         if (!url) {
             res.set('Content-Type', 'image/png');
             return res.send(TRANSPARENT_PNG);
         }
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
-
-        try {
-            const response = await fetch(url, {
-                signal: controller.signal,
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Accept': 'image/*,*/*;q=0.8'
-                }
-            });
-            clearTimeout(timeout);
-
-            if (!response.ok) {
-                res.set('Content-Type', 'image/png');
-                res.set('Cache-Control', 'public, max-age=3600');
-                return res.send(TRANSPARENT_PNG);
-            }
-
-            const contentType = response.headers.get('content-type') || 'image/png';
-            res.set('Content-Type', contentType);
+        const cached = await getOrFetchCachedImage(url, 4000);
+        if (cached) {
             res.set('Access-Control-Allow-Origin', '*');
-            res.set('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
-
-            if (response.body) {
-                const stream = Readable.from(response.body);
-                stream.pipe(res);
-            } else {
-                res.end();
+            res.set('Content-Type', cached.mimeType || 'image/png');
+            res.set('Cache-Control', 'public, max-age=31536000, immutable');
+            res.set('X-Velora-Image-Cache', cached.hit ? 'HIT' : 'MISS');
+            if (cached.buffer) {
+                return res.send(cached.buffer);
+            } else if (cached.filePath) {
+                return res.sendFile(cached.filePath);
             }
-        } catch (fetchErr) {
-            clearTimeout(timeout);
-            res.set('Content-Type', 'image/png');
-            res.set('Cache-Control', 'public, max-age=1800');
-            return res.send(TRANSPARENT_PNG);
         }
+
+        res.set('Content-Type', 'image/png');
+        res.set('Cache-Control', 'public, max-age=3600');
+        return res.send(TRANSPARENT_PNG);
     } catch (err) {
         res.set('Content-Type', 'image/png');
         return res.send(TRANSPARENT_PNG);

@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const { getDb } = require('../db/sqlite');
+const { getOrFetchCachedImage } = require('./imageCache');
 
 const CACHE_FILE = path.join(__dirname, '..', '..', 'data', 'channel-logos-cache.json');
 const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -247,6 +248,9 @@ function saveCustomLogo({ name, url, aliases = [], country = '' }) {
         };
         raw[name.trim()] = cleanAliases.length || country ? entryObj : url.trim();
         writeRawCustomLogosFile(raw);
+    }
+    if (typeof url === 'string' && url.startsWith('http')) {
+        getOrFetchCachedImage(url).catch(() => {});
     }
     return getCustomLogos();
 }

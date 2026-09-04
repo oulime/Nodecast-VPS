@@ -1186,12 +1186,12 @@ router.post('/epg/:sourceId/channels', async (req, res) => {
  * Supports HTTP Range requests for video seeking and live HLS manifest deduplication/resilience
  */
 const liveManifestCache = new Map();
-const LIVE_MANIFEST_CACHE_TTL_MS = 1000;
+const LIVE_MANIFEST_CACHE_TTL_MS = 3500;
 const LIVE_MANIFEST_STALE_TTL_MS = 25000;
 
 router.get('/stream', async (req, res) => {
-    const maxRetries = 4;
-    const retryDelays = [250, 600, 1200, 2000];
+    const maxRetries = 2;
+    const retryDelays = [800, 1500];
     let lastError = null;
 
     let { url } = req.query;
@@ -1404,10 +1404,25 @@ router.get('/stream', async (req, res) => {
                     } catch (e) { return line; }
                 }).join('\n');
 
-                // Cache rewritten live manifest for short deduplication
+                // Monotonic sequence protection: Ensure upstream CDN round-robin doesn't step backward in time
+                const seqMatch = manifest.match(/#EXT-X-MEDIA-SEQUENCE:(\d+)/i);
+                const incomingSeq = seqMatch ? parseInt(seqMatch[1], 10) : null;
+
+                if (liveManifestCache.has(url)) {
+                    const cached = liveManifestCache.get(url);
+                    if (incomingSeq !== null && typeof cached.sequence === 'number' && incomingSeq < cached.sequence) {
+                        console.warn(`[Proxy] Dropped out-of-order CDN manifest for ${url.substring(0, 70)} (incoming seq ${incomingSeq} < cached ${cached.sequence})`);
+                        req.off('close', onClose);
+                        res.set('X-Velora-Manifest-Monotonic', 'PREVENT_REGRESSION');
+                        return res.send(cached.manifest);
+                    }
+                }
+
+                // Cache rewritten live manifest for short deduplication and monotonic tracking
                 liveManifestCache.set(url, {
                     manifest,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
+                    sequence: incomingSeq !== null ? incomingSeq : (liveManifestCache.get(url)?.sequence || 0)
                 });
                 if (liveManifestCache.size > 200) {
                     const now = Date.now();

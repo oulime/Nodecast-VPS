@@ -119,11 +119,11 @@ class VideoPlayer {
             maxMaxBufferLength: 60,        // Absolute max buffer 60 seconds
             maxBufferSize: 60 * 1000 * 1000, // 60MB max buffer size
             maxBufferHole: 1.0,            // Allow 1s holes in buffer (helps with discontinuities)
-            // Live stream settings - stay right at live edge for real-time live streaming
-            liveSyncMode: 'edge',
-            liveSyncDurationCount: 1,      // Stay at the newest live segment
-            liveMaxLatencyDurationCount: 4, // Catch up quickly if lagging behind
-            maxLiveSyncPlaybackRate: 1.1,  // Seamlessly catch up to live edge
+            // Live stream settings - stable playback without scene jumping
+            liveSyncMode: 'buffered',
+            liveSyncDurationCount: 3,      // Stay 3 segments behind live edge (standard HLS stability)
+            liveMaxLatencyDurationCount: 10, // Allow up to 10 segments of buffer before catching up
+            maxLiveSyncPlaybackRate: 1.05, // Smooth, imperceptible catch-up if connection lags
             liveBackBufferLength: 30,      // Keep 30s of back buffer for seeking
             // Audio discontinuity handling (fixes garbled audio during ad transitions)
             stretchShortVideoTrack: true,  // Stretch short segments to avoid gaps

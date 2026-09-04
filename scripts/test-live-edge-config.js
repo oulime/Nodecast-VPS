@@ -3,25 +3,26 @@ const assert = require('assert');
 
 console.log('--- 1. Testing VideoPlayer.js config ---');
 const vp = fs.readFileSync('public/js/components/VideoPlayer.js', 'utf8');
-assert(vp.includes("liveSyncMode: 'edge'"), 'VideoPlayer missing liveSyncMode: edge');
-assert(vp.includes("liveSyncDurationCount: 1"), 'VideoPlayer missing liveSyncDurationCount: 1');
-assert(vp.includes("liveMaxLatencyDurationCount: 4"), 'VideoPlayer missing liveMaxLatencyDurationCount: 4');
-assert(vp.includes("maxLiveSyncPlaybackRate: 1.1"), 'VideoPlayer missing maxLiveSyncPlaybackRate: 1.1');
+assert(vp.includes("liveSyncMode: 'buffered'"), 'VideoPlayer missing liveSyncMode: buffered');
+assert(vp.includes("liveSyncDurationCount: 3"), 'VideoPlayer missing liveSyncDurationCount: 3');
+assert(vp.includes("liveMaxLatencyDurationCount: 10"), 'VideoPlayer missing liveMaxLatencyDurationCount: 10');
+assert(vp.includes("maxLiveSyncPlaybackRate: 1.05"), 'VideoPlayer missing maxLiveSyncPlaybackRate: 1.05');
 console.log('PASS: VideoPlayer.js configured correctly');
 
 console.log('--- 2. Testing main-JkackQV-.js & custom-package-v7.js ---');
 for (const file of ['public/assets/main-JkackQV-.js', 'public/assets/main-JkackQV-custom-package-v7.js']) {
   const b = fs.readFileSync(file, 'utf8');
-  assert(b.includes('liveSyncMode:"edge",liveSyncDurationCount:1,liveMaxLatencyDurationCount:4'), file + ' missing liveSyncMode edge or liveSyncDurationCount 1 in GU');
-  assert(b.includes('liveBackBufferLength:30,liveSyncMode:"edge",liveSyncDurationCount:1,liveMaxLatencyDurationCount:4'), file + ' missing liveSyncMode edge in Sg');
+  assert(b.includes('liveSyncMode:"buffered",liveSyncDurationCount:3,liveMaxLatencyDurationCount:10'), file + ' missing liveSyncMode buffered or liveSyncDurationCount 3 in GU');
+  assert(b.includes('liveBackBufferLength:30,liveSyncMode:"buffered",liveSyncDurationCount:3,liveMaxLatencyDurationCount:10'), file + ' missing liveSyncMode buffered in Sg');
   assert(b.includes('let u=o,d=null;if(l.autoTranscode&&!r){'), file + ' missing !r in jU autoTranscode');
   console.log('PASS: ' + file + ' verified');
 }
 
-console.log('--- 3. Testing proxy.js cache TTL ---');
+console.log('--- 3. Testing proxy.js cache TTL & monotonic guard ---');
 const proxy = fs.readFileSync('server/routes/proxy.js', 'utf8');
-assert(proxy.includes('const LIVE_MANIFEST_CACHE_TTL_MS = 1000;'), 'proxy.js does not have LIVE_MANIFEST_CACHE_TTL_MS = 1000');
-console.log('PASS: server/routes/proxy.js cache TTL is 1000ms');
+assert(proxy.includes('const LIVE_MANIFEST_CACHE_TTL_MS = 3500;'), 'proxy.js does not have LIVE_MANIFEST_CACHE_TTL_MS = 3500');
+assert(proxy.includes('Monotonic sequence protection'), 'proxy.js missing monotonic sequence protection');
+console.log('PASS: server/routes/proxy.js cache TTL is 3500ms and has monotonic sequence protection');
 
 console.log('--- 4. Testing transcodeSession.js INITIAL_LIVE_SEGMENTS ---');
 const ts = fs.readFileSync('server/services/transcodeSession.js', 'utf8');
@@ -30,8 +31,8 @@ console.log('PASS: server/services/transcodeSession.js INITIAL_LIVE_SEGMENTS is 
 
 console.log('--- 5. Testing index.html bundle version ---');
 const html = fs.readFileSync('public/index.html', 'utf8');
-assert(html.includes('main-JkackQV-custom-package-v7.js?v=20260903-live-edge-v1'), 'index.html missing updated cache buster');
-console.log('PASS: public/index.html cache buster is 20260903-live-edge-v1');
+assert(html.includes('main-JkackQV-custom-package-v7.js?v=20260904-hls-stable-v1'), 'index.html missing updated cache buster');
+console.log('PASS: public/index.html cache buster is 20260904-hls-stable-v1');
 
 console.log('--- 6. Testing Dino HLS manifest rewrite simulation ---');
 const sampleDinoPlaylist = [

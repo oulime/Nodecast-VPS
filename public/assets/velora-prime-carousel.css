@@ -210,7 +210,7 @@ body.vel-modal-active {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  margin-bottom: clamp(10px, 1.2vw, 16px);
+  margin-bottom: clamp(2px, 0.4vw, 6px);
 }
 
 .TvxgS1 {
@@ -307,7 +307,7 @@ body.vel-modal-active {
   scroll-behavior: smooth;
   list-style: none;
   margin: 0;
-  padding: 8px 4px 16px;
+  padding: 4px 4px 14px;
   scrollbar-width: none;
   -ms-overflow-style: none;
   -webkit-overflow-scrolling: touch;

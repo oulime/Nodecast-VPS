@@ -238,7 +238,7 @@ body.vel-modal-active {
 [data-testid="carousel-title"] {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   line-height: 1;
   text-transform: none !important;
 }

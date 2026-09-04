@@ -1086,53 +1086,18 @@
     }
 
     async ensurePackageLogoFromChannels(pkg, channels) {
-      if (!pkg || !Array.isArray(channels) || channels.length === 0) return;
+      if (!pkg) return;
 
-      const officialOnly = isOfficialLogosOnlyActive();
       let currentCover = this.resolvePackageCover(pkg);
-
-      if (!currentCover || isCountryFlagUrl(currentCover)) {
-        const firstWithLogo = channels.find(ch => {
-          const icon = String(ch.stream_icon || ch.logo || ch.cover || "").trim();
-          if (!icon || icon.includes("tmdb.org") || icon.includes("image.tmdb")) return false;
-          if (officialOnly && !isOfficialLogoUrl(icon)) return false;
-          return true;
-        });
-
-        let rawLogo = "";
-        if (firstWithLogo) {
-          rawLogo = String(firstWithLogo.stream_icon || firstWithLogo.logo || firstWithLogo.cover || "").trim();
-        } else {
-          // Fallback to brand match or country flag / logo
-          const countryId = getActiveCountryId();
-          const select = document.getElementById("country-select") || document.getElementById("home-country-select");
-          const countryName = (select?.options?.[select?.selectedIndex]?.text || "").replace(/^[^a-zA-ZÀ-ÿ]+/, "").trim();
-          rawLogo = getBrandLogoForName(pkg.name || pkg.display_name) || getCountryFlagUrl(countryId, countryName);
-        }
+      if (!currentCover) {
+        const countryId = getActiveCountryId();
+        const select = document.getElementById("country-select") || document.getElementById("home-country-select");
+        const countryName = (select?.options?.[select?.selectedIndex]?.text || "").replace(/^[^a-zA-ZÀ-ÿ]+/, "").trim();
+        const rawLogo = getBrandLogoForName(pkg.name || pkg.display_name) || getCountryFlagUrl(countryId, countryName);
 
         if (rawLogo) {
           const proxiedLogo = toProxiedImageUrl(rawLogo);
           pkg.cover_url = proxiedLogo;
-
-          if (isOfficialLogoUrl(rawLogo) || !officialOnly) {
-            window.__veloraCustomPackageLogos = window.__veloraCustomPackageLogos || {};
-            window.__veloraCustomPackageLogos[pkg.id] = rawLogo;
-            try {
-              localStorage.setItem("velora_package_covers", JSON.stringify(window.__veloraCustomPackageLogos));
-            } catch (_) {}
-
-            if (typeof window.veloraReportPackageCover === "function") {
-              window.veloraReportPackageCover(pkg.id, rawLogo);
-            } else {
-              try {
-                fetch("/api/package-covers/auto-backfill", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ packageId: String(pkg.id), coverUrl: rawLogo })
-                }).catch(() => {});
-              } catch (_) {}
-            }
-          }
 
           extractColorFromImage(proxiedLogo, (extractedTheme) => {
             pkg._cachedTheme = extractedTheme;
@@ -1144,8 +1109,6 @@
           if (this.packages.length >= 1) {
             this.renderMainCards();
           }
-
-          window.dispatchEvent(new CustomEvent("velora-package-covers-updated", { detail: { packageId: pkg.id, coverUrl: rawLogo, covers: window.__veloraCustomPackageLogos } }));
         }
       }
     }

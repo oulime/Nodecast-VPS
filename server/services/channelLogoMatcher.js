@@ -857,31 +857,7 @@ function syncAllPackageCovers(db) {
                 }
             }
 
-            // Step B: If no brand match, check channels inside this category for official logos
-            if (!bestLogo && catId) {
-                const channels = channelLookupStmt.all(catId);
-                for (const ch of channels) {
-                    if (ch.stream_icon && (
-                        ch.stream_icon.includes('imgur') ||
-                        ch.stream_icon.includes('wikimedia') ||
-                        ch.stream_icon.includes('wikia') ||
-                        ch.stream_icon.includes('github') ||
-                        ch.stream_icon.includes('flagcdn.com') ||
-                        ch.stream_icon.includes('/uploads/') ||
-                        ch.stream_icon.includes('/logos/')
-                    ) && !ch.stream_icon.includes('tmdb.org')) {
-                        bestLogo = ch.stream_icon;
-                        break;
-                    }
-                    const chMatch = matchChannelLogo(ch.name);
-                    if (chMatch && chMatch.logo) {
-                        bestLogo = chMatch.logo;
-                        break;
-                    }
-                }
-            }
-
-            // Step C: Fallback to country flag / logo if not found in JSON or channels
+            // Step B: Fallback to country flag / logo if not found in brand match (never channel logos)
             if (!bestLogo) {
                 bestLogo = getCountryFlagOrLogo(pkg.country_id, countryName);
             }
@@ -898,40 +874,6 @@ function syncAllPackageCovers(db) {
                         veloraData.saveRow('admin_packages', pkg);
                     }
                     coversUpdated++;
-                }
-            }
-        }
-
-        // 2. Also map raw category_ids from playlist_items
-        const liveCategories = db.prepare(`
-            SELECT category_id, MIN(name) as sample_name
-            FROM playlist_items
-            WHERE type = 'live' AND category_id IS NOT NULL AND is_hidden = 0
-            GROUP BY category_id
-        `).all();
-
-        for (const cat of liveCategories) {
-            const catId = String(cat.category_id || '').trim();
-            if (!catId || discovered[catId]) continue;
-
-            const channels = channelLookupStmt.all(catId);
-            for (const ch of channels) {
-                if (ch.stream_icon && (
-                    ch.stream_icon.includes('imgur') ||
-                    ch.stream_icon.includes('wikimedia') ||
-                    ch.stream_icon.includes('wikia') ||
-                    ch.stream_icon.includes('github') ||
-                    ch.stream_icon.includes('flagcdn.com') ||
-                    ch.stream_icon.includes('/uploads/') ||
-                    ch.stream_icon.includes('/logos/')
-                ) && !ch.stream_icon.includes('tmdb.org')) {
-                    discovered[catId] = ch.stream_icon;
-                    break;
-                }
-                const chMatch = matchChannelLogo(ch.name);
-                if (chMatch && chMatch.logo) {
-                    discovered[catId] = chMatch.logo;
-                    break;
                 }
             }
         }

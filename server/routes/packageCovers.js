@@ -261,18 +261,9 @@ async function removeOldPackageCovers(packageSlug, keepFileName) {
  */
 router.get('/package-covers/all', async (_req, res) => {
     try {
-        const discovered = await loadDiscoveredCovers();
         const covers = {};
 
-        // 1. Add auto-discovered covers (never return TMDB movie posters for package covers)
-        for (const [id, item] of Object.entries(discovered)) {
-            const url = typeof item === 'string' ? item : item?.coverUrl;
-            if (url && !url.includes('tmdb.org') && !url.includes('image.tmdb') && !url.includes('/w600_and_h900_bestv2/')) {
-                covers[id] = url;
-            }
-        }
-
-        // 2. Add or override with admin explicit covers from SQLite DB
+        // 1. Add admin explicit covers from SQLite DB (manual uploads only, ignore auto-discovered channel icons)
         let veloraData = null;
         try {
             veloraData = require('./veloraData');
@@ -280,13 +271,13 @@ router.get('/package-covers/all', async (_req, res) => {
             for (const row of adminCovers) {
                 const id = String(row.package_id || '');
                 const url = String(row.cover_url || '').trim();
-                if (id && url && !row.deleted && !url.includes('tmdb.org') && !url.includes('image.tmdb')) {
+                if (id && url && !row.deleted && !row.auto_discovered && !url.includes('tmdb.org') && !url.includes('image.tmdb')) {
                     covers[id] = url;
                 }
             }
         } catch (_) {}
 
-        // 3. Official logos filtering & Country flag fallback for packages
+        // 2. Official logos filtering, Brand matches & Country flag fallback for packages
         try {
             const channelLogoMatcher = require('../services/channelLogoMatcher');
             const officialOnly = veloraData && typeof veloraData.isOfficialPackagesLogosOnly === 'function'
@@ -310,18 +301,17 @@ router.get('/package-covers/all', async (_req, res) => {
                     existingCover = '';
                 }
 
-                const isFlag = (url) => typeof url === 'string' && (url.includes('flagcdn.com') || url.includes('/flags/') || url.includes('country_') || url.includes('/logos/arabe.svg'));
+                // Check brand match first (e.g. Netflix, Canal+, DAZN)
+                if (pkgName) {
+                    const brandMatch = channelLogoMatcher.matchChannelLogo(pkgName);
+                    if (brandMatch && brandMatch.logo) {
+                        existingCover = brandMatch.logo;
+                    }
+                }
 
-                if (!existingCover || isFlag(existingCover)) {
-                    if (pkgName) {
-                        const brandMatch = channelLogoMatcher.matchChannelLogo(pkgName);
-                        if (brandMatch && brandMatch.logo) {
-                            existingCover = brandMatch.logo;
-                        }
-                    }
-                    if (!existingCover) {
-                        existingCover = channelLogoMatcher.getCountryFlagOrLogo(pkg.country_id, countryName);
-                    }
+                // Fallback to Country Flag / Logo if no dedicated manual/brand logo
+                if (!existingCover) {
+                    existingCover = channelLogoMatcher.getCountryFlagOrLogo(pkg.country_id, countryName);
                 }
 
                 if (existingCover) {
@@ -351,125 +341,10 @@ router.get('/package-covers/all', async (_req, res) => {
 
 /**
  * POST /api/package-covers/auto-backfill
- * Crowd-sourced package cover backfill: whenever any user opens a package without a cover,
- * the first channel image is saved to server storage so every user sees it.
+ * Packages strictly use brand logos or country flags, channel icons are not backfilled.
  */
-router.post('/package-covers/auto-backfill', express.json(), async (req, res) => {
-    try {
-        const items = Array.isArray(req.body?.items)
-            ? req.body.items
-            : (req.body?.packageId && req.body?.coverUrl ? [req.body] : []);
-
-        if (!items.length) {
-            return res.status(400).json({ error: 'packageId and coverUrl required' });
-        }
-
-        const map = await loadDiscoveredCovers();
-        let changed = false;
-        let veloraData = null;
-        try { veloraData = require('./veloraData'); } catch (_) {}
-
-        for (const item of items) {
-            const packageId = String(item.packageId || '').trim();
-            let coverUrl = String(item.coverUrl || '').trim();
-
-            const officialOnly = veloraData && typeof veloraData.isOfficialPackagesLogosOnly === 'function'
-                ? veloraData.isOfficialPackagesLogosOnly()
-                : (veloraData && typeof veloraData.isOfficialLogosOnly === 'function' && veloraData.isOfficialLogosOnly());
-            if (officialOnly) {
-                if (!veloraData.isOfficialLogoUrl(coverUrl)) {
-                    continue;
-                }
-            }
-
-            // Unwrap nested /proxy?target=
-            while (coverUrl.includes('/proxy?target=') || coverUrl.includes('/api/proxy?target=')) {
-                try {
-                    const idx = coverUrl.indexOf('target=');
-                    if (idx !== -1) {
-                        const rawTarget = coverUrl.slice(idx + 7).split('&')[0];
-                        const decoded = decodeURIComponent(rawTarget);
-                        if (decoded && (decoded.startsWith('http://') || decoded.startsWith('https://') || decoded.startsWith('/'))) {
-                            coverUrl = decoded;
-                            continue;
-                        }
-                    }
-                } catch (_) {}
-                break;
-            }
-
-            // Reject TMDB movie poster URLs from being saved as package covers
-            if (coverUrl.includes('image.tmdb.org') || coverUrl.includes('tmdb.org') || coverUrl.includes('/w600_and_h900_bestv2/') || coverUrl.includes('/w500/') || coverUrl.includes('/w300/')) {
-                continue;
-            }
-
-            // Strip localhost / loopback / origin prefix to keep URL portable
-            try {
-                if (coverUrl.startsWith('http://') || coverUrl.startsWith('https://')) {
-                    const u = new URL(coverUrl);
-                    if (u.pathname.startsWith('/proxy') || u.pathname.startsWith('/api/proxy') || u.pathname.startsWith('/uploads/') || u.pathname.startsWith('/images/') || u.pathname.startsWith('/logos/')) {
-                        coverUrl = u.pathname + u.search;
-                    }
-                }
-            } catch (_) {}
-
-            if (!/^https?:\/\//i.test(coverUrl) && !coverUrl.startsWith('/uploads/') && !coverUrl.startsWith('/proxy') && !coverUrl.startsWith('/api/proxy') && !coverUrl.startsWith('/images/') && !coverUrl.startsWith('/logos/')) {
-                continue;
-            }
-
-            const existing = map[packageId];
-            const currentUrl = typeof existing === 'string' ? existing : existing?.coverUrl;
-
-            if (currentUrl !== coverUrl) {
-                map[packageId] = {
-                    packageId,
-                    coverUrl,
-                    updatedAt: new Date().toISOString()
-                };
-                changed = true;
-
-                // Also sync into SQLite admin_package_covers and admin_packages if available
-                if (veloraData && typeof veloraData.saveRow === 'function') {
-                    try {
-                        const dbRows = veloraData.allRows('admin_package_covers') || [];
-                        const dbExisting = dbRows.find(r => String(r.package_id) === packageId);
-                        // Do not overwrite manual admin-uploaded covers
-                        if (!dbExisting || dbExisting.auto_discovered || !dbExisting.cover_url) {
-                            veloraData.saveRow('admin_package_covers', {
-                                package_id: packageId,
-                                cover_url: coverUrl,
-                                auto_discovered: 1
-                            }, req);
-                        }
-
-                        // Also update admin_packages row so cover_url is part of package metadata
-                        const pkgRows = veloraData.allRows('admin_packages') || [];
-                        const targetPkg = pkgRows.find(r => String(r.id) === packageId);
-                        if (targetPkg && !targetPkg.cover_url) {
-                            veloraData.saveRow('admin_packages', {
-                                ...targetPkg,
-                                cover_url: coverUrl
-                            }, req);
-                        }
-                    } catch (dbErr) {
-                        console.warn('[package-cover] DB saveRow error:', dbErr.message);
-                    }
-                }
-            }
-        }
-
-        if (changed) {
-            await saveDiscoveredCovers(map);
-            if (veloraData && typeof veloraData.invalidateCountryPackageCache === 'function') {
-                try { veloraData.invalidateCountryPackageCache(); } catch (_) {}
-            }
-        }
-
-        return res.json({ ok: true, saved: items.length });
-    } catch (err) {
-        console.error('[package-cover] auto-backfill failed:', err);
-        return res.status(500).json({ error: 'Auto-backfill failed.' });
-    }
+router.post('/package-covers/auto-backfill', express.json(), async (_req, res) => {
+    return res.json({ ok: true, ignored: true });
 });
 
 // Admin upload cover

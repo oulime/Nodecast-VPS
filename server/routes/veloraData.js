@@ -195,8 +195,65 @@ const COUNTRY_PACKAGE_TABLES = new Set([
     'admin_package_channel_order',
     'admin_package_covers',
     'admin_packages',
+    'admin_settings',
     'admin_stream_curations'
 ]);
+
+function isOfficialLogoUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    const trimmed = url.trim();
+    if (!trimmed) return false;
+    if (trimmed.startsWith('data:image/') || trimmed.startsWith('/uploads/')) return true;
+    try {
+        const parsed = new URL(trimmed);
+        const host = parsed.hostname.toLowerCase();
+        return (
+            host.includes('iptv-org.github.io') ||
+            host.includes('raw.githubusercontent.com') ||
+            host.includes('github.io') ||
+            host.includes('wikimedia.org') ||
+            host.includes('wikipedia.org') ||
+            host.includes('wikidata.org') ||
+            host.includes('imgur.com') ||
+            host.includes('themoviedb.org') ||
+            host.includes('tmdb.org') ||
+            host.includes('thetvdb.com') ||
+            host.includes('freebox.cdn.scw.iliad.fr') ||
+            host.includes('cloudfront.net')
+        );
+    } catch {
+        return false;
+    }
+}
+
+function isOfficialLogosOnly() {
+    try {
+        const row = getDb().prepare(
+            `SELECT data FROM velora_admin_rows WHERE table_name = 'admin_settings' AND row_id = 'official_logos_only'`
+        ).get();
+        if (row?.data) {
+            const parsed = JSON.parse(row.data);
+            const val = parsed.value;
+            return val === '1' || val === 1 || val === true || val === 'true';
+        }
+    } catch (_) {}
+    return false;
+}
+
+function sanitizeChannelIcon(name, streamIcon) {
+    const rawIcon = String(streamIcon || '').trim();
+    if (!isOfficialLogosOnly()) {
+        return rawIcon;
+    }
+    if (rawIcon && isOfficialLogoUrl(rawIcon)) {
+        return rawIcon;
+    }
+    const matched = channelLogoMatcher.matchChannelLogo(name);
+    if (matched) {
+        return matched;
+    }
+    return '';
+}
 const HOME_CHANNEL_RULE_TABLES = new Set([
     'admin_channel_name_prefixes',
     'admin_channel_name_suffixes',
@@ -863,7 +920,7 @@ function liveChannelsForCurations(curations, packageById) {
             kind: 'live',
             origin_package_id: String(curation.origin_package_id || ''),
             name: item.name,
-            stream_icon: item.stream_icon || '',
+            stream_icon: sanitizeChannelIcon(item.name, item.stream_icon),
             provider_order: item.provider_order,
             package_id: packageId,
             package_name: packageById.get(packageId)?.name || packageId
@@ -1965,7 +2022,9 @@ function buildHomeCache() {
                 if (!backdropUrl && isHorizontal) {
                     backdropUrl = backdropCache[key] || backdropCache[titleKey] || '';
                 }
-                const standardThumb = String(item.stream_icon || item.cover || '');
+                const standardThumb = type === 'live'
+                    ? sanitizeChannelIcon(rawName, item.stream_icon || item.cover || '')
+                    : String(item.stream_icon || item.cover || '');
                 const finalThumb = (isHorizontal && backdropUrl) ? backdropUrl : (standardThumb || backdropUrl);
                 return {
                     id: `home-cache:${section.id}:${rawId}`,

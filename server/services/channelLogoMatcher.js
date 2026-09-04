@@ -43,12 +43,43 @@ function fetchJson(url) {
     });
 }
 
+const COUNTRY_WORDS = [
+    'MAROC', 'MOROCCO', 'FRANCE', 'ALGERIE', 'ALGERIA', 'TUNISIE', 'TUNISIA',
+    'EGYPT', 'EGYPTE', 'LIBAN', 'LEBANON', 'ARABIA', 'SAUDI', 'QATAR', 'EMIRATES',
+    'DUBAI', 'KSA', 'UAE', 'UK', 'USA', 'SPAIN', 'ESPAGNE', 'ITALY', 'ITALIE',
+    'GERMANY', 'ALLEMAGNE', 'PORTUGAL', 'BELGIQUE', 'BELGIUM', 'SUISSE',
+    'SWITZERLAND', 'TURKEY', 'TURQUIE', 'AFRIQUE', 'AFRICA', 'LATINO', 'INTER',
+    'INTERNATIONAL', 'NATIONAL', 'MONDE', 'WORLD'
+];
+
+const COUNTRY_PRIORITY = ['FR', 'MA', 'DZ', 'TN', 'EG', 'SA', 'AE', 'QA', 'UK', 'US', 'ES', 'DE', 'IT'];
+
+const KNOWN_CHANNEL_ALIASES = {
+    'alaoula': ['alaoula', 'alaoulamaroc', 'snrt1', 'snrtaloula', 'la1ere'],
+    'alaoulamaroc': ['alaoula', 'alaoulamaroc', 'snrt1'],
+    'arryadia': ['arryadia', 'arriadia', 'snrt3', 'arryadiahd1', 'alriyadia'],
+    'arrabiaa': ['arrabia', 'arrabiaa', 'athaqafia', 'snrt4'],
+    'almaghribia': ['almaghribia', 'almaghribiya', 'snrt5'],
+    'assadissa': ['assadissa', 'assadisa', 'snrt6'],
+    'aflamtv': ['aflamtv', 'snrt7'],
+    'tamazight': ['tamazight', 'tamazighttv', 'snrt8'],
+    'medi1': ['medi1tvmaghreb', 'medi1tv', 'medi1tvarabic', 'medi1tvafrique'],
+    'medi1tv': ['medi1tvmaghreb', 'medi1tv', 'medi1tvarabic', 'medi1tvafrique'],
+    'chada': ['chadatv', 'chada'],
+    'chadatv': ['chadatv', 'chada'],
+    'telemaroc': ['telemaroc', 'telemaroctv'],
+    'canal': ['canalplus', 'canalplusfrance'],
+    'canalplus': ['canalplus', 'canalplusfrance'],
+    'beinsport': ['beinsports', 'beinsport1', 'beinsports1'],
+    'beinsports': ['beinsports', 'beinsport', 'beinsports1', 'beinsport1']
+};
+
 function cleanChannelName(raw) {
     if (!raw) return '';
     let name = String(raw).trim();
 
-    // Remove emoji/hashtag borders like "##### 4K UHD #####"
-    name = name.replace(/^[#*=\-_~+\s]+|[#*=\-_~+\s]+$/g, '');
+    // Remove decorative symbols, emojis and border characters
+    name = name.replace(/^[#*=\-_~+•|/\\:;!?,.()\[\]{}◉●★☆▲▼◆◇■□✪✦✧✔✓🔴🎬🍿⚽🏆🥇🥈🥉📺📡🔴⚪🟢🟡🟣🔵⚫\s]+|[#*=\-_~+•|/\\:;!?,.()\[\]{}◉●★☆▲▼◆◇■□✪✦✧✔✓🔴🎬🍿⚽🏆🥇🥈🥉📺📡🔴⚪🟢🟡🟣🔵⚫\s]+$/g, '');
 
     // Normalize unicode characters (e.g. superscript ᵁᴴᴰ ³⁸⁴⁰ᴾ, accents)
     name = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
@@ -59,12 +90,22 @@ function cleanChannelName(raw) {
     name = name.replace(/^(fr|ar|uk|us|es|it|de|pt|nl|be|ch|pl|tr|ca|ru|in|ma|dz|tn|sa|ae|eg|qa|kw)[\s:|\-_]+/i, '');
     name = name.replace(/^(4k|fhd|uhd|hd|sd|hevc|h265|vip)[\s:|\-_]+/i, '');
 
-    // Strip common trailing resolution/event badges
+    // Strip common trailing resolution/event/codec badges
     name = name.replace(/[\s:|\-_]+(4k|fhd|uhd|hd|sd|hevc|h265|event|live|backup|vip|\(\d+\)|\[.*?\]|\(.*?\)).*$/i, '');
     name = name.replace(/[\s:|\-_]+(1080p|720p|50fps|60fps|h264|aac|raw).*$/i, '');
 
     // Collapse spaces and trim
     return name.replace(/\s+/g, ' ').trim();
+}
+
+function stripCountry(str) {
+    if (!str) return '';
+    let res = str;
+    for (const c of COUNTRY_WORDS) {
+        const reg = new RegExp('(^|\\s+)' + c + '(\\s+|$)', 'gi');
+        res = res.replace(reg, ' ').trim();
+    }
+    return res.replace(/\s+/g, ' ').trim();
 }
 
 function normalizeKey(str) {
@@ -125,20 +166,34 @@ async function loadOrBuildLogoIndex(forceRefresh = false) {
     const exactMap = new Map();
     const cleanMap = new Map();
 
-    for (const c of cacheData.channels || []) {
+    // Sort channels giving priority to key markets
+    const sortedChannels = [...(cacheData.channels || [])].sort((a, b) => {
+        const pA = COUNTRY_PRIORITY.indexOf(a.country);
+        const pB = COUNTRY_PRIORITY.indexOf(b.country);
+        const valA = pA === -1 ? 999 : pA;
+        const valB = pB === -1 ? 999 : pB;
+        return valA - valB;
+    });
+
+    for (const c of sortedChannels) {
         const logo = logoById.get(c.id);
         if (!logo) continue;
 
-        const names = [c.name, ...(c.alt_names || [])];
+        const idBase = c.id.replace(/\.[a-z]{2,3}$/i, '');
+        const names = [c.name, ...(c.alt_names || []), idBase];
         for (const n of names) {
             if (!n) continue;
             const norm = normalizeKey(n);
-            if (norm && !exactMap.has(norm)) {
+            if (norm && (!exactMap.has(norm) || COUNTRY_PRIORITY.includes(c.country))) {
                 exactMap.set(norm, { id: c.id, name: c.name, logo, country: c.country });
             }
             const clean = normalizeKey(cleanChannelName(n));
-            if (clean && !cleanMap.has(clean)) {
+            if (clean && (!cleanMap.has(clean) || COUNTRY_PRIORITY.includes(c.country))) {
                 cleanMap.set(clean, { id: c.id, name: c.name, logo, country: c.country });
+            }
+            const noCountry = normalizeKey(stripCountry(n));
+            if (noCountry && !cleanMap.has(noCountry)) {
+                cleanMap.set(noCountry, { id: c.id, name: c.name, logo, country: c.country });
             }
         }
     }
@@ -153,40 +208,72 @@ function matchChannelLogo(rawName, countryHint = '') {
     const { exactMap, cleanMap } = inMemoryIndex;
 
     const candidates = [];
-    candidates.push(normalizeKey(rawName));
+    const addCandidate = (str) => {
+        if (!str) return;
+        const norm = typeof str === 'string' && /^[a-z0-9]+$/.test(str) ? str : normalizeKey(str);
+        if (norm && !candidates.includes(norm)) {
+            candidates.push(norm);
+        }
+    };
 
+    // Tier 1: Raw & Direct Cleaned
+    addCandidate(rawName);
     const cleaned = cleanChannelName(rawName);
-    const cleanNorm = normalizeKey(cleaned);
-    candidates.push(cleanNorm);
+    addCandidate(cleaned);
 
-    // Remove secondary qualifiers like "premium", "cinema", "cinemas", "box office", "extra"
+    // Tier 2: Country / Region Suffix Stripping (e.g. "2M MAROC" -> "2M", "AL AOULA MAROC" -> "AL AOULA")
+    const noCountry = stripCountry(cleaned);
+    if (noCountry && noCountry !== cleaned) {
+        addCandidate(noCountry);
+    }
+
+    // Tier 3: Remove secondary qualifiers ("premium", "extra", "live", "event", "box office")
     const strippedQualifiers = cleaned
         .replace(/\b(premium|extra|live|event|feed|box\s*office)\b/gi, '')
         .replace(/\s+/g, ' ')
         .trim();
     if (strippedQualifiers && strippedQualifiers !== cleaned) {
-        candidates.push(normalizeKey(strippedQualifiers));
+        addCandidate(strippedQualifiers);
+        const sqNoCountry = stripCountry(strippedQualifiers);
+        if (sqNoCountry) addCandidate(sqNoCountry);
     }
 
-    // Number repositioning: e.g. "beIN Sports 1 Premium" -> "beIN Sports Premium 1"
+    // Tier 4: Number repositioning (e.g. "beIN Sports 1 Premium" -> "beIN Sports Premium 1")
     const numMatch = cleaned.match(/\b(\d+)\s+([a-z]+)\b/i);
     if (numMatch) {
-        candidates.push(normalizeKey(cleaned.replace(numMatch[0], `${numMatch[2]} ${numMatch[1]}`)));
+        addCandidate(cleaned.replace(numMatch[0], `${numMatch[2]} ${numMatch[1]}`));
     }
 
-    // Plural/singular normalization (e.g. cinema <-> cinemas, sports <-> sport)
-    const singular = cleanNorm
-        .replace(/cinemas/g, 'cinema')
-        .replace(/sports/g, 'sport');
-    if (singular !== cleanNorm) {
-        candidates.push(singular);
+    // Tier 5: Known Aliases & Transliterations
+    for (const key of [...candidates]) {
+        if (KNOWN_CHANNEL_ALIASES[key]) {
+            for (const alt of KNOWN_CHANNEL_ALIASES[key]) {
+                addCandidate(alt);
+            }
+        }
     }
-    const plural = cleanNorm
-        .replace(/cinema(?![a-z])/g, 'cinemas')
-        .replace(/sport(?![a-z])/g, 'sports');
-    if (plural !== cleanNorm) {
-        candidates.push(plural);
+
+    // Tier 6: Progressive Cascade - Rightmost Word Stripping (e.g. "BEIN SPORTS MAX 4" -> "BEIN SPORTS MAX" -> "BEIN SPORTS" -> "BEIN")
+    const words = cleaned.split(/\s+/).filter(Boolean);
+    for (let len = words.length - 1; len >= 1; len--) {
+        const sub = words.slice(0, len).join(' ');
+        const subNorm = normalizeKey(sub);
+        if (subNorm.length >= 2) {
+            addCandidate(subNorm);
+            const subNoCountry = normalizeKey(stripCountry(sub));
+            if (subNoCountry.length >= 2) addCandidate(subNoCountry);
+            if (KNOWN_CHANNEL_ALIASES[subNorm]) {
+                for (const alt of KNOWN_CHANNEL_ALIASES[subNorm]) addCandidate(alt);
+            }
+        }
     }
+
+    // Tier 7: Plural/singular normalization (cinema <-> cinemas, sports <-> sport)
+    const cleanNorm = normalizeKey(cleaned);
+    const singular = cleanNorm.replace(/cinemas/g, 'cinema').replace(/sports/g, 'sport');
+    if (singular !== cleanNorm) addCandidate(singular);
+    const plural = cleanNorm.replace(/cinema(?![a-z])/g, 'cinemas').replace(/sport(?![a-z])/g, 'sports');
+    if (plural !== cleanNorm) addCandidate(plural);
 
     for (const key of candidates) {
         if (!key) continue;

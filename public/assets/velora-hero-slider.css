@@ -120,8 +120,8 @@
 }
 
 .vel-hero-title-logo {
-  max-width: min(560px, 88%);
-  max-height: clamp(90px, 15vw, 175px);
+  max-width: min(580px, 86%);
+  max-height: clamp(100px, 16vw, 165px);
   width: auto;
   height: auto;
   object-fit: contain;
@@ -131,17 +131,44 @@
   pointer-events: none;
 }
 
+/* Smart Optical Aspect-Ratio Modifiers */
+.vel-hero-title-logo.is-tall-logo {
+  max-height: clamp(85px, 13vw, 135px);
+  max-width: min(440px, 72%);
+}
+
+.vel-hero-title-logo.is-wide-logo {
+  max-width: min(660px, 92%);
+  max-height: clamp(95px, 15vw, 150px);
+}
+
 @media (max-width: 768px) {
   .vel-hero-title-logo {
-    max-width: min(380px, 90%);
-    max-height: clamp(65px, 16vw, 115px);
+    max-width: min(340px, 86%);
+    max-height: clamp(62px, 18vw, 92px);
+  }
+  .vel-hero-title-logo.is-tall-logo {
+    max-height: clamp(52px, 15vw, 76px);
+    max-width: min(260px, 75%);
+  }
+  .vel-hero-title-logo.is-wide-logo {
+    max-width: min(380px, 92%);
+    max-height: clamp(58px, 17vw, 84px);
   }
 }
 
 @media (max-width: 480px) {
   .vel-hero-title-logo {
-    max-width: min(290px, 92%);
-    max-height: clamp(55px, 18vw, 90px);
+    max-width: min(280px, 88%);
+    max-height: clamp(52px, 17vw, 78px);
+  }
+  .vel-hero-title-logo.is-tall-logo {
+    max-height: clamp(45px, 14vw, 65px);
+    max-width: min(220px, 78%);
+  }
+  .vel-hero-title-logo.is-wide-logo {
+    max-width: min(320px, 94%);
+    max-height: clamp(48px, 16vw, 70px);
   }
 }
 

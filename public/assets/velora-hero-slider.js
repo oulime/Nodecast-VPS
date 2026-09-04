@@ -232,7 +232,28 @@
         };
 
         var resolvedLogoSrc = formatLogoUrl(logoUrl);
+
+        function updateLogoAspect(img) {
+          if (!img || !img.naturalWidth || !img.naturalHeight) return;
+          var ratio = img.naturalWidth / img.naturalHeight;
+          img.classList.remove("is-tall-logo", "is-wide-logo", "is-balanced-logo");
+          if (ratio < 1.85) {
+            img.classList.add("is-tall-logo");
+          } else if (ratio > 3.2) {
+            img.classList.add("is-wide-logo");
+          } else {
+            img.classList.add("is-balanced-logo");
+          }
+        }
+
+        logoImg.onload = function() {
+          updateLogoAspect(logoImg);
+        };
         logoImg.src = resolvedLogoSrc;
+        if (logoImg.complete && logoImg.naturalWidth > 0) {
+          updateLogoAspect(logoImg);
+        }
+
         logoWrap.appendChild(logoImg);
         content.appendChild(logoWrap);
       } else {

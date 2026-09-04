@@ -16,10 +16,15 @@ const countryPackageCachePath = path.join(
 );
 const vodPosterCachePath = path.join(__dirname, '..', '..', 'data', 'vod-poster-cache.json');
 const vodBackdropCachePath = path.join(__dirname, '..', '..', 'data', 'vod-backdrop-cache.json');
+const vodTitleLogoCachePath = path.join(__dirname, '..', '..', 'data', 'vod-title-logo-cache.json');
+const TITLE_LOGO_UPLOAD_DIR = path.join(__dirname, '..', '..', 'public', 'uploads', 'title-logos');
+const TITLE_LOGO_PUBLIC_PATH = '/uploads/title-logos';
+try { fs.mkdirSync(TITLE_LOGO_UPLOAD_DIR, { recursive: true }); } catch (_) {}
 const mediaFeedCachePath = path.join(__dirname, '..', '..', 'data', 'velora-cache', 'media-feed-cache.json');
 const MEDIA_FEED_ENTRIES_PER_PACKAGE = 20;
 let currentMediaFeedCache = null;
 const https = require('https');
+const http = require('http');
 const dbJsonPath = path.join(__dirname, '..', '..', 'data', 'db.json');
 
 function getEnabledSourceIdSet() {
@@ -38,15 +43,18 @@ function getEnabledSourceIdSet() {
 function cleanMediaTitleForSearch(raw) {
     let title = String(raw || '').trim();
     for (let i = 0; i < 5; i++) {
+        const prev = title;
         title = title
-            .replace(/^[\[\(]?[A-Z0-9\+\-\s]+[\]\)]\s*[-:]?\s*/i, '')
-            .replace(/^([0-9]+K|[0-9]+D|HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|EN|ES|DE|MULTI|TRUEFRENCH|FRENCH|HEVC|HDR|DOLBY|ATMOS)\s*[-:]?\s*/i, '')
-            .replace(/^[A-Z0-9]{1,8}-[A-Z0-9]{1,8}\s*[-:]?\s*/i, '')
+            .replace(/^[\[\(][A-Z0-9\+\-\s]+[\]\)]\s*[-:|•]?\s*/i, '')
+            .replace(/^([0-9]+K|[0-9]+D|HD|FHD|UHD|4K|VF|VOSTFR|VO|MULTI|TRUEFRENCH|FRENCH|HEVC|HDR|DOLBY|ATMOS)(\s*[-:|•]\s*|\s+)/i, '')
+            .replace(/^[A-Z0-9]{1,5}-[A-Z0-9]{1,5}\s*[-:|•]\s+/i, '')
+            .replace(/^[A-Z]{2,3}\s*[-:|•]\s+/i, '')
             .trim();
+        if (title === prev) break;
     }
     const yearMatch = title.match(/\((\d{4})\)/);
     const year = yearMatch ? yearMatch[1] : '';
-    title = title.replace(/\(\d{4}\).*$/, '').replace(/[-:]\s*$/, '').trim();
+    title = title.replace(/\(\d{4}\).*$/, '').replace(/[-:|•]\s*$/, '').trim();
     return { title, year };
 }
 
@@ -185,6 +193,255 @@ async function enrichHomeCacheBackdrops(payload) {
     if (changed) {
         try { fs.writeFileSync(vodBackdropCachePath, JSON.stringify(backdropCache, null, 2)); } catch (_) {}
     }
+    return payload;
+}
+
+function downloadImageToDisk(url, destPath) {
+    return new Promise((resolve) => {
+        const file = fs.createWriteStream(destPath);
+        const client = url.startsWith('https') ? https : http;
+        const req = client.get(url, { timeout: 8000 }, (res) => {
+            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                file.close();
+                try { fs.unlinkSync(destPath); } catch (_) {}
+                return downloadImageToDisk(res.headers.location, destPath).then(resolve);
+            }
+            if (res.statusCode !== 200) {
+                file.close();
+                try { fs.unlinkSync(destPath); } catch (_) {}
+                return resolve(false);
+            }
+            res.pipe(file);
+            file.on('finish', () => {
+                file.close(() => resolve(true));
+            });
+        });
+        req.on('error', () => {
+            file.close();
+            try { fs.unlinkSync(destPath); } catch (_) {}
+            resolve(false);
+        });
+        req.on('timeout', () => {
+            req.destroy();
+            file.close();
+            try { fs.unlinkSync(destPath); } catch (_) {}
+            resolve(false);
+        });
+    });
+}
+
+let titleLogoMemoryCache = null;
+function getTitleLogoCache() {
+    if (titleLogoMemoryCache) return titleLogoMemoryCache;
+    try {
+        if (fs.existsSync(vodTitleLogoCachePath)) {
+            titleLogoMemoryCache = JSON.parse(fs.readFileSync(vodTitleLogoCachePath, 'utf8')) || {};
+        } else {
+            titleLogoMemoryCache = {};
+        }
+    } catch (_) {
+        titleLogoMemoryCache = {};
+    }
+    return titleLogoMemoryCache;
+}
+
+function saveTitleLogoCache() {
+    try {
+        if (titleLogoMemoryCache) {
+            fs.writeFileSync(vodTitleLogoCachePath, JSON.stringify(titleLogoMemoryCache, null, 2));
+        }
+    } catch (_) {}
+}
+
+const activeLogoFetches = new Map();
+
+async function fetchAndCacheTitleLogo(name, isSeries = false) {
+    const rawName = String(name || '').trim();
+    if (!rawName) return '';
+    const { title, year } = cleanMediaTitleForSearch(rawName);
+    if (!title || title.length < 2) return '';
+
+    const cacheKey = `${isSeries ? 'tv' : 'movie'}:${title.toLowerCase()}`;
+    const cache = getTitleLogoCache();
+
+    if (cache[cacheKey]) {
+        if (cache[cacheKey] === 'NONE') return '';
+        const localPath = path.join(TITLE_LOGO_UPLOAD_DIR, path.basename(cache[cacheKey]));
+        if (fs.existsSync(localPath)) {
+            return cache[cacheKey];
+        }
+    }
+
+    if (activeLogoFetches.has(cacheKey)) {
+        return activeLogoFetches.get(cacheKey);
+    }
+
+    const fetchPromise = (async () => {
+        try {
+            const safeBase = title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 45) || 'logo';
+            const existingFiles = fs.existsSync(TITLE_LOGO_UPLOAD_DIR) ? fs.readdirSync(TITLE_LOGO_UPLOAD_DIR) : [];
+            const matchingFile = existingFiles.find(f => f.startsWith(`${safeBase}-`) && f.endsWith('.png'));
+            if (matchingFile) {
+                const url = `${TITLE_LOGO_PUBLIC_PATH}/${matchingFile}`;
+                cache[cacheKey] = url;
+                saveTitleLogoCache();
+                return url;
+            }
+
+            const endpoint = isSeries ? 'search/tv' : 'search/movie';
+            const yearParam = year ? (isSeries ? `&first_air_date_year=${year}` : `&year=${year}`) : '';
+            const searchUrl = `https://api.themoviedb.org/3/${endpoint}?api_key=1cf50e6248dc270629e802686245c2c8&query=${encodeURIComponent(title)}${yearParam}&language=fr-FR`;
+            
+            const searchRes = await new Promise(resolve => {
+                https.get(searchUrl, { timeout: 4000 }, res => {
+                    if (res.statusCode !== 200) return resolve(null);
+                    let d = '';
+                    res.on('data', c => d += c);
+                    res.on('end', () => {
+                        try { resolve(JSON.parse(d)); } catch (_) { resolve(null); }
+                    });
+                }).on('error', () => resolve(null)).on('timeout', function() { this.destroy(); resolve(null); });
+            });
+
+            const mediaItem = searchRes?.results?.[0];
+            if (!mediaItem || !mediaItem.id) {
+                cache[cacheKey] = 'NONE';
+                saveTitleLogoCache();
+                return '';
+            }
+
+            const mediaId = mediaItem.id;
+            const mediaType = isSeries ? 'tv' : 'movie';
+            let candidateLogoUrl = '';
+
+            const fanartKey = process.env.FANART_API_KEY || 'adcce1694cd06785070b4ca811413b15';
+            if (fanartKey) {
+                try {
+                    let fanartUrl = '';
+                    if (mediaType === 'tv') {
+                        const extUrl = `https://api.themoviedb.org/3/tv/${mediaId}/external_ids?api_key=1cf50e6248dc270629e802686245c2c8`;
+                        const extRes = await new Promise(resolve => {
+                            https.get(extUrl, { timeout: 3500 }, res => {
+                                if (res.statusCode !== 200) return resolve(null);
+                                let d = '';
+                                res.on('data', c => d += c);
+                                res.on('end', () => {
+                                    try { resolve(JSON.parse(d)); } catch (_) { resolve(null); }
+                                });
+                            }).on('error', () => resolve(null)).on('timeout', function() { this.destroy(); resolve(null); });
+                        });
+                        const tvdbId = extRes?.tvdb_id;
+                        if (tvdbId) {
+                            fanartUrl = `https://webservice.fanart.tv/v3/tv/${tvdbId}?api_key=${fanartKey}`;
+                        }
+                    } else {
+                        fanartUrl = `https://webservice.fanart.tv/v3/movies/${mediaId}?api_key=${fanartKey}`;
+                    }
+
+                    if (fanartUrl) {
+                        const fanartRes = await new Promise(resolve => {
+                            https.get(fanartUrl, { timeout: 4000 }, res => {
+                                if (res.statusCode !== 200) return resolve(null);
+                                let d = '';
+                                res.on('data', c => d += c);
+                                res.on('end', () => {
+                                    try { resolve(JSON.parse(d)); } catch (_) { resolve(null); }
+                                });
+                            }).on('error', () => resolve(null)).on('timeout', function() { this.destroy(); resolve(null); });
+                        });
+                        if (fanartRes) {
+                            const list = mediaType === 'tv'
+                                ? (fanartRes.hdtvlogo || fanartRes.clearlogo || fanartRes.tvlogo || [])
+                                : (fanartRes.hdmovielogo || fanartRes.movielogo || fanartRes.clearlogo || []);
+                            if (Array.isArray(list) && list.length) {
+                                const frLogo = list.find(l => l.lang === 'fr') || list.find(l => l.lang === 'en') || list[0];
+                                if (frLogo && frLogo.url) candidateLogoUrl = frLogo.url;
+                            }
+                        }
+                    }
+                } catch (_) {}
+            }
+
+            if (!candidateLogoUrl) {
+                const imagesUrl = `https://api.themoviedb.org/3/${mediaType}/${mediaId}/images?api_key=1cf50e6248dc270629e802686245c2c8&include_image_language=fr,en,null`;
+                const imagesRes = await new Promise(resolve => {
+                    https.get(imagesUrl, { timeout: 4000 }, res => {
+                        if (res.statusCode !== 200) return resolve(null);
+                        let d = '';
+                        res.on('data', c => d += c);
+                        res.on('end', () => {
+                            try { resolve(JSON.parse(d)); } catch (_) { resolve(null); }
+                        });
+                    }).on('error', () => resolve(null)).on('timeout', function() { this.destroy(); resolve(null); });
+                });
+
+                const logos = (imagesRes?.logos || []).filter(l => l.file_path && l.file_path.endsWith('.png'));
+                if (logos.length) {
+                    const sorted = logos.sort((a, b) => {
+                        if (a.iso_639_1 === 'fr' && b.iso_639_1 !== 'fr') return -1;
+                        if (b.iso_639_1 === 'fr' && a.iso_639_1 !== 'fr') return 1;
+                        if (a.iso_639_1 === 'en' && b.iso_639_1 !== 'en') return -1;
+                        if (b.iso_639_1 === 'en' && a.iso_639_1 !== 'en') return 1;
+                        return (b.vote_average || 0) - (a.vote_average || 0);
+                    });
+                    candidateLogoUrl = `https://image.tmdb.org/t/p/w500${sorted[0].file_path}`;
+                }
+            }
+
+            if (!candidateLogoUrl) {
+                cache[cacheKey] = 'NONE';
+                saveTitleLogoCache();
+                return '';
+            }
+
+            const fileName = `${safeBase}-${mediaId}.png`;
+            const destPath = path.join(TITLE_LOGO_UPLOAD_DIR, fileName);
+            const downloaded = await downloadImageToDisk(candidateLogoUrl, destPath);
+            if (downloaded) {
+                const localUrl = `${TITLE_LOGO_PUBLIC_PATH}/${fileName}`;
+                cache[cacheKey] = localUrl;
+                saveTitleLogoCache();
+                return localUrl;
+            } else {
+                return '';
+            }
+        } catch (e) {
+            console.warn('[Velora Data] Title logo fetch error:', e.message);
+            return '';
+        } finally {
+            activeLogoFetches.delete(cacheKey);
+        }
+    })();
+
+    activeLogoFetches.set(cacheKey, fetchPromise);
+    return fetchPromise;
+}
+
+async function enrichHomeCacheTitleLogos(payload) {
+    const horizontalSections = (payload.sections || []).filter(section =>
+        section?.card_orientation === 'horizontal' && (section.content_type === 'movies' || section.content_type === 'series')
+    );
+    if (!horizontalSections.length) return payload;
+
+    const entries = horizontalSections.flatMap(section => 
+        (Array.isArray(section.entries) ? section.entries : []).map(entry => ({ entry, isSeries: section.content_type === 'series' }))
+    );
+    let cursor = 0;
+
+    async function worker() {
+        while (cursor < entries.length) {
+            const item = entries[cursor++];
+            if (!item || !item.entry) continue;
+            try {
+                const logoUrl = await fetchAndCacheTitleLogo(item.entry.name, item.isSeries);
+                if (logoUrl) {
+                    item.entry.title_logo = logoUrl;
+                }
+            } catch (_) {}
+        }
+    }
+
+    await Promise.all(Array.from({ length: Math.min(8, entries.length || 1) }, worker));
     return payload;
 }
 const COUNTRY_PACKAGE_TABLES = new Set([
@@ -2025,12 +2282,22 @@ function buildHomeCache() {
                 const standardThumb = String(item.thumbUrl || item.stream_icon || item.cover || '');
                 const backdropUrl = String(item.backdropUrl || item.backdrop || standardThumb || '');
                 const finalThumb = (isHorizontal && backdropUrl) ? backdropUrl : (standardThumb || backdropUrl);
+                let titleLogo = item.title_logo || item.titleLogo || item.logo || '';
+                if (!titleLogo && isHorizontal && (type === 'movies' || type === 'series')) {
+                    const clean = cleanMediaTitleForSearch(rawName);
+                    const k1 = `${type === 'movies' ? 'movie' : 'tv'}:${(clean.title || rawName).toLowerCase().trim()}`;
+                    const k2 = `${type === 'movies' ? 'movie' : 'tv'}:${rawName.toLowerCase().trim()}`;
+                    const lCache = getTitleLogoCache();
+                    if (lCache[k1] && lCache[k1] !== 'NONE') titleLogo = lCache[k1];
+                    else if (lCache[k2] && lCache[k2] !== 'NONE') titleLogo = lCache[k2];
+                }
                 return {
                     id: item.id || `home-cache:${section.id}:${rawId}`,
                     name: stripHomeChannelPrefixes(rawName, channelRules.prefixes, channelRules.suffixes),
                     thumbUrl: finalThumb,
                     backdropUrl: backdropUrl || (isHorizontal ? '' : standardThumb),
                     section_logo_url: String(section.logo_url || section.badge_logo_url || item.section_logo_url || '').trim(),
+                    title_logo: titleLogo,
                     streamId: rawId,
                     sourceId: item.sourceId ?? item.source_id,
                     globalStreamId: item.globalStreamId ?? item.global_stream_id ?? rawId,
@@ -2077,12 +2344,22 @@ function buildHomeCache() {
                     ? sanitizeChannelIcon(rawName, item.stream_icon || item.cover || '')
                     : String(item.stream_icon || item.cover || '');
                 const finalThumb = (isHorizontal && backdropUrl) ? backdropUrl : (standardThumb || backdropUrl);
+                let titleLogo = item.title_logo || item.titleLogo || item.logo || '';
+                if (!titleLogo && isHorizontal && (type === 'movies' || type === 'series')) {
+                    const clean = cleanMediaTitleForSearch(rawName);
+                    const k1 = `${type === 'movies' ? 'movie' : 'tv'}:${(clean.title || rawName).toLowerCase().trim()}`;
+                    const k2 = `${type === 'movies' ? 'movie' : 'tv'}:${rawName.toLowerCase().trim()}`;
+                    const lCache = getTitleLogoCache();
+                    if (lCache[k1] && lCache[k1] !== 'NONE') titleLogo = lCache[k1];
+                    else if (lCache[k2] && lCache[k2] !== 'NONE') titleLogo = lCache[k2];
+                }
                 return {
                     id: `home-cache:${section.id}:${rawId}`,
                     name: stripHomeChannelPrefixes(rawName, channelRules.prefixes, channelRules.suffixes),
                     thumbUrl: finalThumb,
                     backdropUrl: backdropUrl || (isHorizontal ? '' : standardThumb),
                     section_logo_url: String(section.logo_url || section.badge_logo_url || '').trim(),
+                    title_logo: titleLogo,
                     streamId: rawId,
                     sourceId: item.source_id,
                     globalStreamId: item.global_stream_id || item.stream_id,
@@ -2237,11 +2514,25 @@ router.post('/home-cache/rebuild', async (req, res) => {
         const payload = buildHomeCache();
         await enrichHomeCacheMoviePosters(payload);
         await enrichHomeCacheBackdrops(payload);
+        await enrichHomeCacheTitleLogos(payload);
         writeJsonAtomic(homeCachePath, payload);
         return res.json({ ok: true, generatedAt: payload.generatedAt, sections: payload.sections.length,
             entries: payload.sections.reduce((total, section) => total + section.entries.length, 0) });
     } catch (error) {
         return res.status(500).json({ error: error.message });
+    }
+});
+
+router.get('/title-logo', async (req, res) => {
+    try {
+        const name = String(req.query.title || req.query.name || '').trim();
+        const type = String(req.query.type || req.query.content_type || '').toLowerCase();
+        const isSeries = type === 'series' || type === 'anime';
+        if (!name) return res.status(400).json({ error: 'Title required' });
+        const logoUrl = await fetchAndCacheTitleLogo(name, isSeries);
+        return res.json({ ok: true, hasLogo: Boolean(logoUrl), url: logoUrl || '' });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
     }
 });
 

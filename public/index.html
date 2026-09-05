@@ -5699,6 +5699,24 @@
               <button type="button" id="suffix-add" class="primary">Ajouter</button>
             </div>
             <div id="suffix-wrap" class="countries-admin-table-wrap" style="margin-top: 1rem"></div>
+
+            <hr style="margin: 1.6rem 0; border: 0; border-top: 1px solid rgba(255, 255, 255, 0.1)" />
+            <h2>Filtres de masquage — chaînes & mots-clés masqués</h2>
+            <p class="countries-admin-intro" style="margin-top: 0">
+              Mots ou fragments de texte pour <strong>masquer automatiquement</strong> des chaînes dans l'application (ex.
+              <code>HEVC</code>, <code>4K</code>, <code>VIP</code>, ou <code>prefix:TEST</code>, <code>suffix:SD</code>). Toute chaîne contenant l'un de ces mots-clés sera exclue de l'affichage.
+            </p>
+            <p id="hf-status" class="status" aria-live="polite"></p>
+            <div class="field row">
+              <div>
+                <label for="hf-needle">Mot-clé / Fragment à masquer</label>
+                <input id="hf-needle" type="text" placeholder="HEVC ou 4K" autocomplete="off" />
+              </div>
+            </div>
+            <div class="actions">
+              <button type="button" id="hf-add" class="primary">Ajouter</button>
+            </div>
+            <div id="hf-wrap" class="countries-admin-table-wrap" style="margin-top: 1rem"></div>
           </section>
 
           <section
@@ -11173,8 +11191,155 @@ if (target.closest(".trial-offer-button")) {
             }
           }
 
+          var searchHiddenFilters = ["hevc", "h265", "h.265", "h 265", "x265", "###"];
+          var searchPrefixes = [];
+          var searchSuffixes = [];
+
+          async function loadSearchRules() {
+            try {
+              var [resF, resP, resS] = await Promise.all([
+                fetch("/api/velora-db/rest/v1/admin_hidden_filters?select=needle&order=needle.asc"),
+                fetch("/api/velora-db/rest/v1/admin_channel_name_prefixes?select=prefix,sort_order&order=sort_order.asc,prefix.desc"),
+                fetch("/api/velora-db/rest/v1/admin_channel_name_suffixes?select=suffix,sort_order&order=sort_order.asc,suffix.desc")
+              ]);
+              if (resF.ok) {
+                var fRows = await resF.json();
+                if (Array.isArray(fRows)) {
+                  searchHiddenFilters = [
+                    "hevc", "h265", "h.265", "h 265", "x265", "###",
+                    ...fRows.map(function (r) { return String(r.needle || "").trim().toLowerCase(); }).filter(Boolean)
+                  ];
+                }
+              }
+              if (resP.ok) {
+                var pRows = await resP.json();
+                if (Array.isArray(pRows)) {
+                  searchPrefixes = pRows.map(function (r) { return String(r.prefix || "").trim(); }).filter(Boolean)
+                    .sort(function (a, b) { return b.length - a.length; });
+                }
+              }
+              if (resS.ok) {
+                var sRows = await resS.json();
+                if (Array.isArray(sRows)) {
+                  searchSuffixes = sRows.map(function (r) { return String(r.suffix || "").trim(); }).filter(Boolean)
+                    .sort(function (a, b) { return b.length - a.length; });
+                }
+              }
+              if (dialog && !dialog.classList.contains("hidden") && lastSearchPayload && lastSearchQuery) {
+                renderResults(lastSearchPayload, lastSearchQuery);
+              }
+            } catch (_) {}
+          }
+
+          loadSearchRules();
+          document.addEventListener("velora-channel-prefixes-changed", loadSearchRules);
+          document.addEventListener("velora-channel-suffixes-changed", loadSearchRules);
+          document.addEventListener("velora-channel-hidden-filters-changed", loadSearchRules);
+
+          function isSearchItemHidden(item) {
+            if (!item) return true;
+            var raw = String(item.label || item.name || item.title || "").trim();
+            if (!raw) return true;
+            var lower = raw.normalize("NFKC").toLowerCase();
+
+            // 1. Triple hash category separators
+            if ((raw.match(/#/g) || []).length >= 3) return true;
+
+            // 2. Decorative banners (--- ... ---, === ... ===, *** ... ***)
+            if (/^[-=*~_]{3,}.*[-=*~_]{3,}$/.test(raw)) return true;
+
+            // 3. Hidden filters (contains, prefix:, suffix:)
+            for (var i = 0; i < searchHiddenFilters.length; i++) {
+              var filter = searchHiddenFilters[i];
+              if (!filter) continue;
+              if (filter.startsWith("suffix:")) {
+                var suffix = filter.slice(7).trim();
+                if (suffix && (lower.endsWith(suffix) || lower.includes(suffix))) return true;
+              } else if (filter.startsWith("prefix:")) {
+                var prefix = filter.slice(7).trim();
+                if (prefix && (lower.startsWith(prefix) || lower.includes(prefix))) return true;
+              } else {
+                if (lower.includes(filter)) return true;
+              }
+            }
+            return false;
+          }
+
+          function cleanSearchTitle(rawName) {
+            var name = String(rawName || "").trim();
+            if (!name) return "";
+
+            // 1. Strip dynamic prefixes
+            for (var pass = 0; pass < 32; pass++) {
+              var prefix = searchPrefixes.find(function (p) {
+                return p.length <= name.length && name.slice(0, p.length).toLowerCase() === p.toLowerCase();
+              });
+              if (!prefix) break;
+              name = name.slice(prefix.length).trim();
+              name = name.replace(/^[-:|•\s]+/g, "").trim();
+            }
+
+            // 2. Strip dynamic suffixes
+            for (var pass = 0; pass < 32; pass++) {
+              var suffix = searchSuffixes.find(function (s) {
+                return s.length <= name.length && name.slice(-s.length).toLowerCase() === s.toLowerCase();
+              });
+              if (!suffix) break;
+              name = name.slice(0, -suffix.length).trim();
+              name = name.replace(/[-:|•\s]+$/g, "").trim();
+            }
+
+            // 3. Strip bracketed language codes / tags like [FR] -, |FR|, AR :
+            for (var pass = 0; pass < 4; pass++) {
+              var codeMatch = /^(\|[A-Za-z0-9]{2,4}\|\s*|\[[A-Za-z0-9\+\-\s]{1,12}\]\s*|[A-Za-z]{2,3}\s*:\s*|[A-Za-z]{2,3}\s*[-–]\s*)/i.exec(name);
+              if (codeMatch && codeMatch[0]) {
+                name = name.slice(codeMatch[0].length).trim();
+              } else {
+                break;
+              }
+            }
+
+            return name || rawName;
+          }
+
+          function filterAndCleanSearchPayload(payload) {
+            if (!payload) return payload;
+            var clean = Object.assign({}, payload);
+            if (Array.isArray(clean.sections)) {
+              clean.sections = clean.sections.map(function (sec) {
+                if (!sec || !Array.isArray(sec.items)) return sec;
+                var filteredItems = sec.items
+                  .filter(function (item) { return !isSearchItemHidden(item); })
+                  .map(function (item) {
+                    var cleanedLabel = cleanSearchTitle(item.label || item.name || item.title || "");
+                    var cleanedPkg = cleanSearchTitle(item.packageName || "");
+                    return Object.assign({}, item, {
+                      label: cleanedLabel,
+                      name: cleanedLabel,
+                      packageName: cleanedPkg || item.packageName
+                    });
+                  });
+                return Object.assign({}, sec, { items: filteredItems });
+              }).filter(function (sec) { return sec && Array.isArray(sec.items) && sec.items.length > 0; });
+            }
+            if (Array.isArray(clean.results)) {
+              clean.results = clean.results
+                .filter(function (item) { return !isSearchItemHidden(item); })
+                .map(function (item) {
+                  var cleanedLabel = cleanSearchTitle(item.label || item.name || item.title || "");
+                  var cleanedPkg = cleanSearchTitle(item.packageName || "");
+                  return Object.assign({}, item, {
+                    label: cleanedLabel,
+                    name: cleanedLabel,
+                    packageName: cleanedPkg || item.packageName
+                  });
+                });
+            }
+            return clean;
+          }
+
           function cleanResultMeta(packageName, countryName) {
-            var meta = String(packageName || "").trim();
+            var meta = cleanSearchTitle(String(packageName || "").trim());
             if (!meta || /\b(films?|s[ée]ries?|series?|cha[îi]nes?|chaines?)\b/i.test(meta)) {
               return String(countryName || "").trim();
             }
@@ -11335,25 +11500,26 @@ if (target.closest(".trial-offer-button")) {
                 return;
               }
               deferredSearchUpdate = null;
+              var filteredPayload = filterAndCleanSearchPayload(payload);
               var totalCount = 0;
-              if (payload && Array.isArray(payload.sections)) {
-                payload.sections.forEach(function (s) {
+              if (filteredPayload && Array.isArray(filteredPayload.sections)) {
+                filteredPayload.sections.forEach(function (s) {
                   if (s && Array.isArray(s.items)) totalCount += s.items.length;
                 });
-              } else if (payload && Array.isArray(payload.results)) {
-                totalCount = payload.results.length;
+              } else if (filteredPayload && Array.isArray(filteredPayload.results)) {
+                totalCount = filteredPayload.results.length;
               }
-              var country = (payload && payload.countryName) || "ce pays";
+              var country = (filteredPayload && filteredPayload.countryName) || "ce pays";
               setSearchLoading(loading);
               setStatus(totalCount
                 ? totalCount + " résultat" + (totalCount > 1 ? "s" : "") + " dans " + country + (loading ? "..." : "")
                 : (loading ? "Recherche dans " + country + "..." : "Aucun résultat dans " + country));
               if (loading && results.querySelector(".vel-global-search__result[data-search-result-id]")) {
-                lastSearchPayload = payload;
+                lastSearchPayload = filteredPayload;
                 lastSearchQuery = query;
                 return;
               }
-              renderResults(payload, query);
+              renderResults(filteredPayload, query);
             }
 
             var searchPromise = typeof window.veloraSearchCountryContentProgress === "function"
@@ -14420,6 +14586,151 @@ if (target.closest(".trial-offer-button")) {
             document.dispatchEvent(new CustomEvent("velora-channel-suffixes-changed"));
           } catch (error) {
             setStatus("Impossible d’ajouter ce suffixe.", true);
+          } finally {
+            addButton.disabled = false;
+          }
+        });
+
+        input.addEventListener("keydown", function (event) {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            addButton.click();
+          }
+        });
+
+        document.addEventListener("click", function (event) {
+          if (event.target && event.target.closest("[data-settings-tab='prefixes']")) load();
+        });
+        load();
+      })();
+    </script>
+    <script>
+      (function () {
+        var status = document.getElementById("hf-status");
+        var input = document.getElementById("hf-needle");
+        var addButton = document.getElementById("hf-add");
+        var wrap = document.getElementById("hf-wrap");
+        if (!status || !input || !addButton || !wrap) return;
+
+        var endpoint = "/api/velora-db/rest/v1/admin_hidden_filters";
+        var defaultFilters = ["HEVC", "H265", "H.265", "H 265", "x265"];
+
+        function setStatus(message, isError) {
+          status.textContent = message;
+          status.classList.toggle("error", !!isError);
+        }
+
+        async function request(url, options) {
+          var response = await fetch(url, Object.assign({
+            cache: "no-store",
+            headers: {
+              "Content-Type": "application/json",
+              "Prefer": "return=representation"
+            }
+          }, options || {}));
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          if (response.status === 204) return null;
+          var text = await response.text();
+          return text ? JSON.parse(text) : null;
+        }
+
+        function render(rows) {
+          wrap.replaceChildren();
+
+          var defaultInfo = document.createElement("div");
+          defaultInfo.style.cssText = "margin-bottom:0.75rem;padding:0.6rem 0.85rem;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;font-size:0.85rem;color:var(--theme-text-muted,#888);";
+          defaultInfo.innerHTML = "<strong style='color:var(--theme-text,#fff);'>Filtres intégrés par défaut :</strong> " +
+            defaultFilters.map(function (f) { return "<code style='background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;margin:0 2px;'>" + f + "</code>"; }).join(" ");
+          wrap.appendChild(defaultInfo);
+
+          if (!rows.length) {
+            var empty = document.createElement("p");
+            empty.className = "countries-admin-empty";
+            empty.textContent = "Aucun filtre personnalisé configuré — seuls les filtres par défaut (HEVC / H265) sont actifs.";
+            wrap.appendChild(empty);
+            return;
+          }
+
+          var table = document.createElement("table");
+          table.className = "countries-admin-table";
+          table.innerHTML = "<thead><tr><th>Mot-clé / Fragment masqué</th><th>Type</th><th></th></tr></thead><tbody></tbody>";
+          var body = table.querySelector("tbody");
+          rows.forEach(function (row) {
+            var tr = document.createElement("tr");
+
+            var valueCell = document.createElement("td");
+            var code = document.createElement("code");
+            code.textContent = String(row.needle || "");
+            valueCell.appendChild(code);
+
+            var typeCell = document.createElement("td");
+            var rawVal = String(row.needle || "").toLowerCase();
+            var badgeText = "Contient";
+            if (rawVal.startsWith("prefix:")) badgeText = "Début (prefix:)";
+            else if (rawVal.startsWith("suffix:")) badgeText = "Fin (suffix:)";
+            typeCell.textContent = badgeText;
+            typeCell.style.cssText = "font-size:0.8rem;opacity:0.8;";
+
+            var actionCell = document.createElement("td");
+            var remove = document.createElement("button");
+            remove.type = "button";
+            remove.className = "countries-admin-del";
+            remove.textContent = "Supprimer";
+            remove.addEventListener("click", async function () {
+              try {
+                setStatus("Suppression…");
+                await request(endpoint + "?id=eq." + encodeURIComponent(row.id), { method: "DELETE" });
+                await load();
+                document.dispatchEvent(new CustomEvent("velora-channel-hidden-filters-changed"));
+                document.dispatchEvent(new CustomEvent("velora-home-cache-invalidated"));
+              } catch (error) {
+                setStatus("Impossible de supprimer ce filtre.", true);
+              }
+            });
+            actionCell.appendChild(remove);
+
+            tr.append(valueCell, typeCell, actionCell);
+            body.appendChild(tr);
+          });
+          wrap.appendChild(table);
+        }
+
+        async function load() {
+          try {
+            setStatus("Chargement…");
+            var rows = await request(endpoint + "?select=id,needle&order=needle.asc");
+            var filters = Array.isArray(rows) ? rows : [];
+            render(filters);
+            setStatus(
+              filters.length
+                ? filters.length + " filtre(s) personnalisé(s). Fermez les paramètres pour actualiser l'affichage."
+                : "Seuls les filtres par défaut sont actifs."
+            );
+          } catch (error) {
+            wrap.replaceChildren();
+            setStatus("Impossible de charger les filtres.", true);
+          }
+        }
+
+        addButton.addEventListener("click", async function () {
+          var value = input.value.trim();
+          if (!value) {
+            setStatus("Saisissez un mot-clé ou fragment (ex. 4K, UHD, prefix:TEST).", true);
+            return;
+          }
+          addButton.disabled = true;
+          try {
+            setStatus("Ajout…");
+            await request(endpoint, {
+              method: "POST",
+              body: JSON.stringify({ needle: value })
+            });
+            input.value = "";
+            await load();
+            document.dispatchEvent(new CustomEvent("velora-channel-hidden-filters-changed"));
+            document.dispatchEvent(new CustomEvent("velora-home-cache-invalidated"));
+          } catch (error) {
+            setStatus("Impossible d’ajouter ce filtre.", true);
           } finally {
             addButton.disabled = false;
           }

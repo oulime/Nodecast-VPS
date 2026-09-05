@@ -771,6 +771,11 @@
         this.allChannels.forEach(ch => { ch.name = cleanChannelTitle(ch.name); });
         this.filterAndRenderChannels();
       });
+      document.addEventListener("velora-channel-hidden-filters-changed", async () => {
+        await loadAdminChannelRules();
+        this.allChannels = this.allChannels.filter(ch => !isDummyOrHiddenChannel(ch.name));
+        this.filterAndRenderChannels();
+      });
 
       document.addEventListener("velora-top-level-tab", () => this.checkVisibility());
       document.addEventListener("velora-show-home", () => this.checkVisibility());

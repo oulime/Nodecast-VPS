@@ -574,8 +574,8 @@ function invalidateMediaFeedCache() {
 }
 
 function invalidateDerivedCachesForTable(table) {
-    if (COUNTRY_PACKAGE_TABLES.has(table)) invalidateCountryPackageCache();
-    else if (table === 'admin_home_sections' || HOME_CHANNEL_RULE_TABLES.has(table)) invalidateHomeCache();
+    if (COUNTRY_PACKAGE_TABLES.has(table) || HOME_CHANNEL_RULE_TABLES.has(table)) invalidateCountryPackageCache();
+    if (table === 'admin_home_sections' || HOME_CHANNEL_RULE_TABLES.has(table)) invalidateHomeCache();
 }
 
 function homeChannelNameRules() {
@@ -745,6 +745,7 @@ const NATURAL_KEYS = {
     admin_global_package_allowlist: ['stream_id'],
     admin_global_package_open_confirm: ['id'],
     admin_hero_slider: ['id'],
+    admin_hidden_filters: ['needle'],
     admin_home_sections: ['id'],
     admin_package_channel_order: ['country_id', 'package_id'],
     admin_package_covers: ['package_id'],

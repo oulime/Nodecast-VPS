@@ -190,9 +190,6 @@ if (USE_VPS_DATA_API) {
                 return res.sendFile(localUploadPath);
             }
         }
-        if (req.path === '/api/velora-db/hero-slider' || req.path.startsWith('/api/velora-db/rest/v1/admin_hero_slider') || req.path.startsWith('/api/velora-db/hero-slider/')) {
-            return next();
-        }
         if (!isVpsDataApiRequest(req.path)) return next();
 
         const controller = new AbortController();

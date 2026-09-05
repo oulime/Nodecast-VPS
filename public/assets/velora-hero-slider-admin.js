@@ -929,7 +929,12 @@
       loadCountries();
     });
 
+    window.veloraReloadSliderAdmin = function() {
+      loadSliderItems();
+      loadCountries();
+    };
     loadCountries();
+    loadSliderItems();
   }
 
   if (document.readyState === "loading") {

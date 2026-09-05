@@ -6,7 +6,7 @@ const veloraData = require('./veloraData');
 
 const router = express.Router();
 const MAX_CATEGORIES = 200;
-const MAX_RESULTS = 150;
+const MAX_RESULTS = 500;
 const MAX_INDEXED_CATEGORIES = 400;
 const MAX_ALLOWED_ITEMS = 100000;
 const DEFAULT_REMOTE_SEARCH_BASE = 'https://nodecast.veloravip.net';

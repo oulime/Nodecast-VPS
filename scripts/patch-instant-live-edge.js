@@ -12,29 +12,43 @@ for (const asset of assets) {
     const filename = path.join(root, asset);
     let source = fs.readFileSync(filename, 'utf8');
 
-    // 1. Hls.js internal default liveSyncDurationCount
-    const hlsDefaultBefore = 'liveSyncMode:"edge",liveSyncDurationCount:3,';
-    const hlsDefaultAfter = 'liveSyncMode:"edge",liveSyncDurationCount:1,';
-    if (source.includes(hlsDefaultBefore)) {
-        source = source.replace(hlsDefaultBefore, hlsDefaultAfter);
-        console.log(`[${asset}] Patched Hls default liveSyncDurationCount to 1`);
-    }
+    // 1. Hls.js internal default liveSyncDurationCount & liveSyncMode
+    source = source.replace(
+        'nudgeOnVideoHole:!0,liveSyncMode:"edge",liveSyncDurationCount:1,',
+        'nudgeOnVideoHole:!0,liveSyncMode:"buffered",liveSyncDurationCount:3,'
+    );
+    source = source.replace(
+        'liveSyncMode:"edge",liveSyncDurationCount:1,',
+        'liveSyncMode:"buffered",liveSyncDurationCount:3,'
+    );
+    source = source.replace(
+        'liveSyncMode:"edge",liveSyncDurationCount:3,',
+        'liveSyncMode:"buffered",liveSyncDurationCount:3,'
+    );
 
     // 2. GU() player config
-    const guBefore = 'liveSyncDurationCount:3,liveMaxLatencyDurationCount:10,liveDurationInfinity:!0';
-    const guAfter = 'liveSyncMode:"edge",liveSyncDurationCount:1,liveMaxLatencyDurationCount:4,maxLiveSyncPlaybackRate:1.1,liveDurationInfinity:!0';
-    if (source.includes(guBefore)) {
-        source = source.replace(guBefore, guAfter);
-        console.log(`[${asset}] Patched GU() live settings to live edge`);
-    }
+    source = source.replace(
+        'liveSyncMode:"buffered",liveSyncDurationCount:3,liveMaxLatencyDurationCount:4,maxLiveSyncPlaybackRate:1.1,liveDurationInfinity:!0',
+        'liveSyncMode:"buffered",liveSyncDurationCount:3,liveMaxLatencyDurationCount:10,maxLiveSyncPlaybackRate:1.05,liveDurationInfinity:!0'
+    );
+    source = source.replace(
+        'liveSyncMode:"edge",liveSyncDurationCount:1,liveMaxLatencyDurationCount:4,maxLiveSyncPlaybackRate:1.1,liveDurationInfinity:!0',
+        'liveSyncMode:"buffered",liveSyncDurationCount:3,liveMaxLatencyDurationCount:10,maxLiveSyncPlaybackRate:1.05,liveDurationInfinity:!0'
+    );
+    source = source.replace(
+        'liveSyncDurationCount:3,liveMaxLatencyDurationCount:10,liveDurationInfinity:!0',
+        'liveSyncMode:"buffered",liveSyncDurationCount:3,liveMaxLatencyDurationCount:10,maxLiveSyncPlaybackRate:1.05,liveDurationInfinity:!0'
+    );
 
     // 3. Sg() player config
-    const sgBefore = 'liveBackBufferLength:30,liveSyncDurationCount:d?2:3,liveMaxLatencyDurationCount:d?6:10';
-    const sgAfter = 'liveBackBufferLength:30,liveSyncMode:"edge",liveSyncDurationCount:1,liveMaxLatencyDurationCount:4,maxLiveSyncPlaybackRate:1.1';
-    if (source.includes(sgBefore)) {
-        source = source.replace(sgBefore, sgAfter);
-        console.log(`[${asset}] Patched Sg() live settings to live edge`);
-    }
+    source = source.replace(
+        'liveBackBufferLength:30,liveSyncMode:"edge",liveSyncDurationCount:1,liveMaxLatencyDurationCount:4,maxLiveSyncPlaybackRate:1.1',
+        'liveBackBufferLength:30,liveSyncMode:"buffered",liveSyncDurationCount:3,liveMaxLatencyDurationCount:10,maxLiveSyncPlaybackRate:1.05'
+    );
+    source = source.replace(
+        'liveBackBufferLength:30,liveSyncDurationCount:d?2:3,liveMaxLatencyDurationCount:d?6:10',
+        'liveBackBufferLength:30,liveSyncMode:"buffered",liveSyncDurationCount:3,liveMaxLatencyDurationCount:10,maxLiveSyncPlaybackRate:1.05'
+    );
 
     // 4. jU() bypass autoTranscode upfront probe on Live TV
     const juAutoTranscodeBefore = 'let u=o,d=null;if(l.autoTranscode){';

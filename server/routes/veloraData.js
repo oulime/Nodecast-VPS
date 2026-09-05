@@ -9,6 +9,8 @@ const veloraCatalogCache = require('../services/veloraCatalogCache');
 const channelLogoMatcher = require('../services/channelLogoMatcher');
 
 const router = express.Router();
+module.exports = router;
+module.exports.allRows = (table) => allRows(table);
 const homeCachePath = path.join(__dirname, '..', '..', 'data', 'velora-cache', 'home-sections.json');
 const HOME_CACHE_ENTRIES_PER_PACKAGE = 20;
 const countryPackageCachePath = path.join(
@@ -20,6 +22,12 @@ const vodTitleLogoCachePath = path.join(__dirname, '..', '..', 'data', 'vod-titl
 const TITLE_LOGO_UPLOAD_DIR = path.join(__dirname, '..', '..', 'public', 'uploads', 'title-logos');
 const TITLE_LOGO_PUBLIC_PATH = '/uploads/title-logos';
 try { fs.mkdirSync(TITLE_LOGO_UPLOAD_DIR, { recursive: true }); } catch (_) {}
+const HERO_BACKDROP_UPLOAD_DIR = path.join(__dirname, '..', '..', 'public', 'uploads', 'hero-slider', 'backdrops');
+const HERO_BACKDROP_PUBLIC_PATH = '/uploads/hero-slider/backdrops';
+const HERO_LOGO_UPLOAD_DIR = path.join(__dirname, '..', '..', 'public', 'uploads', 'hero-slider', 'logos');
+const HERO_LOGO_PUBLIC_PATH = '/uploads/hero-slider/logos';
+try { fs.mkdirSync(HERO_BACKDROP_UPLOAD_DIR, { recursive: true }); } catch (_) {}
+try { fs.mkdirSync(HERO_LOGO_UPLOAD_DIR, { recursive: true }); } catch (_) {}
 const mediaFeedCachePath = path.join(__dirname, '..', '..', 'data', 'velora-cache', 'media-feed-cache.json');
 const MEDIA_FEED_ENTRIES_PER_PACKAGE = 20;
 let currentMediaFeedCache = null;
@@ -52,9 +60,11 @@ function cleanMediaTitleForSearch(raw) {
             .trim();
         if (title === prev) break;
     }
-    const yearMatch = title.match(/\((\d{4})\)/);
+    const yearMatch = title.match(/\((\d{4})(?:-\d{2}-\d{2})?\)/);
     const year = yearMatch ? yearMatch[1] : '';
-    title = title.replace(/\(\d{4}\).*$/, '').replace(/[-:|•]\s*$/, '').trim();
+    title = title.replace(/\s*[-:]?\s*(?:Season|Saison)\s*\d+/i, '');
+    title = title.replace(/\s*[-:]?\s*S\d+/i, '');
+    title = title.replace(/\s*\(\d{4}(?:-\d{2}-\d{2})?\).*$/, '').replace(/[-:|•]\s*$/, '').trim();
     return { title, year };
 }
 
@@ -227,6 +237,26 @@ function downloadImageToDisk(url, destPath) {
             try { fs.unlinkSync(destPath); } catch (_) {}
             resolve(false);
         });
+    });
+}
+
+function fetchJson(url, timeoutMs = 4500) {
+    return new Promise((resolve) => {
+        if (!url) return resolve(null);
+        const client = url.startsWith('https') ? https : http;
+        const req = client.get(url, { timeout: timeoutMs }, (res) => {
+            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                return fetchJson(res.headers.location, timeoutMs).then(resolve);
+            }
+            if (res.statusCode !== 200) return resolve(null);
+            let d = '';
+            res.on('data', c => d += c);
+            res.on('end', () => {
+                try { resolve(JSON.parse(d)); } catch (_) { resolve(null); }
+            });
+        });
+        req.on('error', () => resolve(null));
+        req.on('timeout', () => { req.destroy(); resolve(null); });
     });
 }
 
@@ -415,6 +445,230 @@ async function fetchAndCacheTitleLogo(name, isSeries = false) {
 
     activeLogoFetches.set(cacheKey, fetchPromise);
     return fetchPromise;
+}
+
+function slugifySliderTitle(text) {
+    return String(text || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '') || 'item';
+}
+
+async function enrichHeroSliderItem(item) {
+    if (!item || !item.title) return item;
+
+    const baseSlug = slugifySliderTitle(String(item.id || item.title).replace('hero_', ''));
+
+    // Check if backdrop or logo are preserved manual files (/uploads/hero-slider/backdrops/hero-1- to hero-10-)
+    const isPreservedManualBackdrop = item.backdrop && (
+        item.backdrop.includes('/hero-1-') ||
+        item.backdrop.includes('/hero-2-') ||
+        item.backdrop.includes('/hero-3-') ||
+        item.backdrop.includes('/hero-4-') ||
+        item.backdrop.includes('/hero-5-') ||
+        item.backdrop.includes('/hero-6-') ||
+        item.backdrop.includes('/hero-7-') ||
+        item.backdrop.includes('/hero-8-') ||
+        item.backdrop.includes('/hero-9-') ||
+        item.backdrop.includes('/hero-10-')
+    );
+
+    const isPreservedManualLogo = item.logo && (
+        item.logo.includes('/hero-1-') ||
+        item.logo.includes('/hero-2-') ||
+        item.logo.includes('/hero-3-') ||
+        item.logo.includes('/hero-4-') ||
+        item.logo.includes('/hero-5-') ||
+        item.logo.includes('/hero-6-') ||
+        item.logo.includes('/hero-7-') ||
+        item.logo.includes('/hero-8-') ||
+        item.logo.includes('/hero-9-') ||
+        item.logo.includes('/hero-10-')
+    );
+
+    // 1. BACKDROP: If user manually configured a custom external URL (e.g. imgbb link or custom manual upload):
+    let currentBackdrop = item.backdrop || item.image || '';
+    if (item.manual_backdrop && currentBackdrop && String(currentBackdrop).startsWith('http')) {
+        const ext = currentBackdrop.includes('.png') ? '.png' : '.jpg';
+        const filename = `${baseSlug}-${Date.now()}${ext}`;
+        const dest = path.join(HERO_BACKDROP_UPLOAD_DIR, filename);
+        const ok = await downloadImageToDisk(currentBackdrop, dest);
+        if (ok) {
+            const localUrl = `${HERO_BACKDROP_PUBLIC_PATH}/${filename}`;
+            item.backdrop = localUrl;
+            item.image = localUrl;
+        }
+    }
+
+    // 2. LOGO: If user manually configured a custom external URL:
+    let currentLogo = item.logo || '';
+    if (item.manual_logo && currentLogo && String(currentLogo).startsWith('http')) {
+        const filename = `${baseSlug}-${Date.now()}.png`;
+        const dest = path.join(HERO_LOGO_UPLOAD_DIR, filename);
+        const ok = await downloadImageToDisk(currentLogo, dest);
+        if (ok) {
+            const localUrl = `${HERO_LOGO_PUBLIC_PATH}/${filename}`;
+            item.logo = localUrl;
+        }
+    }
+
+    // 3. AUTO-FETCH CONDITIONS:
+    const needsAutoBackdrop = !isPreservedManualBackdrop && !item.manual_backdrop && (
+        !item.backdrop ||
+        !String(item.backdrop).trim() ||
+        String(item.backdrop).startsWith('http') || // IPTV stream cover/icon
+        item.backdrop.includes('slider-1788575503861') // Breaking bad previous low-res download
+    );
+
+    const needsAutoLogo = !isPreservedManualLogo && !item.manual_logo && (
+        !item.logo ||
+        !String(item.logo).trim()
+    );
+
+    if (!needsAutoBackdrop && !needsAutoLogo) {
+        // Still ensure country_mappings thumbUrl/logo match
+        if (item.country_mappings && typeof item.country_mappings === 'object') {
+            for (const c of Object.keys(item.country_mappings)) {
+                if (item.backdrop) item.country_mappings[c].thumbUrl = item.backdrop;
+                if (item.logo) item.country_mappings[c].logo = item.logo;
+            }
+        }
+        return item;
+    }
+
+    try {
+        const isSeries = item.category === 'series' || item.category === 'anime' || item.category === 'tv';
+        const endpointType = isSeries ? 'tv' : 'movie';
+        const tmdbApiKey = '1cf50e6248dc270629e802686245c2c8';
+        const fanartKey = process.env.FANART_API_KEY || 'adcce1694cd06785070b4ca811413b15';
+
+        let mediaId = String(item.tmdb_id || item.tmdbId || '').trim();
+        let mediaDetails = null;
+
+        if (!mediaId) {
+            const rawTitle = String(item.title).trim();
+            const { title, year } = cleanMediaTitleForSearch(rawTitle);
+            const searchTitle = title || rawTitle;
+            const yearParam = year ? (isSeries ? `&first_air_date_year=${year}` : `&year=${year}`) : '';
+
+            let searchRes = await fetchJson(`https://api.themoviedb.org/3/search/${endpointType}?api_key=${tmdbApiKey}&query=${encodeURIComponent(searchTitle)}${yearParam}&language=en-US`);
+            if (!searchRes?.results?.length) {
+                searchRes = await fetchJson(`https://api.themoviedb.org/3/search/${endpointType}?api_key=${tmdbApiKey}&query=${encodeURIComponent(searchTitle)}`);
+            }
+            if (!searchRes?.results?.length) {
+                const altEndpoint = isSeries ? 'movie' : 'tv';
+                searchRes = await fetchJson(`https://api.themoviedb.org/3/search/${altEndpoint}?api_key=${tmdbApiKey}&query=${encodeURIComponent(searchTitle)}`);
+            }
+            if (searchRes?.results?.length) {
+                mediaId = String(searchRes.results[0].id);
+                mediaDetails = searchRes.results[0];
+            }
+        }
+
+        if (mediaId && !mediaDetails) {
+            mediaDetails = await fetchJson(`https://api.themoviedb.org/3/${endpointType}/${mediaId}?api_key=${tmdbApiKey}&language=en-US`);
+        }
+
+        let tvdbId = null;
+        if (mediaId && isSeries) {
+            const extRes = await fetchJson(`https://api.themoviedb.org/3/tv/${mediaId}/external_ids?api_key=${tmdbApiKey}`);
+            tvdbId = extRes?.tvdb_id;
+        }
+
+        let fanartData = null;
+        if (fanartKey) {
+            let fanartUrl = '';
+            if (isSeries && tvdbId) {
+                fanartUrl = `https://webservice.fanart.tv/v3/tv/${tvdbId}?api_key=${fanartKey}`;
+            } else if (!isSeries && mediaId) {
+                fanartUrl = `https://webservice.fanart.tv/v3/movies/${mediaId}?api_key=${fanartKey}`;
+            }
+            if (fanartUrl) {
+                fanartData = await fetchJson(fanartUrl);
+            }
+        }
+
+        let tmdbImages = null;
+        if (mediaId) {
+            tmdbImages = await fetchJson(`https://api.themoviedb.org/3/${endpointType}/${mediaId}/images?api_key=${tmdbApiKey}&include_image_language=en,null`);
+        }
+
+        // Auto-fetch 4K backdrop from Fanart -> TMDB original fallback
+        if (needsAutoBackdrop) {
+            let candidateBg = '';
+            const fanartBgs = isSeries ? (fanartData?.showbackground || []) : (fanartData?.moviebackground || []);
+            if (Array.isArray(fanartBgs) && fanartBgs.length > 0) {
+                candidateBg = fanartBgs[0].url;
+            } else if (tmdbImages?.backdrops?.length > 0) {
+                const sorted = [...tmdbImages.backdrops].sort((a, b) => (b.width * b.height) - (a.width * a.height));
+                candidateBg = `https://image.tmdb.org/t/p/original${sorted[0].file_path}`;
+            } else if (mediaDetails?.backdrop_path) {
+                candidateBg = `https://image.tmdb.org/t/p/original${mediaDetails.backdrop_path}`;
+            }
+
+            if (candidateBg) {
+                const ext = candidateBg.includes('.png') ? '.png' : '.jpg';
+                const filename = `${baseSlug}-${Date.now()}${ext}`;
+                const dest = path.join(HERO_BACKDROP_UPLOAD_DIR, filename);
+                const ok = await downloadImageToDisk(candidateBg, dest);
+                if (ok) {
+                    const localUrl = `${HERO_BACKDROP_PUBLIC_PATH}/${filename}`;
+                    item.backdrop = localUrl;
+                    item.image = localUrl;
+                }
+            }
+        }
+
+        // Auto-fetch logo from Fanart (English preferred) -> TMDB original fallback
+        if (needsAutoLogo) {
+            let candidateLogo = '';
+            const fanartLogos = isSeries
+                ? (fanartData?.hdtvlogo || fanartData?.clearlogo || fanartData?.tvlogo || [])
+                : (fanartData?.hdmovielogo || fanartData?.movielogo || fanartData?.clearlogo || []);
+            if (Array.isArray(fanartLogos) && fanartLogos.length > 0) {
+                const enLogo = fanartLogos.find(l => l.lang === 'en') || fanartLogos.find(l => !l.lang || l.lang === '00') || fanartLogos[0];
+                if (enLogo?.url) candidateLogo = enLogo.url;
+            }
+
+            if (!candidateLogo && tmdbImages?.logos?.length > 0) {
+                const pngLogos = tmdbImages.logos.filter(l => l.file_path && l.file_path.endsWith('.png'));
+                if (pngLogos.length > 0) {
+                    pngLogos.sort((a, b) => {
+                        if (a.iso_639_1 === 'en' && b.iso_639_1 !== 'en') return -1;
+                        if (b.iso_639_1 === 'en' && a.iso_639_1 !== 'en') return 1;
+                        return (b.vote_average || 0) - (a.vote_average || 0);
+                    });
+                    candidateLogo = `https://image.tmdb.org/t/p/original${pngLogos[0].file_path}`;
+                }
+            }
+
+            if (candidateLogo) {
+                const filename = `${baseSlug}-${Date.now()}.png`;
+                const dest = path.join(HERO_LOGO_UPLOAD_DIR, filename);
+                const ok = await downloadImageToDisk(candidateLogo, dest);
+                if (ok) {
+                    const localUrl = `${HERO_LOGO_PUBLIC_PATH}/${filename}`;
+                    item.logo = localUrl;
+                }
+            }
+        }
+
+        if (mediaDetails?.vote_average && !item.rating) {
+            item.rating = mediaDetails.vote_average.toFixed(1);
+        }
+
+        // Propagate local backdrop and logo to all countries in country_mappings
+        if (item.country_mappings && typeof item.country_mappings === 'object') {
+            for (const c of Object.keys(item.country_mappings)) {
+                if (item.backdrop) item.country_mappings[c].thumbUrl = item.backdrop;
+                if (item.logo) item.country_mappings[c].logo = item.logo;
+            }
+        }
+    } catch (err) {
+        console.warn('[Velora Data] Hero slider asset enrichment error:', err.message);
+    }
+
+    return item;
 }
 
 async function enrichHomeCacheTitleLogos(payload) {
@@ -3041,7 +3295,7 @@ router.get('/hero-slider/scan-availability', (req, res) => {
     }
 });
 
-router.post('/hero-slider/bulk-assign', (req, res) => {
+router.post('/hero-slider/bulk-assign', async (req, res) => {
     try {
         const { title, category, badge, image, backdrop, overview, query, manualMappings } = req.body || {};
         if (!title) {
@@ -3134,6 +3388,7 @@ router.post('/hero-slider/bulk-assign', (req, res) => {
             country_mappings: countryMappings
         };
 
+        sliderItem = await enrichHeroSliderItem(sliderItem);
         saveRow('admin_hero_slider', sliderItem, req);
         return res.json({ ok: true, item: sliderItem });
     } catch (error) {
@@ -3443,7 +3698,7 @@ router.post('/admin/assign-package', (req, res) => {
     }
 });
 
-router.all('/rest/v1/:table', (req, res) => {
+router.all('/rest/v1/:table', async (req, res) => {
     const table = req.params.table;
     if (!ALLOWED_TABLES.has(table)) {
         return res.status(404).json({
@@ -3486,6 +3741,11 @@ router.all('/rest/v1/:table', (req, res) => {
         if (req.method === 'POST') {
             invalidateDerivedCachesForTable(table);
             const values = Array.isArray(req.body) ? req.body : [req.body];
+            if (table === 'admin_hero_slider') {
+                for (let i = 0; i < values.length; i++) {
+                    values[i] = await enrichHeroSliderItem(values[i]);
+                }
+            }
             const saved = getDb().transaction(() => values.map(value => saveRow(table, value, req)))();
             const representation = String(req.get('Prefer') || '').includes('return=representation');
             return representation ? res.status(201).json(saved) : res.status(201).end();
@@ -3494,6 +3754,13 @@ router.all('/rest/v1/:table', (req, res) => {
         const rows = allRows(table).filter(row => matches(row, req.query));
         if (req.method === 'PATCH') {
             if (rows.length) invalidateDerivedCachesForTable(table);
+            if (table === 'admin_hero_slider') {
+                for (let i = 0; i < rows.length; i++) {
+                    const merged = { ...rows[i], ...req.body };
+                    await enrichHeroSliderItem(merged);
+                    Object.assign(req.body, merged);
+                }
+            }
             const saved = getDb().transaction(() =>
                 rows.map(row => saveRow(table, { ...row, ...req.body }, req))
             )();
@@ -3541,3 +3808,4 @@ module.exports.isOfficialChannelsLogosOnly = isOfficialChannelsLogosOnly;
 module.exports.isOfficialPackagesLogosOnly = isOfficialPackagesLogosOnly;
 module.exports.isOfficialLogoUrl = isOfficialLogoUrl;
 module.exports.sanitizeChannelIcon = sanitizeChannelIcon;
+module.exports.enrichHeroSliderItem = enrichHeroSliderItem;

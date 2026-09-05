@@ -311,11 +311,22 @@
         logoImg.alt = cleanTitle || entry.name || "";
         logoImg.loading = "lazy";
         logoImg.decoding = "async";
+        var smartScale = function () {
+          var nw = logoImg.naturalWidth, nh = logoImg.naturalHeight;
+          if (nw && nh) {
+            var r = nw / nh;
+            if (r >= 2.4) logoImg.classList.add("vel-title-logo--wide");
+            else if (r <= 1.45) logoImg.classList.add("vel-title-logo--tall");
+            else logoImg.classList.add("vel-title-logo--standard");
+          }
+        };
+        logoImg.onload = smartScale;
         logoImg.onerror = function () {
           card.classList.remove("has-title-logo");
           logoImg.remove();
         };
         logoImg.src = url;
+        if (logoImg.complete) smartScale();
         card.appendChild(logoImg);
       };
       if (titleLogoUrl) {

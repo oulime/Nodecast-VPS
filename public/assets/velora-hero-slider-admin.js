@@ -480,6 +480,8 @@
           setStatus("Modifications enregistrées avec succès pour " + (cObj ? cObj.name : targetCountry) + " !");
         } else {
           // Global update
+          var isManualImg = !!(imgInp && imgInp.value.trim());
+          var isManualLogo = !!(logoInp && logoInp.value.trim());
           var payload = {
             title: title,
             category: catInp ? catInp.value : "movie",
@@ -487,6 +489,8 @@
             image: imgInp ? imgInp.value.trim() : "",
             backdrop: imgInp ? imgInp.value.trim() : "",
             logo: logoInp ? logoInp.value.trim() : "",
+            manual_backdrop: isManualImg,
+            manual_logo: isManualLogo,
             overview: descInp ? descInp.value.trim() : ""
           };
 
@@ -498,6 +502,8 @@
         }
       } else {
         // Add new
+        var isManualImg = !!(imgInp && imgInp.value.trim());
+        var isManualLogo = !!(logoInp && logoInp.value.trim());
         var newPayload = {
           id: "hero_slider_" + Date.now(),
           title: title,
@@ -506,6 +512,8 @@
           image: imgInp ? imgInp.value.trim() : "",
           backdrop: imgInp ? imgInp.value.trim() : "",
           logo: logoInp ? logoInp.value.trim() : "",
+          manual_backdrop: isManualImg,
+          manual_logo: isManualLogo,
           overview: descInp ? descInp.value.trim() : "",
           sort_order: state.items.length + 1,
           published: true,
@@ -779,8 +787,11 @@
         title: title,
         category: category,
         badge: category === "series" ? "Série" : "Cinéma",
-        image: item.thumbUrl || scanData.usaFallback?.thumbUrl || "",
-        backdrop: item.thumbUrl || scanData.usaFallback?.thumbUrl || "",
+        image: "",
+        backdrop: "",
+        logo: "",
+        manual_backdrop: false,
+        manual_logo: false,
         query: item.cleanTitle,
         tmdb_id: item.tmdbId || "",
         country_mappings: countryMappings
@@ -829,8 +840,11 @@
         title: title,
         category: category,
         badge: category === "series" ? "Série" : "Cinéma",
-        image: streamToAssign?.thumbUrl || item.thumbUrl || "",
-        backdrop: streamToAssign?.thumbUrl || item.thumbUrl || "",
+        image: "",
+        backdrop: "",
+        logo: "",
+        manual_backdrop: false,
+        manual_logo: false,
         tmdb_id: item.tmdbId || "",
         sort_order: state.items.length + 1,
         published: true,

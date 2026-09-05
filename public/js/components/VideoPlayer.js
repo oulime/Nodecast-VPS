@@ -115,15 +115,16 @@ class VideoPlayer {
         return {
             enableWorker: true,
             // Buffer settings to prevent underruns during background tab throttling
-            maxBufferLength: 30,           // Buffer up to 30 seconds of content
-            maxMaxBufferLength: 60,        // Absolute max buffer 60 seconds
-            maxBufferSize: 60 * 1000 * 1000, // 60MB max buffer size
-            maxBufferHole: 1.0,            // Allow 1s holes in buffer (helps with discontinuities)
+            maxBufferLength: 90,           // Buffer up to 90 seconds of content
+            maxMaxBufferLength: 180,        // Absolute max buffer 180 seconds
+            maxBufferSize: 250 * 1000 * 1000, // 250MB max buffer size
+            maxBufferHole: 1.5,            // Allow 1.5s holes in buffer (helps with discontinuities)
+            maxFragLookUpTolerance: 1.5,   // Smooth segment transition without false hole detection
             // Live stream settings - stable playback without scene jumping
             liveSyncMode: 'buffered',
             liveSyncDurationCount: 3,      // Stay 3 segments behind live edge (standard HLS stability)
             liveMaxLatencyDurationCount: 10, // Allow up to 10 segments of buffer before catching up
-            maxLiveSyncPlaybackRate: 1.05, // Smooth, imperceptible catch-up if connection lags
+            maxLiveSyncPlaybackRate: 1,    // Strict 1.0x playback, never speed up on live IPTV
             liveBackBufferLength: 30,      // Keep 30s of back buffer for seeking
             // Audio discontinuity handling (fixes garbled audio during ad transitions)
             stretchShortVideoTrack: true,  // Stretch short segments to avoid gaps

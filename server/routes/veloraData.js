@@ -6,11 +6,12 @@ const { getDb } = require('../db/sqlite');
 const { sources } = require('../db');
 const xtreamApi = require('../services/xtreamApi');
 const veloraCatalogCache = require('../services/veloraCatalogCache');
-const channelLogoMatcher = require('../services/channelLogoMatcher');
 
 const router = express.Router();
 module.exports = router;
 module.exports.allRows = (table) => allRows(table);
+
+const channelLogoMatcher = require('../services/channelLogoMatcher');
 const homeCachePath = path.join(__dirname, '..', '..', 'data', 'velora-cache', 'home-sections.json');
 const HOME_CACHE_ENTRIES_PER_PACKAGE = 20;
 const countryPackageCachePath = path.join(
@@ -40,12 +41,14 @@ function getEnabledSourceIdSet() {
         if (fs.existsSync(dbJsonPath)) {
             const data = JSON.parse(fs.readFileSync(dbJsonPath, 'utf8'));
             const list = Array.isArray(data?.sources) ? data.sources : [];
-            return new Set(list.filter(s => s.enabled !== false && s.enabled !== 0).map(s => String(s.id)));
+            const set = new Set(list.filter(s => s.enabled !== false && s.enabled !== 0).map(s => String(s.id)));
+            set.add('999999');
+            return set;
         }
     } catch (e) {
         console.warn('[Velora data] Failed to read enabled sources:', e.message);
     }
-    return new Set();
+    return new Set(['999999']);
 }
 
 function cleanMediaTitleForSearch(raw) {

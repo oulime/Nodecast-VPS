@@ -124,18 +124,40 @@
   position: absolute !important;
   bottom: 12px !important;
   left: 14px !important;
-  max-height: clamp(34px, 5.5vw, 56px) !important;
-  max-width: calc(100% - 28px) !important;
+  max-height: clamp(42px, 6.8vw, 68px) !important;
+  max-width: min(84%, 270px) !important;
   width: auto !important;
   height: auto !important;
   object-fit: contain !important;
   object-position: left bottom !important;
-  filter: drop-shadow(0 3px 12px rgba(0, 0, 0, 0.95)) drop-shadow(0 1px 4px rgba(0, 0, 0, 0.9)) !important;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.98)) drop-shadow(0 4px 14px rgba(0, 0, 0, 0.92)) drop-shadow(0 0 2px rgba(0, 0, 0, 0.85)) !important;
   z-index: 3 !important;
   pointer-events: none !important;
   transform: translateZ(0) !important;
   transition: transform 320ms cubic-bezier(0.2, 0.9, 0.4, 1) !important;
 }
+
+/* Wide / elongated single-line logos (e.g. Toradora, Akane-banashi, Black Torch) */
+.vel-home-section__title-logo.vel-title-logo--wide {
+  min-width: clamp(100px, 14vw, 155px) !important;
+  max-height: clamp(40px, 6.2vw, 62px) !important;
+  max-width: min(85%, 270px) !important;
+}
+
+/* Standard ratio logos with vertical glyphs (e.g. Monster with sword, Hunter x Hunter):
+   Gives generous height so the letters enlarge to match optical visual weight! */
+.vel-home-section__title-logo.vel-title-logo--standard {
+  min-width: clamp(95px, 13.5vw, 145px) !important;
+  max-height: clamp(48px, 7.6vw, 76px) !important;
+  max-width: min(80%, 250px) !important;
+}
+
+/* Stacked 2-line / tall logos: keeps height balanced so it never covers characters */
+.vel-home-section__title-logo.vel-title-logo--tall {
+  max-height: clamp(38px, 5.5vw, 54px) !important;
+  max-width: min(65%, 195px) !important;
+}
+
 .vel-home-section--horizontal .vel-home-section__card:hover .vel-home-section__title-logo,
 .vel-home-section--horizontal .vel-home-section__card:focus-visible .vel-home-section__title-logo,
 .vel-home-section__card--horizontal:hover .vel-home-section__title-logo,
@@ -146,8 +168,20 @@
   .vel-home-section__title-logo {
     bottom: 9px !important;
     left: 10px !important;
-    max-height: clamp(26px, 6.8vw, 42px) !important;
-    max-width: calc(100% - 20px) !important;
+    max-height: clamp(30px, 8.2vw, 50px) !important;
+    max-width: min(85%, 220px) !important;
+  }
+  .vel-home-section__title-logo.vel-title-logo--wide {
+    min-width: clamp(85px, 26vw, 130px) !important;
+    max-height: clamp(30px, 8vw, 46px) !important;
+  }
+  .vel-home-section__title-logo.vel-title-logo--standard {
+    min-width: clamp(75px, 22vw, 115px) !important;
+    max-height: clamp(34px, 9vw, 54px) !important;
+  }
+  .vel-home-section__title-logo.vel-title-logo--tall {
+    max-height: clamp(28px, 7vw, 42px) !important;
+    max-width: min(68%, 170px) !important;
   }
 }
 .vel-home-section--horizontal .vel-home-section__skeleton,

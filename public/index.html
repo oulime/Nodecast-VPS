@@ -13583,7 +13583,7 @@ if (target.closest(".trial-offer-button")) {
         }
       }
 
-      /* Desktop / PC browser: keep Live TV & VOD player compact at the top */
+      /* Desktop / PC browser: Responsive media players taking half the height of the screen (50vh / 50dvh) */
       @media (min-width: 768px) {
         body .main--velora #player-container.player-container,
         body .main--velora #vod-player-container.player-container,
@@ -13592,10 +13592,13 @@ if (target.closest(".trial-offer-button")) {
         .main--velora:has(#player-container:not(.hidden)) #player-container.player-container,
         .main--velora:has(#vod-player-container:not(.hidden)) #vod-player-container.player-container,
         .main--velora:has(#content-view:not(.hidden)):has(#player-container:not(.hidden)) #player-container.player-container,
-        .main--velora:has(#content-view:not(.hidden)):has(#vod-player-container:not(.hidden)) #vod-player-container.player-container {
+        .main--velora:has(#content-view:not(.hidden)):has(#vod-player-container:not(.hidden)) #vod-player-container.player-container,
+        .vel-adult-player-container {
           flex: 0 0 auto !important;
-          max-width: 480px !important;
-          width: min(100%, 480px) !important;
+          max-width: min(calc(50vh * (16 / 9)), calc(100vw - 2rem)) !important;
+          width: min(100%, calc(50vh * (16 / 9))) !important;
+          height: auto !important;
+          max-height: 50vh !important;
           margin: 0.25rem auto 0.35rem !important;
           border-radius: 14px !important;
           box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 20px rgba(138, 43, 226, 0.25) !important;
@@ -13608,14 +13611,20 @@ if (target.closest(".trial-offer-button")) {
         }
 
         #player-container .video-wrapper,
-        #vod-player-container .video-wrapper {
-          max-height: 260px !important;
-          aspect-ratio: 16 / 9;
+        #vod-player-container .video-wrapper,
+        .vel-adult-video-wrapper {
+          width: 100% !important;
+          height: 50vh !important;
+          max-height: 50vh !important;
+          aspect-ratio: 16 / 9 !important;
         }
 
         #player-container #video,
-        #vod-player-container #video-vod {
-          max-height: 260px !important;
+        #vod-player-container #video-vod,
+        .vel-adult-video-wrapper video {
+          width: 100% !important;
+          height: 100% !important;
+          max-height: 50vh !important;
           object-fit: contain !important;
         }
 
@@ -13627,12 +13636,19 @@ if (target.closest(".trial-offer-button")) {
         }
 
         .vel-casino-wheel-wrapper {
-          max-width: 480px !important;
+          max-width: min(calc(50vh * (16 / 9)), calc(100vw - 2rem)) !important;
+          width: min(100%, calc(50vh * (16 / 9))) !important;
           margin: 0.15rem auto 0.25rem !important;
         }
 
-        .main--velora.main--velora-live-package #now-playing {
-          max-width: 480px !important;
+        .main--velora.main--velora-live-package #now-playing,
+        .main--velora.main--velora-in-package #now-playing-vod,
+        #now-playing,
+        #now-playing-vod,
+        .vel-adult-now-playing-title,
+        .vel-adult-player-header {
+          max-width: min(calc(50vh * (16 / 9)), calc(100vw - 2rem)) !important;
+          width: min(100%, calc(50vh * (16 / 9))) !important;
           margin: 0.25rem auto 0.2rem !important;
           font-size: 0.95rem !important;
         }
@@ -13657,7 +13673,13 @@ if (target.closest(".trial-offer-button")) {
       /* Fullscreen on PC / all devices fills entire screen */
       #player-container:fullscreen,
       #player-container:-webkit-full-screen,
-      #player-container.player-container--live-fullscreen {
+      #player-container.player-container--live-fullscreen,
+      #vod-player-container:fullscreen,
+      #vod-player-container:-webkit-full-screen,
+      #vod-player-container.player-container--fullscreen,
+      .vel-adult-player-container:fullscreen,
+      .vel-adult-video-wrapper:fullscreen,
+      .vel-adult-video-wrapper:-webkit-full-screen {
         position: fixed !important;
         inset: 0 !important;
         width: 100vw !important;
@@ -13671,7 +13693,12 @@ if (target.closest(".trial-offer-button")) {
 
       #player-container:fullscreen .video-wrapper,
       #player-container:-webkit-full-screen .video-wrapper,
-      #player-container.player-container--live-fullscreen .video-wrapper {
+      #player-container.player-container--live-fullscreen .video-wrapper,
+      #vod-player-container:fullscreen .video-wrapper,
+      #vod-player-container:-webkit-full-screen .video-wrapper,
+      #vod-player-container.player-container--fullscreen .video-wrapper,
+      .vel-adult-video-wrapper:fullscreen,
+      .vel-adult-video-wrapper:-webkit-full-screen {
         width: 100% !important;
         height: 100% !important;
         max-width: none !important;
@@ -13680,7 +13707,12 @@ if (target.closest(".trial-offer-button")) {
 
       #player-container:fullscreen #video,
       #player-container:-webkit-full-screen #video,
-      #player-container.player-container--live-fullscreen #video {
+      #player-container.player-container--live-fullscreen #video,
+      #vod-player-container:fullscreen #video-vod,
+      #vod-player-container:-webkit-full-screen #video-vod,
+      #vod-player-container.player-container--fullscreen #video-vod,
+      .vel-adult-video-wrapper:fullscreen video,
+      .vel-adult-video-wrapper:-webkit-full-screen video {
         width: 100% !important;
         height: 100% !important;
         max-height: none !important;

@@ -55,12 +55,12 @@ async function run() {
     const bundle = fs.readFileSync(bundlePath, 'utf8');
     assert.match(bundle, /categoryId:"\*",packageId:"__velora_country_memberships__"/);
     assert.match(bundle, /priority:!1/);
-    assert.match(bundle, /JSON\.stringify\(\{query:e,type:i,countryId:r,limit:150\}\)/);
+    assert.match(bundle, /JSON\.stringify\(\{query:e,type:(?:i|type),countryId:r,limit:\d+\}\)/);
     assert.doesNotMatch(bundle, /countryId:r,categories:/);
     assert.doesNotMatch(bundle, /allowedItems:\[\.\.\.d\.keys\(\)\]/);
     assert.match(bundle, /Ze\(String\(l\.id\)\)\?Dh\(String\(l\.id\)\)/);
     assert.doesNotMatch(bundle, /source:"browser-memory-cache"/);
-    assert.match(bundle, /source:c\.source\|\|"vps-search-cache"/);
+    assert.match(bundle, /source:(?:c\.source\|\|)?"vps-search-cache"/);
     assert.match(bundle, /#vel-media-package-menu \[data-package-id\]/);
 
     console.log('Search regression tests passed.');

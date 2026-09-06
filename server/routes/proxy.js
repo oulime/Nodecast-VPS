@@ -1186,8 +1186,8 @@ router.post('/epg/:sourceId/channels', async (req, res) => {
  * Supports HTTP Range requests for video seeking and live HLS manifest deduplication/resilience
  */
 const liveManifestCache = new Map();
-const LIVE_MANIFEST_CACHE_TTL_MS = 3500;
-const LIVE_MANIFEST_STALE_TTL_MS = 25000;
+const LIVE_MANIFEST_CACHE_TTL_MS = 6500;
+const LIVE_MANIFEST_STALE_TTL_MS = 120000;
 
 router.get('/stream', async (req, res) => {
     const maxRetries = 2;
@@ -1263,7 +1263,22 @@ router.get('/stream', async (req, res) => {
             const response = await fetch(url, { headers, signal: abortController.signal });
             activeResponse = response;
 
-            // Retry on 5xx errors or transient burst rate limits (458, 429)
+            // If upstream returns 458/429/5xx for an m3u8 and we have a cached manifest, serve it IMMEDIATELY
+            // without slamming upstream or sleeping 800ms
+            if ((response.status === 458 || response.status === 429 || response.status >= 500) && isM3u8Url && liveManifestCache.has(url)) {
+                const cached = liveManifestCache.get(url);
+                if (Date.now() - cached.timestamp < LIVE_MANIFEST_STALE_TTL_MS) {
+                    req.off('close', onClose);
+                    res.set('Access-Control-Allow-Origin', '*');
+                    res.set('X-Accel-Buffering', 'no');
+                    res.set('Content-Type', 'application/vnd.apple.mpegurl');
+                    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+                    res.set('X-Velora-Manifest-Fallback', 'STALE_200');
+                    return res.send(cached.manifest);
+                }
+            }
+
+            // Retry on 5xx errors or transient burst rate limits (458, 429) when no cached manifest exists
             if ((response.status >= 500 || response.status === 458 || response.status === 429) && attempt < maxRetries) {
                 const delay = retryDelays[attempt - 1] || 800;
                 console.log(`[Proxy] Upstream transient status ${response.status} for ${url.substring(0, 60)} (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms...`);
@@ -1272,18 +1287,16 @@ router.get('/stream', async (req, res) => {
             }
 
             if (!response.ok) {
-                // If upstream failed with 458/429/5xx and we have a stale manifest, serve it to prevent player stutter
+                // If upstream failed with 458/429/5xx and we have a cached manifest, serve it to prevent player stutter
                 if (isM3u8Url && liveManifestCache.has(url)) {
                     const cached = liveManifestCache.get(url);
-                    if (Date.now() - cached.timestamp < LIVE_MANIFEST_STALE_TTL_MS) {
-                        req.off('close', onClose);
-                        res.set('Access-Control-Allow-Origin', '*');
-                        res.set('X-Accel-Buffering', 'no');
-                        res.set('Content-Type', 'application/vnd.apple.mpegurl');
-                        res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
-                        res.set('X-Velora-Manifest-Fallback', 'STALE_200');
-                        return res.send(cached.manifest);
-                    }
+                    req.off('close', onClose);
+                    res.set('Access-Control-Allow-Origin', '*');
+                    res.set('X-Accel-Buffering', 'no');
+                    res.set('Content-Type', 'application/vnd.apple.mpegurl');
+                    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+                    res.set('X-Velora-Manifest-Fallback', 'STALE_200');
+                    return res.send(cached.manifest);
                 }
                 req.off('close', onClose);
                 console.error(`Upstream error for ${url.substring(0, 80)}...: ${response.status} ${response.statusText}`);

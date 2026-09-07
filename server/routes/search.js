@@ -43,23 +43,62 @@ function getQueryTokens(normalizedQuery) {
 
 function matchQueryTokens(normalizedName, normalizedQuery, tokens) {
     if (!normalizedName) return false;
-    if (normalizedName.includes(normalizedQuery)) return true;
-    if (tokens.length > 1) {
-        return tokens.every(token => normalizedName.includes(token));
+    if (normalizedName === normalizedQuery) return true;
+    if (tokens.length === 0) return false;
+
+    // Fast check: if the raw normalized string doesn't even contain the words in any form
+    const nameNoSpace = normalizedName.replace(/\s+/g, '');
+    const queryNoSpace = normalizedQuery.replace(/\s+/g, '');
+    if (nameNoSpace.includes(queryNoSpace)) return true;
+
+    // Check with word boundaries: every token in query must match a title word exactly, or prefix a title word
+    const nameWords = normalizedName.split(/\s+/).filter(Boolean);
+    for (const token of tokens) {
+        let matched = false;
+        for (const w of nameWords) {
+            if (w === token || (token.length >= 2 && w.startsWith(token))) {
+                matched = true;
+                break;
+            }
+        }
+        if (!matched) {
+            // For longer tokens (>=4 chars), allow substring match inside longer words, but NOT short words
+            if (token.length >= 4 && nameWords.some(w => w.length >= 6 && w.includes(token))) {
+                matched = true;
+            }
+        }
+        if (!matched) return false;
     }
-    return false;
+    return true;
 }
 
 function calculateScore(normalizedName, normalizedQuery, tokens, priority) {
     let score = Number(priority ? 1000 : 0);
+    const nameWords = normalizedName.split(/\s+/).filter(Boolean);
+    const nameNoSpace = nameWords.join('');
+    const queryNoSpace = tokens.join('');
+
     if (normalizedName === normalizedQuery) {
-        score += 500;
+        score += 5000;
     } else if (normalizedName.startsWith(normalizedQuery)) {
-        score += 350;
-    } else if (normalizedName.includes(normalizedQuery)) {
-        score += 250;
-    } else if (tokens.length > 1 && tokens.every(t => normalizedName.includes(t))) {
-        score += 150;
+        score += 3500;
+    } else if ((' ' + normalizedName + ' ').includes(' ' + normalizedQuery + ' ')) {
+        score += 2500;
+    } else if (nameNoSpace.includes(queryNoSpace)) {
+        score += 2000;
+    } else {
+        // Token score
+        let tokenScore = 0;
+        for (const token of tokens) {
+            if (nameWords.includes(token)) {
+                tokenScore += 300;
+            } else if (nameWords.some(w => w.startsWith(token))) {
+                tokenScore += 150;
+            } else {
+                tokenScore += 50;
+            }
+        }
+        score += tokenScore;
     }
     return score;
 }

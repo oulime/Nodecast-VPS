@@ -10943,12 +10943,117 @@ if (target.closest(".trial-offer-button")) {
             return "";
           }
 
-          function filterAndCleanSearchPayload(payload) {
+          function extractItemRecency(item, rawTitle) {
+            if (!item) return { score: 0, year: "" };
+            var it = item.item || item;
+            var explicitYear = item.year || it.year || item.release_year || it.release_year;
+            if (explicitYear) {
+              var yNum = parseInt(explicitYear, 10);
+              if (!isNaN(yNum) && yNum >= 1900 && yNum <= 2099) {
+                return { score: yNum * 10000, year: String(yNum) };
+              }
+            }
+
+            var relDate = item.release_date || it.release_date || item.releasedate || it.releasedate || item.releaseDate || it.releaseDate || item.first_air_date || it.first_air_date;
+            if (relDate) {
+              var d = new Date(relDate);
+              if (!isNaN(d.getTime())) {
+                var y = d.getFullYear();
+                return { score: y * 10000 + (d.getMonth() + 1) * 100 + d.getDate(), year: String(y) };
+              }
+              var mDate = String(relDate).match(/\b(19\d\d|20\d\d)\b/);
+              if (mDate) {
+                return { score: parseInt(mDate[1], 10) * 10000, year: mDate[1] };
+              }
+            }
+
+            var titleStr = rawTitle || item.rawLabel || item.original_title || item.title || item.label || item.name || it.name || it.title || "";
+            var titleMatches = String(titleStr).match(/[\(\[\s\-_](19\d\d|20\d\d)[\)\]\s\-_]?/g);
+            if (titleMatches && titleMatches.length) {
+              var lastMatch = titleMatches[titleMatches.length - 1].replace(/\D/g, "");
+              var yVal = parseInt(lastMatch, 10);
+              if (!isNaN(yVal) && yVal >= 1920 && yVal <= 2099) {
+                return { score: yVal * 10000, year: String(yVal) };
+              }
+            }
+
+            var pkg = String(item.packageName || it.packageName || it.package_name || "").toUpperCase();
+            var pkgMatch = pkg.match(/\b(19\d\d|20\d\d)\b/);
+            if (pkgMatch) {
+              var pYear = parseInt(pkgMatch[1], 10);
+              if (!isNaN(pYear) && pYear >= 1990 && pYear <= 2099) {
+                return { score: pYear * 10000, year: String(pYear) };
+              }
+            }
+
+            var added = item.added || it.added || item.created_at || it.created_at;
+            if (added) {
+              var numAdded = parseInt(added, 10);
+              if (!isNaN(numAdded) && numAdded > 1000000000) {
+                var ts = numAdded > 100000000000 ? numAdded : numAdded * 1000;
+                var adDate = new Date(ts);
+                if (!isNaN(adDate.getTime())) {
+                  var ay = adDate.getFullYear();
+                  return { score: ay * 10000 + (adDate.getMonth() + 1) * 100 + adDate.getDate(), year: (ay >= 1990 ? String(ay) : "") };
+                }
+              }
+            }
+
+            var rawId = parseInt(String(item.id || it.id || "").replace(/\D/g, ""), 10);
+            if (!isNaN(rawId) && rawId > 0) {
+              return { score: rawId, year: "" };
+            }
+
+            return { score: 0, year: "" };
+          }
+
+          function calculateSearchRelevance(rawTitle, query) {
+            if (!rawTitle || !query) return 0;
+            var normTitle = String(rawTitle).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+            var normQuery = String(query).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+            if (!normTitle || !normQuery) return 0;
+
+            var titleWords = normTitle.split(/\s+/).filter(Boolean);
+            var queryTokens = normQuery.split(/\s+/).filter(Boolean);
+            var titleNoSpace = titleWords.join("");
+            var queryNoSpace = queryTokens.join("");
+
+            if (normTitle === normQuery) return 100000;
+            if (normTitle.startsWith(normQuery)) return 80000;
+            if ((" " + normTitle + " ").indexOf(" " + normQuery + " ") !== -1) return 60000;
+            if (normTitle.indexOf(normQuery) !== -1) return 40000;
+            if (titleNoSpace.indexOf(queryNoSpace) !== -1) return 30000;
+
+            // Check word token matching: every token in query must match a title word or prefix a title word
+            for (var i = 0; i < queryTokens.length; i++) {
+              var token = queryTokens[i];
+              var matched = false;
+              for (var j = 0; j < titleWords.length; j++) {
+                var w = titleWords[j];
+                if (w === token || (token.length >= 2 && w.indexOf(token) === 0)) {
+                  matched = true;
+                  break;
+                }
+              }
+              if (!matched) {
+                if (token.length >= 4 && titleWords.some(function (w) { return w.length >= 6 && w.indexOf(token) !== -1; })) {
+                  matched = true;
+                }
+              }
+              if (!matched) return 0; // Filtered out - not relevant to query
+            }
+            return 10000;
+          }
+
+          function filterAndCleanSearchPayload(payload, currentQuery) {
             if (!payload) return payload;
             var clean = Object.assign({}, payload);
+            var q = String(currentQuery || "").trim();
+
             if (Array.isArray(clean.sections)) {
               clean.sections = clean.sections.map(function (sec) {
                 if (!sec || !Array.isArray(sec.items)) return sec;
+                var isVodSec = sec.key === "movies" || sec.key === "series";
                 var filteredItems = sec.items
                   .filter(function (item) { return !isSearchItemHidden(item); })
                   .map(function (item) {
@@ -10956,13 +11061,37 @@ if (target.closest(".trial-offer-button")) {
                     var cleanedLabel = cleanSearchTitle(rawTitle);
                     var cleanedPkg = cleanSearchTitle(item.packageName || "");
                     var quality = detectQualityBadge(rawTitle, item.packageName || "");
+                    var recencyInfo = isVodSec ? extractItemRecency(item, rawTitle) : { score: 0, year: "" };
+                    var relScore = q.length >= 2 ? calculateSearchRelevance(cleanedLabel || rawTitle, q) : 10000;
                     return Object.assign({}, item, {
                       label: cleanedLabel,
                       name: cleanedLabel,
                       packageName: cleanedPkg || item.packageName,
-                      quality: quality
+                      quality: quality,
+                      relevanceScore: relScore,
+                      recencyScore: recencyInfo.score,
+                      yearDisplay: recencyInfo.year
                     });
                   });
+
+                // Filter out non-matching items if relevance is computed
+                if (q.length >= 2) {
+                  var strictMatches = filteredItems.filter(function (it) { return it.relevanceScore > 0; });
+                  if (strictMatches.length > 0) {
+                    filteredItems = strictMatches;
+                  }
+                }
+
+                // Sort: highest relevance first, then most recent first for VOD
+                filteredItems.sort(function (a, b) {
+                  var relDiff = (b.relevanceScore || 0) - (a.relevanceScore || 0);
+                  if (relDiff !== 0) return relDiff;
+                  if (isVodSec) {
+                    return (b.recencyScore || 0) - (a.recencyScore || 0);
+                  }
+                  return 0;
+                });
+
                 return Object.assign({}, sec, { items: filteredItems });
               }).filter(function (sec) { return sec && Array.isArray(sec.items) && sec.items.length > 0; });
             }
@@ -10974,13 +11103,32 @@ if (target.closest(".trial-offer-button")) {
                   var cleanedLabel = cleanSearchTitle(rawTitle);
                   var cleanedPkg = cleanSearchTitle(item.packageName || "");
                   var quality = detectQualityBadge(rawTitle, item.packageName || "");
+                  var isVod = item.type === "movie" || item.type === "series";
+                  var recencyInfo = isVod ? extractItemRecency(item, rawTitle) : { score: 0, year: "" };
+                  var relScore = q.length >= 2 ? calculateSearchRelevance(cleanedLabel || rawTitle, q) : 10000;
                   return Object.assign({}, item, {
                     label: cleanedLabel,
                     name: cleanedLabel,
                     packageName: cleanedPkg || item.packageName,
-                    quality: quality
+                    quality: quality,
+                    relevanceScore: relScore,
+                    recencyScore: recencyInfo.score,
+                    yearDisplay: recencyInfo.year
                   });
                 });
+
+              if (q.length >= 2) {
+                var strictRes = clean.results.filter(function (it) { return it.relevanceScore > 0; });
+                if (strictRes.length > 0) {
+                  clean.results = strictRes;
+                }
+              }
+
+              clean.results.sort(function (a, b) {
+                var relDiff = (b.relevanceScore || 0) - (a.relevanceScore || 0);
+                if (relDiff !== 0) return relDiff;
+                return (b.recencyScore || 0) - (a.recencyScore || 0);
+              });
             }
             return clean;
           }
@@ -11110,7 +11258,8 @@ if (target.closest(".trial-offer-button")) {
               meta.innerHTML = '<span class="vel-global-search__live-tag">● DIRECT</span><span class="vel-global-search__meta-text">' + (metaText ? ' ' + metaText : '') + '</span>';
             } else {
               var typeTag = (item.type === "series" || sectionKey === "series") ? "Série" : "Film";
-              meta.innerHTML = '<span class="vel-global-search__type-tag">' + typeTag + '</span><span class="vel-global-search__meta-text">' + (metaText ? ' • ' + metaText : '') + '</span>';
+              var yearHtml = item.yearDisplay ? '<span class="vel-global-search__year-tag">' + item.yearDisplay + '</span>' : '';
+              meta.innerHTML = '<span class="vel-global-search__type-tag">' + typeTag + '</span>' + (yearHtml ? '<span class="vel-global-search__meta-dot">•</span>' + yearHtml : '') + '<span class="vel-global-search__meta-text">' + (metaText ? ' • ' + metaText : '') + '</span>';
             }
 
             body.append(title, meta);
@@ -11453,7 +11602,7 @@ if (target.closest(".trial-offer-button")) {
                 return;
               }
               deferredSearchUpdate = null;
-              var filteredPayload = filterAndCleanSearchPayload(payload);
+              var filteredPayload = filterAndCleanSearchPayload(payload, query);
               indexSearchPayloadItems(filteredPayload);
               var totalCount = 0;
               if (filteredPayload && Array.isArray(filteredPayload.sections)) {
@@ -14711,6 +14860,17 @@ if (target.closest(".trial-offer-button")) {
       .vel-global-search__type-tag {
         color: #a78bfa;
         font-weight: 800;
+      }
+
+      .vel-global-search__year-tag {
+        color: #38bdf8;
+        font-weight: 800;
+        font-size: 0.68rem;
+      }
+
+      .vel-global-search__meta-dot {
+        color: rgba(255, 255, 255, 0.35);
+        font-size: 0.65rem;
       }
 
       /* Live Channel Card Styles - Compact */

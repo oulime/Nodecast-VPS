@@ -11223,7 +11223,44 @@ if (target.closest(".trial-offer-button")) {
                 return;
               }
 
-              payload.sections.forEach(function (section) {
+              // Smart Dynamic Sorting: prioritize sections with most results and highest relevance
+              var cleanQuery = String(query || "").trim().toLowerCase();
+              var sortedSections = payload.sections.slice().filter(function (sec) {
+                return sec && Array.isArray(sec.items) && sec.items.length > 0;
+              }).sort(function (a, b) {
+                // If user selected a specific category tab, keep it first
+                if (currentFilterTab !== "all") {
+                  if (a.key === currentFilterTab && b.key !== currentFilterTab) return -1;
+                  if (b.key === currentFilterTab && a.key !== currentFilterTab) return 1;
+                }
+
+                // Match relevance score
+                var aExact = 0;
+                var bExact = 0;
+                if (cleanQuery) {
+                  a.items.forEach(function (it) {
+                    var t = String(it.label || it.name || "").toLowerCase();
+                    if (t === cleanQuery || t.startsWith(cleanQuery)) aExact++;
+                  });
+                  b.items.forEach(function (it) {
+                    var t = String(it.label || it.name || "").toLowerCase();
+                    if (t === cleanQuery || t.startsWith(cleanQuery)) bExact++;
+                  });
+                }
+
+                var aScore = (aExact * 10) + a.items.length;
+                var bScore = (bExact * 10) + b.items.length;
+
+                if (bScore !== aScore) {
+                  return bScore - aScore; // Highest count / relevance first
+                }
+
+                // Default tie-breaker order: films -> séries -> chaînes
+                var order = { movies: 1, series: 2, live: 3 };
+                return (order[a.key] || 99) - (order[b.key] || 99);
+              });
+
+              sortedSections.forEach(function (section) {
                 if (!section || !Array.isArray(section.items) || !section.items.length) return;
 
                 // Apply active tab filter

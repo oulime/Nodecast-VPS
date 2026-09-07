@@ -348,28 +348,52 @@ router.post('/package-covers/auto-backfill', express.json(), async (_req, res) =
 });
 
 // Admin upload cover
-router.post('/r2-package-cover', async (req, res) => {
-    const boundary = getBoundary(req.headers['content-type']);
-    if (!boundary) {
-        return res.status(400).json({ error: 'multipart/form-data requis.' });
-    }
-
+router.post(['/r2-package-cover', '/package-cover'], express.json({ limit: '50mb' }), async (req, res) => {
     let inputPath = null;
     let webpPath = null;
 
     try {
-        const body = await readRequestBuffer(req);
-        const { fields, files } = parseMultipart(body, boundary);
-        const file = files.get('file');
-        const packageId = fields.get('packageId');
+        let packageId = null;
+        let fileBuffer = null;
 
-        if (!file || !file.data.length) {
+        const contentType = String(req.headers['content-type'] || '').toLowerCase();
+
+        if (contentType.includes('application/json') || (req.body && (req.body.dataBase64 || req.body.image || req.body.data || req.body.file))) {
+            // JSON Base64 mode
+            packageId = String(req.body?.packageId || req.body?.package_id || req.body?.id || '').trim();
+            const encoded = String(req.body?.dataBase64 || req.body?.image || req.body?.data || req.body?.file || '').trim();
+            if (encoded) {
+                fileBuffer = Buffer.from(encoded.replace(/^data:[^;]+;base64,/, ''), 'base64');
+            }
+        } else {
+            // Multipart mode
+            const boundary = getBoundary(req.headers['content-type']);
+            if (boundary) {
+                const body = await readRequestBuffer(req);
+                const { fields, files } = parseMultipart(body, boundary);
+                const file = files.get('file') || files.get('image');
+                packageId = fields.get('packageId') || fields.get('package_id') || fields.get('id') || '';
+                if (file && file.data && file.data.length) {
+                    fileBuffer = file.data;
+                }
+            }
+        }
+
+        if (!packageId) {
+            return res.status(400).json({ error: 'Identifiant du package manquant.' });
+        }
+
+        if (!fileBuffer || !fileBuffer.length) {
             return res.status(400).json({ error: 'Fichier image manquant.' });
         }
 
-        const detected = sniffImage(file.data);
+        if (fileBuffer.length > MAX_UPLOAD_BYTES) {
+            return res.status(413).json({ error: 'Image trop volumineuse (max 8 Mo).' });
+        }
+
+        const detected = sniffImage(fileBuffer);
         if (!detected || !Object.values(IMAGE_TYPES).includes(detected.mime)) {
-            return res.status(415).json({ error: 'Format image non supporte.' });
+            return res.status(415).json({ error: 'Format image non supporte (utilisez PNG, JPG, WebP ou GIF).' });
         }
 
         await fsp.mkdir(TMP_DIR, { recursive: true });
@@ -381,7 +405,7 @@ router.post('/r2-package-cover', async (req, res) => {
 
         inputPath = path.join(TMP_DIR, `${baseName}.${detected.ext}`);
         webpPath = path.join(TMP_DIR, `${baseName}.webp`);
-        await fsp.writeFile(inputPath, file.data, { flag: 'wx' });
+        await fsp.writeFile(inputPath, fileBuffer, { flag: 'wx' });
 
         const ffmpegPath = req.app && req.app.locals ? req.app.locals.ffmpegPath : null;
         const isPng = detected.ext === 'png';
@@ -407,6 +431,39 @@ router.post('/r2-package-cover', async (req, res) => {
             updatedAt: new Date().toISOString()
         };
         await saveDiscoveredCovers(map);
+
+        // Also update SQLite admin_package_covers and admin_packages if accessible
+        try {
+            const veloraData = require('./veloraData');
+            if (typeof veloraData.upsertRow === 'function') {
+                veloraData.upsertRow('admin_package_covers', {
+                    package_id: packageId,
+                    cover_url: coverUrl,
+                    auto_discovered: 0,
+                    deleted: 0,
+                    updated_at: new Date().toISOString()
+                }, ['package_id']);
+            }
+            if (typeof veloraData.updateRow === 'function') {
+                veloraData.updateRow('admin_packages', { id: packageId }, { cover_url: coverUrl });
+            }
+        } catch (_) {}
+
+        // Asynchronously mirror upload to VPS if in dev mode
+        if (process.env.NODE_ENV !== 'production' && !/^(1|true|yes)$/i.test(String(process.env.VPS_DATA_API_DISABLED || '').trim())) {
+            const VPS_DATA_API_BASE = String(process.env.VPS_DATA_API_BASE || 'https://nodecast.veloravip.net').trim().replace(/\/+$/, '');
+            try {
+                const remoteFormData = new FormData();
+                const blob = new Blob([fileBuffer], { type: detected.mime });
+                remoteFormData.append('file', blob, `${baseName}.${detected.ext}`);
+                remoteFormData.append('packageId', packageId);
+                fetch(`${VPS_DATA_API_BASE}/api/r2-package-cover`, {
+                    method: 'POST',
+                    body: remoteFormData,
+                    headers: req.headers.authorization ? { Authorization: req.headers.authorization } : {}
+                }).catch(err => console.warn('[package-covers] VPS mirror upload non-fatal:', err.message));
+            } catch (_) {}
+        }
 
         return res.json({
             ok: true,

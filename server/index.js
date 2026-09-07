@@ -171,7 +171,6 @@ const VPS_DATA_API_PATHS = [
     '/api/velora-db',
     '/api/package-covers',
     '/api/country-logos',
-    '/api/r2-package-cover',
     '/api/analytics',
     '/uploads'
 ];
@@ -343,7 +342,7 @@ if (USE_VPS_DATA_API) {
             }
             console.error('[VPS data API] Request failed:', err);
             if (!res.headersSent) {
-                if (req.path.startsWith('/api/package-covers')) {
+                if (req.path.startsWith('/api/package-covers') || req.path === '/api/r2-package-cover' || req.path === '/api/package-cover') {
                     clearRequest();
                     return next();
                 }

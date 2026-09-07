@@ -1552,7 +1552,7 @@
     <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/velora-home-sections.js?v=20260905-smart-logos-v1"></script>
     <script defer src="/assets/velora-home-cache-fallback.js?v=20260905-smart-logos-v1"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=20260907-search-fix-v2"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=20260907-search-fix-v3"></script>
     <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-54"></script>
@@ -11715,6 +11715,11 @@ if (target.closest(".trial-offer-button")) {
               var mappedChannels = channelList.map(function (t) {
                 var it = t.item || t;
                 var stId = String(it.stream_id ?? it.raw_stream_id ?? t.itemId ?? t.streamId ?? t.id ?? "");
+                if (!stId || stId.startsWith("live:") || stId.startsWith("cache:") || stId.startsWith("api:")) {
+                  var parts = stId.split(":");
+                  if (parts.length === 4 && parts[0] === "live") stId = parts[2];
+                  else if (parts.length >= 3) stId = parts[2];
+                }
                 var numId = /^\d+$/.test(stId) ? Number(stId) : stId;
                 return {
                   stream_id: numId,

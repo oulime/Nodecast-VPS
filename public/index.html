@@ -1552,7 +1552,7 @@
     <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/velora-home-sections.js?v=20260905-smart-logos-v1"></script>
     <script defer src="/assets/velora-home-cache-fallback.js?v=20260905-smart-logos-v1"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=20260905-hls-smooth-v3"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=20260907-search-fix-v2"></script>
     <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-54"></script>
@@ -1617,7 +1617,7 @@
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css?v=vod-contrast-shimmer-v5-20260830">
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=large-package-virtualization-v1-20260810">
     <link rel="stylesheet" href="/assets/live-package-text-cards.css?v=tv-package-flat-inner-v1-20260814">
-    <link rel="stylesheet" href="/assets/velora-live-wheel.css?v=20260904-white-thumb-v10">
+    <link rel="stylesheet" href="/assets/velora-live-wheel.css?v=20260907-search-fix-v2">
     <link rel="stylesheet" href="/assets/pkg-hub-selector.css?v=20260830-visibility-fix-v43">
     <style>
       #settings-tab-btn-ip,
@@ -11705,6 +11705,39 @@ if (target.closest(".trial-offer-button")) {
             }
           }
 
+          var VEL_SEARCH_CHANNEL_PACKAGE_ID = "00000000-0000-4000-8000-00000000a001";
+
+          if (typeof window.veloraSyncSearchChannelPackage !== "function") {
+            window.veloraSyncSearchChannelPackage = function (channelList, queryName) {
+              var state = typeof window.veloraGetState === "function" ? window.veloraGetState() : null;
+              if (!state || !Array.isArray(channelList)) return;
+
+              var mappedChannels = channelList.map(function (t) {
+                var it = t.item || t;
+                var stId = String(it.stream_id ?? it.raw_stream_id ?? t.itemId ?? t.streamId ?? t.id ?? "");
+                var numId = /^\d+$/.test(stId) ? Number(stId) : stId;
+                return {
+                  stream_id: numId,
+                  raw_stream_id: numId,
+                  name: String(it.name || t.label || t.name || "Chaîne"),
+                  stream_icon: String(it.stream_icon || t.thumbUrl || t.cover || ""),
+                  cover: String(it.cover || it.stream_icon || t.thumbUrl || ""),
+                  container_extension: String(it.container_extension || ""),
+                  category_id: VEL_SEARCH_CHANNEL_PACKAGE_ID,
+                  category_ids: [VEL_SEARCH_CHANNEL_PACKAGE_ID],
+                  nodecast_source_id: String(it.nodecast_source_id ?? t.sourceId ?? state.nodecastXtreamSourceId ?? ""),
+                  nodecast_global_stream_id: String(it.nodecast_global_stream_id ?? t.globalStreamId ?? ""),
+                  nodecast_media: "live"
+                };
+              });
+
+              state.streamsByCatAll.set(VEL_SEARCH_CHANNEL_PACKAGE_ID, mappedChannels);
+              if (window.__velLoadedLivePackageIds) {
+                window.__velLoadedLivePackageIds.add(VEL_SEARCH_CHANNEL_PACKAGE_ID);
+              }
+            };
+          }
+
           var suppressTouchSearchCloseUntil = 0;
 
           function openSearch(event) {
@@ -11915,10 +11948,12 @@ if (target.closest(".trial-offer-button")) {
 
               var directType = button.dataset.searchResultType || "";
               var targetTab = (directType === "series" || id.startsWith("series") || id.includes(":series:")) ? "series" : (directType === "movie" || id.startsWith("movies") || id.includes(":movie:")) ? "movies" : "live";
-              document.body.dataset.velActiveTab = targetTab;
-              document.querySelectorAll(".vel-bottom-nav__button").forEach(function (b) {
-                b.classList.toggle("is-active", b.dataset.bottomNav === targetTab);
-              });
+              if (targetTab !== "live") {
+                document.body.dataset.velActiveTab = targetTab;
+                document.querySelectorAll(".vel-bottom-nav__button").forEach(function (b) {
+                  b.classList.toggle("is-active", b.dataset.bottomNav === targetTab);
+                });
+              }
 
               var itemTitle = button.querySelector(".vel-global-search__title")?.textContent || "";
               try {
@@ -11983,6 +12018,39 @@ if (target.closest(".trial-offer-button")) {
                 })();
                 return;
               }
+
+              // For Live Channels: open the channel in player with the list of search channels at the bottom
+              if (
+                targetTab === "live" &&
+                typeof window.veloraOpenSearchChannelItem === "function" &&
+                lastSearchPayload
+              ) {
+                var allLiveChannels = [];
+                if (Array.isArray(lastSearchPayload.sections)) {
+                  var liveSec = lastSearchPayload.sections.find(function (s) { return s && s.key === "live"; });
+                  if (liveSec && Array.isArray(liveSec.items)) {
+                    allLiveChannels = liveSec.items;
+                  }
+                } else if (Array.isArray(lastSearchPayload.live)) {
+                  allLiveChannels = lastSearchPayload.live;
+                } else if (Array.isArray(lastSearchPayload.results)) {
+                  allLiveChannels = lastSearchPayload.results.filter(function (r) { return r && (r.type === "channel" || r.type === "live"); });
+                }
+
+                var clickedMedia = searchMediaById.get(String(id)) || {
+                  id: id,
+                  label: itemTitle,
+                  name: itemTitle
+                };
+
+                if (allLiveChannels.length > 0) {
+                  window.veloraOpenSearchChannelItem(clickedMedia, allLiveChannels, lastSearchQuery).catch(function () {
+                    window.veloraOpenSearchResult(id).catch(function () {});
+                  });
+                  return;
+                }
+              }
+
               window.veloraOpenSearchResult(id).catch(function () {});
               return;
             }
@@ -16314,7 +16382,7 @@ if (target.closest(".trial-offer-button")) {
       })();
     </script>
     <script defer src="/assets/cast-bridge.js?v=20260821-cast-airplay-v1"></script>
-    <script defer src="/assets/velora-live-wheel.js?v=20260904-universal-thematics-v11"></script>
+    <script defer src="/assets/velora-live-wheel.js?v=20260907-search-fix-v2"></script>
     <link rel="stylesheet" href="/assets/velora-prime-carousel.css?v=20260902-feed-v5" />
     <script defer src="/assets/velora-prime-carousels.js?v=20260902-feed-v5"></script>
     <script>

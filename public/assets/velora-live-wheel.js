@@ -925,8 +925,8 @@
         this.wrapper.style.display = showWheel ? "block" : "none";
       }
 
-      // Keep player visible when on Live TV or playing favorite live channel
-      const isFavoritesChannel = !!document.body.dataset.veloraReturnFavorites && document.body.dataset.veloraReturnFavorites === "channel";
+      // Keep player visible when on Live TV or playing favorite/search live channel
+      const isFavoritesChannel = !!document.body.dataset.veloraReturnFavorites && (document.body.dataset.veloraReturnFavorites === "channel" || document.body.dataset.veloraReturnFavorites === "search");
       const playerContainer = document.getElementById("player-container");
       if (playerContainer && (isLive || isFavoritesChannel)) {
         playerContainer.classList.remove("hidden");

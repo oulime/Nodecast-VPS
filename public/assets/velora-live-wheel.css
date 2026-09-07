@@ -13,8 +13,8 @@
 }
 
 /* Display the carousel specifically on Live TV */
-body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]):not(.vel-favorites-open) .vel-casino-wheel-wrapper,
-body[data-vel-top-level="live"]:not(.vel-home-empty-active):not(.vel-favorites-open) .vel-casino-wheel-wrapper {
+body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]):not(.vel-favorites-open):not([data-velora-return-favorites]) .vel-casino-wheel-wrapper,
+body[data-vel-top-level="live"]:not(.vel-home-empty-active):not(.vel-favorites-open):not([data-velora-return-favorites]) .vel-casino-wheel-wrapper {
   display: block;
 }
 

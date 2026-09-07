@@ -119,7 +119,7 @@ body[data-vel-active-tab="series"] .vel-prime-search-btn {
   position: fixed !important;
   top: max(16px, env(safe-area-inset-top, 16px)) !important;
   right: max(22px, env(safe-area-inset-right, 22px)) !important;
-  z-index: 99999 !important;
+  z-index: 2500 !important;
   width: clamp(48px, 4.4vw, 54px) !important;
   height: clamp(48px, 4.4vw, 54px) !important;
   border-radius: 50% !important;
@@ -132,6 +132,8 @@ body[data-vel-active-tab="series"] .vel-prime-search-btn {
   align-items: center !important;
   justify-content: center !important;
   cursor: pointer !important;
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent !important;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.7) !important;
   transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease !important;
 }
@@ -147,6 +149,7 @@ body[data-vel-active-tab="series"] .vel-prime-search-btn:hover {
   width: 25px !important;
   height: 25px !important;
   fill: #fff !important;
+  pointer-events: none !important;
 }
 
 /* Hide on non-media tabs (home, live, etc.) */
@@ -158,12 +161,17 @@ body[data-vel-active-tab="live"] .vel-prime-search-btn {
   pointer-events: none !important;
 }
 
-/* Hide when modal or video player is open */
+/* Hide when search overlay, modal, or video player is open */
+body:has(.vel-global-search:not(.hidden)) .vel-prime-search-btn,
+body.vel-search-open .vel-prime-search-btn,
 body.vel-modal-active .vel-prime-search-btn,
 body.vel-vod-fullscreen-active .vel-prime-search-btn,
 body.vel-live-fullscreen-active .vel-prime-search-btn,
 .vel-prime-search-btn.is-hidden {
   display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 body[data-vel-active-tab="movies"] .vel-prime-container,

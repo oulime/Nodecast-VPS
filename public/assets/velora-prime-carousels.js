@@ -1126,6 +1126,7 @@
         primeSearchBtn.addEventListener("click", (e) => {
           e.stopPropagation();
           primeSearchBtn.classList.add("is-hidden");
+          primeSearchBtn.style.setProperty("display", "none", "important");
           document.dispatchEvent(new CustomEvent("velora-open-search"));
         });
         document.body.appendChild(primeSearchBtn);
@@ -1137,8 +1138,13 @@
           const isOpen = !globalSearch.classList.contains("hidden");
           const btn = document.getElementById("vel-prime-search-btn");
           if (btn) {
-            if (isOpen) btn.classList.add("is-hidden");
-            else btn.classList.remove("is-hidden");
+            if (isOpen) {
+              btn.classList.add("is-hidden");
+              btn.style.setProperty("display", "none", "important");
+            } else {
+              btn.classList.remove("is-hidden");
+              btn.style.removeProperty("display");
+            }
           }
         }).observe(globalSearch, { attributes: true, attributeFilter: ["class"] });
       }
@@ -1149,12 +1155,13 @@
         primeSearchBtn.style.setProperty("display", "none", "important");
       } else {
         primeSearchBtn.classList.remove("is-hidden");
-        primeSearchBtn.style.setProperty("display", "flex", "important");
+        primeSearchBtn.style.removeProperty("display");
       }
     } else {
       if (stickyTop) stickyTop.style.removeProperty("display");
       if (velHeader) velHeader.style.removeProperty("display");
       if (primeSearchBtn) {
+        primeSearchBtn.classList.add("is-hidden");
         primeSearchBtn.style.setProperty("display", "none", "important");
       }
       if (primeContainer) {

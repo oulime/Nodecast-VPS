@@ -800,7 +800,7 @@ const HOME_CHANNEL_RULE_TABLES = new Set([
     'admin_channel_name_suffixes',
     'admin_hidden_filters'
 ]);
-const DEFAULT_CHANNEL_HIDDEN_FILTERS = ['HEVC', 'H265', 'H.265', 'H 265', 'x265'];
+const DEFAULT_CHANNEL_HIDDEN_FILTERS = ['HEVC', 'H265', 'H.265', 'H 265', 'x265', '###', '##', 'suffix:##', 'prefix:##'];
 
 let currentCountryPackageCache = null;
 
@@ -855,10 +855,15 @@ function normalizeChannelRuleValue(value) {
 
 function isHomeChannelHidden(rawName, hiddenFilters) {
     const name = normalizeChannelRuleValue(rawName);
-    if ((name.match(/#/g) || []).length >= 3) return true;
-    if (/^[-=*~_]{3,}.*[-=*~_]{3,}$/.test(name)) return true;
-    return hiddenFilters.some(filter => {
+    if (!name) return true;
+    if ((name.match(/#/g) || []).length >= 2) return true;
+    if (name.includes('###') || name.includes('##')) return true;
+    if (/^[-=*~_#]{2,}.*[-=*~_#]{2,}$/.test(name)) return true;
+    if (/^[#\s\-=_*~|]+$/.test(name)) return true;
+    const filters = Array.isArray(hiddenFilters) && hiddenFilters.length > 0 ? hiddenFilters : DEFAULT_CHANNEL_HIDDEN_FILTERS;
+    return filters.some(filter => {
         const normalized = normalizeChannelRuleValue(filter);
+        if (!normalized) return false;
         if (normalized.startsWith('suffix:')) {
             const s = normalized.slice(7).trim();
             return s && (name.endsWith(s) || name.includes(s));
@@ -1466,6 +1471,7 @@ function getCountryPackageCache() {
 
 function liveChannelsForCurations(curations, packageById) {
     const enabledSourceIds = getEnabledSourceIdSet();
+    const channelRules = homeChannelNameRules();
     const findItem = getDb().prepare(`
         SELECT item_id, name, stream_icon, provider_order
         FROM playlist_items
@@ -1481,7 +1487,8 @@ function liveChannelsForCurations(curations, packageById) {
         const key = `${packageId}:${sourceId}:${streamId}`;
         if (!Number.isInteger(sourceId) || !streamId || !enabledSourceIds.has(String(sourceId)) || seen.has(key)) continue;
         const item = findItem.get(sourceId, streamId);
-        if (!item) continue;
+        if (!item || !item.name) continue;
+        if (isHomeChannelHidden(item.name, channelRules.hiddenFilters)) continue;
         seen.add(key);
         const pkgRow = packageById.get(packageId);
         const pkgCover = pkgRow?.cover_url || '';
@@ -1490,7 +1497,7 @@ function liveChannelsForCurations(curations, packageById) {
             source_id: sourceId,
             kind: 'live',
             origin_package_id: String(curation.origin_package_id || ''),
-            name: item.name,
+            name: stripHomeChannelPrefixes(item.name, channelRules.prefixes, channelRules.suffixes),
             stream_icon: sanitizeChannelIcon(item.name, item.stream_icon, pkgCover),
             provider_order: item.provider_order,
             package_id: packageId,
@@ -3812,3 +3819,6 @@ module.exports.isOfficialPackagesLogosOnly = isOfficialPackagesLogosOnly;
 module.exports.isOfficialLogoUrl = isOfficialLogoUrl;
 module.exports.sanitizeChannelIcon = sanitizeChannelIcon;
 module.exports.enrichHeroSliderItem = enrichHeroSliderItem;
+module.exports.isHomeChannelHidden = isHomeChannelHidden;
+module.exports.homeChannelNameRules = homeChannelNameRules;
+module.exports.stripHomeChannelPrefixes = stripHomeChannelPrefixes;

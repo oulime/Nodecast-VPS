@@ -276,6 +276,7 @@ async function getIndexedCategory(action, category, snapshotVersion, type) {
         const itemId = getItemId(item, type);
         const name = cleanText(item.name || item.title || item.series_name, 500);
         if (itemId === undefined || itemId === null || !name) return null;
+        if (type === 'live' && veloraData.isHomeChannelHidden(name)) return null;
         return {
             sourceId: category.sourceId,
             itemId: String(itemId),
@@ -305,6 +306,7 @@ async function getIndexedSnapshot(action, snapshotVersion, type) {
         const itemId = getItemId(item, type);
         const name = cleanText(item.name || item.title || item.series_name, 500);
         if (!Number.isInteger(sourceId) || itemId == null || !name) return null;
+        if (type === 'live' && veloraData.isHomeChannelHidden(name)) return null;
         return {
             sourceId,
             itemId: String(itemId),
@@ -334,6 +336,7 @@ async function getIndexedCountrySnapshot(action, snapshotVersion, type, countryS
         const itemId = getItemId(item, type);
         const name = cleanText(item.name || item.title || item.series_name, 500);
         if (!Number.isInteger(sourceId) || itemId == null || !name) return null;
+        if (type === 'live' && veloraData.isHomeChannelHidden(name)) return null;
         const countryAssignment = getCountryItemAssignment(countryScope, sourceId, itemId);
         if (!countryAssignment) return null;
         return {
@@ -445,6 +448,7 @@ async function searchSource(sourceId, type, categoryMap, normalizedQuery, allowe
         const itemId = getItemId(item, type);
         if (itemId === undefined || itemId === null) continue;
         const name = cleanText(item.name || item.title || item.series_name, 500);
+        if (type === 'live' && veloraData.isHomeChannelHidden(name)) continue;
         const normName = normalizeText(name);
         if (!name || !matchQueryTokens(normName, normalizedQuery, tokens)) continue;
 

@@ -476,10 +476,28 @@
     return { sourceId, categoryId };
   }
 
+  const wheelChannelCache = new Map();
+
   // Fetch streams for a specific package ID (with VPS parent/child expansion support)
   async function fetchLiveStreamsForPkg(pkg) {
-    const countryId = getActiveCountryId();
+    if (!pkg) return [];
     const pkgId = String(pkg.id || "").trim();
+    if (pkgId && wheelChannelCache.has(pkgId)) {
+      const cached = wheelChannelCache.get(pkgId);
+      if (Array.isArray(cached) && cached.length > 0) return cached;
+    }
+
+    // 0. Check in-memory state from main app engine
+    const state = typeof window.veloraGetState === "function" ? window.veloraGetState() : null;
+    if (state && state.streamsByCatAll) {
+      const memStreams = state.streamsByCatAll.get(pkgId) || state.streamsByCatAll.get(pkg.category_id);
+      if (Array.isArray(memStreams) && memStreams.length > 0) {
+        wheelChannelCache.set(pkgId, memStreams);
+        return memStreams;
+      }
+    }
+
+    const countryId = getActiveCountryId();
 
     // 1. Preferred backend endpoint: loads curated channels and expands parent bouquets into all children!
     if (pkgId) {
@@ -489,7 +507,9 @@
         if (res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data.channels) && data.channels.length > 0) {
-            return data.channels;
+            const cleanChannels = data.channels.filter(ch => !isDummyOrHiddenChannel(ch?.name || ch?.title));
+            wheelChannelCache.set(pkgId, cleanChannels);
+            return cleanChannels;
           }
         }
       } catch (_) {}
@@ -507,9 +527,15 @@
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) return data;
-          if (data && Array.isArray(data.streams) && data.streams.length > 0) return data.streams;
-          if (data && Array.isArray(data.items) && data.items.length > 0) return data.items;
+          let list = [];
+          if (Array.isArray(data) && data.length > 0) list = data;
+          else if (data && Array.isArray(data.streams) && data.streams.length > 0) list = data.streams;
+          else if (data && Array.isArray(data.items) && data.items.length > 0) list = data.items;
+          if (list.length > 0) {
+            const cleanList = list.filter(ch => !isDummyOrHiddenChannel(ch?.name || ch?.title));
+            if (pkgId) wheelChannelCache.set(pkgId, cleanList);
+            return cleanList;
+          }
         }
       } catch (_) {}
     }
@@ -517,7 +543,7 @@
   }
 
   // Channel Name Filter & Cleaner Rules
-  let cachedHiddenFilters = ["hevc", "h265", "h.265", "h 265", "x265", "###"];
+  let cachedHiddenFilters = ["hevc", "h265", "h.265", "h 265", "x265", "###", "##", "suffix:##", "prefix:##"];
   let cachedPrefixes = [];
 
   async function loadAdminChannelRules() {
@@ -530,7 +556,7 @@
         const rows = await resF.json();
         if (Array.isArray(rows)) {
           cachedHiddenFilters = [
-            "hevc", "h265", "h.265", "h 265", "x265", "###",
+            "hevc", "h265", "h.265", "h 265", "x265", "###", "##", "suffix:##", "prefix:##",
             ...rows.map(r => String(r.needle || "").trim().toLowerCase()).filter(Boolean)
           ];
         }
@@ -551,23 +577,26 @@
 
     const lower = raw.normalize("NFKC").toLowerCase();
 
-    // 1. Any channel containing 3 or more hashes '#' is a category separator banner
-    if ((raw.match(/#/g) || []).length >= 3) return true;
+    // 1. Any channel containing 2 or more hashes '#' or separator banners
+    if ((raw.match(/#/g) || []).length >= 2 || raw.includes("###") || raw.includes("##")) return true;
 
     // 2. Decorative separator banner patterns (e.g. --- ... --- or === ... === or *** ... ***)
-    if (/^[-=*~_]{3,}.*[-=*~_]{3,}$/.test(raw)) return true;
+    if (/^[-=*~_#]{2,}.*[-=*~_#]{2,}$/.test(raw)) return true;
+    if (/^[#\s\-=_*~|]+$/.test(raw)) return true;
 
     // 3. Admin hidden filters and suffixes/prefixes
     for (const filter of cachedHiddenFilters) {
       if (!filter) continue;
-      if (filter.startsWith("suffix:")) {
-        const suffix = filter.slice(7).trim();
+      const f = String(filter).trim().toLowerCase();
+      if (!f) continue;
+      if (f.startsWith("suffix:")) {
+        const suffix = f.slice(7).trim();
         if (suffix && (lower.endsWith(suffix) || lower.includes(suffix))) return true;
-      } else if (filter.startsWith("prefix:")) {
-        const prefix = filter.slice(7).trim();
+      } else if (f.startsWith("prefix:")) {
+        const prefix = f.slice(7).trim();
         if (prefix && (lower.startsWith(prefix) || lower.includes(prefix))) return true;
       } else {
-        if (lower.includes(filter)) return true;
+        if (lower.includes(f)) return true;
       }
     }
 
@@ -631,7 +660,26 @@
       this.activeRgb = { r: 56, g: 189, b: 248 };
       this.lastThemedIndex = -1;
       this.colorAnimFrameId = null;
+      this.refreshDebounceTimer = null;
       this.init();
+    }
+
+    scheduleRefreshPackages(delay = 40) {
+      if (this.refreshDebounceTimer) clearTimeout(this.refreshDebounceTimer);
+      this.refreshDebounceTimer = setTimeout(() => {
+        this.refreshDebounceTimer = null;
+        if (this.isLiveActive()) {
+          this.refreshPackages();
+        }
+      }, delay);
+    }
+
+    scheduleCheckVisibility(delay = 40) {
+      if (this.refreshDebounceTimer) clearTimeout(this.refreshDebounceTimer);
+      this.refreshDebounceTimer = setTimeout(() => {
+        this.refreshDebounceTimer = null;
+        this.checkVisibility();
+      }, delay);
     }
 
     async init() {
@@ -941,7 +989,7 @@
     observeState() {
       // Observe body dataset and classes
       const bodyObserver = new MutationObserver(() => {
-        this.checkVisibility();
+        this.scheduleCheckVisibility(50);
       });
       bodyObserver.observe(document.body, {
         attributes: true,
@@ -953,7 +1001,7 @@
       if (packagesView) {
         const pkgObserver = new MutationObserver(() => {
           if (this.isLiveActive()) {
-            this.refreshPackages();
+            this.scheduleRefreshPackages(50);
           }
         });
         pkgObserver.observe(packagesView, { childList: true, subtree: false });
@@ -963,10 +1011,22 @@
       const homePage = document.getElementById("vel-home-empty-page");
       if (homePage) {
         const homeObserver = new MutationObserver(() => {
-          this.checkVisibility();
+          this.scheduleCheckVisibility(50);
         });
         homeObserver.observe(homePage, { attributes: true, attributeFilter: ["class", "style"] });
       }
+
+      // App lifecycle events
+      document.addEventListener("velora-countries-ready", () => {
+        if (this.isLiveActive()) {
+          this.scheduleRefreshPackages(60);
+        }
+      });
+      document.addEventListener("velora-app-ready", () => {
+        if (this.isLiveActive()) {
+          this.scheduleRefreshPackages(60);
+        }
+      });
     }
 
     async loadCatalogCache() {
@@ -998,6 +1058,7 @@
 
         rawCards.forEach((card, i) => {
           const id = String(card.dataset.packageId || "");
+          const existingPkg = this.packages.find(p => p.id === id);
           const titleEl = card.querySelector(".vel-package-card__title");
           const title = titleEl ? titleEl.textContent.trim() : card.getAttribute("aria-label") || `Bouquet ${i+1}`;
           const apiPkg = this.cachedApiPackages.find(p => String(p.id) === id);
@@ -1035,7 +1096,9 @@
             child_package_ids: childIds,
             originalCard: card,
             source_id: apiPkg?.source_id,
-            category_id: apiPkg?.category_id || catId
+            category_id: apiPkg?.category_id || catId,
+            _cachedChannels: (existingPkg && existingPkg._cachedChannels) || (typeof wheelChannelCache !== "undefined" ? wheelChannelCache.get(id) : null) || null,
+            _cachedTheme: (existingPkg && existingPkg._cachedTheme) || null
           };
           list.push(pkgObj);
 
@@ -1107,7 +1170,9 @@
 
         const isFirstOpen = !this.hasLoadedInitialLiveChannel;
         const currentPkg = this.packages[targetIdx];
-        const needsLoad = isFirstOpen || this.allChannels.length === 0 || isListEmpty || (currentPkg && this.currentLoadedPkgId !== currentPkg.id);
+        const isCurrentPkgLoading = this.isLoadingChannels && this.currentLoadedPkgId === (currentPkg ? currentPkg.id : "");
+        const needsLoad = !isCurrentPkgLoading && (isFirstOpen || (this.allChannels.length === 0 && !this.isLoadingChannels) || isListEmpty || (currentPkg && this.currentLoadedPkgId !== currentPkg.id));
+
         if (needsLoad) {
           this.hasLoadedInitialLiveChannel = true;
           this.currentLoadedPkgId = currentPkg ? currentPkg.id : "";
@@ -1437,9 +1502,13 @@
         });
       }
 
-      if (options && options.isInitialLoad && this.filteredChannels.length > 0) {
+      const video = document.getElementById("video");
+      const isVideoPlaying = video && !video.paused && video.currentTime > 0;
+      const shouldAutoPlay = (options && options.isInitialLoad) || (!this.currentPlayingStreamId && !isVideoPlaying && this.isLiveActive());
+
+      if (shouldAutoPlay && this.filteredChannels.length > 0) {
         const first = this.filteredChannels[0];
-        console.log("%c[Velora Live] 📺 Initial open - Preselecting & playing first channel:", "color: #38bdf8; font-weight: bold;", first);
+        console.log("%c[Velora Live] 📺 Preselecting & playing first channel:", "color: #38bdf8; font-weight: bold;", first);
         this.playChannel(first);
       }
     }
@@ -1680,27 +1749,43 @@
       };
 
       // Direct invocation of the native application player engine
-      if (typeof window.veloraPlayLiveChannel === "function") {
-        try {
-          console.log("[Velora Live] 📡 Calling native engine window.veloraPlayLiveChannel...", item);
-          await window.veloraPlayLiveChannel(item);
-          console.log("[Velora Live] ✅ window.veloraPlayLiveChannel completed successfully.");
-          
-          const video = document.getElementById("video");
-          if (video) {
-            console.log("[Velora Live] 📺 Player state:", {
-              src: video.src || video.currentSrc,
-              paused: video.paused,
-              readyState: video.readyState,
-              networkState: video.networkState,
-              error: video.error
-            });
+      const invokePlayer = async () => {
+        if (typeof window.veloraPlayLiveChannel === "function") {
+          try {
+            console.log("[Velora Live] 📡 Calling native engine window.veloraPlayLiveChannel...", item);
+            await window.veloraPlayLiveChannel(item);
+            console.log("[Velora Live] ✅ window.veloraPlayLiveChannel completed successfully.");
+            
+            const video = document.getElementById("video");
+            if (video) {
+              console.log("[Velora Live] 📺 Player state:", {
+                src: video.src || video.currentSrc,
+                paused: video.paused,
+                readyState: video.readyState,
+                networkState: video.networkState,
+                error: video.error
+              });
+            }
+          } catch (err) {
+            console.error("[Velora Live] ❌ Playback error in window.veloraPlayLiveChannel:", err);
           }
-        } catch (err) {
-          console.error("[Velora Live] ❌ Playback error in window.veloraPlayLiveChannel:", err);
+        } else {
+          console.error("[Velora Live] ❌ window.veloraPlayLiveChannel is NOT defined on window object! Check script loading order.");
         }
+      };
+
+      if (typeof window.veloraHomeCatalogReady === "function" && window.veloraHomeCatalogReady()) {
+        await invokePlayer();
       } else {
-        console.error("[Velora Live] ❌ window.veloraPlayLiveChannel is NOT defined on window object! Check script loading order.");
+        window.__veloraPendingLiveChannel = item;
+        await invokePlayer();
+        const onReady = () => {
+          if (this.currentPlayingStreamId === streamId && this.isLiveActive()) {
+            invokePlayer();
+          }
+        };
+        document.addEventListener("velora-countries-ready", onReady, { once: true });
+        document.addEventListener("velora-app-ready", onReady, { once: true });
       }
     }
 

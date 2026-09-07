@@ -370,9 +370,19 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active):not(.vel-favorites-o
 
 /* Optimize Dynamic List Spacing & Safe Scroll */
 body[data-vel-active-tab="live"] #dynamic-list,
-body[data-vel-top-level="live"] #dynamic-list {
-  padding-top: 0.5rem !important;
-  padding-bottom: 1.25rem !important;
+body[data-vel-top-level="live"] #dynamic-list,
+body:has(#player-container:not(.hidden)) .main--velora #dynamic-list,
+.main--velora:has(#player-container:not(.hidden)) #dynamic-list {
+  padding-top: 0.35rem !important;
+  padding-bottom: 0.5rem !important;
+}
+
+body[data-vel-active-tab="live"] .vel-body,
+body[data-vel-top-level="live"] .vel-body,
+body[data-vel-active-tab="live"] #content-view,
+body[data-vel-top-level="live"] #content-view {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
 }
 
 @media (max-width: 640px) {

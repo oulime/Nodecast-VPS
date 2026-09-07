@@ -1617,7 +1617,7 @@
     <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css?v=vod-contrast-shimmer-v5-20260830">
     <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=large-package-virtualization-v1-20260810">
     <link rel="stylesheet" href="/assets/live-package-text-cards.css?v=tv-package-flat-inner-v1-20260814">
-    <link rel="stylesheet" href="/assets/velora-live-wheel.css?v=20260907-search-fix-v2">
+    <link rel="stylesheet" href="/assets/velora-live-wheel.css?v=20260907-bottom-gap-fix-v3">
     <link rel="stylesheet" href="/assets/pkg-hub-selector.css?v=20260830-visibility-fix-v43">
     <style>
       #settings-tab-btn-ip,
@@ -13841,7 +13841,7 @@ if (target.closest(".trial-offer-button")) {
         -webkit-overflow-scrolling: touch !important;
         touch-action: pan-y !important;
         overscroll-behavior-y: contain !important;
-        padding-bottom: calc(var(--vel-bottom-nav-height, 76px) + 32px) !important;
+        padding-bottom: 0.5rem !important;
       }
 
       .main--velora:has(#player-container:not(.hidden)) #dynamic-list *,

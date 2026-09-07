@@ -11141,6 +11141,50 @@ if (target.closest(".trial-offer-button")) {
             return meta;
           }
 
+          function setupSliderDragScroll(sliderEl) {
+            if (!sliderEl) return;
+            var isDown = false;
+            var startX = 0;
+            var scrollLeft = 0;
+            var hasMoved = false;
+
+            function onPointerDown(e) {
+              // Only trigger on primary mouse click or touch/pen
+              if (e.button && e.button !== 0) return;
+              isDown = true;
+              hasMoved = false;
+              sliderEl.classList.add("is-dragging");
+              startX = e.pageX - sliderEl.offsetLeft;
+              scrollLeft = sliderEl.scrollLeft;
+            }
+
+            function onPointerMove(e) {
+              if (!isDown) return;
+              var x = e.pageX - sliderEl.offsetLeft;
+              var walk = (x - startX) * 1.5;
+              if (Math.abs(x - startX) > 6) {
+                hasMoved = true;
+                sliderEl.dataset.wasDragging = "true";
+              }
+              sliderEl.scrollLeft = scrollLeft - walk;
+            }
+
+            function onPointerUp() {
+              if (!isDown) return;
+              isDown = false;
+              sliderEl.classList.remove("is-dragging");
+              if (hasMoved) {
+                window.setTimeout(function () {
+                  delete sliderEl.dataset.wasDragging;
+                }, 120);
+              }
+            }
+
+            sliderEl.addEventListener("mousedown", onPointerDown);
+            window.addEventListener("mousemove", onPointerMove);
+            window.addEventListener("mouseup", onPointerUp);
+          }
+
           function renderSuggestions() {
             results.replaceChildren();
             if (filterTabs) filterTabs.classList.add("hidden");
@@ -11157,14 +11201,14 @@ if (target.closest(".trial-offer-button")) {
             tagsList.className = "vel-global-search__tags-wrap";
 
             var suggestions = [
-              { label: "⚽ beIN SPORTS 1", query: "BEIN SPORTS 1" },
-              { label: "🎬 Films 4K", query: "4K" },
-              { label: "🍿 Séries Populaires", query: "Being" },
-              { label: "🏎️ CANAL+ Sport", query: "CANAL+" },
-              { label: "🏆 RMC Sport", query: "RMC SPORT" },
-              { label: "🇫🇷 Chaînes France", query: "France" },
-              { label: "🌟 Films Récents", query: "2024" },
-              { label: "⚡ Prime Video", query: "PRIME" }
+              { label: "beIN SPORTS 1", query: "BEIN SPORTS 1" },
+              { label: "Films 4K", query: "4K" },
+              { label: "Séries Populaires", query: "Being" },
+              { label: "CANAL+ Sport", query: "CANAL+" },
+              { label: "RMC Sport", query: "RMC SPORT" },
+              { label: "Chaînes France", query: "France" },
+              { label: "Films Récents", query: "2024" },
+              { label: "Prime Video", query: "PRIME" }
             ];
 
             suggestions.forEach(function (sug) {
@@ -11521,6 +11565,7 @@ if (target.closest(".trial-offer-button")) {
                   });
 
                   sliderWrap.append(prevBtn, slider, nextBtn);
+                  setupSliderDragScroll(slider);
                   group.appendChild(sliderWrap);
                 } else {
                   // VOD Full Grid Mode with Progressive "Voir plus"
@@ -11837,6 +11882,10 @@ if (target.closest(".trial-offer-button")) {
 
             var button = event.target && event.target.closest(".vel-global-search__result[data-search-result-id]");
             if (button && typeof window.veloraOpenSearchResult === "function") {
+              var parentSlider = button.closest(".vel-global-search__slider");
+              if (parentSlider && parentSlider.dataset.wasDragging === "true") {
+                return;
+              }
               var id = button.dataset.searchResultId || "";
               if (!id) return;
               prioritizeResultInteraction(button);
@@ -14560,6 +14609,14 @@ if (target.closest(".trial-offer-button")) {
         padding: 0.3rem 0.2rem 0.65rem;
         scrollbar-width: none;
         box-sizing: border-box;
+        cursor: grab;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      .vel-global-search__slider.is-dragging {
+        cursor: grabbing;
+        scroll-snap-type: none !important;
       }
 
       .vel-global-search__slider::-webkit-scrollbar {

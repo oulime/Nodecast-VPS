@@ -1210,6 +1210,20 @@ router.post('/epg/:sourceId/channels', async (req, res) => {
 const liveManifestCache = new Map();
 const LIVE_MANIFEST_CACHE_TTL_MS = 6500;
 const LIVE_MANIFEST_STALE_TTL_MS = 120000;
+const activeStreamControllersByAccount = new Map();
+
+function getStreamAccountKey(streamUrl = '', req) {
+    try {
+        const parsed = new URL(streamUrl);
+        const match = parsed.pathname.match(/\/(live|movie|series)\/([^/]+)\/([^/]+)/i);
+        if (match) {
+            return `${parsed.host}:${match[1]}:${match[2]}`;
+        }
+        return `${parsed.host}:${req.ip || 'client'}`;
+    } catch (_) {
+        return `${req.ip || 'client'}`;
+    }
+}
 
 router.get('/stream', async (req, res) => {
     const maxRetries = 3;
@@ -1236,6 +1250,18 @@ router.get('/stream', async (req, res) => {
         }
     }
 
+    // Automatically terminate any previous active proxy connection for the same IPTV account/client
+    // so the provider never sees 2 simultaneous streams (which causes HTTP 458)
+    const accountKey = getStreamAccountKey(url, req);
+    if (activeStreamControllersByAccount.has(accountKey)) {
+        const prev = activeStreamControllersByAccount.get(accountKey);
+        if (prev?.abortController && !prev.abortController.signal.aborted) {
+            try { prev.abortController.abort(); } catch (_) {}
+            try { prev.activeResponse?.body?.cancel?.().catch?.(() => {}); } catch (_) {}
+        }
+        activeStreamControllersByAccount.delete(accountKey);
+    }
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         let abortController = new AbortController();
         let activeResponse = null;
@@ -1253,8 +1279,12 @@ router.get('/stream', async (req, res) => {
                         }
                     } catch {}
                 }
+                if (activeStreamControllersByAccount.get(accountKey)?.abortController === abortController) {
+                    activeStreamControllersByAccount.delete(accountKey);
+                }
             };
             req.on('close', onClose);
+            activeStreamControllersByAccount.set(accountKey, { abortController, activeResponse });
 
             // If client has already disconnected or aborted before attempt, exit immediately
             if (req.destroyed || res.destroyed || res.writableEnded || abortController.signal.aborted) {

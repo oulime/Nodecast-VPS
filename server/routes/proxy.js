@@ -1260,6 +1260,8 @@ router.get('/stream', async (req, res) => {
             try { prev.activeResponse?.body?.cancel?.().catch?.(() => {}); } catch (_) {}
         }
         activeStreamControllersByAccount.delete(accountKey);
+        // Short pause to allow Node.js and remote CDN load-balancer to cleanly finalize the TCP socket closure
+        await new Promise(r => setTimeout(r, 100));
     }
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -1353,14 +1355,14 @@ router.get('/stream', async (req, res) => {
                 }
             }
 
-            // Retry on 5xx errors or transient burst rate limits (458, 429) ONLY for m3u8 playlists when client is still connected
-            if ((response.status >= 500 || ((response.status === 458 || response.status === 429) && isM3u8Url)) && attempt < maxRetries) {
+            // Retry on 5xx errors or transient burst rate limits (458, 429) when client is still connected
+            if ((response.status >= 500 || response.status === 458 || response.status === 429) && attempt < maxRetries) {
                 if (req.destroyed || res.destroyed || res.writableEnded || abortController.signal.aborted) {
                     if (onClose) req.off('close', onClose);
                     return;
                 }
-                const delay = retryDelays[attempt - 1] || 800;
-                console.log(`[Proxy] Upstream transient status ${response.status} for ${url.substring(0, 60)} (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms...`);
+                const delay = retryDelays[attempt - 1] || 400;
+                console.log(`[Proxy] Upstream transient status ${response.status} for ${cleanUrl.substring(0, 60)} (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms...`);
                 await new Promise(r => setTimeout(r, delay));
                 continue;
             }

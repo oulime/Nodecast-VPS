@@ -236,6 +236,19 @@ router.options('/:sessionId/:segment', (req, res) => {
     res.sendStatus(204);
 });
 
+const sessionRateLimiter = new Map();
+
+function checkSessionRateLimit(key, maxRequests = 3, windowMs = 5000) {
+    const now = Date.now();
+    const timestamps = (sessionRateLimiter.get(key) || []).filter(t => now - t < windowMs);
+    if (timestamps.length >= maxRequests) {
+        return { limited: true, retryAfterMs: Math.max(800, windowMs - (now - timestamps[0])) };
+    }
+    timestamps.push(now);
+    sessionRateLimiter.set(key, timestamps);
+    return { limited: false, retryAfterMs: 0 };
+}
+
 /**
  * Create a new transcode session
  * POST /api/transcode/session
@@ -277,6 +290,15 @@ router.post('/session', async (req, res) => {
         : (inferredVodMode ? 'vod' : requestedMode);
     const isVodMode = ['vod', 'movie', 'series', 'episode'].includes(normalizedMode);
     const streamUrl = db.resolveStreamUrl(url);
+
+    if (isVodMode) {
+        const clientKey = `${req.ip || 'local'}:${streamUrl}`;
+        const rateCheck = checkSessionRateLimit(clientKey, 3, 5000);
+        if (rateCheck.limited) {
+            console.log(`[Transcode] Rapid seeking detected for ${clientKey}, throttling request by ${Math.min(1500, rateCheck.retryAfterMs)}ms`);
+            await new Promise(r => setTimeout(r, Math.min(1500, rateCheck.retryAfterMs)));
+        }
+    }
 
     console.log('[Transcode] Session request:', {
         url: redactStreamUrlForLogs(url),

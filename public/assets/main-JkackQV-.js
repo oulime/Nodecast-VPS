@@ -495,7 +495,9 @@ window.__veloraGetVodPlaybackInfo=()=>({currentSeconds:(window.__veloraOptimisti
   }
   sb(de, clamped);
 };
+let __veloraSeekHistory = [];
 let __veloraSeekDebounceTimer = null;
+
 async function sb(s, e) {
   const t = a => {
     console.log("[VOD SEEK GUARD]", {
@@ -570,7 +572,22 @@ async function sb(s, e) {
     }
   }
 
-  // --- 2. OUT-OF-BUFFER SEEK: DEBOUNCE BY 250ms SO RAPID CLICKS PRODUCE ONLY 1 REQUEST ---
+  // --- 2. OUT-OF-BUFFER SEEK: ANTI-ABUSE RATE LIMITING & ADAPTIVE DEBOUNCE ---
+  const now = Date.now();
+  __veloraSeekHistory = (__veloraSeekHistory || []).filter(t => now - t < 4000);
+  __veloraSeekHistory.push(now);
+
+  let debounceMs = 250;
+  if (__veloraSeekHistory.length >= 4) {
+    debounceMs = 1500; // User is spamming seeking -> let him wait 1.5s
+    gt(!0);
+    if (ct) ct.innerHTML = "? Patientez un instant... (" + gg(n) + ")";
+  } else if (__veloraSeekHistory.length >= 3) {
+    debounceMs = 800; // Rapid seeking -> 800ms debounce
+    gt(!0);
+    if (ct) ct.innerHTML = "? Pr?paration du saut (" + gg(n) + ")...";
+  }
+
   if (__veloraSeekDebounceTimer) {
     clearTimeout(__veloraSeekDebounceTimer);
     __veloraSeekDebounceTimer = null;
@@ -581,7 +598,7 @@ async function sb(s, e) {
       __veloraSeekDebounceTimer = null;
       const res = await doExecuteSessionSeek(s, n);
       resolve(res);
-    }, 250);
+    }, debounceMs);
   });
 }
 

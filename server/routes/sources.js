@@ -26,11 +26,17 @@ function syncSourceAndWarm(sourceId, reason) {
 
             syncService.updateSyncStatus(sourceId, 'all', 'warming');
             try {
-                await warmVeloraCatalog(reason).promise;
-                syncService.updateSyncStatus(sourceId, 'all', 'success');
+                const job = warmVeloraCatalog(reason);
+                if (job?.promise) {
+                    await job.promise;
+                }
             } catch (err) {
-                syncService.updateSyncStatus(sourceId, 'all', 'error', err.message);
-                throw err;
+                console.error('[Sources] Velora catalog warm after sync failed:', err);
+            } finally {
+                const catalogStatus = veloraCatalogCache.getStatus();
+                if (!catalogStatus.running) {
+                    syncService.updateSyncStatus(sourceId, 'all', 'success');
+                }
             }
         })
         .catch(err => {
@@ -59,6 +65,10 @@ router.get('/status', async (req, res) => {
     try {
         const { getDb } = require('../db/sqlite');
         const db = getDb();
+        const catalogStatus = veloraCatalogCache.getStatus();
+        if (!catalogStatus.running) {
+            db.prepare("UPDATE sync_status SET status = 'success' WHERE status = 'warming'").run();
+        }
         const statuses = db.prepare('SELECT * FROM sync_status').all();
         res.json(statuses);
     } catch (err) {

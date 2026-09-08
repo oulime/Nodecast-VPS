@@ -105,11 +105,15 @@ if (status.running || status.error === 'Previous catalogue build was interrupted
     status = {
         ...status,
         running: false,
+        phase: 'ready',
         completedAt: new Date().toISOString(),
         error: null,
         interruptedAt: new Date().toISOString()
     };
     writeStatus();
+    try {
+        getDb().prepare("UPDATE sync_status SET status = 'success' WHERE status IN ('warming', 'syncing')").run();
+    } catch (_) {}
 }
 
 function encodeGlobalId(sourceId, itemId) {
@@ -515,6 +519,9 @@ async function buildSnapshot(reason) {
     };
     writeStatus();
     cleanupOldSnapshots(version);
+    try {
+        getDb().prepare("UPDATE sync_status SET status = 'success' WHERE status = 'warming'").run();
+    } catch (_) {}
     console.log('[Velora cache] Snapshot ready', status.counts);
     await notifySnapshotReady({ ...status });
     return {

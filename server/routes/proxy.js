@@ -1244,11 +1244,22 @@ router.get('/stream', async (req, res) => {
                 try {
                     abortController.abort();
                 } catch {}
-                try {
-                    activeResponse?.body?.cancel?.();
-                } catch {}
+                if (activeResponse?.body) {
+                    try {
+                        const cancelPromise = activeResponse.body.cancel?.();
+                        if (cancelPromise && typeof cancelPromise.catch === 'function') {
+                            cancelPromise.catch(() => {});
+                        }
+                    } catch {}
+                }
             };
             req.on('close', onClose);
+
+            // If client has already disconnected or aborted before attempt, exit immediately
+            if (req.destroyed || res.destroyed || res.writableEnded || abortController.signal.aborted) {
+                req.off('close', onClose);
+                return;
+            }
 
             // Forward headers to origin
             const plutoDomains = ['pluto.tv', 'pluto.io', 'plutotv.net', 'siloh.pluto.tv', 'service-stitcher'];
@@ -1282,7 +1293,16 @@ router.get('/stream', async (req, res) => {
                 headers['Range'] = rangeHeader;
             }
 
-            const response = await fetch(url, { headers, signal: abortController.signal });
+            let response;
+            try {
+                response = await fetch(url, { headers, signal: abortController.signal });
+            } catch (fetchErr) {
+                req.off('close', onClose);
+                if (fetchErr.name === 'AbortError' || abortController.signal.aborted || req.destroyed || res.destroyed || res.writableEnded) {
+                    return;
+                }
+                throw fetchErr;
+            }
             activeResponse = response;
 
             // If upstream returns 458/429/5xx for an m3u8 and we have a cached manifest, serve it IMMEDIATELY
@@ -1300,8 +1320,12 @@ router.get('/stream', async (req, res) => {
                 }
             }
 
-            // Retry on 5xx errors or transient burst rate limits (458, 429) when no cached manifest exists
-            if ((response.status >= 500 || response.status === 458 || response.status === 429) && attempt < maxRetries) {
+            // Retry on 5xx errors or transient burst rate limits (458, 429) ONLY for m3u8 playlists when client is still connected
+            if ((response.status >= 500 || ((response.status === 458 || response.status === 429) && isM3u8Url)) && attempt < maxRetries) {
+                if (req.destroyed || res.destroyed || res.writableEnded || abortController.signal.aborted) {
+                    req.off('close', onClose);
+                    return;
+                }
                 const delay = retryDelays[attempt - 1] || 800;
                 console.log(`[Proxy] Upstream transient status ${response.status} for ${url.substring(0, 60)} (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms...`);
                 await new Promise(r => setTimeout(r, delay));
@@ -1480,7 +1504,10 @@ router.get('/stream', async (req, res) => {
             let result = await iterator.next();
             while (!result.done) {
                 if (req.destroyed || res.destroyed || res.writableEnded) {
-                    try { response.body?.cancel?.(); } catch {}
+                    try {
+                        const c = response.body?.cancel?.();
+                        if (c && typeof c.catch === 'function') c.catch(() => {});
+                    } catch {}
                     break;
                 }
                 if (!res.write(Buffer.from(result.value))) {
@@ -1498,7 +1525,7 @@ router.get('/stream', async (req, res) => {
                 return;
             }
             console.error(`Stream proxy error (attempt ${attempt}/${maxRetries}):`, err.message);
-            if (res.headersSent) {
+            if (res.headersSent || req.destroyed || res.destroyed || res.writableEnded) {
                 return;
             }
             if (attempt < maxRetries) {

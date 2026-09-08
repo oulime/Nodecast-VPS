@@ -1532,10 +1532,29 @@
     } catch (_) {}
   }
 
+  let activeAdultTranscodeSessionId = null;
+  async function closeAdultTranscodeSession() {
+    if (!activeAdultTranscodeSessionId) return;
+    const sid = activeAdultTranscodeSessionId;
+    activeAdultTranscodeSessionId = null;
+    try {
+      const token = localStorage.getItem("authToken");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      fetch(`/api/transcode/${encodeURIComponent(sid)}`, {
+        method: "DELETE",
+        headers,
+        keepalive: true
+      }).catch(() => {});
+    } catch (_) {}
+  }
+  window.veloraCloseActiveAdultTranscodeSession = closeAdultTranscodeSession;
+
   let activeVodPlayToken = 0;
   async function playAdultMovieByIndex(index) {
     const list = window._veloraAdultVodMovies;
     if (!list || index < 0 || index >= list.length) return;
+
+    await closeAdultTranscodeSession();
 
     const playToken = ++activeVodPlayToken;
     window._veloraAdultVodCurrentIndex = index;
@@ -1568,11 +1587,61 @@
     if (errEl) errEl.classList.add("hidden");
     if (buffering) buffering.classList.remove("hidden");
 
-    const ext = movie.container_extension || "mp4";
+    const ext = String(movie.container_extension || "mkv").toLowerCase();
     const apiUrl = `/api/proxy/xtream/${encodeURIComponent(movie.source_id)}/stream/${encodeURIComponent(movie.stream_id)}/movie?container=${encodeURIComponent(ext)}`;
-    const resolvedUrl = await resolveStreamMediaUrl(apiUrl);
+
+    const token = localStorage.getItem("authToken");
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    let directSourceUrl = null;
+    try {
+      const metaRes = await fetch(apiUrl, { headers });
+      if (metaRes.ok) {
+        const json = await metaRes.json();
+        if (json && json.url) directSourceUrl = String(json.url).trim();
+      }
+    } catch (_) {}
+
+    if (!directSourceUrl) directSourceUrl = apiUrl;
     if (playToken !== activeVodPlayToken) return;
-    const finalUrl = resolvedUrl || apiUrl;
+
+    let finalUrl = null;
+    const isTranscodeContainer = !['mp4', 'm4v'].includes(ext) || ext === 'mkv' || ext === 'ts';
+
+    if (isTranscodeContainer) {
+      try {
+        const sessionRes = await fetch('/api/transcode/session', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            url: directSourceUrl,
+            mode: 'vod',
+            metadata: movie,
+            duration: movie.duration_secs || movie.duration || null
+          })
+        });
+        if (sessionRes.ok) {
+          const sessionData = await sessionRes.json();
+          if (playToken !== activeVodPlayToken) {
+            if (sessionData && sessionData.sessionId) {
+              fetch(`/api/transcode/${encodeURIComponent(sessionData.sessionId)}`, { method: "DELETE", headers, keepalive: true }).catch(() => {});
+            }
+            return;
+          }
+          if (sessionData && sessionData.playlistUrl) {
+            activeAdultTranscodeSessionId = sessionData.sessionId;
+            finalUrl = sessionData.playlistUrl;
+          }
+        }
+      } catch (e) {
+        console.warn("[Adult VOD] Transcode session failed:", e);
+      }
+    }
+
+    if (!finalUrl) {
+      finalUrl = `/api/proxy/stream?url=${encodeURIComponent(directSourceUrl)}`;
+    }
 
     if (video.hls && typeof video.hls.destroy === "function") {
       try { video.hls.destroy(); } catch (_) {}
@@ -2771,6 +2840,9 @@
   }
 
   function stopAllActiveStreams() {
+    try {
+      closeAdultTranscodeSession();
+    } catch (_) {}
     try {
       const videos = document.querySelectorAll("video");
       videos.forEach(v => {

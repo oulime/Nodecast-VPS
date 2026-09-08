@@ -766,6 +766,19 @@ class TranscodeSession extends EventEmitter {
  */
 async function createSession(url, options = {}) {
     await ensureCacheDir();
+
+    // Terminate any older active sessions for the same stream URL to prevent concurrent IPTV connections throttling
+    for (const [existingId, existingSession] of sessions.entries()) {
+        if (existingSession.url === url && ['running', 'starting', 'pending'].includes(existingSession.status)) {
+            console.log(`[TranscodeSession] Terminating older active session ${existingId} for same URL to avoid upstream connection throttle`);
+            try {
+                existingSession.stop();
+                existingSession.cleanup().catch(() => {});
+            } catch (_) {}
+            sessions.delete(existingId);
+        }
+    }
+
     const session = new TranscodeSession(url, options);
     sessions.set(session.id, session);
     return session;

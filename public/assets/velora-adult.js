@@ -698,7 +698,7 @@
 
     container.innerHTML = `
       <div class="vel-adult-video-wrapper">
-        <video id="vel-adult-video" playsinline webkit-playsinline preload="auto"></video>
+        <video id="vel-adult-video" playsinline webkit-playsinline preload="none"></video>
         <div id="vel-adult-touch-overlay" class="vel-adult-touch-overlay"></div>
         <div id="vel-adult-player-buffering" class="vel-adult-buffering hidden">
           <div class="vel-adult-spinner"></div>
@@ -828,8 +828,15 @@
       if (video.paused || (isLive && !video.hls)) {
         if (isLive) {
           // When clicking Play on paused live stream: restart fresh with newest m3u8 pack
-          if (window._veloraAdultLiveChannels && window._veloraAdultLiveCurrentIndex !== undefined) {
+          if (window._veloraAdultLiveChannels && window._veloraAdultLiveCurrentIndex !== undefined && window._veloraAdultLiveCurrentIndex >= 0) {
             playAdultLiveChannelByIndex(window._veloraAdultLiveCurrentIndex).catch(() => {});
+            showControls();
+            return;
+          }
+        } else if (!video.src && !video.hls) {
+          if (window._veloraAdultVodMovies && window._veloraAdultVodMovies.length > 0) {
+            const idx = (window._veloraAdultVodCurrentIndex !== undefined && window._veloraAdultVodCurrentIndex >= 0) ? window._veloraAdultVodCurrentIndex : 0;
+            playAdultMovieByIndex(idx).catch(() => {});
             showControls();
             return;
           }
@@ -1618,8 +1625,9 @@
     const imgObserver = getAdultMovieImageObserver();
 
     function createMovieRowNode(movie, originalIdx) {
+      const isCurrentlyPlaying = window._veloraAdultVodCurrentIndex !== undefined && window._veloraAdultVodCurrentIndex >= 0 && originalIdx === window._veloraAdultVodCurrentIndex;
       const row = document.createElement("div");
-      row.className = `vel-adult-movie-row ${originalIdx === (window._veloraAdultVodCurrentIndex || 0) ? "vel-adult-movie-row--active" : ""}`;
+      row.className = `vel-adult-movie-row ${isCurrentlyPlaying ? "vel-adult-movie-row--active" : ""}`;
       row.setAttribute("role", "button");
       row.tabIndex = 0;
       row.dataset.streamId = String(movie.stream_id);
@@ -1669,7 +1677,7 @@
         <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
         <span>Lecture</span>
       `;
-      badge.style.display = originalIdx === (window._veloraAdultVodCurrentIndex || 0) ? "inline-flex" : "none";
+      badge.style.display = isCurrentlyPlaying ? "inline-flex" : "none";
 
       const sourceInfo = document.createElement("span");
       sourceInfo.textContent = movie.package_name ? `${movie.package_name}` : "🔞 Film Adulte";
@@ -1802,11 +1810,11 @@
       });
       if (uniqueImmediate.length > 0) {
         window._veloraAdultVodMovies = uniqueImmediate;
-        window._veloraAdultVodCurrentIndex = 0;
+        window._veloraAdultVodCurrentIndex = -1;
         renderAdultMoviesListView(uniqueImmediate, container, false);
-        playAdultMovieByIndex(0).catch(() => {});
       }
     } else {
+      window._veloraAdultVodCurrentIndex = -1;
       renderAdultMoviesListView([], container, true);
     }
 
@@ -1862,14 +1870,11 @@
     }
 
     window._veloraAdultVodMovies = uniqueMovies;
-    if (window._veloraAdultVodCurrentIndex === undefined || window._veloraAdultVodCurrentIndex < 0) {
-      window._veloraAdultVodCurrentIndex = 0;
+    if (window._veloraAdultVodCurrentIndex === undefined) {
+      window._veloraAdultVodCurrentIndex = -1;
     }
 
     renderAdultMoviesListView(uniqueMovies, container, false);
-    if (!immediateMovies.length) {
-      playAdultMovieByIndex(0).catch(() => {});
-    }
 
     window.scrollTo(0, 0);
     return true;
@@ -2623,6 +2628,7 @@
     setTimeout(function () { window._veloraNavLock = false; }, 600);
 
     closeActivePlayers();
+    stopAllActiveStreams();
 
     isAdultOpen = true;
     currentAdultView = null; // Unselected by default

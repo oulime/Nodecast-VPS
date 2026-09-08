@@ -534,31 +534,43 @@
   // ---------------------------------------------------------------------------
   // Dedicated Adult Portal View Controller (#adult-view)
   const resolvedStreamUrlCache = new Map();
+  const inFlightStreamResolves = new Map();
   async function resolveStreamMediaUrl(endpoint) {
     if (resolvedStreamUrlCache.has(endpoint)) {
       return resolvedStreamUrlCache.get(endpoint);
     }
-    try {
-      const token = localStorage.getItem("authToken");
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers.Authorization = `Bearer ${token}`;
-      const res = await fetch(endpoint, { headers });
-      if (res.ok) {
-        const json = await res.json();
-        if (json && json.url) {
-          let directUrl = String(json.url).trim();
-          let finalProxyUrl = directUrl;
-          if (/^https?:\/\//i.test(directUrl)) {
-            finalProxyUrl = `/api/proxy/stream?url=${encodeURIComponent(directUrl)}`;
-          }
-          resolvedStreamUrlCache.set(endpoint, finalProxyUrl);
-          return finalProxyUrl;
-        }
-      }
-    } catch (e) {
-      console.warn("[Velora Adult] Failed to resolve stream URL from endpoint:", endpoint, e.message);
+    if (inFlightStreamResolves.has(endpoint)) {
+      return inFlightStreamResolves.get(endpoint);
     }
-    return null;
+
+    const promise = (async () => {
+      try {
+        const token = localStorage.getItem("authToken");
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers.Authorization = `Bearer ${token}`;
+        const res = await fetch(endpoint, { headers });
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.url) {
+            let directUrl = String(json.url).trim();
+            let finalProxyUrl = directUrl;
+            if (/^https?:\/\//i.test(directUrl)) {
+              finalProxyUrl = `/api/proxy/stream?url=${encodeURIComponent(directUrl)}`;
+            }
+            resolvedStreamUrlCache.set(endpoint, finalProxyUrl);
+            return finalProxyUrl;
+          }
+        }
+      } catch (e) {
+        console.warn("[Velora Adult] Failed to resolve stream URL from endpoint:", endpoint, e.message);
+      } finally {
+        inFlightStreamResolves.delete(endpoint);
+      }
+      return null;
+    })();
+
+    inFlightStreamResolves.set(endpoint, promise);
+    return promise;
   }
 
   async function fetchLiveChannelsForPackage(pkg) {
@@ -700,6 +712,10 @@
       <div class="vel-adult-video-wrapper">
         <video id="vel-adult-video" playsinline webkit-playsinline preload="none"></video>
         <div id="vel-adult-touch-overlay" class="vel-adult-touch-overlay"></div>
+        <button type="button" id="vel-adult-unmute-badge" class="vel-adult-unmute-badge hidden" title="Activer le son">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
+          <span>Activer le son</span>
+        </button>
         <div id="vel-adult-player-buffering" class="vel-adult-buffering hidden">
           <div class="vel-adult-spinner"></div>
         </div>
@@ -746,6 +762,10 @@
             </div>
             <span id="vel-adult-duration" class="vel-adult-time">00:00</span>
             ` : `<span style="font-size:0.75rem;font-weight:800;color:#10b981;letter-spacing:0.05em;margin-left:8px;">● DIRECT</span><div style="flex:1;"></div>`}
+            <button id="vel-adult-volume-btn" class="vel-adult-tool-btn" title="Activer / Couper le son" aria-label="Son">
+              <svg id="vel-adult-vol-icon-on" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
+              <svg id="vel-adult-vol-icon-muted" class="hidden" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
+            </button>
             <button id="vel-adult-fullscreen" class="vel-adult-tool-btn" title="Plein écran" aria-label="Plein écran">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
             </button>
@@ -769,10 +789,56 @@
     const seekTrack = container.querySelector("#vel-adult-seek-track");
     const seekFill = container.querySelector("#vel-adult-seek-fill");
     const seekHandle = container.querySelector("#vel-adult-seek-handle");
+    const volumeBtn = container.querySelector("#vel-adult-volume-btn");
+    const volIconOn = container.querySelector("#vel-adult-vol-icon-on");
+    const volIconMuted = container.querySelector("#vel-adult-vol-icon-muted");
+    const unmuteBadge = container.querySelector("#vel-adult-unmute-badge");
     const fullscreenBtn = container.querySelector("#vel-adult-fullscreen");
     const buffering = container.querySelector("#vel-adult-player-buffering");
 
     let idleTimer = null;
+
+    function syncVolumeUI() {
+      if (!video) return;
+      const isMuted = video.muted || video.volume === 0;
+      if (volIconOn && volIconMuted) {
+        volIconOn.classList.toggle("hidden", isMuted);
+        volIconMuted.classList.toggle("hidden", !isMuted);
+      }
+      if (unmuteBadge) {
+        unmuteBadge.classList.toggle("hidden", !isMuted || video.paused);
+      }
+    }
+
+    function toggleMute() {
+      if (!video) return;
+      if (video.muted || video.volume === 0) {
+        video.muted = false;
+        video.volume = 1;
+      } else {
+        video.muted = true;
+      }
+      syncVolumeUI();
+    }
+
+    if (volumeBtn) {
+      volumeBtn.onclick = (e) => {
+        e.stopPropagation();
+        toggleMute();
+      };
+    }
+
+    if (unmuteBadge) {
+      unmuteBadge.onclick = (e) => {
+        e.stopPropagation();
+        if (video) {
+          video.muted = false;
+          video.volume = 1;
+          video.play().catch(() => {});
+        }
+        syncVolumeUI();
+      };
+    }
 
     function hideControls() {
       if (idleTimer) clearTimeout(idleTimer);
@@ -805,6 +871,13 @@
       const now = Date.now();
       if (now - lastTapTime < 220) return;
       lastTapTime = now;
+
+      // If video was muted, tap automatically un-mutes
+      if (video && video.muted) {
+        video.muted = false;
+        video.volume = 1;
+        syncVolumeUI();
+      }
 
       // If clicking directly on an interactive button or seekbar, keep controls awake
       if (e && e.target && (e.target.closest("button") || e.target.closest(".vel-adult-seek-track"))) {
@@ -980,6 +1053,11 @@
           playAdultMovieByIndex(window._veloraAdultVodCurrentIndex + 1);
         }
       };
+
+      video.onvolumechange = () => {
+        syncVolumeUI();
+      };
+      syncVolumeUI();
     }
 
     return container;
@@ -1178,6 +1256,10 @@
     const errEl = document.getElementById("vel-adult-player-error");
     if (!video) return;
 
+    // Reset video volume and ensure unmuted state
+    video.muted = false;
+    video.volume = 1;
+
     if (errEl) errEl.classList.add("hidden");
     if (buffering) buffering.classList.remove("hidden");
 
@@ -1216,12 +1298,20 @@
 
       hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
         if (errEl) errEl.classList.add("hidden");
+        video.muted = false;
+        video.volume = 1;
         const p = video.play();
         if (p && typeof p.catch === "function") {
           p.catch(() => {
             video.muted = true;
             video.play().catch(e => console.warn("[Adult Live] Autoplay fallback notice:", e));
           });
+        }
+      });
+
+      hls.on(window.Hls.Events.AUDIO_TRACKS_UPDATED, () => {
+        if (hls.audioTracks && hls.audioTracks.length > 0 && hls.audioTrack === -1) {
+          hls.audioTrack = 0;
         }
       });
 
@@ -1278,6 +1368,8 @@
         }
       });
     } else {
+      video.muted = false;
+      video.volume = 1;
       video.src = finalUrl;
       video.load();
       const p = video.play();
@@ -1440,10 +1532,12 @@
     } catch (_) {}
   }
 
+  let activeVodPlayToken = 0;
   async function playAdultMovieByIndex(index) {
     const list = window._veloraAdultVodMovies;
     if (!list || index < 0 || index >= list.length) return;
 
+    const playToken = ++activeVodPlayToken;
     window._veloraAdultVodCurrentIndex = index;
     const movie = list[index];
 
@@ -1467,12 +1561,17 @@
     const errEl = document.getElementById("vel-adult-player-error");
     if (!video) return;
 
+    // Reset video volume and ensure unmuted state
+    video.muted = false;
+    video.volume = 1;
+
     if (errEl) errEl.classList.add("hidden");
     if (buffering) buffering.classList.remove("hidden");
 
     const ext = movie.container_extension || "mp4";
     const apiUrl = `/api/proxy/xtream/${encodeURIComponent(movie.source_id)}/stream/${encodeURIComponent(movie.stream_id)}/movie?container=${encodeURIComponent(ext)}`;
     const resolvedUrl = await resolveStreamMediaUrl(apiUrl);
+    if (playToken !== activeVodPlayToken) return;
     const finalUrl = resolvedUrl || apiUrl;
 
     if (video.hls && typeof video.hls.destroy === "function") {
@@ -1493,13 +1592,22 @@
       video.hls = hls;
 
       hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+        if (playToken !== activeVodPlayToken) return;
         if (errEl) errEl.classList.add("hidden");
+        video.muted = false;
+        video.volume = 1;
         const p = video.play();
         if (p && typeof p.catch === "function") {
           p.catch(() => {
             video.muted = true;
             video.play().catch(e => console.warn("[Adult VOD] Autoplay fallback notice:", e));
           });
+        }
+      });
+
+      hls.on(window.Hls.Events.AUDIO_TRACKS_UPDATED, () => {
+        if (hls.audioTracks && hls.audioTracks.length > 0 && hls.audioTrack === -1) {
+          hls.audioTrack = 0;
         }
       });
 
@@ -1540,8 +1648,11 @@
         }
       });
     } else {
-      video.src = finalUrl;
-      video.load();
+      video.muted = false;
+      video.volume = 1;
+      if (video.getAttribute("src") !== finalUrl) {
+        video.src = finalUrl;
+      }
       video.onerror = () => {
         if (buffering) buffering.classList.add("hidden");
         if (errEl) errEl.classList.remove("hidden");
@@ -2585,7 +2696,6 @@
     document.querySelectorAll("video, audio").forEach(function (v) {
       try {
         v.pause();
-        v.muted = true;
         v.currentTime = 0;
         if (v.hls && typeof v.hls.destroy === "function") {
           try { v.hls.destroy(); } catch (_) {}

@@ -698,7 +698,6 @@
     document.querySelectorAll("video, audio").forEach(function (v) {
       try {
         v.pause();
-        v.muted = true;
         v.currentTime = 0;
         if (v.hls && typeof v.hls.destroy === "function") {
           try { v.hls.destroy(); } catch (_) {}

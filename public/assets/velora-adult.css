@@ -881,6 +881,35 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
   to { transform: rotate(360deg); }
 }
 
+.vel-adult-unmute-badge {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 28;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(225, 29, 72, 0.95);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  transition: all 0.2s ease;
+}
+
+.vel-adult-unmute-badge:hover {
+  background: #f43f5e;
+  transform: scale(1.05);
+}
+
+.vel-adult-unmute-badge.hidden {
+  display: none !important;
+}
+
 .vel-adult-touch-overlay {
   position: absolute;
   inset: 0;

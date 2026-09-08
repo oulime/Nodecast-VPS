@@ -1212,8 +1212,8 @@ const LIVE_MANIFEST_CACHE_TTL_MS = 6500;
 const LIVE_MANIFEST_STALE_TTL_MS = 120000;
 
 router.get('/stream', async (req, res) => {
-    const maxRetries = 2;
-    const retryDelays = [800, 1500];
+    const maxRetries = 3;
+    const retryDelays = [400, 800, 1500];
     let lastError = null;
 
     let { url } = req.query;

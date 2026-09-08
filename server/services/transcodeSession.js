@@ -223,7 +223,7 @@ class TranscodeSession extends EventEmitter {
 
         const args = [
             '-hide_banner',
-            '-loglevel', 'warning',
+            '-loglevel', 'info',
             '-user_agent', this.options.userAgent,
         ];
 

@@ -13,6 +13,7 @@ const http = require('http');
 const https = require('https');
 const { spawn } = require('child_process');
 const { Readable } = require('stream');
+const crypto = require('crypto');
 
 // Default cache max age in hours
 const DEFAULT_MAX_AGE_HOURS = 24;
@@ -1255,10 +1256,13 @@ router.get('/stream', async (req, res) => {
     // so the provider never sees 2 simultaneous streams (which causes HTTP 458)
     const cleanUrl = String(url || '').replace(/\/(live|movie|series)\/([^/?#]+)\/([^/?#]+)\//gi, '/$1/***/***/').replace(/([?&](?:password|pass|token|key)=)[^&#]+/gi, '$1***');
     const accountKey = getStreamAccountKey(url, req);
+    const requestId = crypto.randomBytes ? crypto.randomBytes(6).toString('hex') : Math.random().toString(36).slice(2, 8);
+
     if (activeStreamControllersByAccount.has(accountKey)) {
         const prev = activeStreamControllersByAccount.get(accountKey);
-        if (prev?.abortController && !prev.abortController.signal.aborted) {
-            try { prev.abortController.abort(); } catch (_) {}
+        if (prev) {
+            prev.isCancelled = true;
+            try { prev.abortController?.abort(); } catch (_) {}
             try { prev.activeResponse?.body?.cancel?.().catch?.(() => {}); } catch (_) {}
             console.log(`[Proxy Stream] CLOSE (replaced by new seek/stream): ${cleanUrl.substring(0, 80)}`);
         }
@@ -1267,12 +1271,29 @@ router.get('/stream', async (req, res) => {
         await new Promise(r => setTimeout(r, 120));
     }
 
+    const currentEntry = {
+        requestId,
+        isCancelled: false,
+        abortController: null,
+        activeResponse: null
+    };
+    activeStreamControllersByAccount.set(accountKey, currentEntry);
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        if (currentEntry.isCancelled || req.destroyed || res.destroyed || res.writableEnded) {
+            if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
+                activeStreamControllersByAccount.delete(accountKey);
+            }
+            return;
+        }
+
         let abortController = new AbortController();
+        currentEntry.abortController = abortController;
         let activeResponse = null;
         let onClose = null;
         try {
             onClose = () => {
+                currentEntry.isCancelled = true;
                 try {
                     abortController?.abort();
                 } catch {}
@@ -1284,17 +1305,19 @@ router.get('/stream', async (req, res) => {
                         }
                     } catch {}
                 }
-                if (activeStreamControllersByAccount.get(accountKey)?.abortController === abortController) {
+                if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
                     activeStreamControllersByAccount.delete(accountKey);
                 }
                 console.log(`[Proxy Stream] CLOSE (client disconnect): ${cleanUrl.substring(0, 80)}`);
             };
             req.on('close', onClose);
-            activeStreamControllersByAccount.set(accountKey, { abortController, activeResponse });
 
             // If client has already disconnected or aborted before attempt, exit immediately
-            if (req.destroyed || res.destroyed || res.writableEnded || abortController.signal.aborted) {
+            if (currentEntry.isCancelled || req.destroyed || res.destroyed || res.writableEnded || abortController.signal.aborted) {
                 if (onClose) req.off('close', onClose);
+                if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
+                    activeStreamControllersByAccount.delete(accountKey);
+                }
                 return;
             }
 
@@ -1335,12 +1358,16 @@ router.get('/stream', async (req, res) => {
                 response = await fetch(url, { headers, signal: abortController.signal });
             } catch (fetchErr) {
                 if (onClose) req.off('close', onClose);
-                if (fetchErr.name === 'AbortError' || abortController.signal.aborted || req.destroyed || res.destroyed || res.writableEnded) {
+                if (fetchErr.name === 'AbortError' || abortController.signal.aborted || currentEntry.isCancelled || req.destroyed || res.destroyed || res.writableEnded) {
+                    if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
+                        activeStreamControllersByAccount.delete(accountKey);
+                    }
                     return;
                 }
                 throw fetchErr;
             }
             activeResponse = response;
+            currentEntry.activeResponse = response;
             console.log(`[Proxy Stream] OPEN: Range: ${rangeHeader || 'None'} -> ${cleanUrl.substring(0, 80)}`);
 
             // If upstream returns 458/429/5xx for an m3u8 and we have a cached manifest, serve it IMMEDIATELY
@@ -1349,6 +1376,9 @@ router.get('/stream', async (req, res) => {
                 const cached = liveManifestCache.get(url);
                 if (Date.now() - cached.timestamp < LIVE_MANIFEST_STALE_TTL_MS) {
                     if (onClose) req.off('close', onClose);
+                    if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
+                        activeStreamControllersByAccount.delete(accountKey);
+                    }
                     res.set('Access-Control-Allow-Origin', '*');
                     res.set('X-Accel-Buffering', 'no');
                     res.set('Content-Type', 'application/vnd.apple.mpegurl');
@@ -1365,15 +1395,23 @@ router.get('/stream', async (req, res) => {
                 }
                 try { abortController.abort(); } catch {}
                 try { response.body?.cancel?.().catch?.(() => {}); } catch {}
-                if (activeStreamControllersByAccount.get(accountKey)?.abortController === abortController) {
-                    activeStreamControllersByAccount.delete(accountKey);
-                }
-                if (req.destroyed || res.destroyed || res.writableEnded) {
+
+                if (currentEntry.isCancelled || req.destroyed || res.destroyed || res.writableEnded) {
+                    if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
+                        activeStreamControllersByAccount.delete(accountKey);
+                    }
                     return;
                 }
                 const delay = retryDelays[attempt - 1] || 500;
                 console.log(`[Proxy] Upstream transient status ${response.status} for ${cleanUrl.substring(0, 60)} (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms...`);
                 await new Promise(r => setTimeout(r, delay));
+
+                if (currentEntry.isCancelled || req.destroyed || res.destroyed || res.writableEnded) {
+                    if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
+                        activeStreamControllersByAccount.delete(accountKey);
+                    }
+                    return;
+                }
                 continue;
             }
 
@@ -1383,7 +1421,7 @@ router.get('/stream', async (req, res) => {
                 }
                 try { abortController.abort(); } catch {}
                 try { response.body?.cancel?.().catch?.(() => {}); } catch {}
-                if (activeStreamControllersByAccount.get(accountKey)?.abortController === abortController) {
+                if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
                     activeStreamControllersByAccount.delete(accountKey);
                 }
                 // If upstream failed with 458/429/5xx and we have a cached manifest, serve it to prevent player stutter

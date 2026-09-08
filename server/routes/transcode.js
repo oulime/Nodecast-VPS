@@ -389,10 +389,6 @@ router.post('/session', async (req, res) => {
             ? getKnownDurationSeconds(streamUrl, metadata || {})
             : { value: null, pending: false };
 
-        if (isVodMode && durationInfo.pending) {
-            warmDurationCache(streamUrl, ffprobePath, userAgent, upstreamProxy);
-        }
-
         const responsePayload = {
             sessionId: session.id,
             playlistUrl: `/api/transcode/${session.id}/stream.m3u8`,

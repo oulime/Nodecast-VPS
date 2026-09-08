@@ -217,7 +217,14 @@ function downloadImageToDisk(url, destPath) {
     return new Promise((resolve) => {
         const file = fs.createWriteStream(destPath);
         const client = url.startsWith('https') ? https : http;
-        const req = client.get(url, { timeout: 8000 }, (res) => {
+        const options = {
+            timeout: 12000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+            }
+        };
+        const req = client.get(url, options, (res) => {
             if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
                 file.close();
                 try { fs.unlinkSync(destPath); } catch (_) {}
@@ -3366,22 +3373,46 @@ router.get('/stored-media/candidates', async (req, res) => {
 
 router.post('/stored-media/apply-candidate', async (req, res) => {
     try {
-        const category = String(req.body?.category || '').trim();
-        const filename = String(req.body?.filename || '').trim();
+        let category = String(req.body?.category || '').trim();
+        let filename = String(req.body?.filename || '').trim();
+        let title = String(req.body?.title || req.body?.name || '').trim();
         const imageUrl = String(req.body?.imageUrl || '').trim();
+        const candidateType = String(req.body?.candidateType || req.body?.type || '').trim();
+        const tmdbId = String(req.body?.tmdbId || req.body?.id || '').trim();
+        const isTv = String(req.body?.contentType || req.body?.mediaType || '').toLowerCase().includes('tv') || category.includes('tv');
+
+        if (!imageUrl || !imageUrl.startsWith('http')) {
+            return res.status(400).json({ error: 'URL d\'image requise et valide' });
+        }
 
         if (!category || !STORED_MEDIA_DIRECTORIES[category]) {
-            return res.status(400).json({ error: 'Catégorie invalide' });
+            if (category === 'movies' || category === 'series' || category === 'horizontal' || category === 'horizontal-thumbs') {
+                category = candidateType === 'logo' ? 'title-logos' : 'horizontal-thumbs';
+            } else if (candidateType === 'logo') {
+                category = 'title-logos';
+            } else {
+                category = 'horizontal-thumbs';
+            }
         }
+
         if (!filename) {
-            return res.status(400).json({ error: 'Nom de fichier requis' });
-        }
-        if (!imageUrl || !imageUrl.startsWith('http')) {
-            return res.status(400).json({ error: 'URL d\'image invalide' });
+            let baseName = title;
+            if (!baseName) {
+                try {
+                    const parsed = new URL(imageUrl);
+                    baseName = path.basename(parsed.pathname).replace(/\.[^.]+$/, '');
+                } catch (_) {
+                    baseName = 'media';
+                }
+            }
+            const slug = (baseName || 'media').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'media';
+            const isPng = imageUrl.includes('.png') || category === 'title-logos' || candidateType === 'logo';
+            const idSuffix = tmdbId || Date.now();
+            filename = `${slug}-${idSuffix}${isPng ? '.png' : '.jpg'}`;
         }
 
         const safeFilename = path.basename(filename);
-        const conf = STORED_MEDIA_DIRECTORIES[category];
+        const conf = STORED_MEDIA_DIRECTORIES[category] || STORED_MEDIA_DIRECTORIES['horizontal-thumbs'];
         await fs.promises.mkdir(conf.dir, { recursive: true });
 
         const destPath = path.join(conf.dir, safeFilename);
@@ -3395,21 +3426,16 @@ router.post('/stored-media/apply-candidate', async (req, res) => {
         if (conf.cachePath) {
             try {
                 const cacheData = JSON.parse(fs.readFileSync(conf.cachePath, 'utf8')) || {};
-                const baseWithoutExt = safeFilename.replace(/\.[^.]+$/, '');
-                const parts = baseWithoutExt.split('-');
-                if (parts.length >= 2) {
-                    const nameSlug = parts.slice(0, -1).join('-').replace(/_/g, ' ');
-                    const isTv = safeFilename.includes('tv') || category.includes('tv');
-                    const cKey = `${isTv ? 'tv' : 'movie'}:${nameSlug.toLowerCase()}`;
-                    cacheData[cKey] = `${conf.publicPath}/${safeFilename}`;
-                    fs.writeFileSync(conf.cachePath, JSON.stringify(cacheData, null, 2));
-                    if (category === 'title-logos') titleLogoMemoryCache = cacheData;
-                    if (category === 'horizontal-thumbs') horizontalThumbMemoryCache = cacheData;
-                }
+                const cleanTitleKey = (title || safeFilename.replace(/-\d+\.[^.]+$/, '').replace(/[-_]+/g, ' ')).trim().toLowerCase();
+                const cKey = `${isTv ? 'tv' : 'movie'}:${cleanTitleKey}`;
+                cacheData[cKey] = `${conf.publicPath}/${safeFilename}`;
+                fs.writeFileSync(conf.cachePath, JSON.stringify(cacheData, null, 2));
+                if (category === 'title-logos') titleLogoMemoryCache = cacheData;
+                if (category === 'horizontal-thumbs') horizontalThumbMemoryCache = cacheData;
             } catch (_) {}
         }
 
-        return res.json({ ok: true, url, filename: safeFilename });
+        return res.json({ ok: true, url, filename: safeFilename, category });
     } catch (err) {
         console.error('[veloraData] apply candidate image error:', err);
         return res.status(500).json({ error: err.message });

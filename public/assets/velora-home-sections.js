@@ -37,8 +37,466 @@ function renderAdmin(){var wrap=document.getElementById("home-sections-admin-lis
 document.addEventListener("click",function(){document.querySelectorAll(".vel-home-row-more-menu").forEach(function(m){m.hidden=true})});
 var activeContentSection=null,activeContentItems=[],activePackageCatalogItems=[];
 function velNormStr(s){return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim()}
-async function openSectionContentDialog(row){var dialog=document.getElementById("home-section-content-dialog");if(!dialog)return;activeContentSection=row;activeContentItems=[];activePackageCatalogItems=[];var titleEl=document.getElementById("home-section-content-title"),subtitleEl=document.getElementById("home-section-content-subtitle"),searchInput=document.getElementById("home-section-content-search-input"),searchResults=document.getElementById("home-section-content-search-results"),statusEl=document.getElementById("home-section-content-status");if(titleEl)titleEl.textContent=row.title||"Section Accueil";if(subtitleEl){var p=pkg(row.package_id);subtitleEl.textContent=(row.content_type==="series"?"S\u00e9ries":"Films")+" ("+(row.card_orientation==="horizontal"?"Horizontal":"Vertical")+") \u2014 Package : "+(p?p.name:row.package_id)}if(searchInput)searchInput.value="";if(searchResults){searchResults.replaceChildren();searchResults.hidden=true}if(statusEl)statusEl.textContent="Chargement des \u00e9l\u00e9ments...";dialog.showModal();try{var isHoriz=row.card_orientation==="horizontal";if(typeof window.veloraGetHomeSectionContent==="function"){window.veloraGetHomeSectionContent(row.content_type,row.package_id,isHoriz).then(function(catItems){if(Array.isArray(catItems))activePackageCatalogItems=catItems}).catch(function(e){})}if(Array.isArray(row.custom_entries)&&row.custom_entries.length>0){activeContentItems=JSON.parse(JSON.stringify(row.custom_entries))}else{var cachedSec=state.homeCache&&Array.isArray(state.homeCache.sections)?state.homeCache.sections.find(function(s){return String(s.id)===String(row.id)}):null;if(cachedSec&&Array.isArray(cachedSec.entries)&&cachedSec.entries.length>0){activeContentItems=JSON.parse(JSON.stringify(cachedSec.entries))}else if(typeof window.veloraGetHomeSectionContent==="function"){var entries=await window.veloraGetHomeSectionContent(row.content_type,row.package_id,isHoriz);activeContentItems=Array.isArray(entries)?JSON.parse(JSON.stringify(entries)):[];if(Array.isArray(entries))activePackageCatalogItems=entries}}if(statusEl)statusEl.textContent=""}catch(err){if(statusEl)statusEl.textContent="Erreur lors du chargement : "+err.message}renderContentDialogItems()}
-function renderContentDialogItems(){var grid=document.getElementById("home-section-content-items"),countEl=document.getElementById("home-section-content-count");if(!grid)return;grid.replaceChildren();if(countEl)countEl.textContent=activeContentItems.length+" \u00e9l\u00e9ment(s)";if(!activeContentItems.length){var empty=document.createElement("p");empty.className="vel-home-content-dialog__empty";empty.textContent="Cette section ne contient aucun \u00e9l\u00e9ment. Utilisez la recherche ci-dessus pour en ajouter.";grid.appendChild(empty);return}var isHoriz=activeContentSection&&activeContentSection.card_orientation==="horizontal";activeContentItems.forEach(function(item,idx){var card=document.createElement("div");card.className="vel-home-content-item-card"+(isHoriz?" vel-home-content-item-card--horizontal":"");var mediaWrap=document.createElement("div");mediaWrap.className="vel-home-content-item-card__media-wrap";var img=document.createElement("img"),imgSrc=(isHoriz?(item.backdropUrl||item.backdrop||item.thumbUrl):(item.thumbUrl||item.backdropUrl))||"";img.src=imgSrc;img.alt="";img.loading="lazy";img.onerror=function(){if(imgSrc!==item.thumbUrl&&item.thumbUrl)img.src=item.thumbUrl};var delBtn=document.createElement("button");delBtn.type="button";delBtn.className="vel-home-content-item-card__delete-btn";delBtn.title="Supprimer de la section";delBtn.textContent="\u2715";delBtn.addEventListener("click",function(e){e.stopPropagation();activeContentItems.splice(idx,1);renderContentDialogItems()});mediaWrap.append(img,delBtn);var body=document.createElement("div");body.className="vel-home-content-item-card__body";var title=document.createElement("div");title.className="vel-home-content-item-card__title";title.title=item.name||item.title||"";title.textContent=item.name||item.title||"Sans titre";var controls=document.createElement("div");controls.className="vel-home-content-item-card__controls";var moveLeft=document.createElement("button");moveLeft.type="button";moveLeft.className="vel-home-content-item-card__ctrl-btn";moveLeft.title="D\u00e9placer vers la gauche";moveLeft.textContent="\u2190";moveLeft.disabled=idx===0;moveLeft.addEventListener("click",function(e){e.stopPropagation();if(idx>0){var temp=activeContentItems[idx-1];activeContentItems[idx-1]=activeContentItems[idx];activeContentItems[idx]=temp;renderContentDialogItems()}});var moveRight=document.createElement("button");moveRight.type="button";moveRight.className="vel-home-content-item-card__ctrl-btn";moveRight.title="D\u00e9placer vers la droite";moveRight.textContent="\u2192";moveRight.disabled=idx===activeContentItems.length-1;moveRight.addEventListener("click",function(e){e.stopPropagation();if(idx<activeContentItems.length-1){var temp=activeContentItems[idx+1];activeContentItems[idx+1]=activeContentItems[idx];activeContentItems[idx]=temp;renderContentDialogItems()}});controls.append(moveLeft,moveRight);body.append(title,controls);card.append(mediaWrap,body);grid.appendChild(card)})}
+
+var clientBackdropCache = new Map();
+function veloraEnsureCardBackdrop(card, media, section, entry) {
+  if (!section || !entry) return;
+  if (entry && (entry.has_integrated_title || entry.horizontal_thumb)) return;
+  if (card && card.classList.contains("has-integrated-title")) return;
+  var key = String(entry.sourceId || "") + ":" + String(entry.streamId || "") + ":" + String(entry.name || "");
+  if (clientBackdropCache.has(key)) {
+    var cached = clientBackdropCache.get(key);
+    if (cached && media && media.tagName === "IMG" && media.src !== cached) {
+      if (typeof window.veloraSetHomeImageSource === "function") {
+        window.veloraSetHomeImageSource(media, cached);
+      } else {
+        media.src = cached;
+      }
+    }
+    return;
+  }
+  var currentSrc = media && media.tagName === "IMG" ? (media.src || "") : "";
+  if (currentSrc.includes("/w1280") || currentSrc.includes("/w780") || (entry.backdropUrl && entry.backdropUrl !== entry.thumbUrl)) {
+    clientBackdropCache.set(key, entry.backdropUrl || currentSrc);
+    return;
+  }
+  var url = "/api/velora-db/media-backdrop?name=" + encodeURIComponent(entry.name || "") +
+            "&type=" + encodeURIComponent(section.content_type || "movies") +
+            "&stream_id=" + encodeURIComponent(entry.streamId || "") +
+            "&source_id=" + encodeURIComponent(entry.sourceId || "");
+  fetch(url, { cache: "force-cache" })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data && data.ok && data.backdropUrl) {
+        clientBackdropCache.set(key, data.backdropUrl);
+        entry.backdropUrl = data.backdropUrl;
+        entry.thumbUrl = data.backdropUrl;
+        if (media && media.tagName === "IMG") {
+          if (typeof window.veloraSetHomeImageSource === "function") {
+            window.veloraSetHomeImageSource(media, data.backdropUrl, function() {
+              media.removeAttribute("src");
+              media.classList.add("vel-home-section__fallback");
+            });
+          } else {
+            media.src = data.backdropUrl;
+            media.classList.remove("vel-home-section__fallback");
+          }
+        }
+      }
+    })
+    .catch(function() {});
+}
+
+async function openSectionContentDialog(row){
+  var dialog=document.getElementById("home-section-content-dialog");
+  if(!dialog)return;
+  activeContentSection=row;
+  activeContentItems=[];
+  activePackageCatalogItems=[];
+  var titleEl=document.getElementById("home-section-content-title"),
+      subtitleEl=document.getElementById("home-section-content-subtitle"),
+      searchInput=document.getElementById("home-section-content-search-input"),
+      searchResults=document.getElementById("home-section-content-search-results"),
+      statusEl=document.getElementById("home-section-content-status"),
+      enrichBtn=document.getElementById("home-section-content-enrich-btn");
+  if(titleEl)titleEl.textContent=row.title||"Section Accueil";
+  if(subtitleEl){
+    var p=pkg(row.package_id);
+    subtitleEl.textContent=(row.content_type==="series"?"Séries":"Films")+" ("+(row.card_orientation==="horizontal"?"Horizontal":"Vertical")+") — Package : "+(p?p.name:row.package_id);
+  }
+  if(searchInput)searchInput.value="";
+  if(searchResults){searchResults.replaceChildren();searchResults.hidden=true}
+  if(statusEl)statusEl.textContent="Chargement des éléments...";
+  if(enrichBtn){enrichBtn.disabled=false;enrichBtn.textContent="✨ Récupérer visuels Fanart / TMDB";}
+  dialog.showModal();
+  try{
+    var isHoriz=row.card_orientation==="horizontal";
+    if(typeof window.veloraGetHomeSectionContent==="function"){
+      window.veloraGetHomeSectionContent(row.content_type,row.package_id,isHoriz).then(function(catItems){
+        if(Array.isArray(catItems))activePackageCatalogItems=catItems;
+      }).catch(function(e){});
+    }
+    if(Array.isArray(row.custom_entries)&&row.custom_entries.length>0){
+      activeContentItems=JSON.parse(JSON.stringify(row.custom_entries));
+    }else{
+      var cachedSec=state.homeCache&&Array.isArray(state.homeCache.sections)?state.homeCache.sections.find(function(s){return String(s.id)===String(row.id)}):null;
+      if(cachedSec&&Array.isArray(cachedSec.entries)&&cachedSec.entries.length>0){
+        activeContentItems=JSON.parse(JSON.stringify(cachedSec.entries));
+      }else if(typeof window.veloraGetHomeSectionContent==="function"){
+        var entries=await window.veloraGetHomeSectionContent(row.content_type,row.package_id,isHoriz);
+        activeContentItems=Array.isArray(entries)?JSON.parse(JSON.stringify(entries)):[];
+        if(Array.isArray(entries))activePackageCatalogItems=entries;
+      }
+    }
+    // Match backdrops from client cache if available
+    if(isHoriz&&Array.isArray(activeContentItems)){
+      activeContentItems.forEach(function(item){
+        if(!item||!item.name)return;
+        var key=String(item.sourceId||"")+":"+String(item.streamId||"")+":"+String(item.name||"");
+        if(clientBackdropCache&&clientBackdropCache.has(key)){
+          var cachedBd=clientBackdropCache.get(key);
+          if(cachedBd){
+            item.backdropUrl=cachedBd;
+            if(!item.thumbUrl)item.thumbUrl=cachedBd;
+          }
+        }
+      });
+    }
+    if(statusEl)statusEl.textContent="";
+  }catch(err){
+    if(statusEl)statusEl.textContent="Erreur lors du chargement : "+err.message;
+  }
+  renderContentDialogItems();
+}
+
+function renderContentDialogItems(){
+  var grid=document.getElementById("home-section-content-items"),
+      countEl=document.getElementById("home-section-content-count");
+  if(!grid)return;
+  grid.replaceChildren();
+
+  var isHoriz=activeContentSection&&activeContentSection.card_orientation==="horizontal";
+  grid.className="vel-home-content-dialog__grid"+(isHoriz?" vel-home-content-dialog__grid--horizontal":"");
+
+  if(countEl)countEl.textContent=activeContentItems.length+" élément(s)";
+
+  if(!activeContentItems.length){
+    var empty=document.createElement("p");
+    empty.className="vel-home-content-dialog__empty";
+    empty.textContent="Cette section ne contient aucun élément. Utilisez la recherche ci-dessus pour en ajouter.";
+    grid.appendChild(empty);
+    return;
+  }
+
+  activeContentItems.forEach(function(item,idx){
+    var cleanTitle=stripChannelPrefixes(item.name||item.title||"");
+    var isHorizontalThumb=Boolean(item.has_integrated_title||item.horizontal_thumb);
+    var titleLogoUrl=String(item.title_logo||item.titleLogo||"").trim();
+
+    var card=document.createElement("div");
+    card.className="vel-home-content-item-card"+(isHoriz?" vel-home-content-item-card--horizontal":"");
+    if(isHorizontalThumb)card.classList.add("has-integrated-title");
+    else if(titleLogoUrl&&titleLogoUrl!=="NONE")card.classList.add("has-title-logo");
+
+    var mediaWrap=document.createElement("div");
+    mediaWrap.className="vel-home-content-item-card__media-wrap";
+
+    var img=document.createElement("img");
+    img.className="vel-home-content-item-card__media";
+    img.alt="";
+    img.loading="lazy";
+
+    var imgSrc=isHoriz
+      ?(item.horizontal_thumb||item.backdropUrl||item.backdrop||item.thumbUrl||"")
+      :(item.thumbUrl||item.backdropUrl||"");
+
+    if(imgSrc){
+      if(typeof window.veloraSetHomeImageSource==="function"){
+        window.veloraSetHomeImageSource(img,imgSrc);
+      }else{
+        img.src=imgSrc;
+      }
+    }else{
+      img.src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='170' fill='%23111'><rect width='300' height='170'/><text x='50%' y='50%' fill='%23555' font-family='sans-serif' font-size='14' text-anchor='middle'>Pas d'image</text></svg>";
+    }
+
+    mediaWrap.appendChild(img);
+
+    // Front-end card overlays & dynamic visual resolution:
+    if(isHoriz){
+      if(!isHorizontalThumb&&titleLogoUrl&&titleLogoUrl!=="NONE"){
+        var logoImg=document.createElement("img");
+        logoImg.className="vel-home-section__title-logo";
+        logoImg.alt=cleanTitle;
+        logoImg.loading="lazy";
+        function smartScale(){
+          var nw=logoImg.naturalWidth,nh=logoImg.naturalHeight;
+          if(nw&&nh){
+            var r=nw/nh;
+            if(r>=2.4)logoImg.classList.add("vel-title-logo--wide");
+            else if(r<=1.45)logoImg.classList.add("vel-title-logo--tall");
+            else logoImg.classList.add("vel-title-logo--standard");
+          }
+        }
+        logoImg.onload=smartScale;
+        logoImg.src=titleLogoUrl;
+        if(logoImg.complete)smartScale();
+        mediaWrap.appendChild(logoImg);
+      }else if(!isHorizontalThumb){
+        var nameOverlay=document.createElement("span");
+        nameOverlay.className="vel-home-section__name";
+        nameOverlay.textContent=cleanTitle;
+        mediaWrap.appendChild(nameOverlay);
+      }
+
+      // Visual badge
+      var badge=document.createElement("span");
+      badge.className="vel-home-content-item-card__badge";
+      if(isHorizontalThumb){
+        badge.classList.add("vel-home-content-item-card__badge--thumb");
+        badge.textContent="🖼️ Vignette";
+        mediaWrap.appendChild(badge);
+      }else if(titleLogoUrl&&titleLogoUrl!=="NONE"){
+        badge.classList.add("vel-home-content-item-card__badge--logo");
+        badge.textContent="🏷️ Logo titre";
+        mediaWrap.appendChild(badge);
+      }
+
+      // Live resolution of backdrop and logo/thumb for preview cards
+      if(activeContentSection&&(activeContentSection.content_type==="movies"||activeContentSection.content_type==="series")){
+        veloraEnsureCardBackdrop(card,img,activeContentSection,item);
+        if(!isHorizontalThumb&&!titleLogoUrl&&cleanTitle){
+          var cType=activeContentSection.content_type||"movies";
+          if(!window.__veloraFetchingLogos)window.__veloraFetchingLogos=new Map();
+          var logoKey=cType+":"+cleanTitle.toLowerCase();
+          if(!window.__veloraFetchingLogos.has(logoKey)){
+            var p=fetch("/api/velora-db/title-logo?name="+encodeURIComponent(cleanTitle)+"&type="+encodeURIComponent(cType))
+              .then(function(r){return r.ok?r.json():null;})
+              .then(function(data){
+                if(data&&data.hasHorizontalThumb&&data.thumbUrl){
+                  item.horizontal_thumb=data.thumbUrl;
+                  item.has_integrated_title=true;
+                  item.backdropUrl=data.thumbUrl;
+                  item.thumbUrl=data.thumbUrl;
+                  delete item.title_logo;
+                  return {type:"thumb",url:data.thumbUrl};
+                }
+                if(data&&data.url){
+                  item.title_logo=data.url;
+                  return {type:"logo",url:data.url};
+                }
+                return null;
+              }).catch(function(){return null;});
+            window.__veloraFetchingLogos.set(logoKey,p);
+          }
+          window.__veloraFetchingLogos.get(logoKey).then(function(res){
+            if(!res)return;
+            if(res.type==="thumb"&&res.url){
+              card.classList.add("has-integrated-title");
+              card.classList.remove("has-title-logo");
+              var exLogo=mediaWrap.querySelector(".vel-home-section__title-logo");
+              if(exLogo)exLogo.remove();
+              var exName=mediaWrap.querySelector(".vel-home-section__name");
+              if(exName)exName.remove();
+              if(typeof window.veloraSetHomeImageSource==="function"){
+                window.veloraSetHomeImageSource(img,res.url);
+              }else{
+                img.src=res.url;
+              }
+              var exBadge=mediaWrap.querySelector(".vel-home-content-item-card__badge");
+              if(!exBadge){
+                exBadge=document.createElement("span");
+                mediaWrap.appendChild(exBadge);
+              }
+              exBadge.className="vel-home-content-item-card__badge vel-home-content-item-card__badge--thumb";
+              exBadge.textContent="🖼️ Vignette";
+            }else if(res.type==="logo"&&res.url){
+              if(!card.classList.contains("has-integrated-title")){
+                card.classList.add("has-title-logo");
+                var exLogo=mediaWrap.querySelector(".vel-home-section__title-logo");
+                if(!exLogo){
+                  var dynLogo=document.createElement("img");
+                  dynLogo.className="vel-home-section__title-logo";
+                  dynLogo.alt=cleanTitle;
+                  dynLogo.loading="lazy";
+                  function smartScaleDyn(){
+                    var nw=dynLogo.naturalWidth,nh=dynLogo.naturalHeight;
+                    if(nw&&nh){
+                      var r=nw/nh;
+                      if(r>=2.4)dynLogo.classList.add("vel-title-logo--wide");
+                      else if(r<=1.45)dynLogo.classList.add("vel-title-logo--tall");
+                      else dynLogo.classList.add("vel-title-logo--standard");
+                    }
+                  }
+                  dynLogo.onload=smartScaleDyn;
+                  dynLogo.src=res.url;
+                  if(dynLogo.complete)smartScaleDyn();
+                  mediaWrap.appendChild(dynLogo);
+                }
+                var exBadge=mediaWrap.querySelector(".vel-home-content-item-card__badge");
+                if(!exBadge){
+                  exBadge=document.createElement("span");
+                  mediaWrap.appendChild(exBadge);
+                }
+                exBadge.className="vel-home-content-item-card__badge vel-home-content-item-card__badge--logo";
+                exBadge.textContent="🏷️ Logo titre";
+              }
+            }
+          });
+        }
+      }
+    }
+
+    var delBtn=document.createElement("button");
+    delBtn.type="button";
+    delBtn.className="vel-home-content-item-card__delete-btn";
+    delBtn.title="Supprimer de la section";
+    delBtn.textContent="✕";
+    delBtn.addEventListener("click",function(e){
+      e.stopPropagation();
+      activeContentItems.splice(idx,1);
+      renderContentDialogItems();
+    });
+    mediaWrap.appendChild(delBtn);
+
+    var body=document.createElement("div");
+    body.className="vel-home-content-item-card__body";
+
+    var title=document.createElement("div");
+    title.className="vel-home-content-item-card__title";
+    title.title=item.name||item.title||"";
+    title.textContent=cleanTitle||item.name||"Sans titre";
+
+    var controls=document.createElement("div");
+    controls.className="vel-home-content-item-card__controls";
+
+    var moveLeft=document.createElement("button");
+    moveLeft.type="button";
+    moveLeft.className="vel-home-content-item-card__ctrl-btn";
+    moveLeft.title="Déplacer vers la gauche";
+    moveLeft.textContent="←";
+    moveLeft.disabled=(idx===0);
+    moveLeft.addEventListener("click",function(e){
+      e.stopPropagation();
+      if(idx>0){
+        var temp=activeContentItems[idx-1];
+        activeContentItems[idx-1]=activeContentItems[idx];
+        activeContentItems[idx]=temp;
+        renderContentDialogItems();
+      }
+    });
+
+    var replaceBtn=document.createElement("button");
+    replaceBtn.type="button";
+    replaceBtn.className="vel-home-content-item-card__ctrl-btn";
+    replaceBtn.title="Choisir une autre image pour ce titre (Fanart.tv / TMDB)";
+    replaceBtn.textContent="✏️";
+    replaceBtn.addEventListener("click",function(e){
+      e.stopPropagation();
+      var cType=(activeContentSection&&activeContentSection.content_type)||"movies";
+      window.veloraOpenCandidatePicker({
+        name:cleanTitle||item.name,
+        category:isHoriz?"horizontal-thumbs":"posters",
+        contentType:cType,
+        onApplied:function(newUrl){
+          if(isHoriz){
+            item.horizontal_thumb=newUrl;
+            item.has_integrated_title=true;
+            item.backdropUrl=newUrl;
+            item.thumbUrl=newUrl;
+            delete item.title_logo;
+          }else{
+            item.thumbUrl=newUrl;
+          }
+          renderContentDialogItems();
+        }
+      });
+    });
+
+    var moveRight=document.createElement("button");
+    moveRight.type="button";
+    moveRight.className="vel-home-content-item-card__ctrl-btn";
+    moveRight.title="Déplacer vers la droite";
+    moveRight.textContent="→";
+    moveRight.disabled=(idx===activeContentItems.length-1);
+    moveRight.addEventListener("click",function(e){
+      e.stopPropagation();
+      if(idx<activeContentItems.length-1){
+        var temp=activeContentItems[idx+1];
+        activeContentItems[idx+1]=activeContentItems[idx];
+        activeContentItems[idx]=temp;
+        renderContentDialogItems();
+      }
+    });
+
+    controls.append(moveLeft,replaceBtn,moveRight);
+    body.append(title,controls);
+    card.append(mediaWrap,body);
+    grid.appendChild(card);
+  });
+}
+
+async function enrichSectionContentVisuels(){
+  var enrichBtn=document.getElementById("home-section-content-enrich-btn"),
+      statusEl=document.getElementById("home-section-content-status");
+  if(!activeContentSection||!activeContentItems.length)return;
+
+  if(enrichBtn){
+    enrichBtn.disabled=true;
+    enrichBtn.textContent="⏳ Récupération en cours...";
+  }
+  if(statusEl){
+    statusEl.textContent="Recherche des visuels Fanart / TMDB en cours...";
+    statusEl.style.color="#a78bfa";
+  }
+
+  var cType=activeContentSection.content_type||"movies";
+  var isHoriz=activeContentSection.card_orientation==="horizontal";
+  var updatedCount=0;
+  var total=activeContentItems.length;
+
+  for(var i=0;i<total;i++){
+    var item=activeContentItems[i];
+    if(!item||!item.name)continue;
+    var cleanTitle=stripChannelPrefixes(item.name);
+    if(!cleanTitle)continue;
+
+    var hasVisual=isHoriz?Boolean(item.horizontal_thumb||item.title_logo):Boolean(item.thumbUrl);
+    if(hasVisual&&isHoriz&&item.backdropUrl&&item.backdropUrl!==item.thumbUrl){
+      continue;
+    }
+
+    if(statusEl){
+      statusEl.textContent="Traitement ("+(i+1)+"/"+total+") : « "+cleanTitle+" »...";
+    }
+
+    try{
+      // 1. Fetch Fanart.tv horizontal thumb / title logo via API
+      var res=await fetch("/api/velora-db/title-logo?name="+encodeURIComponent(cleanTitle)+"&type="+encodeURIComponent(cType));
+      if(res.ok){
+        var data=await res.json();
+        if(data){
+          if(data.hasHorizontalThumb&&data.thumbUrl){
+            item.horizontal_thumb=data.thumbUrl;
+            item.has_integrated_title=true;
+            item.backdropUrl=data.thumbUrl;
+            item.thumbUrl=data.thumbUrl;
+            delete item.title_logo;
+            updatedCount++;
+          }else if(data.url){
+            item.title_logo=data.url;
+            updatedCount++;
+          }
+        }
+      }
+
+      // 2. Fetch TMDB backdrop if needed for horizontal cards
+      if(isHoriz&&!item.horizontal_thumb&&(!item.backdropUrl||item.backdropUrl===item.thumbUrl||!String(item.backdropUrl).includes("/w1280"))){
+        var bdRes=await fetch("/api/velora-db/media-backdrop?name="+encodeURIComponent(cleanTitle)+"&type="+encodeURIComponent(cType)+"&stream_id="+encodeURIComponent(item.streamId||"")+"&source_id="+encodeURIComponent(item.sourceId||""));
+        if(bdRes.ok){
+          var bdData=await bdRes.json();
+          if(bdData&&bdData.ok&&bdData.backdropUrl){
+            item.backdropUrl=bdData.backdropUrl;
+            if(!item.thumbUrl)item.thumbUrl=bdData.backdropUrl;
+          }
+        }
+      }
+    }catch(err){
+      console.warn("Erreur enrichissement visuel pour",cleanTitle,err);
+    }
+
+    renderContentDialogItems();
+  }
+
+  if(enrichBtn){
+    enrichBtn.disabled=false;
+    enrichBtn.textContent="✨ Récupérer visuels Fanart / TMDB";
+  }
+  if(statusEl){
+    statusEl.textContent="✨ Terminé ! "+updatedCount+" visuel(s) récupéré(s) ou mis à jour. Cliquez sur « Enregistrer le contenu » pour sauvegarder.";
+    statusEl.style.color="#86efac";
+  }
+}
 async function searchMediaForContentDialog(query) {
   var searchResults = document.getElementById("home-section-content-search-results"),
       statusEl = document.getElementById("home-section-content-status");
@@ -263,49 +721,6 @@ async function searchMediaForContentDialog(query) {
     searchResults.appendChild(errEl);
   }
 }
-var clientBackdropCache = new Map();
-function veloraEnsureCardBackdrop(card, media, section, entry) {
-  if (entry && (entry.has_integrated_title || entry.horizontal_thumb)) return;
-  if (card && card.classList.contains("has-integrated-title")) return;
-  var key = String(entry.sourceId || "") + ":" + String(entry.streamId || "") + ":" + String(entry.name || "");
-  if (clientBackdropCache.has(key)) {
-    var cached = clientBackdropCache.get(key);
-    if (cached && media.tagName === "IMG" && media.src !== cached) {
-      media.src = cached;
-    }
-    return;
-  }
-  var currentSrc = media.tagName === "IMG" ? (media.src || "") : "";
-  if (currentSrc.includes("/w1280") || currentSrc.includes("/w780") || (entry.backdropUrl && entry.backdropUrl !== entry.thumbUrl)) {
-    clientBackdropCache.set(key, entry.backdropUrl || currentSrc);
-    return;
-  }
-  var url = "/api/velora-db/media-backdrop?name=" + encodeURIComponent(entry.name || "") +
-            "&type=" + encodeURIComponent(section.content_type || "movies") +
-            "&stream_id=" + encodeURIComponent(entry.streamId || "") +
-            "&source_id=" + encodeURIComponent(entry.sourceId || "");
-  fetch(url, { cache: "force-cache" })
-    .then(function(res) { return res.json(); })
-    .then(function(data) {
-      if (data && data.ok && data.backdropUrl) {
-        clientBackdropCache.set(key, data.backdropUrl);
-        entry.backdropUrl = data.backdropUrl;
-        entry.thumbUrl = data.backdropUrl;
-        if (media.tagName === "IMG") {
-          if (typeof window.veloraSetHomeImageSource === "function") {
-            window.veloraSetHomeImageSource(media, data.backdropUrl, function() {
-              media.removeAttribute("src");
-              media.classList.add("vel-home-section__fallback");
-            });
-          } else {
-            media.src = data.backdropUrl;
-            media.classList.remove("vel-home-section__fallback");
-          }
-        }
-      }
-    })
-    .catch(function() {});
-}
 
 function card(section,entry){var b=document.createElement("button"),packageRow=pkg(section.package_id),countryRow=state.countries.find(function(country){return String(country.id)===String(section.country_id)}),isHorizontal=(section&&section.card_orientation==="horizontal")||(entry&&entry.card_orientation==="horizontal");b.type="button";b.className="vel-home-section__card vel-home-section__card--"+section.content_type+(isHorizontal?" vel-home-section__card--horizontal":"");var cleanTitle=stripChannelPrefixes(entry.name||"");b.setAttribute("aria-label",cleanTitle);b.dataset.packageId=String(section.package_id||entry.packageId||"");b.dataset.packageName=String(packageRow&&packageRow.name||section.title||"");b.dataset.contentType=String(section.content_type||entry.contentType||"");b.dataset.countryName=String(countryRow&&countryRow.name||"");b.dataset.mediaId=String(entry.streamId||entry.globalStreamId||entry.id||"");var media,imgUrl=isHorizontal?(entry.horizontal_thumb||entry.backdropUrl||entry.backdrop||entry.thumbUrl):(entry.thumbUrl||entry.backdropUrl||entry.backdrop);if(imgUrl){media=document.createElement("img");media.alt="";media.loading="lazy";window.veloraSetHomeImageSource(media,imgUrl,function(){media.removeAttribute("src");media.classList.add("vel-home-section__fallback")})}else{media=document.createElement("span");media.classList.add("vel-home-section__fallback");media.textContent="\u25b6"}media.classList.add("vel-home-section__media");var name=document.createElement("span");name.className="vel-home-section__name";name.textContent=cleanTitle;b.append(media,name);if(isHorizontal){var hasIntegratedTitle=Boolean(entry.has_integrated_title||entry.horizontal_thumb);if(hasIntegratedTitle){b.classList.add("has-integrated-title");}else{var titleLogoUrl=String(entry.title_logo||entry.titleLogo||entry.logo||"").trim();function applyTitleLogo(url){if(!url||url==="NONE")return;if(b.querySelector(".vel-home-section__title-logo"))return;b.classList.add("has-title-logo");var logoImg=document.createElement("img");logoImg.className="vel-home-section__title-logo";logoImg.alt=cleanTitle;logoImg.loading="lazy";logoImg.decoding="async";function smartScale(){var nw=logoImg.naturalWidth,nh=logoImg.naturalHeight;if(nw&&nh){var r=nw/nh;if(r>=2.4)logoImg.classList.add("vel-title-logo--wide");else if(r<=1.45)logoImg.classList.add("vel-title-logo--tall");else logoImg.classList.add("vel-title-logo--standard")}}logoImg.onload=smartScale;logoImg.onerror=function(){b.classList.remove("has-title-logo");logoImg.remove()};logoImg.src=url;if(logoImg.complete)smartScale();b.appendChild(logoImg)}if(titleLogoUrl){applyTitleLogo(titleLogoUrl)}else if(cleanTitle&&(section.content_type==="movies"||section.content_type==="series"||entry.contentType==="movies"||entry.contentType==="series")){var cType=section.content_type||entry.contentType||"movies";if(!window.__veloraFetchingLogos)window.__veloraFetchingLogos=new Map();var logoKey=cType+":"+cleanTitle.toLowerCase();if(!window.__veloraFetchingLogos.has(logoKey)){var p=fetch("/api/velora-db/title-logo?name="+encodeURIComponent(cleanTitle)+"&type="+encodeURIComponent(cType)).then(function(r){return r.ok?r.json():null}).then(function(data){if(data&&data.hasHorizontalThumb&&data.thumbUrl){entry.horizontal_thumb=data.thumbUrl;entry.has_integrated_title=true;entry.backdropUrl=data.thumbUrl;entry.thumbUrl=data.thumbUrl;delete entry.title_logo;return {type:"thumb",url:data.thumbUrl}}if(data&&data.url){entry.title_logo=data.url;return {type:"logo",url:data.url}}return null}).catch(function(){return null});window.__veloraFetchingLogos.set(logoKey,p)}window.__veloraFetchingLogos.get(logoKey).then(function(res){if(!res)return;if(res.type==="thumb"&&res.url){b.classList.add("has-integrated-title");b.classList.remove("has-title-logo");var exLogo=b.querySelector(".vel-home-section__title-logo");if(exLogo)exLogo.remove();if(media.tagName==="IMG"){if(typeof window.veloraSetHomeImageSource==="function"){window.veloraSetHomeImageSource(media,res.url)}else{media.src=res.url}}}else if(res.type==="logo"&&res.url){if(!b.classList.contains("has-integrated-title")){applyTitleLogo(res.url)}}})}}}var logoUrl=String(section&&(section.logo_url||section.badge_logo_url)||entry&&(entry.section_logo_url||entry.logo_url)||"").trim();if(logoUrl){b.classList.add("vel-home-section__card--has-badge");var logoEl=document.createElement("img");logoEl.className="vel-home-section__badge-logo";logoEl.alt="";logoEl.loading="lazy";if(typeof window.veloraSetHomeImageSource==="function"){window.veloraSetHomeImageSource(logoEl,logoUrl,function(){logoEl.remove()})}else{logoEl.src=logoUrl;logoEl.onerror=function(){logoEl.remove()}}b.appendChild(logoEl)}if(isHorizontal&&(section.content_type==="movies"||section.content_type==="series")){veloraEnsureCardBackdrop(b,media,section,entry)}if(typeof window.veloraBindHomeCardActivation==="function")window.veloraBindHomeCardActivation(b,section,entry);if(section.content_type==="movies"){b.addEventListener("pointerenter",function(){warmHomeMovie(entry)},{once:true});b.addEventListener("focus",function(){warmHomeMovie(entry)},{once:true})}b.addEventListener("click",function(){if(typeof window.veloraOpenHomeCacheEntry==="function")window.veloraOpenHomeCacheEntry(section,entry,b)});return b}
 var homeRenderVersion=0;async function renderHome(){var wrap=document.getElementById("vel-home-sections"),countrySelect=document.getElementById("country-select");if(!wrap)return;if(typeof window.veloraIsStartupCountryReady==="function"&&!window.veloraIsStartupCountryReady(countrySelect))return;var savedScrolls=new Map();wrap.querySelectorAll(".vel-home-section").forEach(function(sec){var r=sec.querySelector(".vel-home-section__rail"),heading=sec.querySelector(".vel-home-section__heading"),k=heading?heading.textContent.trim():"";if(k&&r&&Number.isFinite(r.scrollLeft)&&r.scrollLeft>0){savedScrolls.set(k,r.scrollLeft)}});var renderVersion=++homeRenderVersion,fragment=document.createDocumentFragment();if(typeof window.veloraRenderResumeSection==="function"){var resumeBlock=window.veloraRenderResumeSection();if(resumeBlock)fragment.appendChild(resumeBlock)}var source=state.homeCache&&Array.isArray(state.homeCache.sections)?state.homeCache.sections:state.sections,active=typeof window.veloraGetActiveCountry==="function"?window.veloraGetActiveCountry():{id:typeof window.veloraGetActiveCountryId==="function"?window.veloraGetActiveCountryId():"",name:""},published=source.filter(function(row){return row.published!==false}),specific=published.filter(function(row){var ids=getRowCountryIds(row);return!ids.includes("default")&&sectionMatchesCountry(row,active)}),defaults=published.filter(function(row){var ids=getRowCountryIds(row);return ids.includes("default")}),rows=(specific.length?specific:defaults).slice().sort(function(a,b){return(a.section_order||0)-(b.section_order||0)});for(var section of rows){var isHorizontal=section.card_orientation==="horizontal",block=document.createElement("section"),heading=document.createElement("h3"),rail=document.createElement("div");block.className="vel-home-section"+(isHorizontal?" vel-home-section--horizontal":"");heading.className="vel-home-section__heading";heading.textContent=section.title;rail.className="vel-home-section__rail";block.append(heading,rail);fragment.appendChild(block);for(var placeholderIndex=0;placeholderIndex<6;placeholderIndex+=1){var placeholder=document.createElement("span");placeholder.className="vel-home-section__skeleton vel-home-section__skeleton--"+section.content_type+(isHorizontal?" vel-home-section__skeleton--horizontal":"");placeholder.setAttribute("aria-hidden","true");rail.appendChild(placeholder)}
@@ -521,17 +936,21 @@ window.veloraOpenCandidatePicker = function(item) {
   var typeSelect = document.getElementById("stored-media-replace-type-select");
   var statusText = document.getElementById("stored-media-replace-status-text");
 
+  var rawTitle = item.name || item.title || item.filename || '';
   var fn = item.filename || '';
   var match = fn.match(/^(.*?)(?:-(\d+))?\.[a-zA-Z0-9]+$/);
-  var extractedTitle = match ? match[1].replace(/[-_]+/g, ' ').trim() : fn;
+  var extractedTitle = match ? match[1].replace(/[-_]+/g, ' ').trim() : rawTitle;
   var tmdbId = match && match[2] ? match[2] : '';
-  extractedTitle = extractedTitle.charAt(0).toUpperCase() + extractedTitle.slice(1);
+  if (extractedTitle) {
+    extractedTitle = stripChannelPrefixes(extractedTitle);
+    extractedTitle = extractedTitle.charAt(0).toUpperCase() + extractedTitle.slice(1);
+  }
 
-  if (titleEl) titleEl.innerHTML = '<span>🎨 Choisir une nouvelle image pour : <strong>' + (extractedTitle || item.filename) + '</strong></span>';
-  if (searchInput) searchInput.value = extractedTitle;
+  if (titleEl) titleEl.innerHTML = '<span>🎨 Choisir une nouvelle image pour : <strong>' + (extractedTitle || rawTitle) + '</strong></span>';
+  if (searchInput) searchInput.value = extractedTitle || rawTitle;
   if (typeSelect) {
-    if (item.category === 'series' || fn.includes('tv') || fn.includes('series')) typeSelect.value = 'tv';
-    else if (item.category === 'movies' || fn.includes('movie')) typeSelect.value = 'movie';
+    if (item.category === 'series' || item.contentType === 'series' || fn.includes('tv') || fn.includes('series')) typeSelect.value = 'tv';
+    else if (item.category === 'movies' || item.contentType === 'movies' || fn.includes('movie')) typeSelect.value = 'movie';
     else typeSelect.value = 'auto';
   }
   if (statusText) statusText.textContent = "Recherche en cours sur Fanart.tv et TMDB...";
@@ -555,7 +974,7 @@ window.veloraOpenCandidatePicker = function(item) {
   }
   dialog.style.display = "block";
 
-  window.veloraFetchCandidates(extractedTitle, typeSelect ? typeSelect.value : 'auto', tmdbId, item.category);
+  window.veloraFetchCandidates(extractedTitle || rawTitle, typeSelect ? typeSelect.value : 'auto', tmdbId, item.category);
 };
 
 window.veloraCloseCandidatePicker = function() {
@@ -714,28 +1133,56 @@ window.veloraRenderCandidatesGrid = function() {
 };
 
 window.veloraApplyCandidateImage = async function(candidate) {
-  if (!activeReplaceTarget || !candidate) return;
+  if (!candidate) return;
   var statusText = document.getElementById("stored-media-replace-status-text");
   if (statusText) statusText.textContent = "Téléchargement et application de l'image...";
+
+  var searchInp = document.getElementById("stored-media-replace-search-input");
+  var typeSel = document.getElementById("stored-media-replace-type-select");
+  var currentSearchTitle = searchInp ? searchInp.value.trim() : "";
+  var currentType = typeSel ? typeSel.value : "auto";
+
+  var cat = (activeReplaceTarget && activeReplaceTarget.category) || "";
+  if (!cat || cat === "movies" || cat === "series" || cat === "horizontal") {
+    cat = (candidate.type === "logo") ? "title-logos" : "horizontal-thumbs";
+  }
+
+  var candidateTitle = (activeReplaceTarget && (activeReplaceTarget.name || activeReplaceTarget.title)) || currentSearchTitle || "";
+  var computedFilename = (activeReplaceTarget && activeReplaceTarget.filename) || "";
+  if (!computedFilename) {
+    var slug = (candidateTitle || "media").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "media";
+    var isPng = (candidate.fullUrl || candidate.previewUrl || "").includes(".png") || cat === "title-logos" || candidate.type === "logo";
+    var idSuffix = candidate.tmdbId || Date.now();
+    computedFilename = slug + "-" + idSuffix + (isPng ? ".png" : ".jpg");
+  }
 
   try {
     var res = await fetch("/api/velora-db/stored-media/apply-candidate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        category: activeReplaceTarget.category,
-        filename: activeReplaceTarget.filename,
-        imageUrl: candidate.fullUrl || candidate.previewUrl
+        category: cat,
+        filename: computedFilename,
+        title: candidateTitle,
+        imageUrl: candidate.fullUrl || candidate.previewUrl,
+        candidateType: candidate.type || "",
+        contentType: (activeReplaceTarget && activeReplaceTarget.contentType) || currentType,
+        tmdbId: candidate.tmdbId || ""
       })
     });
     var data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || "Erreur lors du remplacement");
 
-    if (statusText) statusText.textContent = "Image remplacée avec succès !";
+    if (statusText) statusText.textContent = "Image appliquée avec succès !";
     window.veloraCloseCandidatePicker();
 
+    var appliedUrl = data.url || candidate.fullUrl || candidate.previewUrl;
+    if (activeReplaceTarget && typeof activeReplaceTarget.onApplied === "function") {
+      activeReplaceTarget.onApplied(appliedUrl, candidate);
+    }
+
     var mainStatus = document.getElementById("stored-media-status-text");
-    if (mainStatus) mainStatus.textContent = "« " + activeReplaceTarget.filename + " » a été remplacée par l'image choisie depuis " + candidate.source + " !";
+    if (mainStatus) mainStatus.textContent = "L'image a été appliquée depuis " + candidate.source + " !";
 
     await window.veloraLoadStoredMedia();
   } catch (err) {
@@ -747,7 +1194,43 @@ window.veloraApplyCandidateImage = async function(candidate) {
 document.addEventListener("click", function(event) {
   var target = event.target;
   if (!target) return;
-  if (target.closest("#home-stored-media-manager-btn")) {
+  if (target.closest("#home-section-content-enrich-btn")) {
+    event.preventDefault();
+    enrichSectionContentVisuels();
+  } else if (target.closest("#home-stored-media-manager-btn")) {
+    event.preventDefault();
+    window.veloraOpenStoredMediaDialog();
+  } else if (target.closest("#home-stored-media-close") || target.closest("#home-stored-media-close-footer")) {
+    event.preventDefault();
+    window.veloraCloseStoredMediaDialog();
+  } else if (target.closest("#home-stored-media-replace-close") || target.closest("#home-stored-media-replace-close-footer")) {
+    event.preventDefault();
+    window.veloraCloseCandidatePicker();
+  } else if (target.closest("#stored-media-refresh-btn")) {
+    event.preventDefault();
+    window.veloraLoadStoredMedia();
+  } else if (target.closest("#stored-media-replace-search-btn")) {
+    event.preventDefault();
+    var searchInp = document.getElementById("stored-media-replace-search-input");
+    var typeSel = document.getElementById("stored-media-replace-type-select");
+    var q = searchInp ? searchInp.value.trim() : "";
+    var t = typeSel ? typeSel.value : "auto";
+    if (q) window.veloraFetchCandidates(q, t, "", activeReplaceTarget ? activeReplaceTarget.category : "");
+  } else if (target.closest(".vel-candidate-tab")) {
+    var tab = target.closest(".vel-candidate-tab");
+    activeCandidateFilter = tab.getAttribute("data-type-filter") || "all";
+    document.querySelectorAll('#stored-media-replace-type-tabs .vel-candidate-tab').forEach(function(tb) {
+      tb.classList.toggle("is-active", tb === tab);
+    });
+    window.veloraRenderCandidatesGrid();
+  } else if (target.closest("#stored-media-replace-local-file-btn")) {
+    event.preventDefault();
+    var fileReplacer = document.getElementById("stored-media-file-replacer");
+    if (fileReplacer) {
+      fileReplacer.value = "";
+      fileReplacer.click();
+    }
+  } else if (target.closest("#stored-media-delete-all-btn")) {
     event.preventDefault();
     window.veloraOpenStoredMediaDialog();
   } else if (target.closest("#home-stored-media-close") || target.closest("#home-stored-media-close-footer")) {
@@ -838,12 +1321,17 @@ document.addEventListener("change", function(event) {
     reader.onload = async function(e) {
       try {
         var dataBase64 = e.target.result;
+        var uploadFilename = (activeReplaceTarget && activeReplaceTarget.filename) || "";
+        if (!uploadFilename) {
+          var baseSlug = (file.name || "image").toLowerCase().replace(/[^a-z0-9.]+/g, "_");
+          uploadFilename = baseSlug.includes(".") ? baseSlug : (baseSlug + ".png");
+        }
         var res = await fetch("/api/velora-db/stored-media/upload-replace", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            category: activeReplaceTarget.category,
-            filename: activeReplaceTarget.filename,
+            category: (activeReplaceTarget && activeReplaceTarget.category) || "horizontal-thumbs",
+            filename: uploadFilename,
             dataBase64: dataBase64
           })
         });

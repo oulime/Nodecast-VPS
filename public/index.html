@@ -1546,12 +1546,12 @@
       rel="stylesheet"
     />
     <link
-      href="/assets/velora-home-sections.css?v=20260908-horiz-thumb-priority-v8"
+      href="/assets/velora-home-sections.css?v=20260908-section-content-enrich-v12"
       rel="stylesheet"
     />
     <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-54"></script>
-    <script defer src="/assets/velora-home-sections.js?v=20260908-horiz-thumb-priority-v8"></script>
-    <script defer src="/assets/velora-home-cache-fallback.js?v=20260908-horiz-thumb-priority-v8"></script>
+    <script defer src="/assets/velora-home-sections.js?v=20260908-section-content-enrich-v12"></script>
+    <script defer src="/assets/velora-home-cache-fallback.js?v=20260908-section-content-enrich-v12"></script>
     <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=20260907-search-fix-v3"></script>
     <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-54"></script>
@@ -5386,7 +5386,10 @@
 
                 <div class="vel-home-content-dialog__body">
                   <div class="vel-home-content-dialog__list-header">
-                    <strong id="home-section-content-count">0 élément(s)</strong>
+                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                      <strong id="home-section-content-count">0 élément(s)</strong>
+                      <button type="button" id="home-section-content-enrich-btn" class="vel-home-content-enrich-btn" title="Rechercher et associer automatiquement les visuels manquants (Fanart.tv / TMDB)">✨ Récupérer visuels Fanart / TMDB</button>
+                    </div>
                     <span id="home-section-content-hint" class="vel-home-content-dialog__hint">Utilisez les boutons fléchés pour réorganiser l'ordre</span>
                   </div>
                   <div id="home-section-content-items" class="vel-home-content-dialog__grid"></div>

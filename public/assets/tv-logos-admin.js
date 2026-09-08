@@ -279,20 +279,20 @@
 
       const thumbSrc = item.url.startsWith('/') ? item.url : ('/proxy?target=' + encodeURIComponent(item.url));
 
-      return '<div class="vel-logo-card" data-logo-name="' + esc(item.name) + '">' +
-        '<div class="vel-logo-card__thumb-wrap">' +
-          '<img src="' + thumbSrc + '" alt="' + esc(item.name) + '" class="vel-logo-card__thumb" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';" />' +
-          '<div class="vel-logo-card__thumb-fallback" style="display:none;">📺</div>' +
+      return '<div class="vel-logo-card" data-logo-name="' + esc(item.name) + '" style="display:flex!important;flex-direction:row!important;align-items:center!important;flex:0 0 auto!important;flex-shrink:0!important;flex-grow:0!important;min-height:68px!important;height:auto!important;width:100%!important;box-sizing:border-box!important;padding:0.75rem 1rem!important;gap:0.85rem!important;margin:0!important;">' +
+        '<div class="vel-logo-card__thumb-wrap" style="display:flex!important;align-items:center!important;justify-content:center!important;flex:0 0 48px!important;width:48px!important;height:48px!important;min-width:48px!important;min-height:48px!important;max-width:48px!important;max-height:48px!important;box-sizing:border-box!important;flex-shrink:0!important;border-radius:8px!important;background:rgba(0,0,0,0.55)!important;border:1px solid rgba(255,255,255,0.1)!important;overflow:hidden!important;padding:3px!important;">' +
+          '<img src="' + thumbSrc + '" alt="' + esc(item.name) + '" class="vel-logo-card__thumb" style="max-width:100%!important;max-height:100%!important;object-fit:contain!important;display:block!important;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';" />' +
+          '<div class="vel-logo-card__thumb-fallback" style="display:none;font-size:1.5rem;align-items:center;justify-content:center;">📺</div>' +
         '</div>' +
-        '<div class="vel-logo-card__info">' +
-          '<div class="vel-logo-card__title-row">' +
-            '<strong class="vel-logo-card__name">' + esc(item.name) + '</strong>' +
+        '<div class="vel-logo-card__info" style="display:flex!important;flex-direction:column!important;justify-content:center!important;flex:1 1 auto!important;min-width:0!important;overflow:hidden!important;gap:0.25rem!important;box-sizing:border-box!important;">' +
+          '<div class="vel-logo-card__title-row" style="display:flex!important;align-items:center!important;gap:0.5rem!important;line-height:1.25!important;margin-bottom:0!important;">' +
+            '<strong class="vel-logo-card__name" style="font-size:0.95rem!important;font-weight:700!important;color:#fff!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;line-height:1.25!important;">' + esc(item.name) + '</strong>' +
             countryBadge +
           '</div>' +
-          '<div class="vel-logo-card__url" title="' + esc(item.url) + '">' + esc(item.url) + '</div>' +
-          (aliases.length ? '<div class="vel-logo-card__aliases">' + aliasBadges + '</div>' : '') +
+          '<div class="vel-logo-card__url" style="font-size:0.75rem!important;color:#94a3b8!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;line-height:1.25!important;margin-bottom:0!important;" title="' + esc(item.url) + '">' + esc(item.url) + '</div>' +
+          (aliases.length ? '<div class="vel-logo-card__aliases" style="display:flex!important;flex-wrap:wrap!important;gap:0.35rem!important;margin-top:0.2rem!important;">' + aliasBadges + '</div>' : '') +
         '</div>' +
-        '<div class="vel-logo-card__actions">' +
+        '<div class="vel-logo-card__actions" style="display:flex!important;align-items:center!important;gap:0.45rem!important;flex:0 0 auto!important;flex-shrink:0!important;margin-left:auto!important;box-sizing:border-box!important;">' +
           '<button type="button" class="vel-logo-btn vel-logo-btn--test" data-test-logo="' + esc(item.name) + '" onclick="if(window.veloraLogosAdmin&amp;&amp;window.veloraLogosAdmin.testMatch){window.veloraLogosAdmin.testMatch(this.getAttribute(\'data-test-logo\'));}" title="Tester la détection">⚡ Tester</button>' +
           '<button type="button" class="vel-logo-btn vel-logo-btn--edit" data-edit-logo="' + esc(item.name) + '" onclick="if(window.veloraLogosAdmin&amp;&amp;window.veloraLogosAdmin.editLogo){window.veloraLogosAdmin.editLogo(this.getAttribute(\'data-edit-logo\'));}" title="Modifier ce logo">✏️ Modifier</button>' +
           '<button type="button" class="vel-logo-btn vel-logo-btn--delete" data-delete-logo="' + esc(item.name) + '" onclick="if(window.veloraLogosAdmin&amp;&amp;window.veloraLogosAdmin.deleteLogo){window.veloraLogosAdmin.deleteLogo(this.getAttribute(\'data-delete-logo\'));}" title="Supprimer ce logo">🗑️</button>' +

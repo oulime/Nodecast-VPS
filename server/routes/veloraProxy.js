@@ -271,6 +271,38 @@ function readBody(req) {
     });
 }
 
+const WIKIMEDIA_FALLBACKS = [
+    { match: /TF1_logo/i, replacement: 'https://i.imgur.com/QxHt9NC.png' },
+    { match: /Trace_Tropical/i, replacement: 'https://i.imgur.com/ZHD7Vxy.png' },
+    { match: /National_Geographic/i, replacement: 'https://i.imgur.com/fNA00VF.png' },
+    { match: /Disney_Channel/i, replacement: 'https://i.imgur.com/UxrAiAe.png' },
+    { match: /Canal%2B_Cinema|Canal\+_Cinema/i, replacement: 'https://i.imgur.com/5HcyMnW.png' },
+    { match: /Canal%2B_Pop|Canal\+_Pop/i, replacement: 'https://i.imgur.com/5HcyMnW.png' },
+    { match: /Euronews/i, replacement: 'https://i.imgur.com/Skf6vdi.png' },
+    { match: /BeIN_Sports/i, replacement: 'https://i.imgur.com/8Qh1mR4.png' },
+    { match: /M6_logo/i, replacement: 'https://i.imgur.com/7GVp3fW.png' },
+    { match: /Netflix/i, replacement: 'https://i.imgur.com/rG7bV4Z.png' },
+    { match: /France_3/i, replacement: 'https://i.imgur.com/QxHt9NC.png' },
+    { match: /MBC_1/i, replacement: 'https://i.imgur.com/CiA3plN.png' },
+    { match: /MTV_Music/i, replacement: 'https://i.imgur.com/GlfrYs7.png' },
+    { match: /Ligue_1/i, replacement: 'https://i.imgur.com/RxSgeix.png' },
+    { match: /Roland-Garros/i, replacement: 'https://i.imgur.com/8Qh1mR4.png' },
+    { match: /L%27%C3%89quipe|L'Équipe/i, replacement: 'https://i.imgur.com/8Qh1mR4.png' },
+    { match: /Paramount_Plus/i, replacement: 'https://i.imgur.com/3nbub9F.png' },
+    { match: /Sky_Sports/i, replacement: 'https://i.imgur.com/VfYEc6f.png' },
+    { match: /FoxCrime/i, replacement: 'https://i.imgur.com/5HcyMnW.png' }
+];
+
+function resolveProxyTargetUrl(url) {
+    if (!url || typeof url !== 'string') return url;
+    if (/upload\.wikimedia\.org/i.test(url)) {
+        for (const item of WIKIMEDIA_FALLBACKS) {
+            if (item.match.test(url)) return item.replacement;
+        }
+    }
+    return url;
+}
+
 function parseProxyTarget(req, res) {
     let target = req.query.target || req.query.url;
     let from = req.query.from;
@@ -299,9 +331,12 @@ function parseProxyTarget(req, res) {
     }
 
     if (!from && target) from = target;
-    if (target && typeof target === 'string' && target.startsWith('/')) {
-        res.redirect(302, target);
-        return null;
+    if (target && typeof target === 'string') {
+        target = resolveProxyTargetUrl(target);
+        if (target.startsWith('/')) {
+            res.redirect(302, target);
+            return null;
+        }
     }
     if (!target || !isHttpUrl(target)) {
         res.status(400).send('Bad target');

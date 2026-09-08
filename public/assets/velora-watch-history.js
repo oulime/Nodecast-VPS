@@ -1303,6 +1303,39 @@
     };
   });
 
+  // Helper to get minimum watch seconds required for Reprendre rail (default 3 mins = 180s)
+  function getResumeMinWatchSeconds() {
+    var minutes = 3;
+    if (typeof window.__veloraResumeMinWatchMinutes === "number" && !isNaN(window.__veloraResumeMinWatchMinutes)) {
+      minutes = window.__veloraResumeMinWatchMinutes;
+    } else {
+      try {
+        var cached = localStorage.getItem("velora_resume_min_watch_minutes");
+        if (cached != null && !isNaN(parseFloat(cached))) {
+          minutes = parseFloat(cached);
+        }
+      } catch (_) {}
+    }
+    return Math.max(0, minutes * 60);
+  }
+
+  async function syncResumeMinWatchSetting() {
+    try {
+      var res = await fetch("/api/velora-db/rest/v1/admin_settings?key=eq.resume_min_watch_minutes", { cache: "no-store" });
+      if (res.ok) {
+        var rows = await res.json();
+        if (Array.isArray(rows) && rows.length > 0 && rows[0].value != null) {
+          var m = parseFloat(rows[0].value);
+          if (!isNaN(m) && m >= 0) {
+            window.__veloraResumeMinWatchMinutes = m;
+            try { localStorage.setItem("velora_resume_min_watch_minutes", String(m)); } catch (_) {}
+            injectResumeSectionDirectly();
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
   // ============================================================
   // Requirement 4 & 5: Reprendre Rail (Strictly 1 card per series, No Live TV Channels)
   // ============================================================
@@ -1310,10 +1343,13 @@
     var allItems = getLocalHistory();
     if (!allItems || !allItems.length) return null;
 
+    var minWatchSeconds = getResumeMinWatchSeconds();
+
     var validInProgress = allItems.filter(function (it) {
       if (!isValidMediaEntry(it) || it.isFinished) return false;
       if (it.type !== "series" && it.type !== "movie" && it.type !== "movies") return false;
       if (it.progressPercent != null && it.progressPercent >= FINISHED_WATCH_PERCENT) return false;
+      if (Number(it.currentTime || 0) < minWatchSeconds) return false;
       return true;
     });
 
@@ -1605,7 +1641,12 @@
     }, 250);
 
     loadHistoryFromDatabase();
-    document.addEventListener("velora-user-logged-in", loadHistoryFromDatabase);
+    syncResumeMinWatchSetting();
+    document.addEventListener("velora-user-logged-in", function () {
+      loadHistoryFromDatabase();
+      syncResumeMinWatchSetting();
+    });
+    document.addEventListener("velora-resume-settings-changed", injectResumeSectionDirectly);
     window.addEventListener("pagehide", function () {
       var video = document.getElementById("video-vod");
       if (video) recordProgress(video, false);

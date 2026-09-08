@@ -1580,15 +1580,15 @@
     <link rel="stylesheet" href="/assets/direct-media-packages.css?v=20260830-roller-v34">
     <link rel="stylesheet" href="/assets/velora-hero-slider.css?v=20260904-hero-v12">
     <link rel="stylesheet" href="/assets/velora-hero-slider-admin.css?v=20260902-hero-v9">
-    <link rel="stylesheet" href="/assets/tv-logos-admin.css?v=20260904-logos-v12">
-    <script defer src="/assets/tv-logos-admin.js?v=20260904-logos-v12"></script>
+    <link rel="stylesheet" href="/assets/tv-logos-admin.css?v=20260908-logos-v15">
+    <script defer src="/assets/tv-logos-admin.js?v=20260908-logos-v15"></script>
     <style>
       .manual-pays__pagination{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding:.7rem;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:rgba(14,11,20,.96);color:#aaa4b5;font-size:.75rem}
       .manual-pays__pagination button{border:1px solid rgba(167,139,250,.45);border-radius:8px;background:rgba(124,58,237,.2);color:#fff;padding:.45rem .7rem;cursor:pointer}
       .manual-pays__pagination button:hover:not(:disabled){background:rgba(124,58,237,.38)}
       .manual-pays__pagination button:disabled{opacity:.4;cursor:not-allowed}
     </style>
-    <link rel="stylesheet" href="/assets/paid-users-admin.css?v=settings-admin-share-message-v2-20260810">
+    <link rel="stylesheet" href="/assets/paid-users-admin.css?v=20260908-paid-users-v3">
     <style>
       .vel-subscription-expired[hidden]{display:none!important}
       .vel-subscription-expired{position:fixed;inset:0;z-index:2147483600;display:grid;place-items:center;padding:20px;background:rgba(3,3,8,.82);backdrop-filter:blur(14px)}
@@ -4147,7 +4147,10 @@
 
       .vel-analytics-table-wrap {
         width: 100%;
-        overflow: hidden;
+        max-width: 100%;
+        box-sizing: border-box;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
         border: 1px solid rgba(148, 163, 184, 0.13);
         border-radius: 14px;
         background: rgba(2, 6, 23, 0.2);
@@ -5129,6 +5132,25 @@
                 </select>
               </div>
               <button type="button" id="home-sections-show-all" class="countries-admin-cancel" aria-pressed="false" style="display:none;">Afficher toutes les sections</button>
+            </div>
+
+            <!-- Paramètres du rail Continuer de regarder (Reprendre) -->
+            <div class="vel-home-resume-settings-box" style="margin-top: 1rem; margin-bottom: 1rem; padding: 1rem 1.25rem; border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
+              <h3 style="margin-top:0; margin-bottom:0.35rem; font-size:0.98rem; display:flex; align-items:center; gap:0.5rem; color:#fff;">
+                <span>⏱️ Section « Continuer de regarder » (Reprendre)</span>
+              </h3>
+              <p class="hint" style="margin-top:0; margin-bottom:0.75rem; font-size:0.8rem; color:var(--text-secondary,#cbd5e1);">
+                Définit le temps de visionnage minimum requis avant qu'un film ou épisode n'apparaisse dans le rail « Continuer de regarder » (par défaut : 3 minutes).
+              </p>
+              <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                  <label for="home-resume-min-minutes" style="margin:0; font-size:0.85rem; font-weight:600; white-space:nowrap; color:#e2e8f0;">Temps minimum requis :</label>
+                  <input id="home-resume-min-minutes" type="number" min="0" max="120" step="1" value="3" style="width:75px; margin:0; padding:0.45rem 0.6rem; text-align:center; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:rgba(10,8,20,0.8); color:#fff; font-weight:700;" />
+                  <span style="font-size:0.85rem; color:#cbd5e1;">minute(s)</span>
+                </div>
+                <button type="button" id="home-resume-min-minutes-save" class="primary" style="padding:0.45rem 1rem; font-size:0.82rem; font-weight:700; border-radius:8px;">Enregistrer</button>
+                <span id="home-resume-settings-status" class="status" style="margin:0; font-size:0.82rem; min-height:auto;" aria-live="polite"></span>
+              </div>
             </div>
 
             <div id="home-sections-admin-list" class="vel-home-sections-admin-list" style="margin-top: 0.75rem;"></div>

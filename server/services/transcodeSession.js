@@ -240,8 +240,8 @@ class TranscodeSession extends EventEmitter {
         if (isVodMode) {
             args.push(
                 '-seekable', '0',
-                '-probesize', '5000000',
-                '-analyzeduration', '5000000',
+                '-probesize', '2000000',
+                '-analyzeduration', '2000000',
                 '-fflags', '+genpts+discardcorrupt+nobuffer',
                 '-err_detect', 'ignore_err',
                 '-rw_timeout', '15000000',
@@ -608,7 +608,8 @@ class TranscodeSession extends EventEmitter {
 
         args.push(
             '-c:v', 'libx264',
-            '-preset', 'veryfast',     // Fast for real-time
+            '-preset', 'ultrafast',    // Ultra fast for real-time VPS transcode
+            '-tune', 'zerolatency',
             '-crf', String(crf),
             '-profile:v', 'high',
             '-level', '4.1',

@@ -273,29 +273,63 @@ if (USE_VPS_DATA_API) {
             if (upstream.ok && req.path === '/api/velora-db/home-cache' && contentType.includes('application/json')) {
                 const data = await upstream.json().catch(() => null);
                 if (data && Array.isArray(data.sections)) {
+                    let thumbCache = {};
                     let logoCache = {};
+                    try { thumbCache = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'vod-horizontal-thumb-cache.json'), 'utf8')) || {}; } catch (_) {}
                     try { logoCache = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'vod-title-logo-cache.json'), 'utf8')) || {}; } catch (_) {}
                     for (const section of data.sections) {
                         if (section.card_orientation === 'horizontal' && Array.isArray(section.entries)) {
-                            const isSeries = section.content_type === 'series';
+                            const isSeries = section.content_type === 'series' || section.content_type === 'anime';
                             const type = isSeries ? 'tv' : 'movie';
                             for (const entry of section.entries) {
-                                if (!entry.title_logo && entry.name) {
-                                    const raw = String(entry.name).trim().toLowerCase();
-                                    let found = logoCache[`${type}:${raw}`];
-                                    if (!found) {
+                                if (!entry || !entry.name) continue;
+                                const raw = String(entry.name).trim().toLowerCase();
+                                const clean = raw
+                                    .replace(/^\[.*?\]\s*|^.*?:\s*/g, '')
+                                    .replace(/\b(s\d+|season\s*\d+|saison\s*\d+|\(\d{4}\)|\d{4}|4k|fhd|hd|vf|vostfr|multi)\b/gi, '')
+                                    .replace(/[\(\)\[\]\-:_]/g, ' ')
+                                    .replace(/\s+/g, ' ')
+                                    .trim();
+
+                                // Priority 1: Check horizontal thumb cache
+                                let foundThumb = thumbCache[`${type}:${raw}`] || (clean ? thumbCache[`${type}:${clean}`] : null) || thumbCache[`tv:${raw}`] || thumbCache[`movie:${raw}`];
+                                if (!foundThumb) {
+                                    for (const [k, v] of Object.entries(thumbCache)) {
+                                        if (v && v !== 'NONE') {
+                                            const titlePart = k.replace(/^(tv|movie):/, '').toLowerCase().trim();
+                                            if (raw === titlePart || (clean && clean === titlePart) || raw.startsWith(titlePart) || (clean && clean.startsWith(titlePart)) || titlePart.startsWith(raw)) {
+                                                foundThumb = v;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (foundThumb && foundThumb !== 'NONE') {
+                                    entry.horizontal_thumb = foundThumb;
+                                    entry.has_integrated_title = true;
+                                    entry.thumbUrl = foundThumb;
+                                    entry.backdropUrl = foundThumb;
+                                    delete entry.title_logo;
+                                    continue;
+                                }
+
+                                // Priority 2: Transparent title logo
+                                if (!entry.title_logo) {
+                                    let foundLogo = logoCache[`${type}:${raw}`] || (clean ? logoCache[`${type}:${clean}`] : null) || logoCache[`tv:${raw}`] || logoCache[`movie:${raw}`];
+                                    if (!foundLogo) {
                                         for (const [k, v] of Object.entries(logoCache)) {
-                                            if (k.startsWith(`${type}:`) && v !== 'NONE') {
-                                                const titlePart = k.slice(type.length + 1);
-                                                if (raw === titlePart || raw.startsWith(titlePart) || titlePart.startsWith(raw)) {
-                                                    found = v;
+                                            if (v && v !== 'NONE') {
+                                                const titlePart = k.replace(/^(tv|movie):/, '').toLowerCase().trim();
+                                                if (raw === titlePart || (clean && clean === titlePart) || raw.startsWith(titlePart) || (clean && clean.startsWith(titlePart)) || titlePart.startsWith(raw)) {
+                                                    foundLogo = v;
                                                     break;
                                                 }
                                             }
                                         }
                                     }
-                                    if (found && found !== 'NONE') {
-                                        entry.title_logo = found;
+                                    if (foundLogo && foundLogo !== 'NONE') {
+                                        entry.title_logo = foundLogo;
                                     }
                                 }
                             }

@@ -863,6 +863,7 @@ async function enrichHomeCacheTitleLogos(payload) {
                     item.entry.has_integrated_title = true;
                     item.entry.thumbUrl = thumbUrl;
                     item.entry.backdropUrl = thumbUrl;
+                    delete item.entry.title_logo;
                     continue;
                 }
                 // Priority 2: Transparent Title Logo
@@ -2736,23 +2737,37 @@ function buildHomeCache() {
                     })
                     : String(item.thumbUrl || item.stream_icon || item.cover || '');
                 const backdropUrl = String(item.backdropUrl || item.backdrop || standardThumb || '');
-                const finalThumb = (isHorizontal && backdropUrl) ? backdropUrl : (standardThumb || backdropUrl);
+                let horizontalThumb = item.horizontal_thumb || '';
                 let titleLogo = item.title_logo || item.titleLogo || item.logo || '';
-                if (!titleLogo && isHorizontal && (type === 'movies' || type === 'series')) {
+                let hasIntegratedTitle = Boolean(item.has_integrated_title);
+                if (isHorizontal && (type === 'movies' || type === 'series')) {
                     const clean = cleanMediaTitleForSearch(rawName);
                     const k1 = `${type === 'movies' ? 'movie' : 'tv'}:${(clean.title || rawName).toLowerCase().trim()}`;
                     const k2 = `${type === 'movies' ? 'movie' : 'tv'}:${rawName.toLowerCase().trim()}`;
-                    const lCache = getTitleLogoCache();
-                    if (lCache[k1] && lCache[k1] !== 'NONE') titleLogo = lCache[k1];
-                    else if (lCache[k2] && lCache[k2] !== 'NONE') titleLogo = lCache[k2];
+                    const hCache = getHorizontalThumbCache();
+                    if (!horizontalThumb) {
+                        if (hCache[k1] && hCache[k1] !== 'NONE') horizontalThumb = hCache[k1];
+                        else if (hCache[k2] && hCache[k2] !== 'NONE') horizontalThumb = hCache[k2];
+                    }
+                    if (horizontalThumb) {
+                        hasIntegratedTitle = true;
+                        titleLogo = '';
+                    } else if (!titleLogo) {
+                        const lCache = getTitleLogoCache();
+                        if (lCache[k1] && lCache[k1] !== 'NONE') titleLogo = lCache[k1];
+                        else if (lCache[k2] && lCache[k2] !== 'NONE') titleLogo = lCache[k2];
+                    }
                 }
+                const finalThumb = horizontalThumb || ((isHorizontal && backdropUrl) ? backdropUrl : (standardThumb || backdropUrl));
                 return {
                     id: item.id || `home-cache:${section.id}:${rawId}`,
                     name: stripHomeChannelPrefixes(rawName, channelRules.prefixes, channelRules.suffixes),
                     thumbUrl: finalThumb,
-                    backdropUrl: backdropUrl || (isHorizontal ? '' : standardThumb),
+                    backdropUrl: horizontalThumb || backdropUrl || (isHorizontal ? '' : standardThumb),
                     section_logo_url: String(section.logo_url || section.badge_logo_url || item.section_logo_url || '').trim(),
                     title_logo: titleLogo,
+                    horizontal_thumb: horizontalThumb || undefined,
+                    has_integrated_title: hasIntegratedTitle || undefined,
                     streamId: rawId,
                     sourceId: item.sourceId ?? item.source_id,
                     globalStreamId: item.globalStreamId ?? item.global_stream_id ?? rawId,
@@ -2801,23 +2816,35 @@ function buildHomeCache() {
                         item_id: rawId
                     })
                     : String(item.stream_icon || item.cover || '');
-                const finalThumb = (isHorizontal && backdropUrl) ? backdropUrl : (standardThumb || backdropUrl);
+                let horizontalThumb = '';
                 let titleLogo = item.title_logo || item.titleLogo || item.logo || '';
-                if (!titleLogo && isHorizontal && (type === 'movies' || type === 'series')) {
+                let hasIntegratedTitle = false;
+                if (isHorizontal && (type === 'movies' || type === 'series')) {
                     const clean = cleanMediaTitleForSearch(rawName);
                     const k1 = `${type === 'movies' ? 'movie' : 'tv'}:${(clean.title || rawName).toLowerCase().trim()}`;
                     const k2 = `${type === 'movies' ? 'movie' : 'tv'}:${rawName.toLowerCase().trim()}`;
-                    const lCache = getTitleLogoCache();
-                    if (lCache[k1] && lCache[k1] !== 'NONE') titleLogo = lCache[k1];
-                    else if (lCache[k2] && lCache[k2] !== 'NONE') titleLogo = lCache[k2];
+                    const hCache = getHorizontalThumbCache();
+                    if (hCache[k1] && hCache[k1] !== 'NONE') horizontalThumb = hCache[k1];
+                    else if (hCache[k2] && hCache[k2] !== 'NONE') horizontalThumb = hCache[k2];
+                    if (horizontalThumb) {
+                        hasIntegratedTitle = true;
+                        titleLogo = '';
+                    } else if (!titleLogo) {
+                        const lCache = getTitleLogoCache();
+                        if (lCache[k1] && lCache[k1] !== 'NONE') titleLogo = lCache[k1];
+                        else if (lCache[k2] && lCache[k2] !== 'NONE') titleLogo = lCache[k2];
+                    }
                 }
+                const finalThumb = horizontalThumb || ((isHorizontal && backdropUrl) ? backdropUrl : (standardThumb || backdropUrl));
                 return {
                     id: `home-cache:${section.id}:${rawId}`,
                     name: stripHomeChannelPrefixes(rawName, channelRules.prefixes, channelRules.suffixes),
                     thumbUrl: finalThumb,
-                    backdropUrl: backdropUrl || (isHorizontal ? '' : standardThumb),
+                    backdropUrl: horizontalThumb || backdropUrl || (isHorizontal ? '' : standardThumb),
                     section_logo_url: String(section.logo_url || section.badge_logo_url || '').trim(),
                     title_logo: titleLogo,
+                    horizontal_thumb: horizontalThumb || undefined,
+                    has_integrated_title: hasIntegratedTitle || undefined,
                     streamId: rawId,
                     sourceId: item.source_id,
                     globalStreamId: item.global_stream_id || item.stream_id,

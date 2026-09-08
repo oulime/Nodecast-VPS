@@ -204,6 +204,8 @@
 
   var clientBackdropCache = new Map();
   function veloraEnsureCardBackdrop(card, media, section, entry) {
+    if (entry && (entry.has_integrated_title || entry.horizontal_thumb)) return;
+    if (card && card.classList.contains("has-integrated-title")) return;
     var key = String(entry.sourceId || "") + ":" + String(entry.streamId || "") + ":" + String(entry.name || "");
     if (clientBackdropCache.has(key)) {
       var cached = clientBackdropCache.get(key);
@@ -349,6 +351,7 @@
                   entry.has_integrated_title = true;
                   entry.backdropUrl = data.thumbUrl;
                   entry.thumbUrl = data.thumbUrl;
+                  delete entry.title_logo;
                   return { type: "thumb", url: data.thumbUrl };
                 }
                 if (data && data.url) {
@@ -364,6 +367,9 @@
             if (!res) return;
             if (res.type === "thumb" && res.url) {
               card.classList.add("has-integrated-title");
+              card.classList.remove("has-title-logo");
+              var exLogo = card.querySelector(".vel-home-section__title-logo");
+              if (exLogo) exLogo.remove();
               if (media.tagName === "IMG") {
                 if (typeof window.veloraSetHomeImageSource === "function") {
                   window.veloraSetHomeImageSource(media, res.url);
@@ -372,7 +378,9 @@
                 }
               }
             } else if (res.type === "logo" && res.url) {
-              applyTitleLogo(res.url);
+              if (!card.classList.contains("has-integrated-title")) {
+                applyTitleLogo(res.url);
+              }
             }
           });
         }

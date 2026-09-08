@@ -76,15 +76,46 @@ function parseDurationToSeconds(value) {
     return null;
 }
 
-function tryExtractDurationFromMetadata(metadata = {}) {
+function lookupDurationFromCatalog(url) {
+    try {
+        const match = String(url).match(/\/(movie|series)\/[^/]+\/[^/]+\/(\d+)\./i);
+        if (match) {
+            const type = match[1].toLowerCase();
+            const streamId = match[2];
+            const { getDb } = require('../db/sqlite');
+            const sqliteDb = getDb ? getDb() : null;
+            if (sqliteDb) {
+                if (type === 'movie') {
+                    const row = sqliteDb.prepare("SELECT duration_secs, duration FROM vod_streams WHERE stream_id = ? OR raw_stream_id = ? LIMIT 1").get(streamId, streamId);
+                    if (row) {
+                        const parsed = parseDurationToSeconds(row.duration_secs || row.duration);
+                        if (parsed !== null) return parsed;
+                    }
+                } else if (type === 'series') {
+                    const row = sqliteDb.prepare("SELECT duration_secs, duration, data FROM series_episodes WHERE id = ? OR stream_id = ? LIMIT 1").get(streamId, streamId);
+                    if (row) {
+                        const parsed = parseDurationToSeconds(row.duration_secs || row.duration);
+                        if (parsed !== null) return parsed;
+                    }
+                }
+            }
+        }
+    } catch (_) {}
+    return null;
+}
+
+function tryExtractDurationFromMetadata(metadata = {}, url = '') {
     const candidates = [
         metadata.duration,
+        metadata.duration_secs,
         metadata.runtime,
         metadata.movie_duration,
         metadata.episode_run_time,
         metadata.info?.duration,
+        metadata.info?.duration_secs,
         metadata.info?.runtime,
         metadata.movie_data?.duration,
+        metadata.movie_data?.duration_secs,
         metadata.movie_data?.runtime,
         metadata.episode?.duration,
         metadata.episode?.runtime
@@ -94,6 +125,12 @@ function tryExtractDurationFromMetadata(metadata = {}) {
         const parsed = parseDurationToSeconds(candidate);
         if (parsed !== null) return parsed;
     }
+
+    if (url) {
+        const fromCatalog = lookupDurationFromCatalog(url);
+        if (fromCatalog !== null) return fromCatalog;
+    }
+
     return null;
 }
 
@@ -385,9 +422,10 @@ router.post('/session', async (req, res) => {
             }
         }
 
-        const durationInfo = isVodMode
-            ? getKnownDurationSeconds(streamUrl, metadata || {})
-            : { value: null, pending: false };
+        const durationFromReq = parseDurationToSeconds(req.body.duration || req.body.durationSeconds);
+        const durationFromMeta = tryExtractDurationFromMetadata(metadata || {}, url || streamUrl);
+        const initialDuration = durationFromReq !== null ? durationFromReq : durationFromMeta;
+        const finalDuration = session.durationSeconds || initialDuration || null;
 
         const responsePayload = {
             sessionId: session.id,
@@ -395,8 +433,8 @@ router.post('/session', async (req, res) => {
             status: session.status,
             startAt: effectiveSeekOffset,
             seekOffset: effectiveSeekOffset,
-            durationSeconds: durationInfo.value ?? null,
-            durationPending: !!durationInfo.pending,
+            durationSeconds: finalDuration,
+            durationPending: finalDuration === null,
             seekable: !!isVodMode,
             mode: normalizedMode || 'unknown',
             hardwareMode,

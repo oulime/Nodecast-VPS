@@ -77,6 +77,7 @@ class TranscodeSession extends EventEmitter {
         this.segments = new Map(); // segment index -> { ready: boolean, path: string }
         this.status = 'pending'; // pending | starting | running | stopped | error
         this.error = null;
+        this.durationSeconds = Number(options.duration || options.durationSeconds) || null;
         this.startTime = Date.now();
         this.lastAccess = Date.now();
         this.options = {
@@ -136,7 +137,21 @@ class TranscodeSession extends EventEmitter {
             // Handle stderr (FFmpeg progress/errors)
             let stderrBuffer = '';
             this.process.stderr.on('data', (data) => {
-                stderrBuffer += data.toString();
+                const str = data.toString();
+                stderrBuffer += str;
+
+                // Extract stream duration from FFmpeg header output: "Duration: 01:23:45.67,"
+                if (!this.durationSeconds) {
+                    const durMatch = stderrBuffer.match(/Duration:\s*(\d{1,2}):(\d{1,2}):(\d{1,2}(?:\.\d+)?)/i);
+                    if (durMatch) {
+                        const h = Number(durMatch[1]);
+                        const m = Number(durMatch[2]);
+                        const s = parseFloat(durMatch[3]);
+                        this.durationSeconds = Math.max(0, Math.floor((h * 3600) + (m * 60) + s));
+                        console.log(`[TranscodeSession ${this.id}] Detected stream duration from FFmpeg: ${this.durationSeconds}s`);
+                    }
+                }
+
                 // Log periodically to avoid spam
                 const lines = stderrBuffer.split('\n');
                 if (lines.length > 1) {

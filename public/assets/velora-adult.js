@@ -2858,6 +2858,54 @@
   // ---------------------------------------------------------------------------
   // Global Lifecycle & Triggers
   // ---------------------------------------------------------------------------
+  // Multi-layer automatic stream cleanup on any navigation
+  function handleGlobalNavExit(e) {
+    if (!e || !e.target) return;
+    const navEl = e.target.closest(
+      "nav, .nav-item, .nav-link, .sidebar-link, .vel-bottom-nav-item, [data-nav], [data-tab], [data-settings-tab], .vel-nav-btn, .navbar, .header-nav, #btn-home, #btn-live, #btn-movies, #btn-series, #btn-favorites, [id^='nav-btn-']"
+    );
+    if (navEl) {
+      const isAdultAction = navEl.id === "btn-adult" || (navEl.dataset && (navEl.dataset.tab === "adult" || navEl.dataset.nav === "adult")) || navEl.closest("#adult-view");
+      if (!isAdultAction) {
+        stopAllActiveStreams();
+        closeAdultView();
+      }
+    }
+  }
+
+  document.addEventListener("click", handleGlobalNavExit, true);
+  window.addEventListener("popstate", () => { stopAllActiveStreams(); closeAdultView(); });
+  window.addEventListener("pagehide", () => { stopAllActiveStreams(); closeAdultView(); });
+  window.addEventListener("beforeunload", () => { stopAllActiveStreams(); closeAdultView(); });
+
+  // Continuous observer: if adult view is hidden or body tab is no longer adult, force kill video
+  try {
+    const adultSafetyObserver = new MutationObserver(() => {
+      const activeTab = document.body.dataset ? document.body.dataset.velActiveTab : "";
+      const adultActive = document.body.classList.contains("vel-adult-active");
+      const adultView = document.getElementById("adult-view");
+      const adultHidden = !adultView || adultView.classList.contains("hidden") || adultView.style.display === "none";
+
+      if (!adultActive || activeTab !== "adult" || adultHidden) {
+        const vid = document.getElementById("vel-adult-video");
+        if (vid && (!vid.paused || (vid.hls && vid.hls.media))) {
+          console.log("[Velora Adult Guard] Stopping background adult video stream");
+          try {
+            vid.pause();
+            if (vid.hls && typeof vid.hls.destroy === "function") {
+              try { vid.hls.stopLoad(); } catch (_) {}
+              try { vid.hls.destroy(); } catch (_) {}
+              vid.hls = null;
+            }
+            vid.removeAttribute("src");
+            try { vid.load(); } catch (_) {}
+          } catch (_) {}
+        }
+      }
+    });
+    adultSafetyObserver.observe(document.body, { attributes: true, attributeFilter: ["class", "data-vel-active-tab", "data-vel-top-level"] });
+  } catch (_) {}
+
   document.addEventListener("velora-return-home", stopAllActiveStreams);
   document.addEventListener("velora-show-home", stopAllActiveStreams);
   window.addEventListener("popstate", stopAllActiveStreams);

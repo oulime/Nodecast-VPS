@@ -223,16 +223,16 @@ class TranscodeSession extends EventEmitter {
 
         // Input options (common)
         args.push(
-            '-probesize', '5000000',
-            '-analyzeduration', '5000000',
-            '-fflags', '+genpts+discardcorrupt',
+            '-probesize', isVodMode ? '1500000' : '2500000',
+            '-analyzeduration', isVodMode ? '1500000' : '2500000',
+            '-fflags', '+genpts+discardcorrupt+fastseek',
             '-err_detect', 'ignore_err',
             '-rw_timeout', '15000000',
             '-reconnect', '1',
             '-reconnect_streamed', '1',
             '-reconnect_on_network_error', '1',
             '-reconnect_on_http_error', '4xx,5xx',
-            '-reconnect_delay_max', '5'
+            '-reconnect_delay_max', '2'
         );
 
         if (!isVodMode) {
@@ -591,14 +591,11 @@ class TranscodeSession extends EventEmitter {
      */
     stop() {
         if (this.process) {
-            console.log(`[TranscodeSession ${this.id}] Stopping FFmpeg process`);
-            this.process.kill('SIGTERM');
-            // Force kill after 2 seconds if still running
-            setTimeout(() => {
-                if (this.process) {
-                    this.process.kill('SIGKILL');
-                }
-            }, 2000);
+            console.log(`[TranscodeSession ${this.id}] Force stopping FFmpeg process`);
+            try {
+                this.process.kill('SIGKILL');
+            } catch (_) {}
+            this.process = null;
         }
         this.status = 'stopped';
     }

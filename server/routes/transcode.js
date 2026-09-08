@@ -323,7 +323,7 @@ router.post('/session', async (req, res) => {
                     ? transcodeSession.INITIAL_VOD_SEGMENTS
                     : transcodeSession.INITIAL_LIVE_SEGMENTS;
                 const playlistReadyTimeoutMs = isVodMode
-                    ? 15000
+                    ? 25000
                     : transcodeSession.LIVE_PLAYLIST_READY_TIMEOUT_MS;
                 const ready = await session.waitForPlaylist(playlistReadyTimeoutMs, minInitialSegments);
                 if (!ready) {

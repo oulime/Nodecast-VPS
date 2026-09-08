@@ -495,19 +495,31 @@ window.__veloraGetVodPlaybackInfo=()=>({currentSeconds:(window.__veloraOptimisti
   }
   sb(de, clamped);
 };
-async function sb(s,e){
-  const t=a=>{console.log("[VOD SEEK GUARD]",{reason:a,isVodTranscode:wo,currentVodSourceUrl:Yi,currentVodSeekable:vh,currentVodDurationSeconds:ir,currentTranscodeSessionId:Wi,isVodTranscodeSeeking:ou})};
-  if(!_)return t("missing state"),!1;
-  if(!YT())return t("not transcode session"),!1;
-  if(!Yi)return t("missing currentVodSourceUrl"),!1;
-  if(!ir||!Number.isFinite(ir))return t("missing currentVodDurationSeconds"),!1;
+let __veloraSeekDebounceTimer = null;
+async function sb(s, e) {
+  const t = a => {
+    console.log("[VOD SEEK GUARD]", {
+      reason: a,
+      isVodTranscode: wo,
+      currentVodSourceUrl: Yi,
+      currentVodSeekable: vh,
+      currentVodDurationSeconds: ir,
+      currentTranscodeSessionId: Wi,
+      isVodTranscodeSeeking: ou
+    });
+  };
+  if (!_) return t("missing state"), !1;
+  if (!YT()) return t("not transcode session"), !1;
+  if (!Yi) return t("missing currentVodSourceUrl"), !1;
+  if (!ir || !Number.isFinite(ir)) return t("missing currentVodDurationSeconds"), !1;
 
-  const r=Math.max(0,ir-2),n=Math.max(0,Math.min(e,r));
+  const r = Math.max(0, ir - 2);
+  const n = Math.max(0, Math.min(e, r));
   rr = n;
   qa(n / ir);
   ns(s);
 
-  // --- IN-BUFFER SEEK CHECK ---
+  // --- 1. INSTANT IN-BUFFER SEEK (0ms, 0 network calls) ---
   const currentStartAt = Number.isFinite(yh) ? Math.max(0, yh) : 0;
   let availableManifestDur = 0;
   if (Xe && Xe.levels && Xe.levels.length > 0) {
@@ -531,6 +543,10 @@ async function sb(s,e){
   );
 
   if (isWithinTranscodedRange) {
+    if (__veloraSeekDebounceTimer) {
+      clearTimeout(__veloraSeekDebounceTimer);
+      __veloraSeekDebounceTimer = null;
+    }
     console.log("[VOD SEEK IN-BUFFER] Target " + n + "s is within active session " + Wi + " window [" + currentStartAt + "s -> " + (currentStartAt + availableManifestDur) + "s]. Seeking locally to relative " + relTarget + "s");
     try {
       window.__veloraOptimisticSeekTime = n;
@@ -554,77 +570,92 @@ async function sb(s,e){
     }
   }
 
-  // --- OUT OF BUFFER SEEK: CREATE NEW TRANSCODE SESSION ---
+  // --- 2. OUT-OF-BUFFER SEEK: DEBOUNCE BY 250ms SO RAPID CLICKS PRODUCE ONLY 1 REQUEST ---
+  if (__veloraSeekDebounceTimer) {
+    clearTimeout(__veloraSeekDebounceTimer);
+    __veloraSeekDebounceTimer = null;
+  }
+
+  return new Promise((resolve) => {
+    __veloraSeekDebounceTimer = setTimeout(async () => {
+      __veloraSeekDebounceTimer = null;
+      const res = await doExecuteSessionSeek(s, n);
+      resolve(res);
+    }, 250);
+  });
+}
+
+async function doExecuteSessionSeek(s, n) {
   if (Il || ou) {
     __velPendingSeek = n;
     return !0;
   }
   const thisGen = ++__velSeekGen;
   console.log("[VOD SEEK NEW SESSION] targetSeconds", n, "gen", thisGen);
-  const i=ao();
-  try{window.__veloraFreezeVodFrame?.()}catch(_){}
-  window.__veloraVodSeeking=true;
-  try{window.__veloraSyncVodCenterPlay?.()}catch(_){}
-  i&&qf();
-  Il=!0;
-  ou=!0;
+  const i = ao();
+  try { window.__veloraFreezeVodFrame?.(); } catch(_) {}
+  window.__veloraVodSeeking = true;
+  try { window.__veloraSyncVodCenterPlay?.(); } catch(_) {}
+  i && qf();
+  Il = !0;
+  ou = !0;
 
   try {
     try {
-      const a=Wi;
-      Hu=!0;
-      try{s.pause()}catch{}
-      if(rc('Preparing from ' + gg(n) + '...'),Xe){
-        try{Xe.stopLoad()}catch{}
-        try{Xe.detachMedia()}catch{}
-        try{Xe.destroy()}catch{}
-        Xe=null;
+      const a = Wi;
+      Hu = !0;
+      try { s.pause(); } catch(_) {}
+      if (rc('Preparing from ' + gg(n) + '...'), Xe) {
+        try { Xe.stopLoad(); } catch(_) {}
+        try { Xe.detachMedia(); } catch(_) {}
+        try { Xe.destroy(); } catch(_) {}
+        Xe = null;
       }
 
       // Terminate previous session immediately before requesting new one so IPTV CDN frees connection
       if (a && !window.VeloraCast?.isConnected?.()) {
-        const u = _.base.replace(/\/+$/,'') + '/api/transcode/' + encodeURIComponent(a);
-        try { fetch(An(u), { method: 'DELETE', headers: _.nodecastAuthHeaders, keepalive: true }).catch(()=>{}); } catch(_) {}
+        const u = _.base.replace(/\/+$/, '') + '/api/transcode/' + encodeURIComponent(a);
+        try { fetch(An(u), { method: 'DELETE', headers: _.nodecastAuthHeaders, keepalive: true }).catch(() => {}); } catch(_) {}
         Wi = null;
         await new Promise(r => setTimeout(r, 120));
       }
 
-      i&&qf();
-      const o=await w$(_.base,Yi,_.nodecastAuthHeaders,{mode:'vod',startAt:n,seekOffset:n,videoMode:ny,videoCodec:iy,audioCodec:ay,audioChannels:oy});
-      if(!o||!de)return t('session creation failed'),!1;
+      i && qf();
+      const o = await w$(_.base, Yi, _.nodecastAuthHeaders, { mode: 'vod', startAt: n, seekOffset: n, videoMode: ny, videoCodec: iy, audioCodec: ay, audioChannels: oy });
+      if (!o || !de) return !1;
 
       if (thisGen !== __velSeekGen && __velPendingSeek !== null) {
         const staleId = o.sessionId;
         if (staleId && staleId !== Wi) {
-          const u=_.base.replace(/\/+$/,'') + '/api/transcode/' + encodeURIComponent(staleId);
-          fetch(An(u),{method:'DELETE',headers:_.nodecastAuthHeaders,keepalive:true}).catch(()=>{});
+          const u = _.base.replace(/\/+$/, '') + '/api/transcode/' + encodeURIComponent(staleId);
+          fetch(An(u), { method: 'DELETE', headers: _.nodecastAuthHeaders, keepalive: true }).catch(() => {});
         }
         return !0;
       }
 
-      console.log('[VOD SEEK] new sessionId',o.sessionId);
-      WT({...o,durationSeconds:o.durationSeconds??ir});
-      const l=An(o.playlistUrl);
-      window.VeloraCast?.setMedia?.({type:'movie',url:l,title:ct?.textContent||'VeloraVIP',isLive:!1,video:de,position:n,offset:n,duration:ir||0,sourceUrl:Yi,baseUrl:_.base,authHeaders:_.nodecastAuthHeaders,videoMode:ny,videoCodec:iy,audioCodec:ay,audioChannels:oy,playbackMode:'transcode'});
-      sc=l;
+      console.log('[VOD SEEK] new sessionId', o.sessionId);
+      WT({ ...o, durationSeconds: o.durationSeconds ?? ir });
+      const l = An(o.playlistUrl);
+      window.VeloraCast?.setMedia?.({ type: 'movie', url: l, title: ct?.textContent || 'VeloraVIP', isLive: !1, video: de, position: n, offset: n, duration: ir || 0, sourceUrl: Yi, baseUrl: _.base, authHeaders: _.nodecastAuthHeaders, videoMode: ny, videoCodec: iy, audioCodec: ay, audioChannels: oy, playbackMode: 'transcode' });
+      sc = l;
       wT(s);
-      dy(l,s,_.nodecastAuthHeaders,{autoPlayOnManifest:!0});
-      i&&qf();
+      dy(l, s, _.nodecastAuthHeaders, { autoPlayOnManifest: !0 });
+      i && qf();
 
-      const c=()=>{Hu=!1;s.removeEventListener('loadedmetadata',c);s.removeEventListener('canplay',c)};
-      s.addEventListener('loadedmetadata',c);
-      s.addEventListener('canplay',c);
+      const c = () => { Hu = !1; s.removeEventListener('loadedmetadata', c); s.removeEventListener('canplay', c); };
+      s.addEventListener('loadedmetadata', c);
+      s.addEventListener('canplay', c);
       cy(s);
       Nd(s);
       ns(s);
       return !0;
-    } catch(a) {
-      return console.error('[VOD SEEK] error',a),!1;
+    } catch (a) {
+      return console.error('[VOD SEEK] error', a), !1;
     }
   } finally {
-    Il=!1;
-    ou=!1;
-    window.setTimeout(()=>{Hu=!1},2500);
+    Il = !1;
+    ou = !1;
+    window.setTimeout(() => { Hu = !1; }, 2500);
     if (__velPendingSeek !== null) {
       const nextTarget = __velPendingSeek;
       __velPendingSeek = null;

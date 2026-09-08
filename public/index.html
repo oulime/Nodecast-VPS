@@ -1546,12 +1546,12 @@
       rel="stylesheet"
     />
     <link
-      href="/assets/velora-home-sections.css?v=20260905-smart-logos-v1"
+      href="/assets/velora-home-sections.css?v=20260908-candidate-picker-v7"
       rel="stylesheet"
     />
     <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-54"></script>
-    <script defer src="/assets/velora-home-sections.js?v=20260905-smart-logos-v1"></script>
-    <script defer src="/assets/velora-home-cache-fallback.js?v=20260905-smart-logos-v1"></script>
+    <script defer src="/assets/velora-home-sections.js?v=20260908-candidate-picker-v7"></script>
+    <script defer src="/assets/velora-home-cache-fallback.js?v=20260908-candidate-picker-v7"></script>
     <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=20260907-search-fix-v3"></script>
     <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-54"></script>
@@ -5239,9 +5239,132 @@
             </div>
 
             <div class="vel-home-cache-admin-block" style="margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color, rgba(255,255,255,0.1));">
-              <div class="actions"><button type="button" id="home-cache-rebuild" class="countries-admin-cancel">Reconstruire le cache Accueil</button></div>
+              <div class="actions" style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
+                <button type="button" id="home-cache-rebuild" class="countries-admin-cancel">Reconstruire le cache Accueil</button>
+                <button type="button" id="home-stored-media-manager-btn" onclick="window.veloraOpenStoredMediaDialog &amp;&amp; window.veloraOpenStoredMediaDialog()" class="countries-admin-cancel" style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(59,130,246,0.12); border-color:rgba(59,130,246,0.35); color:#93c5fd; cursor:pointer;">
+                  <span>🖼️ Images &amp; Logos stockés (TMDB / Fanart)</span>
+                </button>
+              </div>
               <p id="home-cache-status" class="status" aria-live="polite" style="margin-top: 0.5rem;"></p>
             </div>
+
+            <!-- Modal Dialog for Stored Media Management (TMDB / Fanart) -->
+            <dialog id="home-stored-media-dialog" class="vel-home-content-dialog" style="max-width: 1200px; width: 94vw;">
+              <div class="vel-home-content-dialog__content" style="max-height: 88vh; display: flex; flex-direction: column;">
+                <header class="vel-home-content-dialog__header" style="padding: 1.15rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                  <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                    <h3 class="vel-home-content-dialog__title" style="margin:0;font-size:1.15rem;display:flex;align-items:center;gap:0.5rem;">
+                      <span>🖼️ Galerie des Images &amp; Logos stockés</span>
+                    </h3>
+                    <span id="stored-media-count-badge" style="background:rgba(59,130,246,0.2);color:#93c5fd;font-size:0.78rem;font-weight:700;padding:0.2rem 0.6rem;border-radius:9999px;border:1px solid rgba(59,130,246,0.3);">0 fichier</span>
+                  </div>
+                  <button type="button" id="home-stored-media-close" onclick="window.veloraCloseStoredMediaDialog &amp;&amp; window.veloraCloseStoredMediaDialog()" class="vel-home-content-dialog__close" aria-label="Fermer">✕</button>
+                </header>
+
+                <!-- Toolbar -->
+                <div style="padding: 0.9rem 1.5rem; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                  <div style="display:flex;align-items:center;gap:0.6rem;flex:1;min-width:260px;">
+                    <input id="stored-media-search-input" type="search" placeholder="🔍 Rechercher par nom de film, série ou fichier..." style="margin:0;flex:1;min-width:200px;" />
+                    <select id="stored-media-category-select" class="admin-add-package-dialog__select" style="margin:0;min-width:190px;">
+                      <option value="all">📁 Tous les types d'images</option>
+                      <option value="horizontal-thumbs">🎨 Vignettes Horizontales</option>
+                      <option value="title-logos">🔤 Logos Transparents</option>
+                      <option value="hero-backdrops">🌟 Hero Slider (Fonds)</option>
+                      <option value="hero-logos">🌟 Hero Slider (Logos)</option>
+                      <option value="section-logos">🏷️ Logos de Sections</option>
+                    </select>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                    <button type="button" id="stored-media-refresh-btn" class="countries-admin-cancel" style="padding:0.45rem 0.8rem;font-size:0.82rem;cursor:pointer;">🔄 Actualiser</button>
+                    <button type="button" id="stored-media-delete-all-btn" class="countries-admin-cancel" style="padding:0.45rem 0.8rem;font-size:0.82rem;color:#fca5a5;border-color:rgba(239,68,68,0.35);background:rgba(239,68,68,0.1);cursor:pointer;">🗑️ Tout supprimer</button>
+                  </div>
+                </div>
+
+                <!-- Hidden file input for replacing an image -->
+                <input type="file" id="stored-media-file-replacer" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display:none;" />
+
+                <!-- Grid Body -->
+                <div id="stored-media-grid-container" class="vel-home-content-dialog__body" style="padding: 1.25rem 1.5rem; flex: 1; overflow-y: auto;">
+                  <div id="stored-media-grid" class="vel-stored-media-grid"></div>
+                  <div id="stored-media-empty" class="vel-home-content-dialog__empty" style="display:none;">Aucune image trouvée.</div>
+                </div>
+
+                <footer class="vel-home-content-dialog__footer" style="padding: 0.85rem 1.5rem; font-size: 0.82rem; color: #94a3b8; display: flex; justify-content: space-between; align-items: center;">
+                  <span id="stored-media-status-text">Cliquez sur « Remplacer » pour changer une image ou « Supprimer » pour libérer l'espace.</span>
+                  <button type="button" id="home-stored-media-close-footer" onclick="window.veloraCloseStoredMediaDialog &amp;&amp; window.veloraCloseStoredMediaDialog()" class="countries-admin-cancel" style="padding:0.4rem 0.9rem;">Fermer</button>
+                </footer>
+              </div>
+            </dialog>
+
+            <!-- Modal Dialog for Choosing Replacement Image (Fanart.tv / TMDB / Local File) -->
+            <dialog id="home-stored-media-replace-dialog" class="vel-home-content-dialog" style="max-width: 1280px; width: 95vw; z-index: 2147483640;">
+              <div class="vel-home-content-dialog__content" style="max-height: 90vh; display: flex; flex-direction: column;">
+                <header class="vel-home-content-dialog__header" style="padding: 1.15rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                  <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                    <h3 id="stored-media-replace-title" class="vel-home-content-dialog__title" style="margin:0;font-size:1.15rem;display:flex;align-items:center;gap:0.5rem;">
+                      <span>🎨 Choisir une nouvelle image (Fanart.tv / TMDB)</span>
+                    </h3>
+                    <span id="stored-media-replace-count-badge" style="background:rgba(245,158,11,0.2);color:#fcd34d;font-size:0.78rem;font-weight:700;padding:0.2rem 0.6rem;border-radius:9999px;border:1px solid rgba(245,158,11,0.3);">0 image trouvée</span>
+                  </div>
+                  <button type="button" id="home-stored-media-replace-close" onclick="window.veloraCloseCandidatePicker &amp;&amp; window.veloraCloseCandidatePicker()" class="vel-home-content-dialog__close" aria-label="Fermer">✕</button>
+                </header>
+
+                <!-- Search & Filters Toolbar -->
+                <div style="padding: 0.9rem 1.5rem; background: rgba(0,0,0,0.25); border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; gap: 0.75rem;">
+                  <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
+                    <input id="stored-media-replace-search-input" type="search" placeholder="Titre du film ou série à rechercher sur Fanart & TMDB..." style="margin:0;flex:1;min-width:240px;" />
+                    <select id="stored-media-replace-type-select" class="admin-add-package-dialog__select" style="margin:0;min-width:130px;">
+                      <option value="auto">🎬 Détection auto</option>
+                      <option value="movie">🎥 Film</option>
+                      <option value="tv">📺 Série</option>
+                    </select>
+                    <button type="button" id="stored-media-replace-search-btn" class="primary" style="padding:0.55rem 1rem;white-space:nowrap;cursor:pointer;">🔍 Rechercher</button>
+                  </div>
+
+                  <!-- Type & Language Tabs -->
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                    <div id="stored-media-replace-type-tabs" class="vel-candidate-filter-tabs" style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+                      <button type="button" class="vel-candidate-tab is-active" data-type-filter="all">Tous</button>
+                      <button type="button" class="vel-candidate-tab" data-type-filter="thumb">🎨 Vignettes (Fanart)</button>
+                      <button type="button" class="vel-candidate-tab" data-type-filter="logo">🔤 Logos Transparents</button>
+                      <button type="button" class="vel-candidate-tab" data-type-filter="backdrop">🖼️ Fonds 16:9</button>
+                      <button type="button" class="vel-candidate-tab" data-type-filter="clearart">🎭 ClearArt</button>
+                      <button type="button" class="vel-candidate-tab" data-type-filter="poster">📜 Affiches</button>
+                    </div>
+
+                    <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+                      <span style="font-size:0.75rem;color:#94a3b8;font-weight:600;">Langue :</span>
+                      <select id="stored-media-replace-lang-select" class="admin-add-package-dialog__select" style="margin:0;padding:0.35rem 0.65rem;font-size:0.8rem;min-width:130px;">
+                        <option value="all">🌐 Toutes les langues</option>
+                        <option value="fr">🇫🇷 Français (FR)</option>
+                        <option value="en">🇬🇧 Anglais (EN)</option>
+                        <option value="null">Sans texte (Null)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Candidates Grid Body -->
+                <div id="stored-media-candidates-body" class="vel-home-content-dialog__body" style="padding: 1.25rem 1.5rem; flex: 1; overflow-y: auto;">
+                  <div id="stored-media-candidates-grid" class="vel-candidate-grid"></div>
+                  <div id="stored-media-candidates-loading" style="text-align:center;padding:3rem 1rem;color:#93c5fd;font-size:1rem;display:none;">
+                    <div style="font-size:2rem;margin-bottom:0.5rem;animation:spin 1s linear infinite;">⏳</div>
+                    Recherche des images sur Fanart.tv et TMDB...
+                  </div>
+                  <div id="stored-media-candidates-empty" class="vel-home-content-dialog__empty" style="display:none;">Aucune image disponible pour ce titre.</div>
+                </div>
+
+                <footer class="vel-home-content-dialog__footer" style="padding: 0.85rem 1.5rem; font-size: 0.82rem; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                  <div style="display:flex;align-items:center;gap:0.6rem;">
+                    <button type="button" id="stored-media-replace-local-file-btn" class="countries-admin-cancel" style="display:inline-flex;align-items:center;gap:0.35rem;padding:0.45rem 0.85rem;cursor:pointer;color:#93c5fd;border-color:rgba(59,130,246,0.35);background:rgba(59,130,246,0.1);">
+                      <span>📁 Importer un fichier depuis mon PC</span>
+                    </button>
+                    <span id="stored-media-replace-status-text">Cliquez sur « Choisir cette image » pour remplacer instantanément.</span>
+                  </div>
+                  <button type="button" id="home-stored-media-replace-close-footer" onclick="window.veloraCloseCandidatePicker &amp;&amp; window.veloraCloseCandidatePicker()" class="countries-admin-cancel" style="padding:0.4rem 0.9rem;">Annuler</button>
+                </footer>
+              </div>
+            </dialog>
 
             <dialog id="home-section-content-dialog" class="vel-home-content-dialog">
               <div class="vel-home-content-dialog__content">

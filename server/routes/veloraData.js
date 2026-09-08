@@ -20,9 +20,13 @@ const countryPackageCachePath = path.join(
 const vodPosterCachePath = path.join(__dirname, '..', '..', 'data', 'vod-poster-cache.json');
 const vodBackdropCachePath = path.join(__dirname, '..', '..', 'data', 'vod-backdrop-cache.json');
 const vodTitleLogoCachePath = path.join(__dirname, '..', '..', 'data', 'vod-title-logo-cache.json');
+const vodHorizontalThumbCachePath = path.join(__dirname, '..', '..', 'data', 'vod-horizontal-thumb-cache.json');
 const TITLE_LOGO_UPLOAD_DIR = path.join(__dirname, '..', '..', 'public', 'uploads', 'title-logos');
 const TITLE_LOGO_PUBLIC_PATH = '/uploads/title-logos';
 try { fs.mkdirSync(TITLE_LOGO_UPLOAD_DIR, { recursive: true }); } catch (_) {}
+const HORIZONTAL_THUMB_UPLOAD_DIR = path.join(__dirname, '..', '..', 'public', 'uploads', 'horizontal-thumbs');
+const HORIZONTAL_THUMB_PUBLIC_PATH = '/uploads/horizontal-thumbs';
+try { fs.mkdirSync(HORIZONTAL_THUMB_UPLOAD_DIR, { recursive: true }); } catch (_) {}
 const HERO_BACKDROP_UPLOAD_DIR = path.join(__dirname, '..', '..', 'public', 'uploads', 'hero-slider', 'backdrops');
 const HERO_BACKDROP_PUBLIC_PATH = '/uploads/hero-slider/backdrops';
 const HERO_LOGO_UPLOAD_DIR = path.join(__dirname, '..', '..', 'public', 'uploads', 'hero-slider', 'logos');
@@ -261,6 +265,168 @@ function fetchJson(url, timeoutMs = 4500) {
         req.on('error', () => resolve(null));
         req.on('timeout', () => { req.destroy(); resolve(null); });
     });
+}
+
+let horizontalThumbMemoryCache = null;
+function getHorizontalThumbCache() {
+    if (horizontalThumbMemoryCache) return horizontalThumbMemoryCache;
+    try {
+        if (fs.existsSync(vodHorizontalThumbCachePath)) {
+            horizontalThumbMemoryCache = JSON.parse(fs.readFileSync(vodHorizontalThumbCachePath, 'utf8')) || {};
+        } else {
+            horizontalThumbMemoryCache = {};
+        }
+    } catch (_) {
+        horizontalThumbMemoryCache = {};
+    }
+    return horizontalThumbMemoryCache;
+}
+
+function saveHorizontalThumbCache() {
+    try {
+        if (horizontalThumbMemoryCache) {
+            fs.writeFileSync(vodHorizontalThumbCachePath, JSON.stringify(horizontalThumbMemoryCache, null, 2));
+        }
+    } catch (_) {}
+}
+
+const activeThumbFetches = new Map();
+
+async function fetchAndCacheHorizontalThumb(name, isSeries = false) {
+    const rawName = String(name || '').trim();
+    if (!rawName) return '';
+    const { title, year } = cleanMediaTitleForSearch(rawName);
+    if (!title || title.length < 2) return '';
+
+    const cacheKey = `${isSeries ? 'tv' : 'movie'}:${title.toLowerCase()}`;
+    const cache = getHorizontalThumbCache();
+
+    if (cache[cacheKey]) {
+        if (cache[cacheKey] === 'NONE') return '';
+        const localPath = path.join(HORIZONTAL_THUMB_UPLOAD_DIR, path.basename(cache[cacheKey]));
+        if (fs.existsSync(localPath)) {
+            return cache[cacheKey];
+        }
+    }
+
+    if (activeThumbFetches.has(cacheKey)) {
+        return activeThumbFetches.get(cacheKey);
+    }
+
+    const fetchPromise = (async () => {
+        try {
+            const safeBase = title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 45) || 'thumb';
+            const existingFiles = fs.existsSync(HORIZONTAL_THUMB_UPLOAD_DIR) ? fs.readdirSync(HORIZONTAL_THUMB_UPLOAD_DIR) : [];
+            const matchingFile = existingFiles.find(f => f.startsWith(`${safeBase}-`) && (f.endsWith('.jpg') || f.endsWith('.png') || f.endsWith('.jpeg')));
+            if (matchingFile) {
+                const url = `${HORIZONTAL_THUMB_PUBLIC_PATH}/${matchingFile}`;
+                cache[cacheKey] = url;
+                saveHorizontalThumbCache();
+                return url;
+            }
+
+            const endpoint = isSeries ? 'search/tv' : 'search/movie';
+            const yearParam = year ? (isSeries ? `&first_air_date_year=${year}` : `&year=${year}`) : '';
+            const searchUrl = `https://api.themoviedb.org/3/${endpoint}?api_key=1cf50e6248dc270629e802686245c2c8&query=${encodeURIComponent(title)}${yearParam}&language=fr-FR`;
+
+            const searchRes = await new Promise(resolve => {
+                https.get(searchUrl, { timeout: 4000 }, res => {
+                    if (res.statusCode !== 200) return resolve(null);
+                    let d = '';
+                    res.on('data', c => d += c);
+                    res.on('end', () => {
+                        try { resolve(JSON.parse(d)); } catch (_) { resolve(null); }
+                    });
+                }).on('error', () => resolve(null)).on('timeout', function() { this.destroy(); resolve(null); });
+            });
+
+            const mediaItem = searchRes?.results?.[0];
+            if (!mediaItem || !mediaItem.id) {
+                cache[cacheKey] = 'NONE';
+                saveHorizontalThumbCache();
+                return '';
+            }
+
+            const mediaId = mediaItem.id;
+            const mediaType = isSeries ? 'tv' : 'movie';
+            let candidateThumbUrl = '';
+
+            const fanartKey = process.env.FANART_API_KEY || 'adcce1694cd06785070b4ca811413b15';
+            if (fanartKey) {
+                try {
+                    let fanartUrl = '';
+                    if (mediaType === 'tv') {
+                        const extUrl = `https://api.themoviedb.org/3/tv/${mediaId}/external_ids?api_key=1cf50e6248dc270629e802686245c2c8`;
+                        const extRes = await new Promise(resolve => {
+                            https.get(extUrl, { timeout: 3500 }, res => {
+                                if (res.statusCode !== 200) return resolve(null);
+                                let d = '';
+                                res.on('data', c => d += c);
+                                res.on('end', () => {
+                                    try { resolve(JSON.parse(d)); } catch (_) { resolve(null); }
+                                });
+                            }).on('error', () => resolve(null)).on('timeout', function() { this.destroy(); resolve(null); });
+                        });
+                        const tvdbId = extRes?.tvdb_id;
+                        if (tvdbId) {
+                            fanartUrl = `https://webservice.fanart.tv/v3/tv/${tvdbId}?api_key=${fanartKey}`;
+                        }
+                    } else {
+                        fanartUrl = `https://webservice.fanart.tv/v3/movies/${mediaId}?api_key=${fanartKey}`;
+                    }
+
+                    if (fanartUrl) {
+                        const fanartRes = await new Promise(resolve => {
+                            https.get(fanartUrl, { timeout: 4000 }, res => {
+                                if (res.statusCode !== 200) return resolve(null);
+                                let d = '';
+                                res.on('data', c => d += c);
+                                res.on('end', () => {
+                                    try { resolve(JSON.parse(d)); } catch (_) { resolve(null); }
+                                });
+                            }).on('error', () => resolve(null)).on('timeout', function() { this.destroy(); resolve(null); });
+                        });
+                        if (fanartRes) {
+                            const list = mediaType === 'tv'
+                                ? (fanartRes.tvthumb || [])
+                                : (fanartRes.moviethumb || []);
+                            if (Array.isArray(list) && list.length) {
+                                const frThumb = list.find(l => l.lang === 'fr') || list.find(l => l.lang === 'en') || list[0];
+                                if (frThumb && frThumb.url) candidateThumbUrl = frThumb.url;
+                            }
+                        }
+                    }
+                } catch (_) {}
+            }
+
+            if (!candidateThumbUrl) {
+                cache[cacheKey] = 'NONE';
+                saveHorizontalThumbCache();
+                return '';
+            }
+
+            const ext = candidateThumbUrl.includes('.png') ? '.png' : '.jpg';
+            const fileName = `${safeBase}-${mediaId}${ext}`;
+            const destPath = path.join(HORIZONTAL_THUMB_UPLOAD_DIR, fileName);
+            const downloaded = await downloadImageToDisk(candidateThumbUrl, destPath);
+            if (downloaded) {
+                const localUrl = `${HORIZONTAL_THUMB_PUBLIC_PATH}/${fileName}`;
+                cache[cacheKey] = localUrl;
+                saveHorizontalThumbCache();
+                return localUrl;
+            } else {
+                return '';
+            }
+        } catch (e) {
+            console.warn('[Velora Data] Horizontal thumb fetch error:', e.message);
+            return '';
+        } finally {
+            activeThumbFetches.delete(cacheKey);
+        }
+    })();
+
+    activeThumbFetches.set(cacheKey, fetchPromise);
+    return fetchPromise;
 }
 
 let titleLogoMemoryCache = null;
@@ -690,6 +856,16 @@ async function enrichHomeCacheTitleLogos(payload) {
             const item = entries[cursor++];
             if (!item || !item.entry) continue;
             try {
+                // Priority 1: Stylized Horizontal Thumbnail
+                const thumbUrl = await fetchAndCacheHorizontalThumb(item.entry.name, item.isSeries);
+                if (thumbUrl) {
+                    item.entry.horizontal_thumb = thumbUrl;
+                    item.entry.has_integrated_title = true;
+                    item.entry.thumbUrl = thumbUrl;
+                    item.entry.backdropUrl = thumbUrl;
+                    continue;
+                }
+                // Priority 2: Transparent Title Logo
                 const logoUrl = await fetchAndCacheTitleLogo(item.entry.name, item.isSeries);
                 if (logoUrl) {
                     item.entry.title_logo = logoUrl;
@@ -2811,9 +2987,545 @@ router.get('/title-logo', async (req, res) => {
         const type = String(req.query.type || req.query.content_type || '').toLowerCase();
         const isSeries = type === 'series' || type === 'anime';
         if (!name) return res.status(400).json({ error: 'Title required' });
+
+        // Priority 1: Stylized Horizontal Thumbnail (Fanart.tv moviethumb/tvthumb)
+        const thumbUrl = await fetchAndCacheHorizontalThumb(name, isSeries);
+        if (thumbUrl) {
+            return res.json({
+                ok: true,
+                hasHorizontalThumb: true,
+                thumbUrl: thumbUrl,
+                hasLogo: false,
+                url: ''
+            });
+        }
+
+        // Priority 2: Transparent Title Logo (Fanart.tv / TMDB)
         const logoUrl = await fetchAndCacheTitleLogo(name, isSeries);
-        return res.json({ ok: true, hasLogo: Boolean(logoUrl), url: logoUrl || '' });
+        return res.json({
+            ok: true,
+            hasHorizontalThumb: false,
+            thumbUrl: '',
+            hasLogo: Boolean(logoUrl),
+            url: logoUrl || ''
+        });
     } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+const STORED_MEDIA_DIRECTORIES = {
+    'horizontal-thumbs': {
+        dir: HORIZONTAL_THUMB_UPLOAD_DIR,
+        publicPath: HORIZONTAL_THUMB_PUBLIC_PATH,
+        label: 'Vignettes Horizontales',
+        cachePath: vodHorizontalThumbCachePath
+    },
+    'title-logos': {
+        dir: TITLE_LOGO_UPLOAD_DIR,
+        publicPath: TITLE_LOGO_PUBLIC_PATH,
+        label: 'Logos Transparents',
+        cachePath: vodTitleLogoCachePath
+    },
+    'hero-backdrops': {
+        dir: HERO_BACKDROP_UPLOAD_DIR,
+        publicPath: HERO_BACKDROP_PUBLIC_PATH,
+        label: 'Hero Slider (Arrière-plans)'
+    },
+    'hero-logos': {
+        dir: HERO_LOGO_UPLOAD_DIR,
+        publicPath: HERO_LOGO_PUBLIC_PATH,
+        label: 'Hero Slider (Logos)'
+    },
+    'section-logos': {
+        dir: SECTION_LOGO_UPLOAD_DIR,
+        publicPath: SECTION_LOGO_PUBLIC_PATH,
+        label: 'Logos de Sections'
+    }
+};
+
+router.get('/stored-media/candidates', async (req, res) => {
+    try {
+        let rawTitle = String(req.query.title || '').trim();
+        let requestedType = String(req.query.type || 'auto').trim().toLowerCase();
+        let tmdbId = String(req.query.tmdbId || '').trim();
+        const category = String(req.query.category || '').trim();
+
+        if (!rawTitle && req.query.filename) {
+            const fn = path.basename(String(req.query.filename));
+            const match = fn.match(/^(.*?)(?:-(\d+))?\.[a-zA-Z0-9]+$/);
+            if (match) {
+                rawTitle = match[1].replace(/[-_]+/g, ' ').trim();
+                if (match[2]) tmdbId = match[2];
+            }
+        }
+
+        if (!rawTitle && !tmdbId) {
+            return res.status(400).json({ error: 'Titre ou identifiant TMDB requis' });
+        }
+
+        const tmdbApiKey = '1cf50e6248dc270629e802686245c2c8';
+        const fanartKey = process.env.FANART_API_KEY || 'adcce1694cd06785070b4ca811413b15';
+
+        let mediaItem = null;
+        let mediaType = requestedType === 'tv' ? 'tv' : (requestedType === 'movie' ? 'movie' : null);
+
+        if (tmdbId) {
+            if (mediaType) {
+                mediaItem = await fetchJson(`https://api.themoviedb.org/3/${mediaType}/${tmdbId}?api_key=${tmdbApiKey}&language=fr-FR`);
+            } else {
+                mediaItem = await fetchJson(`https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${tmdbApiKey}&language=fr-FR`);
+                if (mediaItem && mediaItem.id) {
+                    mediaType = 'movie';
+                } else {
+                    mediaItem = await fetchJson(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${tmdbApiKey}&language=fr-FR`);
+                    if (mediaItem && mediaItem.id) mediaType = 'tv';
+                }
+            }
+        }
+
+        if (!mediaItem || !mediaItem.id) {
+            const { title, year } = cleanMediaTitleForSearch(rawTitle);
+            const searchTitle = title || rawTitle;
+
+            if (requestedType === 'tv') {
+                const yearParam = year ? `&first_air_date_year=${year}` : '';
+                const searchRes = await fetchJson(`https://api.themoviedb.org/3/search/tv?api_key=${tmdbApiKey}&query=${encodeURIComponent(searchTitle)}${yearParam}&language=fr-FR`);
+                mediaItem = searchRes?.results?.[0];
+                mediaType = 'tv';
+            } else if (requestedType === 'movie') {
+                const yearParam = year ? `&year=${year}` : '';
+                const searchRes = await fetchJson(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbApiKey}&query=${encodeURIComponent(searchTitle)}${yearParam}&language=fr-FR`);
+                mediaItem = searchRes?.results?.[0];
+                mediaType = 'movie';
+            } else {
+                const [movieRes, tvRes] = await Promise.all([
+                    fetchJson(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbApiKey}&query=${encodeURIComponent(searchTitle)}&language=fr-FR`),
+                    fetchJson(`https://api.themoviedb.org/3/search/tv?api_key=${tmdbApiKey}&query=${encodeURIComponent(searchTitle)}&language=fr-FR`)
+                ]);
+                const topMovie = movieRes?.results?.[0];
+                const topTv = tvRes?.results?.[0];
+                if (topMovie && topTv) {
+                    if ((topMovie.popularity || 0) >= (topTv.popularity || 0)) {
+                        mediaItem = topMovie;
+                        mediaType = 'movie';
+                    } else {
+                        mediaItem = topTv;
+                        mediaType = 'tv';
+                    }
+                } else if (topMovie) {
+                    mediaItem = topMovie;
+                    mediaType = 'movie';
+                } else if (topTv) {
+                    mediaItem = topTv;
+                    mediaType = 'tv';
+                }
+            }
+        }
+
+        if (!mediaItem || !mediaItem.id) {
+            return res.json({
+                ok: true,
+                found: false,
+                query: rawTitle,
+                message: 'Aucun média correspondant trouvé sur TMDB',
+                candidates: []
+            });
+        }
+
+        const resolvedTmdbId = mediaItem.id;
+        const displayTitle = mediaItem.title || mediaItem.name || rawTitle;
+        const releaseYear = (mediaItem.release_date || mediaItem.first_air_date || '').slice(0, 4);
+
+        let tvdbId = null;
+        if (mediaType === 'tv') {
+            const extRes = await fetchJson(`https://api.themoviedb.org/3/tv/${resolvedTmdbId}/external_ids?api_key=${tmdbApiKey}`);
+            tvdbId = extRes?.tvdb_id;
+        }
+
+        const promises = [
+            fetchJson(`https://api.themoviedb.org/3/${mediaType}/${resolvedTmdbId}/images?api_key=${tmdbApiKey}&include_image_language=fr,en,null,de,es,it,ja,ko,zh`)
+        ];
+
+        if (fanartKey) {
+            if (mediaType === 'tv' && tvdbId) {
+                promises.push(fetchJson(`https://webservice.fanart.tv/v3/tv/${tvdbId}?api_key=${fanartKey}`));
+            } else if (mediaType === 'movie') {
+                promises.push(fetchJson(`https://webservice.fanart.tv/v3/movies/${resolvedTmdbId}?api_key=${fanartKey}`));
+            } else {
+                promises.push(Promise.resolve(null));
+            }
+        } else {
+            promises.push(Promise.resolve(null));
+        }
+
+        const [tmdbImages, fanartData] = await Promise.all(promises);
+        const candidates = [];
+
+        // 1. Fanart Thumbs (moviethumb / tvthumb)
+        const fanartThumbs = mediaType === 'tv' ? (fanartData?.tvthumb || []) : (fanartData?.moviethumb || []);
+        if (Array.isArray(fanartThumbs)) {
+            fanartThumbs.forEach((item, idx) => {
+                if (!item?.url) return;
+                candidates.push({
+                    id: `fanart-thumb-${idx}-${item.id || idx}`,
+                    source: 'Fanart.tv',
+                    type: 'thumb',
+                    typeLabel: '🎨 Vignette Horizontale',
+                    lang: item.lang || 'en',
+                    likes: item.likes || 0,
+                    width: 1000,
+                    height: 562,
+                    previewUrl: item.url,
+                    fullUrl: item.url,
+                    isTransparent: false
+                });
+            });
+        }
+
+        // 2. Fanart Logos (hdmovielogo, movielogo, hdtvlogo, clearlogo, tvlogo)
+        const fanartLogos = mediaType === 'tv'
+            ? [...(fanartData?.hdtvlogo || []), ...(fanartData?.clearlogo || []), ...(fanartData?.tvlogo || [])]
+            : [...(fanartData?.hdmovielogo || []), ...(fanartData?.movielogo || []), ...(fanartData?.clearlogo || [])];
+        const seenFanartLogoUrls = new Set();
+        fanartLogos.forEach((item, idx) => {
+            if (!item?.url || seenFanartLogoUrls.has(item.url)) return;
+            seenFanartLogoUrls.add(item.url);
+            candidates.push({
+                id: `fanart-logo-${idx}-${item.id || idx}`,
+                source: 'Fanart.tv',
+                type: 'logo',
+                typeLabel: '🔤 HD ClearLogo',
+                lang: item.lang || 'en',
+                likes: item.likes || 0,
+                width: 800,
+                height: 310,
+                previewUrl: item.url,
+                fullUrl: item.url,
+                isTransparent: true
+            });
+        });
+
+        // 3. Fanart ClearArt
+        const fanartClearArt = mediaType === 'tv'
+            ? [...(fanartData?.hdclearart || []), ...(fanartData?.clearart || [])]
+            : [...(fanartData?.hdmovieclearart || []), ...(fanartData?.movieart || [])];
+        fanartClearArt.forEach((item, idx) => {
+            if (!item?.url) return;
+            candidates.push({
+                id: `fanart-clearart-${idx}`,
+                source: 'Fanart.tv',
+                type: 'clearart',
+                typeLabel: '🎭 ClearArt',
+                lang: item.lang || 'en',
+                likes: item.likes || 0,
+                width: 1000,
+                height: 562,
+                previewUrl: item.url,
+                fullUrl: item.url,
+                isTransparent: true
+            });
+        });
+
+        // 4. Fanart Backgrounds
+        const fanartBgs = mediaType === 'tv' ? (fanartData?.showbackground || []) : (fanartData?.moviebackground || []);
+        if (Array.isArray(fanartBgs)) {
+            fanartBgs.forEach((item, idx) => {
+                if (!item?.url) return;
+                candidates.push({
+                    id: `fanart-bg-${idx}`,
+                    source: 'Fanart.tv',
+                    type: 'backdrop',
+                    typeLabel: '🖼️ Fond HD 16:9',
+                    lang: item.lang || 'null',
+                    likes: item.likes || 0,
+                    width: 1920,
+                    height: 1080,
+                    previewUrl: item.url,
+                    fullUrl: item.url,
+                    isTransparent: false
+                });
+            });
+        }
+
+        // 5. TMDB Logos
+        if (Array.isArray(tmdbImages?.logos)) {
+            tmdbImages.logos.forEach((item, idx) => {
+                if (!item?.file_path) return;
+                candidates.push({
+                    id: `tmdb-logo-${idx}`,
+                    source: 'TMDB',
+                    type: 'logo',
+                    typeLabel: '🔤 Logo Transparent',
+                    lang: item.iso_639_1 || 'null',
+                    likes: Math.round(item.vote_average * 10) || 0,
+                    width: item.width || 0,
+                    height: item.height || 0,
+                    previewUrl: `https://image.tmdb.org/t/p/w500${item.file_path}`,
+                    fullUrl: `https://image.tmdb.org/t/p/original${item.file_path}`,
+                    isTransparent: true
+                });
+            });
+        }
+
+        // 6. TMDB Backdrops
+        if (Array.isArray(tmdbImages?.backdrops)) {
+            tmdbImages.backdrops.forEach((item, idx) => {
+                if (!item?.file_path) return;
+                candidates.push({
+                    id: `tmdb-backdrop-${idx}`,
+                    source: 'TMDB',
+                    type: 'backdrop',
+                    typeLabel: '🖼️ Fond / Backdrop 16:9',
+                    lang: item.iso_639_1 || 'null',
+                    likes: Math.round(item.vote_average * 10) || 0,
+                    width: item.width || 1920,
+                    height: item.height || 1080,
+                    previewUrl: `https://image.tmdb.org/t/p/w780${item.file_path}`,
+                    fullUrl: `https://image.tmdb.org/t/p/original${item.file_path}`,
+                    isTransparent: false
+                });
+            });
+        }
+
+        // 7. TMDB Posters
+        if (Array.isArray(tmdbImages?.posters)) {
+            tmdbImages.posters.forEach((item, idx) => {
+                if (!item?.file_path) return;
+                candidates.push({
+                    id: `tmdb-poster-${idx}`,
+                    source: 'TMDB',
+                    type: 'poster',
+                    typeLabel: '📜 Affiche / Poster 2:3',
+                    lang: item.iso_639_1 || 'null',
+                    likes: Math.round(item.vote_average * 10) || 0,
+                    width: item.width || 500,
+                    height: item.height || 750,
+                    previewUrl: `https://image.tmdb.org/t/p/w500${item.file_path}`,
+                    fullUrl: `https://image.tmdb.org/t/p/original${item.file_path}`,
+                    isTransparent: false
+                });
+            });
+        }
+
+        // Sort candidates: FR first, then EN, then by popularity/likes
+        candidates.sort((a, b) => {
+            const isFrA = a.lang === 'fr' ? 1 : 0;
+            const isFrB = b.lang === 'fr' ? 1 : 0;
+            if (isFrA !== isFrB) return isFrB - isFrA;
+            const isEnA = a.lang === 'en' ? 1 : 0;
+            const isEnB = b.lang === 'en' ? 1 : 0;
+            if (isEnA !== isEnB) return isEnB - isEnA;
+            return (b.likes || 0) - (a.likes || 0);
+        });
+
+        return res.json({
+            ok: true,
+            found: true,
+            tmdbId: resolvedTmdbId,
+            mediaType,
+            title: displayTitle,
+            year: releaseYear,
+            posterUrl: mediaItem.poster_path ? `https://image.tmdb.org/t/p/w185${mediaItem.poster_path}` : '',
+            candidates,
+            count: candidates.length
+        });
+
+    } catch (err) {
+        console.error('[veloraData] get candidates error:', err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/stored-media/apply-candidate', async (req, res) => {
+    try {
+        const category = String(req.body?.category || '').trim();
+        const filename = String(req.body?.filename || '').trim();
+        const imageUrl = String(req.body?.imageUrl || '').trim();
+
+        if (!category || !STORED_MEDIA_DIRECTORIES[category]) {
+            return res.status(400).json({ error: 'Catégorie invalide' });
+        }
+        if (!filename) {
+            return res.status(400).json({ error: 'Nom de fichier requis' });
+        }
+        if (!imageUrl || !imageUrl.startsWith('http')) {
+            return res.status(400).json({ error: 'URL d\'image invalide' });
+        }
+
+        const safeFilename = path.basename(filename);
+        const conf = STORED_MEDIA_DIRECTORIES[category];
+        await fs.promises.mkdir(conf.dir, { recursive: true });
+
+        const destPath = path.join(conf.dir, safeFilename);
+        const ok = await downloadImageToDisk(imageUrl, destPath);
+        if (!ok) {
+            return res.status(502).json({ error: 'Impossible de télécharger l\'image depuis la source.' });
+        }
+
+        const url = `${conf.publicPath}/${safeFilename}?t=${Date.now()}`;
+
+        if (conf.cachePath) {
+            try {
+                const cacheData = JSON.parse(fs.readFileSync(conf.cachePath, 'utf8')) || {};
+                const baseWithoutExt = safeFilename.replace(/\.[^.]+$/, '');
+                const parts = baseWithoutExt.split('-');
+                if (parts.length >= 2) {
+                    const nameSlug = parts.slice(0, -1).join('-').replace(/_/g, ' ');
+                    const isTv = safeFilename.includes('tv') || category.includes('tv');
+                    const cKey = `${isTv ? 'tv' : 'movie'}:${nameSlug.toLowerCase()}`;
+                    cacheData[cKey] = `${conf.publicPath}/${safeFilename}`;
+                    fs.writeFileSync(conf.cachePath, JSON.stringify(cacheData, null, 2));
+                    if (category === 'title-logos') titleLogoMemoryCache = cacheData;
+                    if (category === 'horizontal-thumbs') horizontalThumbMemoryCache = cacheData;
+                }
+            } catch (_) {}
+        }
+
+        return res.json({ ok: true, url, filename: safeFilename });
+    } catch (err) {
+        console.error('[veloraData] apply candidate image error:', err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/stored-media', async (req, res) => {
+    try {
+        const items = [];
+        for (const [key, conf] of Object.entries(STORED_MEDIA_DIRECTORIES)) {
+            if (!conf.dir || !fs.existsSync(conf.dir)) continue;
+            const files = await fs.promises.readdir(conf.dir, { withFileTypes: true });
+            for (const file of files) {
+                if (!file.isFile()) continue;
+                const filePath = path.join(conf.dir, file.name);
+                const stat = await fs.promises.stat(filePath);
+                items.push({
+                    id: `${key}:${file.name}`,
+                    filename: file.name,
+                    category: key,
+                    categoryLabel: conf.label,
+                    url: `${conf.publicPath}/${file.name}`,
+                    sizeBytes: stat.size,
+                    mtime: stat.mtimeMs
+                });
+            }
+        }
+        items.sort((a, b) => b.mtime - a.mtime);
+        return res.json({ ok: true, items, count: items.length });
+    } catch (err) {
+        console.error('[veloraData] get stored-media error:', err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/stored-media/upload-replace', async (req, res) => {
+    try {
+        const category = String(req.body?.category || '').trim();
+        const filename = String(req.body?.filename || '').trim();
+        const encoded = String(req.body?.dataBase64 || '').trim();
+        if (!category || !STORED_MEDIA_DIRECTORIES[category]) {
+            return res.status(400).json({ error: 'Catégorie invalide' });
+        }
+        if (!filename) {
+            return res.status(400).json({ error: 'Nom de fichier requis' });
+        }
+        if (!encoded) {
+            return res.status(400).json({ error: 'Données image requises' });
+        }
+
+        const safeFilename = path.basename(filename);
+        const conf = STORED_MEDIA_DIRECTORIES[category];
+        const destPath = path.join(conf.dir, safeFilename);
+
+        const buffer = Buffer.from(encoded.replace(/^data:[^;]+;base64,/, ''), 'base64');
+        if (!buffer.length || buffer.length > 10 * 1024 * 1024) {
+            return res.status(413).json({ error: 'L\'image doit faire moins de 10 Mo.' });
+        }
+
+        await fs.promises.mkdir(conf.dir, { recursive: true });
+        await fs.promises.writeFile(destPath, buffer);
+
+        const url = `${conf.publicPath}/${safeFilename}?t=${Date.now()}`;
+        return res.json({ ok: true, url, filename: safeFilename });
+    } catch (err) {
+        console.error('[veloraData] replace stored-media error:', err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+router.delete('/stored-media/item', async (req, res) => {
+    try {
+        const category = String(req.query.category || req.body?.category || '').trim();
+        const filename = String(req.query.filename || req.body?.filename || '').trim();
+        if (!category || !STORED_MEDIA_DIRECTORIES[category]) {
+            return res.status(400).json({ error: 'Catégorie invalide' });
+        }
+        if (!filename) {
+            return res.status(400).json({ error: 'Nom de fichier requis' });
+        }
+
+        const safeFilename = path.basename(filename);
+        const conf = STORED_MEDIA_DIRECTORIES[category];
+        const filePath = path.join(conf.dir, safeFilename);
+
+        if (fs.existsSync(filePath)) {
+            await fs.promises.unlink(filePath);
+        }
+
+        if (conf.cachePath && fs.existsSync(conf.cachePath)) {
+            try {
+                const cacheData = JSON.parse(fs.readFileSync(conf.cachePath, 'utf8')) || {};
+                let changed = false;
+                for (const [k, v] of Object.entries(cacheData)) {
+                    if (typeof v === 'string' && v.includes(safeFilename)) {
+                        delete cacheData[k];
+                        changed = true;
+                    }
+                }
+                if (changed) {
+                    fs.writeFileSync(conf.cachePath, JSON.stringify(cacheData, null, 2));
+                    if (category === 'title-logos') titleLogoMemoryCache = cacheData;
+                    if (category === 'horizontal-thumbs') horizontalThumbMemoryCache = cacheData;
+                }
+            } catch (_) {}
+        }
+
+        return res.json({ ok: true, deleted: safeFilename });
+    } catch (err) {
+        console.error('[veloraData] delete stored-media item error:', err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+router.delete('/stored-media/clear-all', async (req, res) => {
+    try {
+        const targetCategory = String(req.query.category || req.body?.category || 'all').trim();
+        let deletedCount = 0;
+
+        for (const [key, conf] of Object.entries(STORED_MEDIA_DIRECTORIES)) {
+            if (targetCategory !== 'all' && targetCategory !== key) continue;
+            if (!conf.dir || !fs.existsSync(conf.dir)) continue;
+
+            const files = await fs.promises.readdir(conf.dir, { withFileTypes: true });
+            for (const file of files) {
+                if (file.isFile()) {
+                    await fs.promises.unlink(path.join(conf.dir, file.name)).catch(() => {});
+                    deletedCount++;
+                }
+            }
+
+            if (conf.cachePath && fs.existsSync(conf.cachePath)) {
+                try {
+                    fs.writeFileSync(conf.cachePath, JSON.stringify({}, null, 2));
+                    if (key === 'title-logos') titleLogoMemoryCache = {};
+                    if (key === 'horizontal-thumbs') horizontalThumbMemoryCache = {};
+                } catch (_) {}
+            }
+        }
+
+        return res.json({ ok: true, deletedCount });
+    } catch (err) {
+        console.error('[veloraData] clear all stored-media error:', err);
         return res.status(500).json({ error: err.message });
     }
 });

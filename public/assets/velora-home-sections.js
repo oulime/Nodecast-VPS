@@ -265,6 +265,7 @@ async function searchMediaForContentDialog(query) {
 }
 var clientBackdropCache = new Map();
 function veloraEnsureCardBackdrop(card, media, section, entry) {
+  if (entry && (entry.has_integrated_title || entry.horizontal_thumb)) return;
   var key = String(entry.sourceId || "") + ":" + String(entry.streamId || "") + ":" + String(entry.name || "");
   if (clientBackdropCache.has(key)) {
     var cached = clientBackdropCache.get(key);
@@ -305,14 +306,561 @@ function veloraEnsureCardBackdrop(card, media, section, entry) {
     .catch(function() {});
 }
 
-function card(section,entry){var b=document.createElement("button"),packageRow=pkg(section.package_id),countryRow=state.countries.find(function(country){return String(country.id)===String(section.country_id)}),isHorizontal=(section&&section.card_orientation==="horizontal")||(entry&&entry.card_orientation==="horizontal");b.type="button";b.className="vel-home-section__card vel-home-section__card--"+section.content_type+(isHorizontal?" vel-home-section__card--horizontal":"");var cleanTitle=stripChannelPrefixes(entry.name||"");b.setAttribute("aria-label",cleanTitle);b.dataset.packageId=String(section.package_id||entry.packageId||"");b.dataset.packageName=String(packageRow&&packageRow.name||section.title||"");b.dataset.contentType=String(section.content_type||entry.contentType||"");b.dataset.countryName=String(countryRow&&countryRow.name||"");b.dataset.mediaId=String(entry.streamId||entry.globalStreamId||entry.id||"");var media,imgUrl=isHorizontal?(entry.backdropUrl||entry.backdrop||entry.thumbUrl):(entry.thumbUrl||entry.backdropUrl||entry.backdrop);if(imgUrl){media=document.createElement("img");media.alt="";media.loading="lazy";window.veloraSetHomeImageSource(media,imgUrl,function(){media.removeAttribute("src");media.classList.add("vel-home-section__fallback")})}else{media=document.createElement("span");media.classList.add("vel-home-section__fallback");media.textContent="\u25b6"}media.classList.add("vel-home-section__media");var name=document.createElement("span");name.className="vel-home-section__name";name.textContent=cleanTitle;b.append(media,name);if(isHorizontal){var titleLogoUrl=String(entry.title_logo||entry.titleLogo||entry.logo||"").trim();function applyTitleLogo(url){if(!url||url==="NONE")return;if(b.querySelector(".vel-home-section__title-logo"))return;b.classList.add("has-title-logo");var logoImg=document.createElement("img");logoImg.className="vel-home-section__title-logo";logoImg.alt=cleanTitle;logoImg.loading="lazy";logoImg.decoding="async";function smartScale(){var nw=logoImg.naturalWidth,nh=logoImg.naturalHeight;if(nw&&nh){var r=nw/nh;if(r>=2.4)logoImg.classList.add("vel-title-logo--wide");else if(r<=1.45)logoImg.classList.add("vel-title-logo--tall");else logoImg.classList.add("vel-title-logo--standard")}}logoImg.onload=smartScale;logoImg.onerror=function(){b.classList.remove("has-title-logo");logoImg.remove()};logoImg.src=url;if(logoImg.complete)smartScale();b.appendChild(logoImg)}if(titleLogoUrl){applyTitleLogo(titleLogoUrl)}else if(cleanTitle&&(section.content_type==="movies"||section.content_type==="series"||entry.contentType==="movies"||entry.contentType==="series")){var cType=section.content_type||entry.contentType||"movies";if(!window.__veloraFetchingLogos)window.__veloraFetchingLogos=new Map();var logoKey=cType+":"+cleanTitle.toLowerCase();if(!window.__veloraFetchingLogos.has(logoKey)){var p=fetch("/api/velora-db/title-logo?name="+encodeURIComponent(cleanTitle)+"&type="+encodeURIComponent(cType)).then(function(r){return r.ok?r.json():null}).then(function(data){if(data&&data.url){entry.title_logo=data.url;return data.url}return null}).catch(function(){return null});window.__veloraFetchingLogos.set(logoKey,p)}window.__veloraFetchingLogos.get(logoKey).then(function(resolvedUrl){if(resolvedUrl)applyTitleLogo(resolvedUrl)})}}var logoUrl=String(section&&(section.logo_url||section.badge_logo_url)||entry&&(entry.section_logo_url||entry.logo_url)||"").trim();if(logoUrl){b.classList.add("vel-home-section__card--has-badge");var logoEl=document.createElement("img");logoEl.className="vel-home-section__badge-logo";logoEl.alt="";logoEl.loading="lazy";if(typeof window.veloraSetHomeImageSource==="function"){window.veloraSetHomeImageSource(logoEl,logoUrl,function(){logoEl.remove()})}else{logoEl.src=logoUrl;logoEl.onerror=function(){logoEl.remove()}}b.appendChild(logoEl)}if(isHorizontal&&(section.content_type==="movies"||section.content_type==="series")){veloraEnsureCardBackdrop(b,media,section,entry)}if(typeof window.veloraBindHomeCardActivation==="function")window.veloraBindHomeCardActivation(b,section,entry);if(section.content_type==="movies"){b.addEventListener("pointerenter",function(){warmHomeMovie(entry)},{once:true});b.addEventListener("focus",function(){warmHomeMovie(entry)},{once:true})}b.addEventListener("click",function(){if(typeof window.veloraOpenHomeCacheEntry==="function")window.veloraOpenHomeCacheEntry(section,entry,b)});return b}
+function card(section,entry){var b=document.createElement("button"),packageRow=pkg(section.package_id),countryRow=state.countries.find(function(country){return String(country.id)===String(section.country_id)}),isHorizontal=(section&&section.card_orientation==="horizontal")||(entry&&entry.card_orientation==="horizontal");b.type="button";b.className="vel-home-section__card vel-home-section__card--"+section.content_type+(isHorizontal?" vel-home-section__card--horizontal":"");var cleanTitle=stripChannelPrefixes(entry.name||"");b.setAttribute("aria-label",cleanTitle);b.dataset.packageId=String(section.package_id||entry.packageId||"");b.dataset.packageName=String(packageRow&&packageRow.name||section.title||"");b.dataset.contentType=String(section.content_type||entry.contentType||"");b.dataset.countryName=String(countryRow&&countryRow.name||"");b.dataset.mediaId=String(entry.streamId||entry.globalStreamId||entry.id||"");var media,imgUrl=isHorizontal?(entry.horizontal_thumb||entry.backdropUrl||entry.backdrop||entry.thumbUrl):(entry.thumbUrl||entry.backdropUrl||entry.backdrop);if(imgUrl){media=document.createElement("img");media.alt="";media.loading="lazy";window.veloraSetHomeImageSource(media,imgUrl,function(){media.removeAttribute("src");media.classList.add("vel-home-section__fallback")})}else{media=document.createElement("span");media.classList.add("vel-home-section__fallback");media.textContent="\u25b6"}media.classList.add("vel-home-section__media");var name=document.createElement("span");name.className="vel-home-section__name";name.textContent=cleanTitle;b.append(media,name);if(isHorizontal){var hasIntegratedTitle=Boolean(entry.has_integrated_title||entry.horizontal_thumb);if(hasIntegratedTitle){b.classList.add("has-integrated-title");}else{var titleLogoUrl=String(entry.title_logo||entry.titleLogo||entry.logo||"").trim();function applyTitleLogo(url){if(!url||url==="NONE")return;if(b.querySelector(".vel-home-section__title-logo"))return;b.classList.add("has-title-logo");var logoImg=document.createElement("img");logoImg.className="vel-home-section__title-logo";logoImg.alt=cleanTitle;logoImg.loading="lazy";logoImg.decoding="async";function smartScale(){var nw=logoImg.naturalWidth,nh=logoImg.naturalHeight;if(nw&&nh){var r=nw/nh;if(r>=2.4)logoImg.classList.add("vel-title-logo--wide");else if(r<=1.45)logoImg.classList.add("vel-title-logo--tall");else logoImg.classList.add("vel-title-logo--standard")}}logoImg.onload=smartScale;logoImg.onerror=function(){b.classList.remove("has-title-logo");logoImg.remove()};logoImg.src=url;if(logoImg.complete)smartScale();b.appendChild(logoImg)}if(titleLogoUrl){applyTitleLogo(titleLogoUrl)}else if(cleanTitle&&(section.content_type==="movies"||section.content_type==="series"||entry.contentType==="movies"||entry.contentType==="series")){var cType=section.content_type||entry.contentType||"movies";if(!window.__veloraFetchingLogos)window.__veloraFetchingLogos=new Map();var logoKey=cType+":"+cleanTitle.toLowerCase();if(!window.__veloraFetchingLogos.has(logoKey)){var p=fetch("/api/velora-db/title-logo?name="+encodeURIComponent(cleanTitle)+"&type="+encodeURIComponent(cType)).then(function(r){return r.ok?r.json():null}).then(function(data){if(data&&data.hasHorizontalThumb&&data.thumbUrl){entry.horizontal_thumb=data.thumbUrl;entry.has_integrated_title=true;entry.backdropUrl=data.thumbUrl;entry.thumbUrl=data.thumbUrl;return {type:"thumb",url:data.thumbUrl}}if(data&&data.url){entry.title_logo=data.url;return {type:"logo",url:data.url}}return null}).catch(function(){return null});window.__veloraFetchingLogos.set(logoKey,p)}window.__veloraFetchingLogos.get(logoKey).then(function(res){if(!res)return;if(res.type==="thumb"&&res.url){b.classList.add("has-integrated-title");if(media.tagName==="IMG"){if(typeof window.veloraSetHomeImageSource==="function"){window.veloraSetHomeImageSource(media,res.url)}else{media.src=res.url}}}else if(res.type==="logo"&&res.url){applyTitleLogo(res.url)}})}}}var logoUrl=String(section&&(section.logo_url||section.badge_logo_url)||entry&&(entry.section_logo_url||entry.logo_url)||"").trim();if(logoUrl){b.classList.add("vel-home-section__card--has-badge");var logoEl=document.createElement("img");logoEl.className="vel-home-section__badge-logo";logoEl.alt="";logoEl.loading="lazy";if(typeof window.veloraSetHomeImageSource==="function"){window.veloraSetHomeImageSource(logoEl,logoUrl,function(){logoEl.remove()})}else{logoEl.src=logoUrl;logoEl.onerror=function(){logoEl.remove()}}b.appendChild(logoEl)}if(isHorizontal&&(section.content_type==="movies"||section.content_type==="series")){veloraEnsureCardBackdrop(b,media,section,entry)}if(typeof window.veloraBindHomeCardActivation==="function")window.veloraBindHomeCardActivation(b,section,entry);if(section.content_type==="movies"){b.addEventListener("pointerenter",function(){warmHomeMovie(entry)},{once:true});b.addEventListener("focus",function(){warmHomeMovie(entry)},{once:true})}b.addEventListener("click",function(){if(typeof window.veloraOpenHomeCacheEntry==="function")window.veloraOpenHomeCacheEntry(section,entry,b)});return b}
 var homeRenderVersion=0;async function renderHome(){var wrap=document.getElementById("vel-home-sections"),countrySelect=document.getElementById("country-select");if(!wrap)return;if(typeof window.veloraIsStartupCountryReady==="function"&&!window.veloraIsStartupCountryReady(countrySelect))return;var savedScrolls=new Map();wrap.querySelectorAll(".vel-home-section").forEach(function(sec){var r=sec.querySelector(".vel-home-section__rail"),heading=sec.querySelector(".vel-home-section__heading"),k=heading?heading.textContent.trim():"";if(k&&r&&Number.isFinite(r.scrollLeft)&&r.scrollLeft>0){savedScrolls.set(k,r.scrollLeft)}});var renderVersion=++homeRenderVersion,fragment=document.createDocumentFragment();if(typeof window.veloraRenderResumeSection==="function"){var resumeBlock=window.veloraRenderResumeSection();if(resumeBlock)fragment.appendChild(resumeBlock)}var source=state.homeCache&&Array.isArray(state.homeCache.sections)?state.homeCache.sections:state.sections,active=typeof window.veloraGetActiveCountry==="function"?window.veloraGetActiveCountry():{id:typeof window.veloraGetActiveCountryId==="function"?window.veloraGetActiveCountryId():"",name:""},published=source.filter(function(row){return row.published!==false}),specific=published.filter(function(row){var ids=getRowCountryIds(row);return!ids.includes("default")&&sectionMatchesCountry(row,active)}),defaults=published.filter(function(row){var ids=getRowCountryIds(row);return ids.includes("default")}),rows=(specific.length?specific:defaults).slice().sort(function(a,b){return(a.section_order||0)-(b.section_order||0)});for(var section of rows){var isHorizontal=section.card_orientation==="horizontal",block=document.createElement("section"),heading=document.createElement("h3"),rail=document.createElement("div");block.className="vel-home-section"+(isHorizontal?" vel-home-section--horizontal":"");heading.className="vel-home-section__heading";heading.textContent=section.title;rail.className="vel-home-section__rail";block.append(heading,rail);fragment.appendChild(block);for(var placeholderIndex=0;placeholderIndex<6;placeholderIndex+=1){var placeholder=document.createElement("span");placeholder.className="vel-home-section__skeleton vel-home-section__skeleton--"+section.content_type+(isHorizontal?" vel-home-section__skeleton--horizontal":"");placeholder.setAttribute("aria-hidden","true");rail.appendChild(placeholder)}
 try{var entries=await verifiedEntries(section);if(!entries.length&&Array.isArray(section.entries)){var sourceCounts={};section.entries.forEach(function(entry){var source=String(entry.sourceId||"");if(source)sourceCounts[source]=(sourceCounts[source]||0)+1});var dominantSource=Object.keys(sourceCounts).sort(function(a,b){return sourceCounts[b]-sourceCounts[a]})[0];entries=section.entries.filter(function(entry){return !dominantSource||String(entry.sourceId||"")===dominantSource})}rail.replaceChildren();entries.forEach(function(entry){rail.appendChild(card(section,entry))});if(!entries.length){var empty=document.createElement("p");empty.className="vel-home-section__empty";empty.textContent="Aucun contenu disponible.";rail.appendChild(empty)}}catch(e){rail.replaceChildren();var fallbackEntries=Array.isArray(section.entries)?section.entries:[],sourceCounts={};fallbackEntries.forEach(function(entry){var source=String(entry.sourceId||"");if(source)sourceCounts[source]=(sourceCounts[source]||0)+1});var dominantSource=Object.keys(sourceCounts).sort(function(a,b){return sourceCounts[b]-sourceCounts[a]})[0];fallbackEntries.filter(function(entry){return !dominantSource||String(entry.sourceId||"")===dominantSource}).forEach(function(entry){rail.appendChild(card(section,entry))});if(!rail.children.length){var failed=document.createElement("p");failed.className="vel-home-section__empty";failed.textContent="Section indisponible.";rail.appendChild(failed)}}}if(renderVersion===homeRenderVersion){wrap.replaceChildren(fragment);wrap.querySelectorAll(".vel-home-section").forEach(function(sec){var r=sec.querySelector(".vel-home-section__rail"),heading=sec.querySelector(".vel-home-section__heading"),k=heading?heading.textContent.trim():"";if(k&&r&&savedScrolls.has(k)){r.scrollLeft=savedScrolls.get(k)}});document.dispatchEvent(new CustomEvent("velora-home-country-rendered"))}}
 async function loadHomeCache(){if(typeof window.veloraLoadHomeCache==="function")state.homeCache=await window.veloraLoadHomeCache(true);else{var response=await fetch("/api/velora-db/home-cache?t="+Date.now(),{cache:"no-store"});if(!response.ok)throw new Error("HTTP "+response.status);state.homeCache=await response.json()}return applyRulesToHomePayload(state.homeCache)}
 async function load(){try{var v=await Promise.all([req("/admin_home_sections?select=*&order=section_order.asc"),req("/admin_packages?select=id,country_id,name,source_id,category_id,kind,is_hidden&order=name.asc"),req("/admin_country_package_order?select=country_id,ui_tab,package_order"),req("/admin_countries?select=id,name&order=name.asc"),req("/canonical_countries?select=match_key,display_name").catch(function(){return[]}),loadHomeCache(false).catch(function(){return null}),req("/admin_settings?key=eq.resume_min_watch_minutes").catch(function(){return[]})]);state.sections=v[0]||[];state.packages=v[1]||[];state.orders=v[2]||[];state.countries=v[3]||[];var canonical=Array.isArray(v[4])?v[4]:[];state.visibleCountryKeys=new Set(canonical.filter(function(x){return String(x.match_key||"").startsWith("__visible__:")}).map(function(x){return visibilityKey(x.display_name||String(x.match_key).slice(12))}));if(!window.__veloraVisibleCountries||!window.__veloraVisibleCountries.size){window.__veloraVisibleCountries=new Set(state.visibleCountryKeys)}var resumeRows=Array.isArray(v[6])?v[6]:[],minMins=3;if(resumeRows.length>0&&resumeRows[0].value!=null){var parsedMin=parseFloat(resumeRows[0].value);if(!isNaN(parsedMin)&&parsedMin>=0)minMins=parsedMin}window.__veloraResumeMinWatchMinutes=minMins;try{localStorage.setItem("velora_resume_min_watch_minutes",String(minMins))}catch(_){}var resumeInp=document.getElementById("home-resume-min-minutes");if(resumeInp)resumeInp.value=minMins;fillCountries();fillPackages();renderAdmin();renderHome();status(state.sections.length?state.sections.length+" section(s) configur\u00e9e(s).":"Aucune section configur\u00e9e.")}catch(e){status("Impossible de charger les sections Accueil.",true)}}
 async function ensurePlayerCatalog(){if(typeof window.veloraHomeCatalogReady==="function"&&window.veloraHomeCatalogReady())return;if(typeof window.veloraForceAutoconnect!=="function")throw new Error("Connexion au catalogue indisponible");window.veloraForceAutoconnect();for(var attempt=0;attempt<120;attempt+=1){if(typeof window.veloraHomeCatalogReady==="function"&&window.veloraHomeCatalogReady())return;await new Promise(function(resolve){window.setTimeout(resolve,250)})}throw new Error("Le catalogue ne s'est pas charg\u00e9 \u00e0 temps")}
 function init(){var type=document.getElementById("home-section-type"),countryVisibleOnly=document.getElementById("home-section-country-visible-only"),filterCountry=document.getElementById("home-section-filter-country"),packageSelect=document.getElementById("home-section-package"),packageSearch=document.getElementById("home-section-package-search"),orientationSelect=document.getElementById("home-section-card-orientation"),logo=document.getElementById("home-section-logo-url"),logoFile=document.getElementById("home-section-logo-file"),logoUploadBtn=document.getElementById("home-section-logo-upload-btn"),add=document.getElementById("home-section-add"),rebuild=document.getElementById("home-cache-rebuild"),cacheStatus=document.getElementById("home-cache-status"),countriesAllBtn=document.getElementById("home-section-countries-all"),countriesNoneBtn=document.getElementById("home-section-countries-none"),defaultCountryCb=document.getElementById("home-section-country-default"),listWrap=document.getElementById("home-section-countries-list");var cancel=document.getElementById("home-section-cancel");if(cancel)cancel.addEventListener("click",function(){resetEditor();status("Modification annul\u00e9e.")});
-var resumeMinInput=document.getElementById("home-resume-min-minutes"),resumeMinSaveBtn=document.getElementById("home-resume-min-minutes-save"),resumeMinStatus=document.getElementById("home-resume-settings-status");async function saveResumeMinMinutes(){if(!resumeMinInput)return;var rawVal=parseFloat(resumeMinInput.value),val=(isNaN(rawVal)||rawVal<0)?3:rawVal;resumeMinInput.value=val;if(resumeMinSaveBtn)resumeMinSaveBtn.disabled=true;if(resumeMinStatus){resumeMinStatus.textContent="Enregistrement...";resumeMinStatus.style.color="#a78bfa"}try{await req("/admin_settings",{method:"POST",body:JSON.stringify({id:"resume_min_watch_minutes",key:"resume_min_watch_minutes",value:val})});window.__veloraResumeMinWatchMinutes=val;try{localStorage.setItem("velora_resume_min_watch_minutes",String(val))}catch(_){}if(resumeMinStatus){resumeMinStatus.textContent="Temps minimum ("+val+" min) enregistr\u00e9 avec succ\u00e8s !";resumeMinStatus.style.color="#86efac";setTimeout(function(){if(resumeMinStatus)resumeMinStatus.textContent=""},4000)}if(typeof window.veloraInjectResumeSection==="function")window.veloraInjectResumeSection();document.dispatchEvent(new CustomEvent("velora-resume-settings-changed"));document.dispatchEvent(new CustomEvent("velora-watch-history-updated"))}catch(err){if(resumeMinStatus){resumeMinStatus.textContent="Erreur : "+err.message;resumeMinStatus.style.color="#fca5a5"}}finally{if(resumeMinSaveBtn)resumeMinSaveBtn.disabled=false}}if(resumeMinSaveBtn)resumeMinSaveBtn.addEventListener("click",saveResumeMinMinutes);if(resumeMinInput){resumeMinInput.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();saveResumeMinMinutes()}})}if(type)type.addEventListener("change",fillPackages);if(countryVisibleOnly)countryVisibleOnly.addEventListener("change",function(){fillCountries();fillPackages();renderAdmin()});if(filterCountry)filterCountry.addEventListener("change",function(){fillPackages();renderAdmin()});if(defaultCountryCb){defaultCountryCb.addEventListener("change",function(){if(defaultCountryCb.checked&&listWrap){listWrap.querySelectorAll("input[type='checkbox']").forEach(function(cb){cb.checked=false})}})}if(listWrap){listWrap.addEventListener("change",function(e){if(e.target&&e.target.type==="checkbox"){var anyChecked=Array.from(listWrap.querySelectorAll("input[type='checkbox']")).some(function(cb){return cb.checked});if(defaultCountryCb){defaultCountryCb.checked=!anyChecked}}})}if(countriesAllBtn)countriesAllBtn.addEventListener("click",function(){if(listWrap){listWrap.querySelectorAll("input[type='checkbox']").forEach(function(cb){cb.checked=true})}if(defaultCountryCb)defaultCountryCb.checked=false});if(countriesNoneBtn)countriesNoneBtn.addEventListener("click",function(){if(listWrap){listWrap.querySelectorAll("input[type='checkbox']").forEach(function(cb){cb.checked=false})}if(defaultCountryCb)defaultCountryCb.checked=true});if(packageSearch)packageSearch.addEventListener("input",function(){fillPackages()});if(packageSelect)packageSelect.addEventListener("change",function(){var title=document.getElementById("home-section-title"),option=packageSelect.options[packageSelect.selectedIndex];if(title&&option&&option.value&&(!title.value.trim()||editingSectionId==null)){title.value=String(option.textContent||"").trim()}});if(logo)logo.addEventListener("input",function(){updateLogoPreview(logo.value)});if(logoUploadBtn&&logoFile){logoUploadBtn.addEventListener("click",function(){logoFile.click()});logoFile.addEventListener("change",async function(){var file=logoFile.files&&logoFile.files[0];if(!file)return;if(file.size>5*1024*1024){status("Le fichier est trop volumineux (max 5 Mo).",true);return}logoUploadBtn.disabled=true;logoUploadBtn.textContent="\u23f3 Import...";status("T\u00e9l\u00e9versement du logo...");try{var reader=new FileReader();reader.onload=async function(e){try{var dataBase64=e.target.result;var res=await fetch("/api/velora-db/upload-section-logo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({dataBase64:dataBase64,fileName:file.name})});var json=await res.json();if(!res.ok||!json.ok)throw new Error(json.error||"Erreur upload");if(logo)logo.value=json.url;updateLogoPreview(json.url);status("Logo import\u00e9 avec succ\u00e8s.")}catch(err){status("Impossible d'importer le logo : "+err.message,true)}finally{logoUploadBtn.disabled=false;logoUploadBtn.textContent="\ud83d\udcc1 Importer";logoFile.value=""}};reader.readAsDataURL(file)}catch(err){logoUploadBtn.disabled=false;logoUploadBtn.textContent="\ud83d\udcc1 Importer";status("Impossible de lire le fichier.",true)}})}var contentDialog=document.getElementById("home-section-content-dialog"),contentClose=document.getElementById("home-section-content-close"),contentCancel=document.getElementById("home-section-content-cancel-btn"),contentSave=document.getElementById("home-section-content-save-btn"),contentSearchInput=document.getElementById("home-section-content-search-input"),contentSearchBtn=document.getElementById("home-section-content-search-btn");if(contentClose)contentClose.addEventListener("click",function(){if(contentDialog)contentDialog.close()});if(contentCancel)contentCancel.addEventListener("click",function(){if(contentDialog)contentDialog.close()});if(contentSearchBtn&&contentSearchInput){contentSearchBtn.addEventListener("click",function(){searchMediaForContentDialog(contentSearchInput.value)});contentSearchInput.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();searchMediaForContentDialog(contentSearchInput.value)}});var searchDebounce=null;contentSearchInput.addEventListener("input",function(){if(searchDebounce)clearTimeout(searchDebounce);searchDebounce=setTimeout(function(){searchMediaForContentDialog(contentSearchInput.value)},320)})}if(contentSave&&contentDialog){contentSave.addEventListener("click",async function(){if(!activeContentSection)return;contentSave.disabled=true;contentSave.textContent="Enregistrement...";var statusEl=document.getElementById("home-section-content-status");if(statusEl)statusEl.textContent="Enregistrement du contenu...";try{await req("/admin_home_sections?id=eq."+encodeURIComponent(activeContentSection.id),{method:"PATCH",body:JSON.stringify({custom_entries:activeContentItems})});activeContentSection.custom_entries=activeContentItems;if(state.homeCache&&Array.isArray(state.homeCache.sections)){var cached=state.homeCache.sections.find(function(s){return String(s.id)===String(activeContentSection.id)});if(cached)cached.entries=activeContentItems.slice()}if(typeof window.veloraInvalidateHomeCache==="function")window.veloraInvalidateHomeCache();await loadHomeCache(true);renderHome();status("Contenu de la section \u00ab "+activeContentSection.title+" \u00bb enregistr\u00e9 !");contentDialog.close()}catch(err){if(statusEl)statusEl.textContent="Erreur : "+err.message}finally{contentSave.disabled=false;contentSave.textContent="Enregistrer le contenu"}})}document.getElementById("country-select")?.addEventListener("change",function(){window.setTimeout(renderHome,0)});if(rebuild)rebuild.addEventListener("click",async function(){rebuild.disabled=true;if(cacheStatus){cacheStatus.textContent="Chargement des packages et reconstruction du cache...";cacheStatus.classList.remove("error")}try{await ensurePlayerCatalog();var cachedSections=[];for(var section of state.sections){var isHoriz=section.card_orientation==="horizontal",entries=[];if(Array.isArray(section.custom_entries)&&section.custom_entries.length>0){entries=section.custom_entries.slice()}else{entries=typeof window.veloraGetHomeSectionContent==="function"?await window.veloraGetHomeSectionContent(section.content_type,section.package_id,isHoriz):[]}if(isHoriz&&Array.isArray(entries)){entries=entries.map(function(e){var key=String(e.sourceId||"")+":"+String(e.streamId||"")+":"+String(e.name||"");var cached=clientBackdropCache.get(key);var b=cached||e.backdropUrl||e.backdrop||e.thumbUrl;return Object.assign({},e,{thumbUrl:b,backdropUrl:b,section_logo_url:section.logo_url||section.badge_logo_url||""})})}cachedSections.push(Object.assign({},section,{entries:entries,card_orientation:section.card_orientation||"vertical",logo_url:section.logo_url||section.badge_logo_url||""}))}if(!cachedSections.some(function(section){return section.entries.length>0}))throw new Error("Aucun contenu charge depuis les packages");var response=await fetch("/api/velora-db/home-cache/rebuild",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({sections:cachedSections})}),result=await response.json();if(!response.ok)throw new Error(result.error||"HTTP "+response.status);if(typeof window.veloraInvalidateHomeCache==="function")window.veloraInvalidateHomeCache();await loadHomeCache(true);renderHome();if(cacheStatus)cacheStatus.textContent="Cache recree : "+result.sections+" section(s), "+result.entries+" contenu(s)."}catch(e){if(cacheStatus){cacheStatus.textContent="Impossible de reconstruire le cache Accueil : "+(e&&e.message?e.message:String(e));cacheStatus.classList.add("error")}}finally{rebuild.disabled=false}});if(add)add.addEventListener("click",async function(){var title=document.getElementById("home-section-title"),select=document.getElementById("home-section-package"),orientation=document.getElementById("home-section-card-orientation"),logo=document.getElementById("home-section-logo-url"),published=document.getElementById("home-section-published"),defaultCountry=document.getElementById("home-section-country-default"),listWrap=document.getElementById("home-section-countries-list");if(!title||!title.value.trim()){status("Veuillez saisir un nom pour la section.",true);if(title)title.focus();return}var targetCountries=[];if(defaultCountry&&defaultCountry.checked){targetCountries.push("default")}else if(listWrap){listWrap.querySelectorAll("input[type='checkbox']:checked").forEach(function(cb){if(cb.value&&!targetCountries.includes(cb.value))targetCountries.push(cb.value)})}if(!targetCountries.length)targetCountries=["default"];if(editingSectionId!=null){add.disabled=true;try{await req("/admin_home_sections?id=eq."+encodeURIComponent(editingSectionId),{method:"PATCH",body:JSON.stringify({country_id:targetCountries.join(","),country_ids:targetCountries,content_type:type.value,title:title.value.trim(),card_orientation:orientation?orientation.value:"vertical",logo_url:logo?logo.value.trim():"",package_id:select?select.value:"",published:published?published.checked:true})});resetEditor();await load();status("Section modifi\u00e9e avec succ\u00e8s !")}catch(e){status("Impossible de modifier la section : "+e.message,true)}finally{add.disabled=false}return}add.disabled=true;status("Cr\u00e9ation de la section...");try{var order=state.sections.length?Math.max.apply(null,state.sections.map(function(r){return Number(r.section_order)||0}))+1:0;await req("/admin_home_sections",{method:"POST",body:JSON.stringify({country_id:targetCountries.join(","),country_ids:targetCountries,content_type:type.value,title:title.value.trim(),card_orientation:orientation?orientation.value:"vertical",logo_url:logo?logo.value.trim():"",package_id:select?select.value:"",custom_entries:[],published:published?published.checked:true,section_order:order})});resetEditor();await load();status("Section cr\u00e9\u00e9e avec succ\u00e8s ! Cliquez sur \u00ab Contenu \u00bb pour y ajouter des films ou s\u00e9ries.")}catch(e){status("Impossible de cr\u00e9er la section : "+e.message,true)}finally{add.disabled=false}});loadHomeCache(false).then(function(){renderHome()}).catch(function(){});var adminLoaded=false,main=document.getElementById("main");function loadAdminIfVisible(){if(adminLoaded||!main||!main.classList.contains("main--velora-admin"))return;adminLoaded=true;load()}if(main){new MutationObserver(loadAdminIfVisible).observe(main,{attributes:true,attributeFilter:["class"]});loadAdminIfVisible()}}
+var resumeMinInput=document.getElementById("home-resume-min-minutes"),resumeMinSaveBtn=document.getElementById("home-resume-min-minutes-save"),resumeMinStatus=document.getElementById("home-resume-settings-status");async function saveResumeMinMinutes(){if(!resumeMinInput)return;var rawVal=parseFloat(resumeMinInput.value),val=(isNaN(rawVal)||rawVal<0)?3:rawVal;resumeMinInput.value=val;if(resumeMinSaveBtn)resumeMinSaveBtn.disabled=true;if(resumeMinStatus){resumeMinStatus.textContent="Enregistrement...";resumeMinStatus.style.color="#a78bfa"}try{await req("/admin_settings",{method:"POST",body:JSON.stringify({id:"resume_min_watch_minutes",key:"resume_min_watch_minutes",value:val})});window.__veloraResumeMinWatchMinutes=val;try{localStorage.setItem("velora_resume_min_watch_minutes",String(val))}catch(_){}if(resumeMinStatus){resumeMinStatus.textContent="Temps minimum ("+val+" min) enregistr\u00e9 avec succ\u00e8s !";resumeMinStatus.style.color="#86efac";setTimeout(function(){if(resumeMinStatus)resumeMinStatus.textContent=""},4000)}if(typeof window.veloraInjectResumeSection==="function")window.veloraInjectResumeSection();document.dispatchEvent(new CustomEvent("velora-resume-settings-changed"));document.dispatchEvent(new CustomEvent("velora-watch-history-updated"))}catch(err){if(resumeMinStatus){resumeMinStatus.textContent="Erreur : "+err.message;resumeMinStatus.style.color="#fca5a5"}}finally{if(resumeMinSaveBtn)resumeMinSaveBtn.disabled=false}}if(resumeMinSaveBtn)resumeMinSaveBtn.addEventListener("click",saveResumeMinMinutes);if(resumeMinInput){resumeMinInput.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();saveResumeMinMinutes()}})}if(type)type.addEventListener("change",fillPackages);if(countryVisibleOnly)countryVisibleOnly.addEventListener("change",function(){fillCountries();fillPackages();renderAdmin()});if(filterCountry)filterCountry.addEventListener("change",function(){fillPackages();renderAdmin()});if(defaultCountryCb){defaultCountryCb.addEventListener("change",function(){if(defaultCountryCb.checked&&listWrap){listWrap.querySelectorAll("input[type='checkbox']").forEach(function(cb){cb.checked=false})}})}if(listWrap){listWrap.addEventListener("change",function(e){if(e.target&&e.target.type==="checkbox"){var anyChecked=Array.from(listWrap.querySelectorAll("input[type='checkbox']")).some(function(cb){return cb.checked});if(defaultCountryCb){defaultCountryCb.checked=!anyChecked}}})}if(countriesAllBtn)countriesAllBtn.addEventListener("click",function(){if(listWrap){listWrap.querySelectorAll("input[type='checkbox']").forEach(function(cb){cb.checked=true})}if(defaultCountryCb)defaultCountryCb.checked=false});if(countriesNoneBtn)countriesNoneBtn.addEventListener("click",function(){if(listWrap){listWrap.querySelectorAll("input[type='checkbox']").forEach(function(cb){cb.checked=false})}if(defaultCountryCb)defaultCountryCb.checked=true});if(packageSearch)packageSearch.addEventListener("input",function(){fillPackages()});if(packageSelect)packageSelect.addEventListener("change",function(){var title=document.getElementById("home-section-title"),option=packageSelect.options[packageSelect.selectedIndex];if(title&&option&&option.value&&(!title.value.trim()||editingSectionId==null)){title.value=String(option.textContent||"").trim()}});if(logo)logo.addEventListener("input",function(){updateLogoPreview(logo.value)});if(logoUploadBtn&&logoFile){logoUploadBtn.addEventListener("click",function(){logoFile.click()});logoFile.addEventListener("change",async function(){var file=logoFile.files&&logoFile.files[0];if(!file)return;if(file.size>5*1024*1024){status("Le fichier est trop volumineux (max 5 Mo).",true);return}logoUploadBtn.disabled=true;logoUploadBtn.textContent="\u23f3 Import...";status("T\u00e9l\u00e9versement du logo...");try{var reader=new FileReader();reader.onload=async function(e){try{var dataBase64=e.target.result;var res=await fetch("/api/velora-db/upload-section-logo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({dataBase64:dataBase64,fileName:file.name})});var json=await res.json();if(!res.ok||!json.ok)throw new Error(json.error||"Erreur upload");if(logo)logo.value=json.url;updateLogoPreview(json.url);status("Logo import\u00e9 avec succ\u00e8s.")}catch(err){status("Impossible d'importer le logo : "+err.message,true)}finally{logoUploadBtn.disabled=false;logoUploadBtn.textContent="\ud83d\udcc1 Importer";logoFile.value=""}};reader.readAsDataURL(file)}catch(err){logoUploadBtn.disabled=false;logoUploadBtn.textContent="\ud83d\udcc1 Importer";status("Impossible de lire le fichier.",true)}})}var contentDialog=document.getElementById("home-section-content-dialog"),contentClose=document.getElementById("home-section-content-close"),contentCancel=document.getElementById("home-section-content-cancel-btn"),contentSave=document.getElementById("home-section-content-save-btn"),contentSearchInput=document.getElementById("home-section-content-search-input"),contentSearchBtn=document.getElementById("home-section-content-search-btn");if(contentClose)contentClose.addEventListener("click",function(){if(contentDialog)contentDialog.close()});if(contentCancel)contentCancel.addEventListener("click",function(){if(contentDialog)contentDialog.close()});if(contentSearchBtn&&contentSearchInput){contentSearchBtn.addEventListener("click",function(){searchMediaForContentDialog(contentSearchInput.value)});contentSearchInput.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();searchMediaForContentDialog(contentSearchInput.value)}});var searchDebounce=null;contentSearchInput.addEventListener("input",function(){if(searchDebounce)clearTimeout(searchDebounce);searchDebounce=setTimeout(function(){searchMediaForContentDialog(contentSearchInput.value)},320)})}if(contentSave&&contentDialog){contentSave.addEventListener("click",async function(){if(!activeContentSection)return;contentSave.disabled=true;contentSave.textContent="Enregistrement...";var statusEl=document.getElementById("home-section-content-status");if(statusEl)statusEl.textContent="Enregistrement du contenu...";try{await req("/admin_home_sections?id=eq."+encodeURIComponent(activeContentSection.id),{method:"PATCH",body:JSON.stringify({custom_entries:activeContentItems})});activeContentSection.custom_entries=activeContentItems;if(state.homeCache&&Array.isArray(state.homeCache.sections)){var cached=state.homeCache.sections.find(function(s){return String(s.id)===String(activeContentSection.id)});if(cached)cached.entries=activeContentItems.slice()}if(typeof window.veloraInvalidateHomeCache==="function")window.veloraInvalidateHomeCache();await loadHomeCache(true);renderHome();status("Contenu de la section \u00ab "+activeContentSection.title+" \u00bb enregistr\u00e9 !");contentDialog.close()}catch(err){if(statusEl)statusEl.textContent="Erreur : "+err.message}finally{contentSave.disabled=false;contentSave.textContent="Enregistrer le contenu"}})}document.getElementById("country-select")?.addEventListener("change",function(){window.setTimeout(renderHome,0)});if(rebuild)rebuild.addEventListener("click",async function(){rebuild.disabled=true;if(cacheStatus){cacheStatus.textContent="Chargement des packages et reconstruction du cache...";cacheStatus.classList.remove("error")}try{await ensurePlayerCatalog();var cachedSections=[];for(var section of state.sections){var isHoriz=section.card_orientation==="horizontal",entries=[];if(Array.isArray(section.custom_entries)&&section.custom_entries.length>0){entries=section.custom_entries.slice()}else{entries=typeof window.veloraGetHomeSectionContent==="function"?await window.veloraGetHomeSectionContent(section.content_type,section.package_id,isHoriz):[]}if(isHoriz&&Array.isArray(entries)){entries=entries.map(function(e){var key=String(e.sourceId||"")+":"+String(e.streamId||"")+":"+String(e.name||"");var cached=clientBackdropCache.get(key);var b=cached||e.backdropUrl||e.backdrop||e.thumbUrl;return Object.assign({},e,{thumbUrl:b,backdropUrl:b,section_logo_url:section.logo_url||section.badge_logo_url||""})})}cachedSections.push(Object.assign({},section,{entries:entries,card_orientation:section.card_orientation||"vertical",logo_url:section.logo_url||section.badge_logo_url||""}))}if(!cachedSections.some(function(section){return section.entries.length>0}))throw new Error("Aucun contenu charge depuis les packages");var response=await fetch("/api/velora-db/home-cache/rebuild",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({sections:cachedSections})}),result=await response.json();if(!response.ok)throw new Error(result.error||"HTTP "+response.status);if(typeof window.veloraInvalidateHomeCache==="function")window.veloraInvalidateHomeCache();await loadHomeCache(true);renderHome();if(cacheStatus)cacheStatus.textContent="Cache recree : "+result.sections+" section(s), "+result.entries+" contenu(s)."}catch(e){if(cacheStatus){cacheStatus.textContent="Impossible de reconstruire le cache Accueil : "+(e&&e.message?e.message:String(e));cacheStatus.classList.add("error")}}finally{rebuild.disabled=false}});if(add)add.addEventListener("click",async function(){var title=document.getElementById("home-section-title"),select=document.getElementById("home-section-package"),orientation=document.getElementById("home-section-card-orientation"),logo=document.getElementById("home-section-logo-url"),published=document.getElementById("home-section-published"),defaultCountry=document.getElementById("home-section-country-default"),listWrap=document.getElementById("home-section-countries-list");if(!title||!title.value.trim()){status("Veuillez saisir un nom pour la section.",true);if(title)title.focus();return}var targetCountries=[];if(defaultCountry&&defaultCountry.checked){targetCountries.push("default")}else if(listWrap){listWrap.querySelectorAll("input[type='checkbox']:checked").forEach(function(cb){if(cb.value&&!targetCountries.includes(cb.value))targetCountries.push(cb.value)})}if(!targetCountries.length)targetCountries=["default"];if(editingSectionId!=null){add.disabled=true;try{await req("/admin_home_sections?id=eq."+encodeURIComponent(editingSectionId),{method:"PATCH",body:JSON.stringify({country_id:targetCountries.join(","),country_ids:targetCountries,content_type:type.value,title:title.value.trim(),card_orientation:orientation?orientation.value:"vertical",logo_url:logo?logo.value.trim():"",package_id:select?select.value:"",published:published?published.checked:true})});resetEditor();await load();status("Section modifi\u00e9e avec succ\u00e8s !")}catch(e){status("Impossible de modifier la section : "+e.message,true)}finally{add.disabled=false}return}add.disabled=true;status("Cr\u00e9ation de la section...");try{var order=state.sections.length?Math.max.apply(null,state.sections.map(function(r){return Number(r.section_order)||0}))+1:0;await req("/admin_home_sections",{method:"POST",body:JSON.stringify({country_id:targetCountries.join(","),country_ids:targetCountries,content_type:type.value,title:title.value.trim(),card_orientation:orientation?orientation.value:"vertical",logo_url:logo?logo.value.trim():"",package_id:select?select.value:"",custom_entries:[],published:published?published.checked:true,section_order:order})});resetEditor();await load();status("Section cr\u00e9\u00e9e avec succ\u00e8s ! Cliquez sur \u00ab Contenu \u00bb pour y ajouter des films ou s\u00e9ries.")}catch(e){status("Impossible de cr\u00e9er la section : "+e.message,true)}finally{add.disabled=false}});
+
+loadHomeCache(false).then(function(){renderHome()}).catch(function(){});var adminLoaded=false,main=document.getElementById("main");function loadAdminIfVisible(){if(adminLoaded||!main||!main.classList.contains("main--velora-admin"))return;adminLoaded=true;load()}if(main){new MutationObserver(loadAdminIfVisible).observe(main,{attributes:true,attributeFilter:["class"]});loadAdminIfVisible()}}
+
+// Global Stored Media Manager (TMDB / Fanart.tv cached files)
+var storedMediaItems = [];
+var activeReplaceTarget = null;
+
+window.veloraOpenStoredMediaDialog = function() {
+  var dialog = document.getElementById("home-stored-media-dialog");
+  if (!dialog) return;
+  if (typeof dialog.showModal === "function") {
+    try {
+      if (!dialog.open) dialog.showModal();
+    } catch (e) {
+      dialog.setAttribute("open", "");
+    }
+  } else {
+    dialog.setAttribute("open", "");
+  }
+  dialog.style.display = "block";
+  window.veloraLoadStoredMedia();
+};
+
+window.veloraCloseStoredMediaDialog = function() {
+  var dialog = document.getElementById("home-stored-media-dialog");
+  if (!dialog) return;
+  if (typeof dialog.close === "function") {
+    try {
+      dialog.close();
+    } catch (e) {
+      dialog.removeAttribute("open");
+    }
+  } else {
+    dialog.removeAttribute("open");
+  }
+  dialog.style.display = "none";
+};
+
+window.veloraLoadStoredMedia = async function() {
+  var statusText = document.getElementById("stored-media-status-text");
+  var grid = document.getElementById("stored-media-grid");
+  var empty = document.getElementById("stored-media-empty");
+  if (statusText) statusText.textContent = "Chargement des images stockées...";
+  try {
+    var res = await fetch("/api/velora-db/stored-media?t=" + Date.now());
+    var json = await res.json();
+    if (!res.ok || !json.ok) throw new Error(json.error || "Erreur serveur");
+    storedMediaItems = Array.isArray(json.items) ? json.items : [];
+    window.veloraRenderStoredMediaGrid();
+    if (statusText) {
+      statusText.textContent = storedMediaItems.length
+        ? storedMediaItems.length + " image(s) trouvée(s)."
+        : "Aucune image stockée pour le moment.";
+    }
+  } catch (err) {
+    if (statusText) statusText.textContent = "Erreur : " + err.message;
+    if (grid) grid.replaceChildren();
+    if (empty) {
+      empty.style.display = "block";
+      empty.textContent = "Impossible de charger les images : " + err.message;
+    }
+  }
+};
+
+window.veloraRenderStoredMediaGrid = function() {
+  var grid = document.getElementById("stored-media-grid");
+  var empty = document.getElementById("stored-media-empty");
+  var searchInput = document.getElementById("stored-media-search-input");
+  var categorySelect = document.getElementById("stored-media-category-select");
+  var badge = document.getElementById("stored-media-count-badge");
+  var statusText = document.getElementById("stored-media-status-text");
+  if (!grid) return;
+
+  grid.replaceChildren();
+  var searchQ = (searchInput ? searchInput.value : "").trim().toLowerCase();
+  var catFilter = categorySelect ? categorySelect.value : "all";
+
+  var filtered = storedMediaItems.filter(function(item) {
+    if (catFilter !== "all" && item.category !== catFilter) return false;
+    if (searchQ) {
+      var matchFn = item.filename.toLowerCase().includes(searchQ);
+      var matchCat = (item.categoryLabel || "").toLowerCase().includes(searchQ);
+      if (!matchFn && !matchCat) return false;
+    }
+    return true;
+  });
+
+  if (badge) badge.textContent = filtered.length + " / " + storedMediaItems.length + " fichier(s)";
+
+  if (!filtered.length) {
+    if (empty) {
+      empty.style.display = "block";
+      empty.textContent = storedMediaItems.length ? "Aucun résultat pour ce filtre." : "Aucune image stockée.";
+    }
+    return;
+  }
+  if (empty) empty.style.display = "none";
+
+  filtered.forEach(function(item) {
+    var card = document.createElement("div");
+    card.className = "vel-stored-media-card";
+
+    var preview = document.createElement("div");
+    preview.className = "vel-stored-media-card__preview";
+
+    var img = document.createElement("img");
+    img.alt = item.filename;
+    img.loading = "lazy";
+    img.src = item.url;
+
+    var catBadge = document.createElement("span");
+    catBadge.className = "vel-stored-media-card__category-badge";
+    catBadge.textContent = item.categoryLabel || item.category;
+
+    var sizeBadge = document.createElement("span");
+    sizeBadge.className = "vel-stored-media-card__size-badge";
+    sizeBadge.textContent = item.sizeBytes ? (item.sizeBytes / 1024).toFixed(1) + " Ko" : "";
+
+    preview.append(img, catBadge, sizeBadge);
+
+    var info = document.createElement("div");
+    info.className = "vel-stored-media-card__info";
+
+    var nameEl = document.createElement("div");
+    nameEl.className = "vel-stored-media-card__name";
+    var cleanName = item.filename.replace(/\.[^.]+$/, '').replace(/-[0-9]+$/, '').replace(/[-_]+/g, ' ');
+    cleanName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+    nameEl.textContent = cleanName;
+    nameEl.title = cleanName;
+
+    var fnEl = document.createElement("div");
+    fnEl.className = "vel-stored-media-card__filename";
+    fnEl.textContent = item.filename;
+    fnEl.title = item.filename;
+
+    info.append(nameEl, fnEl);
+
+    var actions = document.createElement("div");
+    actions.className = "vel-stored-media-card__actions";
+
+    var replaceBtn = document.createElement("button");
+    replaceBtn.type = "button";
+    replaceBtn.className = "vel-stored-media-card__btn";
+    replaceBtn.innerHTML = "✏️ Remplacer";
+    replaceBtn.title = "Remplacer cette image (Fanart.tv / TMDB / Fichier)";
+    replaceBtn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      window.veloraOpenCandidatePicker(item);
+    });
+
+    var viewBtn = document.createElement("button");
+    viewBtn.type = "button";
+    viewBtn.className = "vel-stored-media-card__btn";
+    viewBtn.innerHTML = "👁️";
+    viewBtn.title = "Ouvrir l'image en grand";
+    viewBtn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      window.open(item.url, "_blank");
+    });
+
+    var delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "vel-stored-media-card__btn vel-stored-media-card__btn--delete";
+    delBtn.innerHTML = "🗑️";
+    delBtn.title = "Supprimer cette image";
+    delBtn.addEventListener("click", async function(e) {
+      e.stopPropagation();
+      if (!confirm("Supprimer définitivement l'image « " + item.filename + " » ?")) return;
+      delBtn.disabled = true;
+      if (statusText) statusText.textContent = "Suppression de " + item.filename + "...";
+      try {
+        var res = await fetch("/api/velora-db/stored-media/item?category=" + encodeURIComponent(item.category) + "&filename=" + encodeURIComponent(item.filename), {
+          method: "DELETE"
+        });
+        var data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || "Erreur lors de la suppression");
+        storedMediaItems = storedMediaItems.filter(function(x) { return x.id !== item.id; });
+        window.veloraRenderStoredMediaGrid();
+        if (statusText) statusText.textContent = "« " + item.filename + " » supprimée avec succès.";
+      } catch (err) {
+        alert("Erreur : " + err.message);
+        delBtn.disabled = false;
+      }
+    });
+
+    actions.append(replaceBtn, viewBtn, delBtn);
+    card.append(preview, info, actions);
+    grid.appendChild(card);
+  });
+};
+
+// Candidate Picker for TMDB & Fanart.tv
+var fetchedCandidates = [];
+var activeCandidateFilter = 'all';
+var activeCandidateLang = 'all';
+
+window.veloraOpenCandidatePicker = function(item) {
+  activeReplaceTarget = item;
+  var dialog = document.getElementById("home-stored-media-replace-dialog");
+  if (!dialog) return;
+
+  var titleEl = document.getElementById("stored-media-replace-title");
+  var searchInput = document.getElementById("stored-media-replace-search-input");
+  var typeSelect = document.getElementById("stored-media-replace-type-select");
+  var statusText = document.getElementById("stored-media-replace-status-text");
+
+  var fn = item.filename || '';
+  var match = fn.match(/^(.*?)(?:-(\d+))?\.[a-zA-Z0-9]+$/);
+  var extractedTitle = match ? match[1].replace(/[-_]+/g, ' ').trim() : fn;
+  var tmdbId = match && match[2] ? match[2] : '';
+  extractedTitle = extractedTitle.charAt(0).toUpperCase() + extractedTitle.slice(1);
+
+  if (titleEl) titleEl.innerHTML = '<span>🎨 Choisir une nouvelle image pour : <strong>' + (extractedTitle || item.filename) + '</strong></span>';
+  if (searchInput) searchInput.value = extractedTitle;
+  if (typeSelect) {
+    if (item.category === 'series' || fn.includes('tv') || fn.includes('series')) typeSelect.value = 'tv';
+    else if (item.category === 'movies' || fn.includes('movie')) typeSelect.value = 'movie';
+    else typeSelect.value = 'auto';
+  }
+  if (statusText) statusText.textContent = "Recherche en cours sur Fanart.tv et TMDB...";
+
+  activeCandidateFilter = 'all';
+  activeCandidateLang = 'all';
+  document.querySelectorAll('#stored-media-replace-type-tabs .vel-candidate-tab').forEach(function(tab) {
+    tab.classList.toggle('is-active', tab.getAttribute('data-type-filter') === 'all');
+  });
+  var langSel = document.getElementById("stored-media-replace-lang-select");
+  if (langSel) langSel.value = 'all';
+
+  if (typeof dialog.showModal === "function") {
+    try {
+      if (!dialog.open) dialog.showModal();
+    } catch (e) {
+      dialog.setAttribute("open", "");
+    }
+  } else {
+    dialog.setAttribute("open", "");
+  }
+  dialog.style.display = "block";
+
+  window.veloraFetchCandidates(extractedTitle, typeSelect ? typeSelect.value : 'auto', tmdbId, item.category);
+};
+
+window.veloraCloseCandidatePicker = function() {
+  var dialog = document.getElementById("home-stored-media-replace-dialog");
+  if (!dialog) return;
+  if (typeof dialog.close === "function") {
+    try {
+      dialog.close();
+    } catch (e) {
+      dialog.removeAttribute("open");
+    }
+  } else {
+    dialog.removeAttribute("open");
+  }
+  dialog.style.display = "none";
+};
+
+window.veloraFetchCandidates = async function(title, type, tmdbId, category) {
+  var grid = document.getElementById("stored-media-candidates-grid");
+  var loading = document.getElementById("stored-media-candidates-loading");
+  var empty = document.getElementById("stored-media-candidates-empty");
+  var badge = document.getElementById("stored-media-replace-count-badge");
+  var statusText = document.getElementById("stored-media-replace-status-text");
+
+  if (grid) grid.replaceChildren();
+  if (loading) loading.style.display = "block";
+  if (empty) empty.style.display = "none";
+  if (badge) badge.textContent = "Recherche...";
+
+  try {
+    var queryParams = new URLSearchParams();
+    if (title) queryParams.set("title", title);
+    if (type && type !== 'auto') queryParams.set("type", type);
+    if (tmdbId) queryParams.set("tmdbId", tmdbId);
+    if (category) queryParams.set("category", category);
+    if (activeReplaceTarget && activeReplaceTarget.filename) queryParams.set("filename", activeReplaceTarget.filename);
+
+    var res = await fetch("/api/velora-db/stored-media/candidates?" + queryParams.toString() + "&t=" + Date.now());
+    var json = await res.json();
+    if (!res.ok || !json.ok) throw new Error(json.error || "Erreur de recherche");
+
+    fetchedCandidates = Array.isArray(json.candidates) ? json.candidates : [];
+    if (loading) loading.style.display = "none";
+
+    window.veloraRenderCandidatesGrid();
+
+    if (statusText) {
+      statusText.textContent = fetchedCandidates.length
+        ? fetchedCandidates.length + " image(s) trouvée(s) pour « " + (json.title || title) + " » (" + (json.year || 'TMDB') + "). Cliquez sur « Choisir » pour appliquer."
+        : "Aucune image trouvée sur Fanart.tv / TMDB.";
+    }
+  } catch (err) {
+    if (loading) loading.style.display = "none";
+    if (empty) {
+      empty.style.display = "block";
+      empty.textContent = "Erreur de chargement : " + err.message;
+    }
+    if (statusText) statusText.textContent = "Erreur : " + err.message;
+  }
+};
+
+window.veloraRenderCandidatesGrid = function() {
+  var grid = document.getElementById("stored-media-candidates-grid");
+  var empty = document.getElementById("stored-media-candidates-empty");
+  var badge = document.getElementById("stored-media-replace-count-badge");
+  if (!grid) return;
+
+  grid.replaceChildren();
+
+  var filtered = fetchedCandidates.filter(function(cand) {
+    if (activeCandidateFilter !== 'all' && cand.type !== activeCandidateFilter) return false;
+    if (activeCandidateLang !== 'all') {
+      if (activeCandidateLang === 'null' && cand.lang && cand.lang !== 'null') return false;
+      if (activeCandidateLang !== 'null' && cand.lang !== activeCandidateLang) return false;
+    }
+    return true;
+  });
+
+  if (badge) badge.textContent = filtered.length + " / " + fetchedCandidates.length + " image(s)";
+
+  if (!filtered.length) {
+    if (empty) {
+      empty.style.display = "block";
+      empty.textContent = fetchedCandidates.length ? "Aucun résultat pour ce filtre." : "Aucune image disponible.";
+    }
+    return;
+  }
+  if (empty) empty.style.display = "none";
+
+  filtered.forEach(function(cand) {
+    var card = document.createElement("div");
+    card.className = "vel-candidate-card" + (cand.type === 'poster' ? " vel-candidate-card--poster" : "");
+
+    var preview = document.createElement("div");
+    preview.className = "vel-candidate-card__preview";
+
+    var img = document.createElement("img");
+    img.alt = cand.typeLabel || "";
+    img.loading = "lazy";
+    img.src = cand.previewUrl;
+
+    var sourceBadge = document.createElement("span");
+    sourceBadge.className = "vel-candidate-badge vel-candidate-badge--source " + (cand.source === 'Fanart.tv' ? "vel-candidate-badge--fanart" : "vel-candidate-badge--tmdb");
+    sourceBadge.textContent = cand.source;
+
+    var langBadge = document.createElement("span");
+    langBadge.className = "vel-candidate-badge vel-candidate-badge--lang " + (cand.lang === 'fr' ? "vel-candidate-badge--lang-fr" : "");
+    langBadge.textContent = cand.lang && cand.lang !== 'null' ? cand.lang.toUpperCase() : 'Sans texte';
+
+    preview.append(img, sourceBadge, langBadge);
+
+    var info = document.createElement("div");
+    info.className = "vel-candidate-card__info";
+
+    var typeEl = document.createElement("div");
+    typeEl.className = "vel-candidate-card__type";
+    typeEl.textContent = cand.typeLabel || cand.type;
+
+    var metaEl = document.createElement("div");
+    metaEl.className = "vel-candidate-card__meta";
+    var dimSpan = document.createElement("span");
+    dimSpan.textContent = (cand.width && cand.height) ? (cand.width + " × " + cand.height) : (cand.isTransparent ? "PNG Transparent" : "HD");
+    var likesSpan = document.createElement("span");
+    likesSpan.textContent = cand.likes ? ("★ " + cand.likes) : "";
+    metaEl.append(dimSpan, likesSpan);
+
+    info.append(typeEl, metaEl);
+
+    var actions = document.createElement("div");
+    actions.className = "vel-candidate-card__actions";
+
+    var chooseBtn = document.createElement("button");
+    chooseBtn.type = "button";
+    chooseBtn.className = "vel-candidate-card__btn-choose";
+    chooseBtn.innerHTML = "✓ Choisir";
+    chooseBtn.title = "Appliquer cette image";
+    chooseBtn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      window.veloraApplyCandidateImage(cand);
+    });
+
+    var viewBtn = document.createElement("button");
+    viewBtn.type = "button";
+    viewBtn.className = "vel-candidate-card__btn-view";
+    viewBtn.innerHTML = "👁️";
+    viewBtn.title = "Ouvrir en grand";
+    viewBtn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      window.open(cand.fullUrl || cand.previewUrl, "_blank");
+    });
+
+    actions.append(chooseBtn, viewBtn);
+    card.append(preview, info, actions);
+    grid.appendChild(card);
+  });
+};
+
+window.veloraApplyCandidateImage = async function(candidate) {
+  if (!activeReplaceTarget || !candidate) return;
+  var statusText = document.getElementById("stored-media-replace-status-text");
+  if (statusText) statusText.textContent = "Téléchargement et application de l'image...";
+
+  try {
+    var res = await fetch("/api/velora-db/stored-media/apply-candidate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        category: activeReplaceTarget.category,
+        filename: activeReplaceTarget.filename,
+        imageUrl: candidate.fullUrl || candidate.previewUrl
+      })
+    });
+    var data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "Erreur lors du remplacement");
+
+    if (statusText) statusText.textContent = "Image remplacée avec succès !";
+    window.veloraCloseCandidatePicker();
+
+    var mainStatus = document.getElementById("stored-media-status-text");
+    if (mainStatus) mainStatus.textContent = "« " + activeReplaceTarget.filename + " » a été remplacée par l'image choisie depuis " + candidate.source + " !";
+
+    await window.veloraLoadStoredMedia();
+  } catch (err) {
+    alert("Impossible d'appliquer l'image : " + err.message);
+    if (statusText) statusText.textContent = "Erreur : " + err.message;
+  }
+};
+
+document.addEventListener("click", function(event) {
+  var target = event.target;
+  if (!target) return;
+  if (target.closest("#home-stored-media-manager-btn")) {
+    event.preventDefault();
+    window.veloraOpenStoredMediaDialog();
+  } else if (target.closest("#home-stored-media-close") || target.closest("#home-stored-media-close-footer")) {
+    event.preventDefault();
+    window.veloraCloseStoredMediaDialog();
+  } else if (target.closest("#home-stored-media-replace-close") || target.closest("#home-stored-media-replace-close-footer")) {
+    event.preventDefault();
+    window.veloraCloseCandidatePicker();
+  } else if (target.closest("#stored-media-refresh-btn")) {
+    event.preventDefault();
+    window.veloraLoadStoredMedia();
+  } else if (target.closest("#stored-media-replace-search-btn")) {
+    event.preventDefault();
+    var searchInp = document.getElementById("stored-media-replace-search-input");
+    var typeSel = document.getElementById("stored-media-replace-type-select");
+    var q = searchInp ? searchInp.value.trim() : "";
+    var t = typeSel ? typeSel.value : "auto";
+    if (q) window.veloraFetchCandidates(q, t, "", activeReplaceTarget ? activeReplaceTarget.category : "");
+  } else if (target.closest(".vel-candidate-tab")) {
+    var tab = target.closest(".vel-candidate-tab");
+    activeCandidateFilter = tab.getAttribute("data-type-filter") || "all";
+    document.querySelectorAll('#stored-media-replace-type-tabs .vel-candidate-tab').forEach(function(tb) {
+      tb.classList.toggle("is-active", tb === tab);
+    });
+    window.veloraRenderCandidatesGrid();
+  } else if (target.closest("#stored-media-replace-local-file-btn")) {
+    event.preventDefault();
+    var fileReplacer = document.getElementById("stored-media-file-replacer");
+    if (fileReplacer) {
+      fileReplacer.value = "";
+      fileReplacer.click();
+    }
+  } else if (target.closest("#stored-media-delete-all-btn")) {
+    event.preventDefault();
+    var catSelect = document.getElementById("stored-media-category-select");
+    var cat = catSelect ? catSelect.value : "all";
+    var catLabel = cat === "all" ? "TOUTES les images stockées" : "les images de la catégorie sélectionnée";
+    if (!confirm("⚠️ ATTENTION : Voulez-vous vraiment supprimer " + catLabel + " ?\nCette action est irréversible.")) return;
+    var statusText = document.getElementById("stored-media-status-text");
+    if (statusText) statusText.textContent = "Suppression en masse...";
+    fetch("/api/velora-db/stored-media/clear-all?category=" + encodeURIComponent(cat), { method: "DELETE" })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data || !data.ok) throw new Error(data && data.error || "Erreur suppression");
+        if (statusText) statusText.textContent = (data.deletedCount || 0) + " image(s) supprimée(s).";
+        window.veloraLoadStoredMedia();
+      })
+      .catch(function(err) {
+        alert("Erreur : " + err.message);
+      });
+  }
+});
+
+document.addEventListener("input", function(event) {
+  if (event.target && event.target.id === "stored-media-search-input") {
+    window.veloraRenderStoredMediaGrid();
+  }
+});
+
+document.addEventListener("keydown", function(event) {
+  if (event.key === "Enter" && event.target && event.target.id === "stored-media-replace-search-input") {
+    event.preventDefault();
+    var searchInp = document.getElementById("stored-media-replace-search-input");
+    var typeSel = document.getElementById("stored-media-replace-type-select");
+    var q = searchInp ? searchInp.value.trim() : "";
+    var t = typeSel ? typeSel.value : "auto";
+    if (q) window.veloraFetchCandidates(q, t, "", activeReplaceTarget ? activeReplaceTarget.category : "");
+  }
+});
+
+document.addEventListener("change", function(event) {
+  if (event.target && event.target.id === "stored-media-category-select") {
+    window.veloraRenderStoredMediaGrid();
+  } else if (event.target && event.target.id === "stored-media-replace-lang-select") {
+    activeCandidateLang = event.target.value || "all";
+    window.veloraRenderCandidatesGrid();
+  } else if (event.target && event.target.id === "stored-media-file-replacer") {
+    var fileReplacer = event.target;
+    var file = fileReplacer.files && fileReplacer.files[0];
+    if (!file || !activeReplaceTarget) return;
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Fichier trop volumineux (max 10 Mo).");
+      return;
+    }
+    var statusText = document.getElementById("stored-media-status-text");
+    if (statusText) statusText.textContent = "Remplacement en cours...";
+    var reader = new FileReader();
+    reader.onload = async function(e) {
+      try {
+        var dataBase64 = e.target.result;
+        var res = await fetch("/api/velora-db/stored-media/upload-replace", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category: activeReplaceTarget.category,
+            filename: activeReplaceTarget.filename,
+            dataBase64: dataBase64
+          })
+        });
+        var json = await res.json();
+        if (!res.ok || !json.ok) throw new Error(json.error || "Erreur remplacement");
+        if (statusText) statusText.textContent = "Image remplacée avec succès !";
+        window.veloraCloseCandidatePicker();
+        await window.veloraLoadStoredMedia();
+      } catch (err) {
+        alert("Impossible de remplacer l'image : " + err.message);
+      } finally {
+        fileReplacer.value = "";
+        activeReplaceTarget = null;
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+});
 function handleCountrySwitch(){window.setTimeout(function(){loadHomeCache(false).then(renderHome).catch(function(){})},40)}
 document.getElementById("country-select")?.addEventListener("change",handleCountrySwitch);
 document.getElementById("home-country-select")?.addEventListener("change",handleCountrySwitch);

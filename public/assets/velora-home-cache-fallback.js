@@ -269,7 +269,7 @@
     card.setAttribute("aria-label", cleanTitle || entry.name || "");
     card.dataset.packageId = String(section.package_id || entry.packageId || "");
     card.dataset.contentType = String(section.content_type || entry.contentType || "");
-    var media, imgUrl = isHorizontal ? (entry.backdropUrl || entry.backdrop || entry.thumbUrl) : (entry.thumbUrl || entry.backdropUrl || entry.backdrop);
+    var media, imgUrl = isHorizontal ? (entry.horizontal_thumb || entry.backdropUrl || entry.backdrop || entry.thumbUrl) : (entry.thumbUrl || entry.backdropUrl || entry.backdrop);
     if (imgUrl) {
       media = document.createElement("img");
       card.classList.add("is-poster-loading");
@@ -302,56 +302,80 @@
     name.textContent = cleanTitle || entry.name || "";
     card.append(media, name);
     if (isHorizontal) {
-      var titleLogoUrl = String(entry.title_logo || entry.titleLogo || entry.logo || "").trim();
-      var applyTitleLogo = function (url) {
-        if (!url || url === "NONE") return;
-        if (card.querySelector(".vel-home-section__title-logo")) return;
-        card.classList.add("has-title-logo");
-        var logoImg = document.createElement("img");
-        logoImg.className = "vel-home-section__title-logo";
-        logoImg.alt = cleanTitle || entry.name || "";
-        logoImg.loading = "lazy";
-        logoImg.decoding = "async";
-        var smartScale = function () {
-          var nw = logoImg.naturalWidth, nh = logoImg.naturalHeight;
-          if (nw && nh) {
-            var r = nw / nh;
-            if (r >= 2.4) logoImg.classList.add("vel-title-logo--wide");
-            else if (r <= 1.45) logoImg.classList.add("vel-title-logo--tall");
-            else logoImg.classList.add("vel-title-logo--standard");
+      var hasIntegratedTitle = Boolean(entry.has_integrated_title || entry.horizontal_thumb);
+      if (hasIntegratedTitle) {
+        card.classList.add("has-integrated-title");
+      } else {
+        var titleLogoUrl = String(entry.title_logo || entry.titleLogo || entry.logo || "").trim();
+        var applyTitleLogo = function (url) {
+          if (!url || url === "NONE") return;
+          if (card.querySelector(".vel-home-section__title-logo")) return;
+          card.classList.add("has-title-logo");
+          var logoImg = document.createElement("img");
+          logoImg.className = "vel-home-section__title-logo";
+          logoImg.alt = cleanTitle || entry.name || "";
+          logoImg.loading = "lazy";
+          logoImg.decoding = "async";
+          var smartScale = function () {
+            var nw = logoImg.naturalWidth, nh = logoImg.naturalHeight;
+            if (nw && nh) {
+              var r = nw / nh;
+              if (r >= 2.4) logoImg.classList.add("vel-title-logo--wide");
+              else if (r <= 1.45) logoImg.classList.add("vel-title-logo--tall");
+              else logoImg.classList.add("vel-title-logo--standard");
+            }
+          };
+          logoImg.onload = smartScale;
+          logoImg.onerror = function () {
+            card.classList.remove("has-title-logo");
+            logoImg.remove();
+          };
+          logoImg.src = url;
+          if (logoImg.complete) smartScale();
+          card.appendChild(logoImg);
+        };
+        if (titleLogoUrl) {
+          applyTitleLogo(titleLogoUrl);
+        } else if (cleanTitle && (section.content_type === "movies" || section.content_type === "series" || entry.contentType === "movies" || entry.contentType === "series")) {
+          var cType = section.content_type || entry.contentType || "movies";
+          if (!window.__veloraFetchingLogos) window.__veloraFetchingLogos = new Map();
+          var logoKey = cType + ":" + cleanTitle.toLowerCase();
+          if (!window.__veloraFetchingLogos.has(logoKey)) {
+            var p = fetch("/api/velora-db/title-logo?name=" + encodeURIComponent(cleanTitle) + "&type=" + encodeURIComponent(cType))
+              .then(function (r) { return r.ok ? r.json() : null; })
+              .then(function (data) {
+                if (data && data.hasHorizontalThumb && data.thumbUrl) {
+                  entry.horizontal_thumb = data.thumbUrl;
+                  entry.has_integrated_title = true;
+                  entry.backdropUrl = data.thumbUrl;
+                  entry.thumbUrl = data.thumbUrl;
+                  return { type: "thumb", url: data.thumbUrl };
+                }
+                if (data && data.url) {
+                  entry.title_logo = data.url;
+                  return { type: "logo", url: data.url };
+                }
+                return null;
+              })
+              .catch(function () { return null; });
+            window.__veloraFetchingLogos.set(logoKey, p);
           }
-        };
-        logoImg.onload = smartScale;
-        logoImg.onerror = function () {
-          card.classList.remove("has-title-logo");
-          logoImg.remove();
-        };
-        logoImg.src = url;
-        if (logoImg.complete) smartScale();
-        card.appendChild(logoImg);
-      };
-      if (titleLogoUrl) {
-        applyTitleLogo(titleLogoUrl);
-      } else if (cleanTitle && (section.content_type === "movies" || section.content_type === "series" || entry.contentType === "movies" || entry.contentType === "series")) {
-        var cType = section.content_type || entry.contentType || "movies";
-        if (!window.__veloraFetchingLogos) window.__veloraFetchingLogos = new Map();
-        var logoKey = cType + ":" + cleanTitle.toLowerCase();
-        if (!window.__veloraFetchingLogos.has(logoKey)) {
-          var p = fetch("/api/velora-db/title-logo?name=" + encodeURIComponent(cleanTitle) + "&type=" + encodeURIComponent(cType))
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (data) {
-              if (data && data.url) {
-                entry.title_logo = data.url;
-                return data.url;
+          window.__veloraFetchingLogos.get(logoKey).then(function (res) {
+            if (!res) return;
+            if (res.type === "thumb" && res.url) {
+              card.classList.add("has-integrated-title");
+              if (media.tagName === "IMG") {
+                if (typeof window.veloraSetHomeImageSource === "function") {
+                  window.veloraSetHomeImageSource(media, res.url);
+                } else {
+                  media.src = res.url;
+                }
               }
-              return null;
-            })
-            .catch(function () { return null; });
-          window.__veloraFetchingLogos.set(logoKey, p);
+            } else if (res.type === "logo" && res.url) {
+              applyTitleLogo(res.url);
+            }
+          });
         }
-        window.__veloraFetchingLogos.get(logoKey).then(function (resolvedUrl) {
-          if (resolvedUrl) applyTitleLogo(resolvedUrl);
-        });
       }
     }
     var logoUrl = String(section && (section.logo_url || section.badge_logo_url) || entry && (entry.section_logo_url || entry.logo_url) || "").trim();

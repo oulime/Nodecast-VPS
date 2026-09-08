@@ -288,16 +288,53 @@
 }
 .vel-home-section__card--resume {
   position: relative !important;
+  flex: 0 0 clamp(14.5rem, 38vw, 20.5rem) !important;
+  flex-basis: clamp(14.5rem, 38vw, 20.5rem) !important;
+  width: clamp(14.5rem, 38vw, 20.5rem) !important;
+  max-width: clamp(14.5rem, 38vw, 20.5rem) !important;
+  aspect-ratio: 16/9 !important;
+  padding: 0 !important;
   overflow: hidden !important;
   border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-radius: 10px !important;
   background: #0d0c14 !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.52) !important;
+  display: block !important;
+  cursor: pointer !important;
+  transition: transform 220ms cubic-bezier(0.2, 0.9, 0.4, 1), border-color 220ms ease, box-shadow 220ms ease !important;
+}
+.vel-home-section__card--resume:hover,
+.vel-home-section__card--resume:focus-visible {
+  transform: translateY(-4px) scale(1.035) !important;
+  border-color: rgba(255, 255, 255, 0.88) !important;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.88), 0 0 24px rgba(229, 9, 20, 0.4) !important;
+  outline: none !important;
+  z-index: 5 !important;
+}
+.vel-home-section__card--resume::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.08) 35%, rgba(3, 2, 8, 0.65) 70%, rgba(3, 2, 8, 0.94) 100%) !important;
+  pointer-events: none !important;
+  z-index: 2 !important;
+  transition: opacity 220ms ease !important;
 }
 .vel-home-section__card--resume .vel-home-section__media {
-  display: block;
-  width: 100%;
-  aspect-ratio: 2/3;
-  object-fit: cover;
-  border-radius: 11px;
+  position: absolute !important;
+  inset: 0 !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  aspect-ratio: 16/9 !important;
+  object-fit: cover !important;
+  border-radius: inherit !important;
+  background: #090811 !important;
+  transition: transform 320ms cubic-bezier(0.2, 0.9, 0.4, 1) !important;
+}
+.vel-home-section__card--resume:hover .vel-home-section__media,
+.vel-home-section__card--resume:focus-visible .vel-home-section__media {
+  transform: scale(1.055) !important;
 }
 .vel-resume-play-center {
   position: absolute;
@@ -331,8 +368,8 @@
 }
 .vel-resume-badge {
   position: absolute;
-  top: 7px;
-  left: 7px;
+  top: 8px;
+  left: 8px;
   z-index: 4;
   padding: 3px 8px;
   border-radius: 6px;
@@ -351,35 +388,61 @@
   flex-direction: column !important;
   justify-content: flex-end !important;
   position: absolute !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
+  bottom: 8px !important;
+  left: 10px !important;
+  right: 10px !important;
+  max-width: calc(100% - 20px) !important;
   z-index: 3 !important;
   min-height: auto !important;
-  padding: 1.8rem 0.55rem 0.55rem !important;
-  background: linear-gradient(0deg, rgba(5,4,10,0.96) 0%, rgba(5,4,10,0.72) 65%, transparent 100%) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
   text-align: left !important;
   pointer-events: none !important;
 }
 .vel-home-section__card--resume .vel-home-section__name strong {
-  display: block;
-  font-size: 0.76rem;
-  font-weight: 900;
-  color: #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+  display: block !important;
+  font-size: clamp(0.78rem, 1.8vw, 0.92rem) !important;
+  font-weight: 900 !important;
+  color: #fff !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.95), 0 1px 3px rgba(0,0,0,0.9) !important;
+  line-height: 1.2 !important;
 }
 .vel-home-section__card--resume .vel-home-section__name small {
-  display: block;
-  font-size: 0.64rem;
-  font-weight: 700;
-  color: #cbd5e1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-top: 1px;
+  display: block !important;
+  font-size: clamp(0.65rem, 1.5vw, 0.72rem) !important;
+  font-weight: 750 !important;
+  color: #cbd5e1 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.9) !important;
+  margin-top: 1px !important;
+  line-height: 1.15 !important;
+}
+@media(max-width:640px) {
+  .vel-home-section__card--resume {
+    flex: 0 0 clamp(12.5rem, 62vw, 17.5rem) !important;
+    flex-basis: clamp(12.5rem, 62vw, 17.5rem) !important;
+    width: clamp(12.5rem, 62vw, 17.5rem) !important;
+    max-width: clamp(12.5rem, 62vw, 17.5rem) !important;
+    border-radius: 9px !important;
+  }
+  .vel-home-section__card--resume .vel-home-section__name {
+    bottom: 6px !important;
+    left: 8px !important;
+    right: 8px !important;
+    max-width: calc(100% - 16px) !important;
+  }
+  .vel-home-section__card--resume .vel-home-section__name strong {
+    font-size: 0.78rem !important;
+  }
+  .vel-home-section__card--resume .vel-home-section__name small {
+    font-size: 0.64rem !important;
+  }
 }
 .vel-resume-progress-bar {
   position: absolute !important;
@@ -389,8 +452,8 @@
   height: 4.5px !important;
   background: rgba(255, 255, 255, 0.25) !important;
   z-index: 5 !important;
-  border-bottom-left-radius: 11px;
-  border-bottom-right-radius: 11px;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
   overflow: hidden;
 }
 .vel-resume-progress-fill {

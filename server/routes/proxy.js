@@ -358,19 +358,29 @@ function getStreamsFromDb(sourceId, type, categoryId = null, includeHidden = fal
     const items = db.prepare(query).all(...params);
 
     // Map to Xtream format
+    const channelLogoMatcher = type === 'live' ? require('../services/channelLogoMatcher') : null;
     return items.map(item => {
         const data = JSON.parse(item.data || '{}');
-        // Override with our local fields if needed, or just return the mixed object
-        // We should ensure critical fields are present
+        let icon = String(item.stream_icon || '').trim();
+        if (type === 'live' && !icon && channelLogoMatcher) {
+            try {
+                const match = channelLogoMatcher.matchChannelLogo(item.name);
+                if (match && match.logo) {
+                    icon = match.logo;
+                } else if (typeof channelLogoMatcher.resolveChannelPackageLogo === 'function') {
+                    icon = channelLogoMatcher.resolveChannelPackageLogo(item.name, item.category_id, item.source_id, item.item_id) || '';
+                }
+            } catch (_) {}
+        }
         return {
             ...data,
             source_id: item.source_id,
             stream_id: item.item_id, // ensure ID matches what client expects
             series_id: type === 'series' ? item.item_id : undefined,
             name: item.name,
-            stream_icon: item.stream_icon,
+            stream_icon: icon || item.stream_icon,
             stream_url: item.stream_url || data.stream_url || data.url,
-            cover: item.stream_icon, // series/vod often use cover
+            cover: icon || item.stream_icon, // series/vod often use cover
             added: item.added_at,
             rating: item.rating,
             container_extension: item.container_extension,
@@ -415,10 +425,22 @@ function getStreamsFromDbForSources(sourceIds, type, categoryId = null, includeH
 
     query += ` ORDER BY source_id ASC, provider_order ASC, rowid ASC`;
 
+    const channelLogoMatcher = type === 'live' ? require('../services/channelLogoMatcher') : null;
     return db.prepare(query).all(...params).map(item => {
         const data = JSON.parse(item.data || '{}');
         const globalStreamId = encodeGlobalId(item.source_id, item.item_id);
         const globalCategoryId = encodeGlobalId(item.source_id, item.category_id);
+        let icon = String(item.stream_icon || '').trim();
+        if (type === 'live' && !icon && channelLogoMatcher) {
+            try {
+                const match = channelLogoMatcher.matchChannelLogo(item.name);
+                if (match && match.logo) {
+                    icon = match.logo;
+                } else if (typeof channelLogoMatcher.resolveChannelPackageLogo === 'function') {
+                    icon = channelLogoMatcher.resolveChannelPackageLogo(item.name, item.category_id, item.source_id, item.item_id) || '';
+                }
+            } catch (_) {}
+        }
         return {
             ...data,
             source_id: item.source_id,
@@ -428,9 +450,9 @@ function getStreamsFromDbForSources(sourceIds, type, categoryId = null, includeH
             raw_series_id: type === 'series' ? item.item_id : undefined,
             series_id: type === 'series' ? globalStreamId : undefined,
             name: item.name,
-            stream_icon: item.stream_icon,
+            stream_icon: icon || item.stream_icon,
             stream_url: item.stream_url || data.stream_url || data.url,
-            cover: item.stream_icon,
+            cover: icon || item.stream_icon,
             added: item.added_at,
             rating: item.rating,
             container_extension: item.container_extension,

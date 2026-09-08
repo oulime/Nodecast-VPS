@@ -243,6 +243,7 @@
       })
       .catch(function() {});
   }
+  window.veloraEnsureCardBackdrop = veloraEnsureCardBackdrop;
 
   function createCard(section, entry) {
     var card = document.createElement("button");

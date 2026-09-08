@@ -775,7 +775,7 @@ function isCountryFlagUrl(url) {
     return url.includes('flagcdn.com') || url.includes('/flags/') || url.includes('country_') || url.includes('/logos/arabe.svg');
 }
 
-function sanitizeChannelIcon(name, streamIcon, packageCover = '') {
+function sanitizeChannelIcon(name, streamIcon, packageCover = '', channelMetadata = null) {
     const rawIcon = String(streamIcon || '').trim();
     if (rawIcon && isOfficialLogoUrl(rawIcon) && !isCountryFlagUrl(rawIcon)) {
         return rawIcon;
@@ -785,13 +785,15 @@ function sanitizeChannelIcon(name, streamIcon, packageCover = '') {
         const url = typeof matched === 'string' ? matched : (matched.logo || '');
         if (url && !isCountryFlagUrl(url)) return url;
     }
-    const cleanPkgCover = String(packageCover || '').trim();
-    if (cleanPkgCover && isOfficialLogoUrl(cleanPkgCover) && !isCountryFlagUrl(cleanPkgCover)) {
+    let cleanPkgCover = String(packageCover || '').trim();
+    if (!cleanPkgCover && typeof channelLogoMatcher.resolveChannelPackageLogo === 'function') {
+        cleanPkgCover = channelLogoMatcher.resolveChannelPackageLogo(channelMetadata || name);
+    }
+    if (cleanPkgCover) {
         return cleanPkgCover;
     }
-    if (!isOfficialChannelsLogosOnly()) {
-        if (rawIcon && !isCountryFlagUrl(rawIcon)) return rawIcon;
-        if (cleanPkgCover && !isCountryFlagUrl(cleanPkgCover)) return cleanPkgCover;
+    if (!isOfficialChannelsLogosOnly() && rawIcon) {
+        return rawIcon;
     }
     return '';
 }
@@ -2549,7 +2551,14 @@ function buildHomeCache() {
                 const rawId = item.streamId ?? item.stream_id ?? item.raw_stream_id ?? a;
                 const sourceId = String(item.sourceId ?? item.source_id ?? '').trim();
                 if (sourceId && !enabledSourceIds.has(sourceId)) return null;
-                const standardThumb = String(item.thumbUrl || item.stream_icon || item.cover || '');
+                const sectionPkgCover = String(packageRow.cover_url || section.logo_url || section.badge_logo_url || item.section_logo_url || '').trim();
+                const standardThumb = type === 'live'
+                    ? sanitizeChannelIcon(rawName, item.thumbUrl || item.stream_icon || item.cover || '', sectionPkgCover, {
+                        package_id: section.package_id,
+                        source_id: sourceId,
+                        item_id: rawId
+                    })
+                    : String(item.thumbUrl || item.stream_icon || item.cover || '');
                 const backdropUrl = String(item.backdropUrl || item.backdrop || standardThumb || '');
                 const finalThumb = (isHorizontal && backdropUrl) ? backdropUrl : (standardThumb || backdropUrl);
                 let titleLogo = item.title_logo || item.titleLogo || item.logo || '';
@@ -2607,11 +2616,14 @@ function buildHomeCache() {
                     if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w1280${url}`;
                     backdropUrl = url;
                 }
-                if (!backdropUrl && isHorizontal) {
-                    backdropUrl = backdropCache[key] || backdropCache[titleKey] || '';
-                }
+                const sectionPkgCover = String(packageRow.cover_url || section.logo_url || section.badge_logo_url || '').trim();
                 const standardThumb = type === 'live'
-                    ? sanitizeChannelIcon(rawName, item.stream_icon || item.cover || '')
+                    ? sanitizeChannelIcon(rawName, item.stream_icon || item.cover || '', sectionPkgCover, {
+                        package_id: section.package_id,
+                        category_id: item.raw_category_id ?? item.category_id,
+                        source_id: item.source_id,
+                        item_id: rawId
+                    })
                     : String(item.stream_icon || item.cover || '');
                 const finalThumb = (isHorizontal && backdropUrl) ? backdropUrl : (standardThumb || backdropUrl);
                 let titleLogo = item.title_logo || item.titleLogo || item.logo || '';

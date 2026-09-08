@@ -297,6 +297,17 @@ class SyncService {
                     name = item.name || `Channel ${item.stream_id}`;
                     catId = item.category_id;
                     icon = item.stream_icon;
+                    if (!icon || !String(icon).trim()) {
+                        try {
+                            const channelLogoMatcher = require('./channelLogoMatcher');
+                            const match = channelLogoMatcher.matchChannelLogo(name);
+                            if (match && match.logo) {
+                                icon = match.logo;
+                            } else if (typeof channelLogoMatcher.resolveChannelPackageLogo === 'function') {
+                                icon = channelLogoMatcher.resolveChannelPackageLogo(name, catId, sourceId, itemId) || '';
+                            }
+                        } catch (_) {}
+                    }
                     added = item.added;
                 } else if (type === 'movie') {
                     itemId = item.stream_id;

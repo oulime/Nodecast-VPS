@@ -35,10 +35,37 @@
       }
       .vel-home-section__card--resume {
         position: relative !important;
+        flex: 0 0 clamp(14.5rem, 38vw, 20.5rem) !important;
+        flex-basis: clamp(14.5rem, 38vw, 20.5rem) !important;
+        width: clamp(14.5rem, 38vw, 20.5rem) !important;
+        max-width: clamp(14.5rem, 38vw, 20.5rem) !important;
+        aspect-ratio: 16/9 !important;
+        padding: 0 !important;
         overflow: hidden !important;
         border: 1px solid rgba(255, 255, 255, 0.18) !important;
+        border-radius: 10px !important;
         background: #0d0c14 !important;
-        transition: transform 0.28s cubic-bezier(0.2, 0, 0, 1), opacity 0.28s cubic-bezier(0.2, 0, 0, 1), width 0.28s cubic-bezier(0.2, 0, 0, 1), min-width 0.28s cubic-bezier(0.2, 0, 0, 1), max-width 0.28s cubic-bezier(0.2, 0, 0, 1), margin 0.28s cubic-bezier(0.2, 0, 0, 1), padding 0.28s cubic-bezier(0.2, 0, 0, 1), border-color 0.28s ease !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.52) !important;
+        display: block !important;
+        cursor: pointer !important;
+        transition: transform 0.28s cubic-bezier(0.2, 0, 0, 1), opacity 0.28s cubic-bezier(0.2, 0, 0, 1), width 0.28s cubic-bezier(0.2, 0, 0, 1), min-width 0.28s cubic-bezier(0.2, 0, 0, 1), max-width 0.28s cubic-bezier(0.2, 0, 0, 1), margin 0.28s cubic-bezier(0.2, 0, 0, 1), padding 0.28s cubic-bezier(0.2, 0, 0, 1), border-color 0.28s ease, box-shadow 0.28s ease !important;
+      }
+      .vel-home-section__card--resume:hover,
+      .vel-home-section__card--resume:focus-visible {
+        transform: translateY(-4px) scale(1.035) !important;
+        border-color: rgba(255, 255, 255, 0.88) !important;
+        box-shadow: 0 20px 48px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.88), 0 0 24px rgba(229, 9, 20, 0.4) !important;
+        outline: none !important;
+        z-index: 5 !important;
+      }
+      .vel-home-section__card--resume::before {
+        content: "" !important;
+        position: absolute !important;
+        inset: 0 !important;
+        background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.08) 35%, rgba(3, 2, 8, 0.65) 70%, rgba(3, 2, 8, 0.94) 100%) !important;
+        pointer-events: none !important;
+        z-index: 2 !important;
+        transition: opacity 220ms ease !important;
       }
       .vel-home-section__card--resume.is-removing {
         opacity: 0 !important;
@@ -55,15 +82,24 @@
         pointer-events: none !important;
       }
       .vel-home-section__card--resume .vel-home-section__media {
-        display: block;
-        width: 100%;
-        aspect-ratio: 2/3;
-        object-fit: cover;
-        border-radius: 11px;
+        position: absolute !important;
+        inset: 0 !important;
+        display: block !important;
+        width: 100% !important;
+        height: 100% !important;
+        aspect-ratio: 16/9 !important;
+        object-fit: cover !important;
+        border-radius: inherit !important;
+        background: #090811 !important;
+        transition: transform 320ms cubic-bezier(0.2, 0.9, 0.4, 1) !important;
+      }
+      .vel-home-section__card--resume:hover .vel-home-section__media,
+      .vel-home-section__card--resume:focus-visible .vel-home-section__media {
+        transform: scale(1.055) !important;
       }
       .vel-resume-play-center {
         position: absolute;
-        top: 50%;
+        top: 42%;
         left: 50%;
         transform: translate(-50%, -50%);
         width: 2.6rem;
@@ -94,8 +130,8 @@
       }
       .vel-resume-badge {
         position: absolute;
-        top: 7px;
-        left: 7px;
+        top: 8px;
+        left: 8px;
         z-index: 4;
         padding: 3px 8px;
         border-radius: 6px;
@@ -111,8 +147,8 @@
       }
       .vel-resume-remove-btn {
         position: absolute !important;
-        top: 7px !important;
-        right: 7px !important;
+        top: 8px !important;
+        right: 8px !important;
         z-index: 6 !important;
         width: 22px !important;
         height: 22px !important;
@@ -170,8 +206,8 @@
         height: 4.5px !important;
         background: rgba(255, 255, 255, 0.25) !important;
         z-index: 5 !important;
-        border-bottom-left-radius: 11px;
-        border-bottom-right-radius: 11px;
+        border-bottom-left-radius: 10px;
+        border-bottom-right-radius: 10px;
         overflow: hidden;
       }
       .vel-resume-progress-fill {
@@ -180,13 +216,65 @@
         box-shadow: 0 0 8px rgba(229, 9, 20, 0.9) !important;
       }
       .vel-home-section__card--resume .vel-home-section__name {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-        min-height: 0 !important;
-        margin: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: flex-end !important;
+        position: absolute !important;
+        bottom: 8px !important;
+        left: 10px !important;
+        right: 10px !important;
+        max-width: calc(100% - 20px) !important;
+        z-index: 3 !important;
+        min-height: auto !important;
         padding: 0 !important;
+        margin: 0 !important;
+        background: transparent !important;
+        text-align: left !important;
         pointer-events: none !important;
+      }
+      .vel-home-section__card--resume .vel-home-section__name strong {
+        display: block !important;
+        font-size: clamp(0.78rem, 1.8vw, 0.92rem) !important;
+        font-weight: 900 !important;
+        color: #ffffff !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95), 0 1px 3px rgba(0, 0, 0, 0.9) !important;
+        line-height: 1.2 !important;
+      }
+      .vel-home-section__card--resume .vel-home-section__name small {
+        display: block !important;
+        font-size: clamp(0.65rem, 1.5vw, 0.72rem) !important;
+        font-weight: 750 !important;
+        color: #cbd5e1 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9) !important;
+        margin-top: 1px !important;
+        line-height: 1.15 !important;
+      }
+      @media(max-width:640px) {
+        .vel-home-section__card--resume {
+          flex: 0 0 clamp(12.5rem, 62vw, 17.5rem) !important;
+          flex-basis: clamp(12.5rem, 62vw, 17.5rem) !important;
+          width: clamp(12.5rem, 62vw, 17.5rem) !important;
+          max-width: clamp(12.5rem, 62vw, 17.5rem) !important;
+          border-radius: 9px !important;
+        }
+        .vel-home-section__card--resume .vel-home-section__name {
+          bottom: 6px !important;
+          left: 8px !important;
+          right: 8px !important;
+          max-width: calc(100% - 16px) !important;
+        }
+        .vel-home-section__card--resume .vel-home-section__name strong {
+          font-size: 0.78rem !important;
+        }
+        .vel-home-section__card--resume .vel-home-section__name small {
+          font-size: 0.64rem !important;
+        }
       }
 
       /* --- Series Episode Rows in Series Detail Page --- */
@@ -596,6 +684,7 @@
 
     var existingEntry = getLocalHistory().find(function (item) { return String(item.id) === String(id); });
     var thumb = cleanCoverUrl(media.thumbUrl || (existingEntry ? existingEntry.thumbUrl : "") || "");
+    var backdrop = cleanCoverUrl(media.backdropUrl || (existingEntry ? existingEntry.backdropUrl : "") || media.thumbUrl || "");
 
     var entry = {
       id: String(id),
@@ -606,8 +695,10 @@
       seasonNumber: media.seasonNumber != null ? Number(media.seasonNumber) : null,
       episodeNumber: media.episodeNumber != null ? Number(media.episodeNumber) : null,
       name: media.name,
+      seriesName: media.seriesName || media.name || null,
       episodeTitle: media.episodeTitle || null,
       thumbUrl: thumb,
+      backdropUrl: backdrop || thumb,
       packageId: media.packageId || "",
       sourceId: media.sourceId || "",
       containerExtension: media.containerExtension || "mp4",
@@ -1201,7 +1292,8 @@
       name: d.seriesName || d.name,
       seriesName: d.seriesName || d.name,
       episodeTitle: d.episodeTitle || null,
-      thumbUrl: cleanCoverUrl(d.poster || ""),
+      thumbUrl: cleanCoverUrl(d.poster || d.cover || d.thumbUrl || ""),
+      backdropUrl: cleanCoverUrl(d.backdropUrl || d.backdrop || d.backdrop_path || d.backdrop_url || d.cover || d.poster || ""),
       packageId: d.packageId || "",
       sourceId: d.sourceId || "",
       containerExtension: d.containerExtension || "mp4",
@@ -1258,7 +1350,7 @@
     if (!deduplicated.length) return null;
 
     var block = document.createElement("section");
-    block.className = "vel-home-section vel-home-section--resume";
+    block.className = "vel-home-section vel-home-section--resume vel-home-section--horizontal";
 
     var heading = document.createElement("h3");
     heading.className = "vel-home-section__heading";
@@ -1272,9 +1364,9 @@
       var isSeries = item.type === "series";
       var card = document.createElement("button");
       card.type = "button";
-      card.className = "vel-home-section__card vel-home-section__card--" + (isSeries ? "series" : "movies") + " vel-home-section__card--resume";
+      card.className = "vel-home-section__card vel-home-section__card--" + (isSeries ? "series" : "movies") + " vel-home-section__card--resume vel-home-section__card--horizontal";
       card.setAttribute("tabindex", "0");
-      card.setAttribute("aria-label", "Continuer de regarder " + item.name);
+      card.setAttribute("aria-label", "Continuer de regarder " + (item.seriesName || item.name));
 
       var entryForOpen = isSeries ? {
         id: "series:" + (item.seriesId || item.streamId),
@@ -1286,6 +1378,7 @@
         currentTime: item.currentTime,
         name: item.seriesName || item.name,
         thumbUrl: item.thumbUrl || item.cover || item.stream_icon || "",
+        backdropUrl: item.backdropUrl || item.backdrop || item.thumbUrl || item.cover || "",
         cover: item.thumbUrl || item.cover || item.stream_icon || "",
         packageId: item.packageId || "series:all",
         sourceId: item.sourceId || "",
@@ -1300,26 +1393,32 @@
       var sectionMeta = {
         id: isSeries ? "series" : "movies",
         content_type: isSeries ? "series" : "movies",
-        package_id: item.packageId || (isSeries ? "series:all" : "movies:all")
+        package_id: item.packageId || (isSeries ? "series:all" : "movies:all"),
+        card_orientation: "horizontal"
       };
       if (typeof window.veloraBindHomeCardActivation === "function") {
         window.veloraBindHomeCardActivation(card, sectionMeta, entryForOpen);
       }
 
-      // Poster Media
+      // Poster / Backdrop Media (16:9)
       var media = document.createElement("img");
       media.alt = "";
       media.loading = "lazy";
       media.decoding = "async";
       media.className = "vel-home-section__media";
-      if (item.thumbUrl && typeof window.veloraSetHomeImageSource === "function") {
-        window.veloraSetHomeImageSource(media, item.thumbUrl, function () {
-          media.removeAttribute("src");
-          media.classList.add("vel-home-section__fallback");
-          media.textContent = "▶";
+      var imgSrc = item.backdropUrl || item.backdrop || item.thumbUrl || item.cover || "";
+      if (imgSrc && typeof window.veloraSetHomeImageSource === "function") {
+        window.veloraSetHomeImageSource(media, imgSrc, function () {
+          if (imgSrc !== item.thumbUrl && item.thumbUrl) {
+            media.src = item.thumbUrl;
+          } else {
+            media.removeAttribute("src");
+            media.classList.add("vel-home-section__fallback");
+            media.textContent = "▶";
+          }
         });
-      } else if (item.thumbUrl) {
-        media.src = item.thumbUrl;
+      } else if (imgSrc) {
+        media.src = imgSrc;
       } else {
         media.classList.add("vel-home-section__fallback");
         media.textContent = "▶";
@@ -1344,6 +1443,28 @@
         badge.textContent = item.progressPercent + "%";
       } else {
         badge.textContent = "Film";
+      }
+
+      // Title & Subtitle Name Overlay at Bottom
+      var nameEl = document.createElement("span");
+      nameEl.className = "vel-home-section__name";
+      var titleStrong = document.createElement("strong");
+      titleStrong.textContent = item.seriesName || item.name || "";
+      nameEl.appendChild(titleStrong);
+
+      if (isSeries) {
+        var epSub = "";
+        if (item.seasonNumber != null && item.episodeNumber != null) {
+          epSub = "S" + item.seasonNumber + ":E" + item.episodeNumber;
+        }
+        if (item.episodeTitle && item.episodeTitle.trim()) {
+          epSub = (epSub ? epSub + " \u2022 " : "") + item.episodeTitle.trim();
+        }
+        if (epSub) {
+          var subSmall = document.createElement("small");
+          subSmall.textContent = epSub;
+          nameEl.appendChild(subSmall);
+        }
       }
 
       // Netflix-Style Red Progress Bar
@@ -1398,7 +1519,11 @@
       removeBtn.addEventListener("touchend", stopBubble, { passive: false });
       removeBtn.addEventListener("click", handleRemoveAction);
 
-      card.append(media, centerPlay, badge, removeBtn, progressBar);
+      card.append(media, centerPlay, badge, removeBtn, nameEl, progressBar);
+
+      if (typeof window.veloraEnsureCardBackdrop === "function") {
+        window.veloraEnsureCardBackdrop(card, media, sectionMeta, entryForOpen);
+      }
 
       card.addEventListener("click", function (event) {
         if (event.target && event.target.closest(".vel-resume-remove-btn, [data-prevent-card-open]")) {

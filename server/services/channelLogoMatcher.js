@@ -631,7 +631,7 @@ async function syncAllChannelLogos(options = {}) {
         const db = getDb();
 
         const channels = db.prepare(`
-            SELECT id, name, stream_icon, category_id
+            SELECT id, source_id, item_id, name, stream_icon, category_id
             FROM playlist_items
             WHERE type = 'live' AND is_hidden = 0
         `).all();
@@ -686,20 +686,13 @@ async function syncAllChannelLogos(options = {}) {
         const packagesUpdated = syncAllPackageCovers(db);
         syncProgress.packagesUpdated = packagesUpdated;
 
-        // Fallback pass: Channels that still don't have a logo inherit their package's cover (NEVER country flags)
-        let discovered = {};
-        try {
-            if (fs.existsSync(DISCOVERED_COVERS_FILE)) {
-                discovered = JSON.parse(fs.readFileSync(DISCOVERED_COVERS_FILE, 'utf8')) || {};
-            }
-        } catch (_) {}
-
-        const isCountryFlag = (url) => typeof url === 'string' && (url.includes('flagcdn.com') || url.includes('/flags/') || url.includes('country_') || url.includes('/logos/arabe.svg'));
+        // Fallback pass: Channels that still don't have a logo automatically inherit their package's logo/cover
+        const packageLookup = buildPackageCoverLookup(db);
 
         for (const ch of channels) {
             if (matchedChannels.has(ch.id)) continue;
             const currentIcon = String(ch.stream_icon || '').trim();
-            const hasExplicitIcon = currentIcon && !isCountryFlag(currentIcon) && (
+            const hasExplicitIcon = currentIcon && (
                 currentIcon.includes('iptv-org') ||
                 currentIcon.includes('github') ||
                 currentIcon.includes('wikimedia') ||
@@ -708,9 +701,8 @@ async function syncAllChannelLogos(options = {}) {
             );
 
             if (!hasExplicitIcon) {
-                const catId = String(ch.category_id || '').trim();
-                const pkgCover = (catId && discovered[catId]) ? (typeof discovered[catId] === 'string' ? discovered[catId] : discovered[catId]?.coverUrl) : '';
-                if (pkgCover && !isCountryFlag(pkgCover) && pkgCover !== currentIcon) {
+                const pkgCover = packageLookup.getCoverForChannel(ch);
+                if (pkgCover && pkgCover !== currentIcon) {
                     batch.push({ id: ch.id, logo: pkgCover });
                     syncProgress.updated++;
                 }
@@ -893,6 +885,8 @@ function getCountryFlagOrLogo(countryId, countryName = '') {
     return '';
 }
 
+const isCountryFlag = (url) => typeof url === 'string' && (url.includes('flagcdn.com') || url.includes('/flags/') || url.includes('country_') || url.includes('/logos/arabe.svg'));
+
 const DISCOVERED_COVERS_FILE = path.join(__dirname, '..', '..', 'data', 'package-discovered-covers.json');
 
 function syncAllPackageCovers(db) {
@@ -1006,6 +1000,210 @@ function syncAllPackageCovers(db) {
     }
 }
 
+function buildPackageCoverLookup(db = null) {
+    let veloraData = null;
+    try { veloraData = require('../routes/veloraData'); } catch (_) {}
+
+    let allPackages = [];
+    let allCurations = [];
+    let allCountries = [];
+    let adminPackageCovers = [];
+
+    if (veloraData && typeof veloraData.allRows === 'function') {
+        allPackages = veloraData.allRows('admin_packages') || [];
+        allCurations = veloraData.allRows('admin_stream_curations') || [];
+        allCountries = veloraData.allRows('admin_countries') || [];
+        adminPackageCovers = veloraData.allRows('admin_package_covers') || [];
+    }
+
+    let discovered = {};
+    try {
+        if (fs.existsSync(DISCOVERED_COVERS_FILE)) {
+            discovered = JSON.parse(fs.readFileSync(DISCOVERED_COVERS_FILE, 'utf8')) || {};
+        }
+    } catch (_) { discovered = {}; }
+
+    const countryById = new Map(allCountries.map(c => [String(c.id), c]));
+    const coverByPackageId = new Map();
+
+    // 1. Fill from admin_package_covers
+    for (const row of adminPackageCovers) {
+        const pkgId = String(row.package_id || '').trim();
+        const cover = String(row.cover_url || '').trim();
+        if (pkgId && cover && !row.deleted) {
+            coverByPackageId.set(pkgId, cover);
+        }
+    }
+
+    // 2. Fill from discovered covers
+    for (const [key, val] of Object.entries(discovered)) {
+        if (!key || !val) continue;
+        const cover = typeof val === 'string' ? val.trim() : String(val.coverUrl || '').trim();
+        if (cover && !coverByPackageId.has(key)) {
+            coverByPackageId.set(key, cover);
+        }
+    }
+
+    // 3. Fill from admin_packages
+    for (const pkg of allPackages) {
+        const pkgId = String(pkg.id || '').trim();
+        let cover = String(pkg.cover_url || '').trim();
+        if (!cover && coverByPackageId.has(pkgId)) {
+            cover = coverByPackageId.get(pkgId);
+        }
+        if (!cover) {
+            const pkgName = String(pkg.name || pkg.original_name || '').trim();
+            if (pkgName) {
+                const brandMatch = matchChannelLogo(pkgName);
+                if (brandMatch && brandMatch.logo) {
+                    cover = brandMatch.logo;
+                }
+            }
+        }
+        if (!cover) {
+            const countryName = countryById.get(String(pkg.country_id))?.name || pkg.country_name || '';
+            cover = getCountryFlagOrLogo(pkg.country_id, countryName);
+        }
+        if (cover) {
+            if (pkgId) coverByPackageId.set(pkgId, cover);
+        }
+    }
+
+    // 4. Mapping lookup structures:
+    // Curation lookup: "sourceId:streamId" -> package cover
+    const coverByCurationKey = new Map();
+    for (const cur of allCurations) {
+        const sourceId = String(cur.source_id ?? '').trim();
+        const streamId = String(cur.stream_id ?? '').trim();
+        const targetPkgId = String(cur.target_package_id ?? '').trim();
+        if (sourceId && streamId && targetPkgId && coverByPackageId.has(targetPkgId)) {
+            coverByCurationKey.set(`${sourceId}:${streamId}`, coverByPackageId.get(targetPkgId));
+        }
+    }
+
+    // Package by category_id & source_id, category_id, and package name
+    const coverBySourceAndCategory = new Map();
+    const coverByCategory = new Map();
+    const coverByPackageName = new Map();
+
+    for (const pkg of allPackages) {
+        const pkgId = String(pkg.id || '').trim();
+        const cover = coverByPackageId.get(pkgId) || String(pkg.cover_url || '').trim();
+        if (!cover) continue;
+
+        const sourceId = String(pkg.source_id ?? '').trim();
+        const catId = String(pkg.category_id ?? '').trim();
+        const name = String(pkg.name || pkg.original_name || '').trim();
+
+        if (sourceId && catId) {
+            coverBySourceAndCategory.set(`${sourceId}:${catId}`, cover);
+        }
+        if (catId) {
+            coverByCategory.set(catId, cover);
+        }
+        if (name) {
+            coverByPackageName.set(normalizeKey(name), cover);
+            coverByPackageName.set(normalizeKey(cleanChannelName(name)), cover);
+        }
+    }
+
+    // Categories table in SQLite for category names & logos
+    if (db) {
+        try {
+            const categoriesList = db.prepare(`SELECT source_id, category_id, name FROM categories WHERE type = 'live' OR type IS NULL`).all();
+            for (const cat of categoriesList) {
+                const sourceId = String(cat.source_id ?? '').trim();
+                const catId = String(cat.category_id ?? '').trim();
+                const catName = String(cat.name ?? '').trim();
+                if (!catName) continue;
+
+                const match = matchChannelLogo(catName);
+                const catCover = (match && match.logo) ? match.logo : getThematicCategoryLogo(catName);
+                if (catCover) {
+                    if (sourceId && catId && !coverBySourceAndCategory.has(`${sourceId}:${catId}`)) {
+                        coverBySourceAndCategory.set(`${sourceId}:${catId}`, catCover);
+                    }
+                    if (catId && !coverByCategory.has(catId)) {
+                        coverByCategory.set(catId, catCover);
+                    }
+                }
+            }
+        } catch (_) {}
+    }
+
+    return {
+        coverByPackageId,
+        coverByCurationKey,
+        coverBySourceAndCategory,
+        coverByCategory,
+        coverByPackageName,
+        getCoverForChannel: (ch) => {
+            if (!ch) return '';
+            const sourceId = String(ch.source_id ?? ch.sourceId ?? '').trim();
+            const itemId = String(ch.item_id ?? ch.stream_id ?? ch.streamId ?? ch.id ?? '').trim();
+            const catId = String(ch.category_id ?? ch.categoryId ?? ch.raw_category_id ?? '').trim();
+            const name = String(ch.name || ch.title || '').trim();
+
+            if (sourceId && itemId) {
+                const curCover = coverByCurationKey.get(`${sourceId}:${itemId}`);
+                if (curCover) return curCover;
+            }
+            if (sourceId && catId) {
+                const srcCatCover = coverBySourceAndCategory.get(`${sourceId}:${catId}`);
+                if (srcCatCover) return srcCatCover;
+            }
+            if (catId) {
+                const catCover = coverByCategory.get(catId);
+                if (catCover) return catCover;
+                if (coverByPackageId.has(catId)) {
+                    return coverByPackageId.get(catId);
+                }
+                if (discovered[catId]) {
+                    const d = discovered[catId];
+                    const url = typeof d === 'string' ? d : (d?.coverUrl || '');
+                    if (url) return url;
+                }
+            }
+            if (ch.package_id && coverByPackageId.has(String(ch.package_id))) {
+                return coverByPackageId.get(String(ch.package_id));
+            }
+            if (ch.package_name) {
+                const pkgNameNorm = normalizeKey(ch.package_name);
+                if (coverByPackageName.has(pkgNameNorm)) return coverByPackageName.get(pkgNameNorm);
+            }
+            return '';
+        }
+    };
+}
+
+let cachedPackageLookup = null;
+let cachedPackageLookupTime = 0;
+
+function resolveChannelPackageLogo(channelOrName, categoryId = '', sourceId = '', streamId = '') {
+    const now = Date.now();
+    if (!cachedPackageLookup || (now - cachedPackageLookupTime > 30000)) {
+        try {
+            const db = getDb();
+            cachedPackageLookup = buildPackageCoverLookup(db);
+            cachedPackageLookupTime = now;
+        } catch (_) {
+            cachedPackageLookup = buildPackageCoverLookup(null);
+            cachedPackageLookupTime = now;
+        }
+    }
+
+    if (typeof channelOrName === 'object' && channelOrName !== null) {
+        return cachedPackageLookup.getCoverForChannel(channelOrName);
+    }
+
+    return cachedPackageLookup.getCoverForChannel({
+        name: channelOrName,
+        category_id: categoryId,
+        source_id: sourceId,
+        item_id: streamId
+    });
+}
+
 async function searchLogos(query, limit = 60) {
     const term = String(query || '').trim().toLowerCase();
     if (!term) return [];
@@ -1107,7 +1305,9 @@ module.exports = {
     deleteCustomLogo,
     saveCustomLogosBulk,
     readRawCustomLogosFile,
-    searchLogos
+    searchLogos,
+    buildPackageCoverLookup,
+    resolveChannelPackageLogo
 };
 
 // Preload index immediately on startup

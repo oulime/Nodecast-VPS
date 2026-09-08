@@ -1217,7 +1217,8 @@ function getStreamAccountKey(streamUrl = '', req) {
         const parsed = new URL(streamUrl);
         const match = parsed.pathname.match(/\/(live|movie|series)\/([^/]+)\/([^/]+)/i);
         if (match) {
-            return `${parsed.host}:${match[1]}:${match[2]}`;
+            // match[2] is the IPTV username. Key is host:username so switching live<->movie cancels old stream immediately.
+            return `${parsed.host}:${match[2]}`;
         }
         return `${parsed.host}:${req.ip || 'client'}`;
     } catch (_) {
@@ -1227,7 +1228,7 @@ function getStreamAccountKey(streamUrl = '', req) {
 
 router.get('/stream', async (req, res) => {
     const maxRetries = 3;
-    const retryDelays = [400, 800, 1500];
+    const retryDelays = [500, 1000, 1800];
     let lastError = null;
 
     let { url } = req.query;
@@ -1263,7 +1264,7 @@ router.get('/stream', async (req, res) => {
         }
         activeStreamControllersByAccount.delete(accountKey);
         // Short pause to allow Node.js and remote CDN load-balancer to cleanly finalize the TCP socket closure
-        await new Promise(r => setTimeout(r, 100));
+        await new Promise(r => setTimeout(r, 120));
     }
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -1359,21 +1360,35 @@ router.get('/stream', async (req, res) => {
 
             // Retry on 5xx errors or transient burst rate limits (458, 429) when client is still connected
             if ((response.status >= 500 || response.status === 458 || response.status === 429) && attempt < maxRetries) {
-                if (req.destroyed || res.destroyed || res.writableEnded || abortController.signal.aborted) {
-                    if (onClose) req.off('close', onClose);
+                if (onClose) {
+                    try { req.off('close', onClose); } catch {}
+                }
+                try { abortController.abort(); } catch {}
+                try { response.body?.cancel?.().catch?.(() => {}); } catch {}
+                if (activeStreamControllersByAccount.get(accountKey)?.abortController === abortController) {
+                    activeStreamControllersByAccount.delete(accountKey);
+                }
+                if (req.destroyed || res.destroyed || res.writableEnded) {
                     return;
                 }
-                const delay = retryDelays[attempt - 1] || 400;
+                const delay = retryDelays[attempt - 1] || 500;
                 console.log(`[Proxy] Upstream transient status ${response.status} for ${cleanUrl.substring(0, 60)} (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms...`);
                 await new Promise(r => setTimeout(r, delay));
                 continue;
             }
 
             if (!response.ok) {
+                if (onClose) {
+                    try { req.off('close', onClose); } catch {}
+                }
+                try { abortController.abort(); } catch {}
+                try { response.body?.cancel?.().catch?.(() => {}); } catch {}
+                if (activeStreamControllersByAccount.get(accountKey)?.abortController === abortController) {
+                    activeStreamControllersByAccount.delete(accountKey);
+                }
                 // If upstream failed with 458/429/5xx and we have a cached manifest, serve it to prevent player stutter
                 if (isM3u8Url && liveManifestCache.has(url)) {
                     const cached = liveManifestCache.get(url);
-                    if (onClose) req.off('close', onClose);
                     res.set('Access-Control-Allow-Origin', '*');
                     res.set('X-Accel-Buffering', 'no');
                     res.set('Content-Type', 'application/vnd.apple.mpegurl');
@@ -1381,7 +1396,6 @@ router.get('/stream', async (req, res) => {
                     res.set('X-Velora-Manifest-Fallback', 'STALE_200');
                     return res.send(cached.manifest);
                 }
-                if (onClose) req.off('close', onClose);
                 console.error(`Upstream error for ${url.substring(0, 80)}...: ${response.status} ${response.statusText}`);
                 if (response.status === 403) {
                     const errorBody = await response.text().catch(() => 'N/A');

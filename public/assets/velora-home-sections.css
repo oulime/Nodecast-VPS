@@ -58,6 +58,15 @@
   z-index: 2 !important;
   transition: opacity 220ms ease !important;
 }
+.vel-home-section--horizontal .vel-home-section__card.has-integrated-title::before,
+.vel-home-section__card--horizontal.has-integrated-title::before,
+.vel-home-section__card.has-integrated-title::before,
+.has-integrated-title::before {
+  display: none !important;
+  content: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
 .vel-home-section--horizontal .vel-home-section__media,
 .vel-home-section__card--horizontal .vel-home-section__media {
   position: absolute !important;

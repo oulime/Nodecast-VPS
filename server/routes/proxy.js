@@ -1528,7 +1528,17 @@ router.get('/stream', async (req, res) => {
             if (onClose) {
                 try { req.off('close', onClose); } catch {}
             }
-            if (err.name === 'AbortError' || abortController?.signal?.aborted || req.destroyed || res.destroyed || res.writableEnded) {
+            const isAborted = (
+                err.name === 'AbortError' ||
+                err.cause?.name === 'AbortError' ||
+                /cancelled|aborted/i.test(String(err.message || '')) ||
+                /cancelled|aborted/i.test(String(err.cause?.message || '')) ||
+                abortController?.signal?.aborted ||
+                req.destroyed ||
+                res.destroyed ||
+                res.writableEnded
+            );
+            if (isAborted) {
                 return;
             }
             const cleanUrl = String(url || '').replace(/\/(live|movie|series)\/([^/?#]+)\/([^/?#]+)\//gi, '/$1/***/***/').replace(/([?&](?:password|pass|token|key)=)[^&#]+/gi, '$1***');

@@ -372,10 +372,10 @@ router.post('/session', async (req, res) => {
                     ? 25000
                     : transcodeSession.LIVE_PLAYLIST_READY_TIMEOUT_MS;
                 const ready = await session.waitForPlaylist(playlistReadyTimeoutMs, minInitialSegments);
-                if (!ready) {
+                if (!ready || session.status === 'stopped' || session.status === 'error') {
                     const hasFallbackLiveSegment = !isVodMode && await session.isPlaylistReadyForSegments(1);
-                    if (!hasFallbackLiveSegment) {
-                        throw new Error('Playlist not generated in time');
+                    if (!hasFallbackLiveSegment || session.status === 'stopped' || session.status === 'error') {
+                        throw new Error(session.error || 'Playlist not generated in time or FFmpeg exited prematurely');
                     }
                     console.warn('[Transcode] Live playlist returned with 1 initial segment after preferred segment wait timed out');
                 }

@@ -1552,7 +1552,7 @@
     <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/velora-home-sections.js?v=20260908-section-content-enrich-v15"></script>
     <script defer src="/assets/velora-home-cache-fallback.js?v=20260908-section-content-enrich-v15"></script>
-    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=20260908-no-probe-seek-v8"></script>
+    <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=20260909-vod-fix-v1"></script>
     <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-54"></script>
     <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-54"></script>
@@ -7870,6 +7870,7 @@
               if (homePage) {
                 homePage.classList.remove("hidden");
                 homePage.setAttribute("aria-hidden", "false");
+                homePage.style.removeProperty("display");
               }
               ["content-view", "packages-view", "adult-view"].forEach(function (id) {
                 var view = document.getElementById(id);
@@ -7878,10 +7879,28 @@
                   view.setAttribute("aria-hidden", "true");
                 }
               });
-              document.body.classList.remove("vel-home-choice-loading");
-              document.body.classList.remove("vel-home-choice-catalog-pending");
-              document.body.classList.remove("vel-adult-active", "vel-adult-player-active");
+              document.body.classList.remove(
+                "vel-home-choice-loading",
+                "vel-home-choice-catalog-pending",
+                "vel-adult-active",
+                "vel-adult-player-active",
+                "vel-modal-active",
+                "pkg-wheel-modal-open",
+                "vel-vod-detail-active",
+                "vel-netflix-modal-open",
+                "main--velora-series-detail-themed"
+              );
+              var pkgModal = document.getElementById("vel-pkg-modal");
+              if (pkgModal) pkgModal.classList.remove("is-open");
+              var cv = document.getElementById("content-view");
+              if (cv) cv.classList.remove("content-view--vod-film-detail");
+              var dl = document.getElementById("dynamic-list");
+              if (dl) dl.classList.remove("item-list--vod-film-detail");
+
               delete document.body.dataset.veloraReturnAdult;
+              delete document.body.dataset.veloraReturnFavorites;
+              delete window._veloraFavoriteReturnTab;
+              delete document.body.dataset.veloraReturnHome;
               document.body.classList.add("vel-home-choice-picked");
               document.body.classList.add("vel-home-empty-active");
               var main = document.querySelector(".main--velora");
@@ -7896,6 +7915,9 @@
                 if (active) button.setAttribute("aria-current", "page");
                 else button.removeAttribute("aria-current");
               });
+              try {
+                document.dispatchEvent(new CustomEvent("velora-return-home"));
+              } catch (_) {}
             };
             window.veloraShowHome = showHomeChoice;
 
@@ -15643,6 +15665,27 @@ if (target.closest(".trial-offer-button")) {
         min-height: calc(100dvh - var(--vel-bottom-nav-height, 76px)) !important;
       }
 
+      body.vel-home-empty-active,
+      html:has(body.vel-home-empty-active) {
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        height: auto !important;
+        min-height: 100% !important;
+      }
+
+      body.vel-home-empty-active .app,
+      body.vel-home-empty-active .main--velora,
+      body.vel-home-empty-active .main--velora .vel-dashboard,
+      body.vel-home-empty-active .main--velora .vel-body,
+      body.vel-home-empty-active #vel-home-empty-page,
+      body.vel-home-empty-active .vel-home-sections {
+        height: auto !important;
+        min-height: 100% !important;
+        max-height: none !important;
+        overflow-y: visible !important;
+        overflow-x: hidden !important;
+      }
+
       body.vel-home-choice-loading .vel-bottom-nav,
       body.vel-live-fullscreen-active .vel-bottom-nav,
       body.vel-vod-fullscreen-active .vel-bottom-nav,
@@ -15895,6 +15938,20 @@ if (target.closest(".trial-offer-button")) {
           delete document.body.dataset.veloraSearchMediaOpen;
           document.body.classList.remove("vel-favorites-open", "vel-favorites-player-active");
           document.body.classList.remove("vel-adult-active", "vel-adult-player-active");
+          document.body.classList.remove(
+            "vel-modal-active",
+            "pkg-wheel-modal-open",
+            "vel-vod-detail-active",
+            "vel-netflix-modal-open",
+            "main--velora-series-detail-themed"
+          );
+          var pkgModal = document.getElementById("vel-pkg-modal");
+          if (pkgModal) pkgModal.classList.remove("is-open");
+          var cv = document.getElementById("content-view");
+          if (cv) cv.classList.remove("content-view--vod-film-detail");
+          var dl = document.getElementById("dynamic-list");
+          if (dl) dl.classList.remove("item-list--vod-film-detail");
+
           if (typeof window.veloraCloseFavoritesPage === "function") {
             try { window.veloraCloseFavoritesPage(false); } catch (_) {}
           }
@@ -16536,8 +16593,8 @@ if (target.closest(".trial-offer-button")) {
     </script>
     <script defer src="/assets/cast-bridge.js?v=20260821-cast-airplay-v1"></script>
     <script defer src="/assets/velora-live-wheel.js?v=20260908-wheel-v10"></script>
-    <link rel="stylesheet" href="/assets/velora-prime-carousel.css?v=20260902-feed-v5" />
-    <script defer src="/assets/velora-prime-carousels.js?v=20260902-feed-v5"></script>
+    <link rel="stylesheet" href="/assets/velora-prime-carousel.css?v=20260908-scroll-fix-v1" />
+    <script defer src="/assets/velora-prime-carousels.js?v=20260908-scroll-fix-v1"></script>
     <script>
       (() => {
         document.addEventListener("click", function (e) {
@@ -16581,7 +16638,7 @@ if (target.closest(".trial-offer-button")) {
         }, true);
       })();
     </script>
-    <script defer src="/assets/velora-nav-controller.js?v=20260908-nav-v4"></script>
+    <script defer src="/assets/velora-nav-controller.js?v=20260908-nav-v5"></script>
     <link rel="stylesheet" href="/assets/velora-adult.css?v=20260908-adult-auto-stop-v22" />
     <script defer src="/assets/velora-adult.js?v=20260908-adult-auto-stop-v22"></script>
   </body>

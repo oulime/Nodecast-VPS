@@ -188,8 +188,13 @@ body[data-vel-active-tab="series"] .vel-netflix-hero {
 }
 
 /* Prevent scrolling when modal is open */
-body.vel-modal-active {
+body.vel-modal-active:not(.vel-home-empty-active) {
   overflow: hidden !important;
+}
+
+body.vel-home-empty-active {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
 }
 
 /* Main Container */

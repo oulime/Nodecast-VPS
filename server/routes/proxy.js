@@ -1950,4 +1950,21 @@ router.get('/person_avatar', async (req, res) => {
     }
 });
 
+function terminateActiveProxyStreamsForUrl(streamUrl) {
+    if (!streamUrl) return;
+    const accountKey = getStreamAccountKey(streamUrl, {});
+    if (activeStreamControllersByAccount.has(accountKey)) {
+        const prev = activeStreamControllersByAccount.get(accountKey);
+        if (prev) {
+            prev.isCancelled = true;
+            try { prev.abortController?.abort(); } catch (_) {}
+            try { prev.activeResponse?.body?.cancel?.().catch?.(() => {}); } catch (_) {}
+            console.log(`[Proxy Stream] CLOSE (terminated for transcode session): account=${accountKey}`);
+        }
+        activeStreamControllersByAccount.delete(accountKey);
+    }
+}
+
+router.terminateActiveProxyStreamsForUrl = terminateActiveProxyStreamsForUrl;
+
 module.exports = router;

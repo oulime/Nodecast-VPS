@@ -237,21 +237,36 @@ class TranscodeSession extends EventEmitter {
         }
 
         // Input options (common)
-        args.push(
-            '-probesize', isVodMode ? '1500000' : '2500000',
-            '-analyzeduration', isVodMode ? '1500000' : '2500000',
-            '-fflags', '+genpts+discardcorrupt+fastseek',
-            '-err_detect', 'ignore_err',
-            '-rw_timeout', '15000000',
-            '-reconnect', '1',
-            '-reconnect_streamed', '1',
-            '-reconnect_on_network_error', '1',
-            '-reconnect_on_http_error', '4xx,5xx',
-            '-reconnect_delay_max', '2'
-        );
-
-        if (!isVodMode) {
-            args.push('-flags', '+low_delay');
+        if (isVodMode) {
+            args.push(
+                '-seekable', '0',
+                '-probesize', '5000000',
+                '-analyzeduration', '5000000',
+                '-fflags', '+genpts+discardcorrupt+nobuffer',
+                '-err_detect', 'ignore_err',
+                '-rw_timeout', '15000000',
+                '-reconnect', '1',
+                '-reconnect_streamed', '1',
+                '-reconnect_at_eof', '0',
+                '-reconnect_on_network_error', '1',
+                '-reconnect_on_http_error', '5xx',
+                '-reconnect_delay_max', '4'
+            );
+        } else {
+            args.push(
+                '-probesize', '2500000',
+                '-analyzeduration', '2500000',
+                '-fflags', '+genpts+discardcorrupt+nobuffer',
+                '-flags', '+low_delay',
+                '-err_detect', 'ignore_err',
+                '-rw_timeout', '15000000',
+                '-reconnect', '1',
+                '-reconnect_streamed', '1',
+                '-reconnect_at_eof', '1',
+                '-reconnect_on_network_error', '1',
+                '-reconnect_on_http_error', '4xx,5xx',
+                '-reconnect_delay_max', '2'
+            );
         }
 
         // Fast input seeking for VOD/session restart seeks.
@@ -639,18 +654,35 @@ class TranscodeSession extends EventEmitter {
     }
 
     countReadySegmentsFromPlaylist(content) {
-        return content
-            .split('\n')
-            .map(line => line.trim())
-            .filter(line => line && !line.startsWith('#') && line.endsWith('.ts'))
-            .length;
+        if (!content || typeof content !== 'string') return 0;
+        const lines = content.split('\n').map(line => line.trim());
+        let count = 0;
+        let lastInfDuration = 0;
+        for (const line of lines) {
+            if (line.startsWith('#EXTINF:')) {
+                const durMatch = line.match(/#EXTINF:([\d.]+)/i);
+                lastInfDuration = durMatch ? parseFloat(durMatch[1]) : 0;
+            } else if (line && !line.startsWith('#') && line.endsWith('.ts')) {
+                // Ignore empty/0-duration dummy segments created upon abort/EOF
+                if (lastInfDuration > 0.05) {
+                    count++;
+                }
+                lastInfDuration = 0;
+            }
+        }
+        return count;
     }
 
     async isPlaylistReadyForSegments(minSegments = 1) {
         try {
             await fs.access(this.playlistPath);
             const content = await fs.readFile(this.playlistPath, 'utf8');
-            return this.countReadySegmentsFromPlaylist(content) >= Math.max(1, minSegments);
+            const readyCount = this.countReadySegmentsFromPlaylist(content);
+            // If the playlist has #EXT-X-ENDLIST with 0 valid segments, the transcode failed immediately
+            if (content.includes('#EXT-X-ENDLIST') && readyCount === 0) {
+                return false;
+            }
+            return readyCount >= Math.max(1, minSegments);
         } catch {
             return false;
         }
@@ -775,22 +807,53 @@ class TranscodeSession extends EventEmitter {
  * Session Manager
  */
 
+function getXtreamAccountKey(streamUrl = '') {
+    try {
+        const parsed = new URL(streamUrl);
+        const match = parsed.pathname.match(/\/(live|movie|series)\/([^/]+)\/([^/]+)/i);
+        if (match) {
+            return `${parsed.host.toLowerCase()}:${match[2]}`;
+        }
+        return `${parsed.host.toLowerCase()}`;
+    } catch (_) {
+        return '';
+    }
+}
+
 /**
  * Create a new transcode session
  */
 async function createSession(url, options = {}) {
     await ensureCacheDir();
 
-    // Terminate any older active sessions for the same stream URL to prevent concurrent IPTV connections throttling
+    // 1. Terminate any active direct proxy stream for this Xtream account to avoid HTTP 458
+    try {
+        const proxyRouter = require('../routes/proxy');
+        if (typeof proxyRouter?.terminateActiveProxyStreamsForUrl === 'function') {
+            proxyRouter.terminateActiveProxyStreamsForUrl(url);
+        }
+    } catch (_) {}
+
+    // 2. Terminate any older active sessions for the same stream URL or same Xtream account to prevent concurrent IPTV connections throttling
+    const targetAccountKey = getXtreamAccountKey(url);
+    let hadKilledSession = false;
     for (const [existingId, existingSession] of sessions.entries()) {
-        if (existingSession.url === url && ['running', 'starting', 'pending'].includes(existingSession.status)) {
-            console.log(`[Transcode Engine] [KILL PREVIOUS] Session ${existingId} killed to free IPTV slot before new session`);
+        const sessionAccountKey = getXtreamAccountKey(existingSession.url);
+        const isSameAccount = targetAccountKey && sessionAccountKey && targetAccountKey === sessionAccountKey;
+        if ((existingSession.url === url || isSameAccount) && ['running', 'starting', 'pending'].includes(existingSession.status)) {
+            console.log(`[Transcode Engine] [KILL PREVIOUS] Session ${existingId} killed to free IPTV slot for account ${targetAccountKey || 'default'}`);
             try {
                 existingSession.stop();
                 existingSession.cleanup().catch(() => {});
             } catch (_) {}
             sessions.delete(existingId);
+            hadKilledSession = true;
         }
+    }
+
+    if (hadKilledSession) {
+        // Small grace pause to ensure upstream CDN frees the TCP connection slot
+        await new Promise(r => setTimeout(r, 120));
     }
 
     const session = new TranscodeSession(url, options);

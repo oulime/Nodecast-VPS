@@ -3423,17 +3423,124 @@ router.post('/stored-media/apply-candidate', async (req, res) => {
 
         const url = `${conf.publicPath}/${safeFilename}?t=${Date.now()}`;
 
-        if (conf.cachePath) {
-            try {
+        try {
+            const cleanTitleKey = (title || safeFilename.replace(/-\d+\.[^.]+$/, '').replace(/[-_]+/g, ' ')).trim().toLowerCase();
+            const cKey = `${isTv ? 'tv' : 'movie'}:${cleanTitleKey}`;
+            const titleSlug = cleanTitleKey.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
+            // 1. Update current category cache
+            if (conf.cachePath) {
                 const cacheData = JSON.parse(fs.readFileSync(conf.cachePath, 'utf8')) || {};
-                const cleanTitleKey = (title || safeFilename.replace(/-\d+\.[^.]+$/, '').replace(/[-_]+/g, ' ')).trim().toLowerCase();
-                const cKey = `${isTv ? 'tv' : 'movie'}:${cleanTitleKey}`;
                 cacheData[cKey] = `${conf.publicPath}/${safeFilename}`;
                 fs.writeFileSync(conf.cachePath, JSON.stringify(cacheData, null, 2));
                 if (category === 'title-logos') titleLogoMemoryCache = cacheData;
                 if (category === 'horizontal-thumbs') horizontalThumbMemoryCache = cacheData;
+            }
+
+            // 2. Clean conflicting counterpart cache and files
+            if (category === 'horizontal-thumbs') {
+                try {
+                    const logoCache = JSON.parse(fs.readFileSync(vodTitleLogoCachePath, 'utf8')) || {};
+                    delete logoCache[cKey];
+                    fs.writeFileSync(vodTitleLogoCachePath, JSON.stringify(logoCache, null, 2));
+                    titleLogoMemoryCache = logoCache;
+                } catch (_) {}
+                if (fs.existsSync(TITLE_LOGO_UPLOAD_DIR)) {
+                    const existingLogos = fs.readdirSync(TITLE_LOGO_UPLOAD_DIR);
+                    for (const f of existingLogos) {
+                        if (f.startsWith(`${titleSlug}-`) || f.startsWith(`${titleSlug}.`)) {
+                            try { fs.unlinkSync(path.join(TITLE_LOGO_UPLOAD_DIR, f)); } catch (_) {}
+                        }
+                    }
+                }
+            } else if (category === 'title-logos') {
+                try {
+                    const thumbCache = JSON.parse(fs.readFileSync(vodHorizontalThumbCachePath, 'utf8')) || {};
+                    delete thumbCache[cKey];
+                    fs.writeFileSync(vodHorizontalThumbCachePath, JSON.stringify(thumbCache, null, 2));
+                    horizontalThumbMemoryCache = thumbCache;
+                } catch (_) {}
+                if (fs.existsSync(HORIZONTAL_THUMB_UPLOAD_DIR)) {
+                    const existingThumbs = fs.readdirSync(HORIZONTAL_THUMB_UPLOAD_DIR);
+                    for (const f of existingThumbs) {
+                        if (f.startsWith(`${titleSlug}-`) || f.startsWith(`${titleSlug}.`)) {
+                            try { fs.unlinkSync(path.join(HORIZONTAL_THUMB_UPLOAD_DIR, f)); } catch (_) {}
+                        }
+                    }
+                }
+            }
+
+            // 3. Update home-sections.json cache immediately
+            if (fs.existsSync(homeCachePath)) {
+                try {
+                    const homeData = JSON.parse(fs.readFileSync(homeCachePath, 'utf8')) || {};
+                    if (Array.isArray(homeData.sections)) {
+                        let homeChanged = false;
+                        for (const sec of homeData.sections) {
+                            if (Array.isArray(sec.entries)) {
+                                for (const ent of sec.entries) {
+                                    const entClean = String(ent.name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                                    if (entClean === cleanTitleKey || entClean.includes(cleanTitleKey) || cleanTitleKey.includes(entClean)) {
+                                        if (category === 'horizontal-thumbs') {
+                                            ent.horizontal_thumb = `${conf.publicPath}/${safeFilename}`;
+                                            ent.has_integrated_title = true;
+                                            ent.thumbUrl = `${conf.publicPath}/${safeFilename}`;
+                                            ent.backdropUrl = `${conf.publicPath}/${safeFilename}`;
+                                            delete ent.title_logo;
+                                            delete ent.titleLogo;
+                                            homeChanged = true;
+                                        } else if (category === 'title-logos') {
+                                            ent.title_logo = `${conf.publicPath}/${safeFilename}`;
+                                            delete ent.horizontal_thumb;
+                                            delete ent.has_integrated_title;
+                                            homeChanged = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (homeChanged) {
+                            fs.writeFileSync(homeCachePath, JSON.stringify(homeData, null, 2));
+                        }
+                    }
+                } catch (_) {}
+            }
+
+            // 4. Update custom_entries in admin_home_sections DB table
+            try {
+                const dbInstance = getDb();
+                const sections = dbInstance.prepare(`SELECT id, custom_entries FROM admin_home_sections WHERE custom_entries IS NOT NULL`).all();
+                for (const sec of sections) {
+                    if (!sec.custom_entries) continue;
+                    let entries = [];
+                    try { entries = JSON.parse(sec.custom_entries); } catch (_) {}
+                    if (!Array.isArray(entries)) continue;
+                    let secChanged = false;
+                    for (const ent of entries) {
+                        const entClean = String(ent.name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                        if (entClean === cleanTitleKey || entClean.includes(cleanTitleKey) || cleanTitleKey.includes(entClean)) {
+                            if (category === 'horizontal-thumbs') {
+                                ent.horizontal_thumb = `${conf.publicPath}/${safeFilename}`;
+                                ent.has_integrated_title = true;
+                                ent.thumbUrl = `${conf.publicPath}/${safeFilename}`;
+                                ent.backdropUrl = `${conf.publicPath}/${safeFilename}`;
+                                delete ent.title_logo;
+                                delete ent.titleLogo;
+                                secChanged = true;
+                            } else if (category === 'title-logos') {
+                                ent.title_logo = `${conf.publicPath}/${safeFilename}`;
+                                delete ent.horizontal_thumb;
+                                delete ent.has_integrated_title;
+                                secChanged = true;
+                            }
+                        }
+                    }
+                    if (secChanged) {
+                        dbInstance.prepare(`UPDATE admin_home_sections SET custom_entries = ? WHERE id = ?`).run(JSON.stringify(entries), sec.id);
+                    }
+                }
             } catch (_) {}
-        }
+        } catch (_) {}
 
         return res.json({ ok: true, url, filename: safeFilename, category });
     } catch (err) {
@@ -3543,6 +3650,63 @@ router.delete('/stored-media/item', async (req, res) => {
             } catch (_) {}
         }
 
+        // Clean home-sections.json cache on disk
+        try {
+            if (fs.existsSync(homeCachePath)) {
+                const homeData = JSON.parse(fs.readFileSync(homeCachePath, 'utf8')) || {};
+                if (Array.isArray(homeData.sections)) {
+                    let homeChanged = false;
+                    for (const sec of homeData.sections) {
+                        if (Array.isArray(sec.entries)) {
+                            for (const ent of sec.entries) {
+                                if (category === 'title-logos' && ent.title_logo && ent.title_logo.includes(safeFilename)) {
+                                    delete ent.title_logo;
+                                    delete ent.titleLogo;
+                                    homeChanged = true;
+                                }
+                                if (category === 'horizontal-thumbs' && ent.horizontal_thumb && ent.horizontal_thumb.includes(safeFilename)) {
+                                    delete ent.horizontal_thumb;
+                                    delete ent.has_integrated_title;
+                                    homeChanged = true;
+                                }
+                            }
+                        }
+                    }
+                    if (homeChanged) {
+                        fs.writeFileSync(homeCachePath, JSON.stringify(homeData, null, 2));
+                    }
+                }
+            }
+        } catch (_) {}
+
+        // Clean custom_entries in database
+        try {
+            const dbInstance = getDb();
+            const sections = dbInstance.prepare(`SELECT id, custom_entries FROM admin_home_sections WHERE custom_entries IS NOT NULL`).all();
+            for (const sec of sections) {
+                if (!sec.custom_entries) continue;
+                let entries = [];
+                try { entries = JSON.parse(sec.custom_entries); } catch (_) {}
+                if (!Array.isArray(entries)) continue;
+                let secChanged = false;
+                for (const ent of entries) {
+                    if (category === 'title-logos' && ent.title_logo && ent.title_logo.includes(safeFilename)) {
+                        delete ent.title_logo;
+                        delete ent.titleLogo;
+                        secChanged = true;
+                    }
+                    if (category === 'horizontal-thumbs' && ent.horizontal_thumb && ent.horizontal_thumb.includes(safeFilename)) {
+                        delete ent.horizontal_thumb;
+                        delete ent.has_integrated_title;
+                        secChanged = true;
+                    }
+                }
+                if (secChanged) {
+                    dbInstance.prepare(`UPDATE admin_home_sections SET custom_entries = ? WHERE id = ?`).run(JSON.stringify(entries), sec.id);
+                }
+            }
+        } catch (_) {}
+
         return res.json({ ok: true, deleted: safeFilename });
     } catch (err) {
         console.error('[veloraData] delete stored-media item error:', err);
@@ -3575,6 +3739,71 @@ router.delete('/stored-media/clear-all', async (req, res) => {
                 } catch (_) {}
             }
         }
+
+        // Clean home-sections.json cache
+        try {
+            if (fs.existsSync(homeCachePath)) {
+                const homeData = JSON.parse(fs.readFileSync(homeCachePath, 'utf8')) || {};
+                if (Array.isArray(homeData.sections)) {
+                    let homeChanged = false;
+                    for (const sec of homeData.sections) {
+                        if (Array.isArray(sec.entries)) {
+                            for (const ent of sec.entries) {
+                                if (targetCategory === 'all' || targetCategory === 'title-logos') {
+                                    if (ent.title_logo || ent.titleLogo) {
+                                        delete ent.title_logo;
+                                        delete ent.titleLogo;
+                                        homeChanged = true;
+                                    }
+                                }
+                                if (targetCategory === 'all' || targetCategory === 'horizontal-thumbs') {
+                                    if (ent.horizontal_thumb) {
+                                        delete ent.horizontal_thumb;
+                                        delete ent.has_integrated_title;
+                                        homeChanged = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (homeChanged) {
+                        fs.writeFileSync(homeCachePath, JSON.stringify(homeData, null, 2));
+                    }
+                }
+            }
+        } catch (_) {}
+
+        // Clean custom_entries in database
+        try {
+            const dbInstance = getDb();
+            const sections = dbInstance.prepare(`SELECT id, custom_entries FROM admin_home_sections WHERE custom_entries IS NOT NULL`).all();
+            for (const sec of sections) {
+                if (!sec.custom_entries) continue;
+                let entries = [];
+                try { entries = JSON.parse(sec.custom_entries); } catch (_) {}
+                if (!Array.isArray(entries)) continue;
+                let secChanged = false;
+                for (const ent of entries) {
+                    if (targetCategory === 'all' || targetCategory === 'title-logos') {
+                        if (ent.title_logo || ent.titleLogo) {
+                            delete ent.title_logo;
+                            delete ent.titleLogo;
+                            secChanged = true;
+                        }
+                    }
+                    if (targetCategory === 'all' || targetCategory === 'horizontal-thumbs') {
+                        if (ent.horizontal_thumb) {
+                            delete ent.horizontal_thumb;
+                            delete ent.has_integrated_title;
+                            secChanged = true;
+                        }
+                    }
+                }
+                if (secChanged) {
+                    dbInstance.prepare(`UPDATE admin_home_sections SET custom_entries = ? WHERE id = ?`).run(JSON.stringify(entries), sec.id);
+                }
+            }
+        } catch (_) {}
 
         return res.json({ ok: true, deletedCount });
     } catch (err) {

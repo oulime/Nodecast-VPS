@@ -1213,6 +1213,94 @@ const LIVE_MANIFEST_CACHE_TTL_MS = 6500;
 const LIVE_MANIFEST_STALE_TTL_MS = 120000;
 const activeStreamControllersByAccount = new Map();
 
+// In-memory index cache for media headers and tail Cues (prevents 458 burst when browser demuxer probes MKV/MP4 files)
+const mediaIndexCache = new Map();
+const MEDIA_INDEX_CACHE_MAX = 60;
+const MEDIA_INDEX_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+function getCachedMediaRange(mediaUrl, rangeHeader) {
+    if (!rangeHeader || !mediaIndexCache.has(mediaUrl)) return null;
+    const entry = mediaIndexCache.get(mediaUrl);
+    if (!entry || Date.now() - entry.timestamp > MEDIA_INDEX_CACHE_TTL_MS) {
+        mediaIndexCache.delete(mediaUrl);
+        return null;
+    }
+
+    const match = rangeHeader.match(/bytes=(\d+)-(\d+)?/i);
+    if (!match) return null;
+
+    const reqStart = parseInt(match[1], 10);
+    const reqEnd = match[2] ? parseInt(match[2], 10) : (entry.totalLength ? entry.totalLength - 1 : null);
+
+    if (reqEnd === null || isNaN(reqStart) || isNaN(reqEnd) || reqStart > reqEnd) return null;
+
+    // Check if fully contained in cached headChunk (e.g. initial headers)
+    if (entry.headChunk && reqStart >= entry.headChunk.start && reqEnd <= entry.headChunk.end) {
+        const sliceStart = reqStart - entry.headChunk.start;
+        const sliceEnd = reqEnd - entry.headChunk.start + 1;
+        const slice = entry.headChunk.buffer.subarray(sliceStart, sliceEnd);
+        return {
+            status: 206,
+            contentRange: `bytes ${reqStart}-${reqEnd}/${entry.totalLength}`,
+            contentLength: slice.length,
+            contentType: entry.contentType,
+            buffer: slice
+        };
+    }
+
+    // Check if fully contained in cached tailChunk (e.g. MKV Cues index / MP4 moov atom at tail)
+    if (entry.tailChunk && reqStart >= entry.tailChunk.start && reqEnd <= entry.tailChunk.end) {
+        const sliceStart = reqStart - entry.tailChunk.start;
+        const sliceEnd = reqEnd - entry.tailChunk.start + 1;
+        const slice = entry.tailChunk.buffer.subarray(sliceStart, sliceEnd);
+        return {
+            status: 206,
+            contentRange: `bytes ${reqStart}-${reqEnd}/${entry.totalLength}`,
+            contentLength: slice.length,
+            contentType: entry.contentType,
+            buffer: slice
+        };
+    }
+
+    return null;
+}
+
+function saveMediaChunkToCache(mediaUrl, rangeStart, rangeEnd, totalLength, contentType, chunkBuffer, isHead = false) {
+    if (!mediaUrl || !chunkBuffer || !totalLength) return;
+    let entry = mediaIndexCache.get(mediaUrl);
+    if (!entry) {
+        if (mediaIndexCache.size >= MEDIA_INDEX_CACHE_MAX) {
+            const oldestKey = mediaIndexCache.keys().next().value;
+            if (oldestKey) mediaIndexCache.delete(oldestKey);
+        }
+        entry = {
+            totalLength,
+            contentType: contentType || 'application/octet-stream',
+            headChunk: null,
+            tailChunk: null,
+            timestamp: Date.now()
+        };
+        mediaIndexCache.set(mediaUrl, entry);
+    }
+    entry.timestamp = Date.now();
+    entry.totalLength = totalLength;
+    if (contentType) entry.contentType = contentType;
+
+    if (isHead) {
+        entry.headChunk = {
+            start: rangeStart,
+            end: rangeEnd,
+            buffer: chunkBuffer
+        };
+    } else {
+        entry.tailChunk = {
+            start: rangeStart,
+            end: rangeEnd,
+            buffer: chunkBuffer
+        };
+    }
+}
+
 function getStreamAccountKey(streamUrl = '', req) {
     try {
         const parsed = new URL(streamUrl);
@@ -1238,8 +1326,10 @@ router.get('/stream', async (req, res) => {
     }
 
     const isM3u8Url = /\.m3u8(\?|$)/i.test(url);
+    const cleanUrl = String(url || '').replace(/\/(live|movie|series)\/([^/?#]+)\/([^/?#]+)\//gi, '/$1/***/***/').replace(/([?&](?:password|pass|token|key)=)[^&#]+/gi, '$1***');
+    const rangeHeader = req.get('range');
 
-    // Fast-path: return freshly cached live manifest to avoid hammering upstream IPTV server concurrently
+    // Fast-path 1: return freshly cached live manifest to avoid hammering upstream IPTV server concurrently
     if (isM3u8Url && liveManifestCache.has(url)) {
         const cached = liveManifestCache.get(url);
         if (Date.now() - cached.timestamp < LIVE_MANIFEST_CACHE_TTL_MS) {
@@ -1252,9 +1342,26 @@ router.get('/stream', async (req, res) => {
         }
     }
 
+    // Fast-path 2: return cached media container headers or tail Cues (prevents multi-socket flood on MKV/MP4 seeking)
+    if (rangeHeader) {
+        const cachedRange = getCachedMediaRange(url, rangeHeader);
+        if (cachedRange) {
+            res.set('Access-Control-Allow-Origin', '*');
+            res.set('X-Accel-Buffering', 'no');
+            res.set('Content-Type', cachedRange.contentType || 'application/octet-stream');
+            res.set('Content-Range', cachedRange.contentRange);
+            res.set('Content-Length', cachedRange.contentLength);
+            res.set('Accept-Ranges', 'bytes');
+            res.set('Cache-Control', 'public, max-age=3600');
+            res.set('X-Velora-Index-Cache', 'HIT');
+            res.status(206);
+            console.log(`[Proxy Stream] CACHE HIT: Range: ${rangeHeader} -> ${cleanUrl.substring(0, 80)}`);
+            return res.send(cachedRange.buffer);
+        }
+    }
+
     // Automatically terminate any previous active proxy connection for the same IPTV account/client
     // so the provider never sees 2 simultaneous streams (which causes HTTP 458)
-    const cleanUrl = String(url || '').replace(/\/(live|movie|series)\/([^/?#]+)\/([^/?#]+)\//gi, '/$1/***/***/').replace(/([?&](?:password|pass|token|key)=)[^&#]+/gi, '$1***');
     const accountKey = getStreamAccountKey(url, req);
     const requestId = crypto.randomBytes ? crypto.randomBytes(6).toString('hex') : Math.random().toString(36).slice(2, 8);
 
@@ -1590,6 +1697,39 @@ router.get('/stream', async (req, res) => {
                 await new Promise(resolve => res.once('drain', resolve));
             }
 
+            // Detect if this is a header probe or tail/index range to cache for instant seeking
+            let isHeadRange = false;
+            let isTailRange = false;
+            let parsedStart = 0;
+            let parsedEnd = 0;
+            let parsedTotal = 0;
+            let capturedChunks = null;
+            let capturedBytes = firstChunk.length;
+
+            if (contentRange) {
+                const crMatch = String(contentRange).match(/bytes\s+(\d+)-(\d+)\/(\d+)/i);
+                if (crMatch) {
+                    parsedStart = parseInt(crMatch[1], 10);
+                    parsedEnd = parseInt(crMatch[2], 10);
+                    parsedTotal = parseInt(crMatch[3], 10);
+                    const rangeLen = parsedEnd - parsedStart + 1;
+
+                    // Head probe (starts at byte 0 and total requested <= 512KB)
+                    if (parsedStart === 0 && rangeLen <= 524288) {
+                        isHeadRange = true;
+                        capturedChunks = [firstChunk];
+                    }
+                    // Tail/index probe (near end of large file, <= 6MB range)
+                    else if (parsedTotal > 1048576 && parsedStart >= parsedTotal - 8388608 && rangeLen <= 6291456) {
+                        isTailRange = true;
+                        capturedChunks = [firstChunk];
+                    }
+                }
+            } else if (rangeHeader === 'bytes=0-' || !rangeHeader) {
+                isHeadRange = true;
+                capturedChunks = [firstChunk];
+            }
+
             let result = await iterator.next();
             while (!result.done) {
                 if (req.destroyed || res.destroyed || res.writableEnded) {
@@ -1599,11 +1739,31 @@ router.get('/stream', async (req, res) => {
                     } catch {}
                     break;
                 }
-                if (!res.write(Buffer.from(result.value))) {
+                const chunkBuf = Buffer.from(result.value);
+                if (capturedChunks) {
+                    capturedBytes += chunkBuf.length;
+                    if (isTailRange || (isHeadRange && capturedBytes <= 524288)) {
+                        capturedChunks.push(chunkBuf);
+                    } else if (isHeadRange) {
+                        capturedChunks = null;
+                    }
+                }
+                if (!res.write(chunkBuf)) {
                     await new Promise(resolve => res.once('drain', resolve));
                 }
                 result = await iterator.next();
             }
+
+            // Save captured head or tail range into memory cache for instant future seeks
+            if (capturedChunks && capturedChunks.length > 0 && parsedTotal > 0) {
+                const combined = Buffer.concat(capturedChunks);
+                if (isTailRange && parsedEnd === parsedTotal - 1) {
+                    saveMediaChunkToCache(url, parsedStart, parsedEnd, parsedTotal, contentType, combined, false);
+                } else if (isHeadRange) {
+                    saveMediaChunkToCache(url, parsedStart, parsedStart + combined.length - 1, parsedTotal, contentType, combined, true);
+                }
+            }
+
             if (onClose) req.off('close', onClose);
             res.end();
             console.log(`[Proxy Stream] CLOSE (finished): ${cleanUrl.substring(0, 80)}`);

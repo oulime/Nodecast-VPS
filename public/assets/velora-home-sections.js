@@ -170,7 +170,16 @@ function renderContentDialogItems(){
 
   activeContentItems.forEach(function(item,idx){
     var cleanTitle=stripChannelPrefixes(item.name||item.title||"");
-    var isHorizontalThumb=Boolean(item.has_integrated_title||item.horizontal_thumb);
+    var isHorizontalThumb=Boolean(
+      item.has_integrated_title ||
+      item.horizontal_thumb ||
+      (item.thumbUrl && String(item.thumbUrl).includes("/uploads/horizontal-thumbs/")) ||
+      (item.backdropUrl && String(item.backdropUrl).includes("/uploads/horizontal-thumbs/"))
+    );
+    if(isHorizontalThumb){
+      delete item.title_logo;
+      delete item.titleLogo;
+    }
     var titleLogoUrl=String(item.title_logo||item.titleLogo||"").trim();
 
     var card=document.createElement("div");
@@ -378,13 +387,14 @@ function renderContentDialogItems(){
         name:cleanTitle||item.name,
         category:isHoriz?"horizontal-thumbs":"posters",
         contentType:cType,
-        onApplied:function(newUrl){
-          if(isHoriz){
+        onApplied:function(newUrl, candidate){
+          if(isHoriz || (candidate && candidate.type !== 'logo' && candidate.type !== 'poster')){
             item.horizontal_thumb=newUrl;
             item.has_integrated_title=true;
             item.backdropUrl=newUrl;
             item.thumbUrl=newUrl;
             delete item.title_logo;
+            delete item.titleLogo;
           }else{
             item.thumbUrl=newUrl;
           }

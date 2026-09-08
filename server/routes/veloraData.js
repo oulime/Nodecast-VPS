@@ -3424,14 +3424,28 @@ router.post('/stored-media/apply-candidate', async (req, res) => {
         const url = `${conf.publicPath}/${safeFilename}?t=${Date.now()}`;
 
         try {
-            const cleanTitleKey = (title || safeFilename.replace(/-\d+\.[^.]+$/, '').replace(/[-_]+/g, ' ')).trim().toLowerCase();
-            const cKey = `${isTv ? 'tv' : 'movie'}:${cleanTitleKey}`;
+            const rawTitleKey = String(title || safeFilename.replace(/-\d+\.[^.]+$/, '').replace(/[-_]+/g, ' ')).trim().toLowerCase();
+            const { title: cleanOnly } = cleanMediaTitleForSearch(rawTitleKey);
+            const cleanTitleKey = (cleanOnly || rawTitleKey).trim().toLowerCase();
+
+            const keysToSet = [
+                `${isTv ? 'tv' : 'movie'}:${cleanTitleKey}`,
+                `${isTv ? 'tv' : 'movie'}:${rawTitleKey}`,
+                `tv:${cleanTitleKey}`,
+                `movie:${cleanTitleKey}`,
+                `tv:${rawTitleKey}`,
+                `movie:${rawTitleKey}`
+            ];
+
             const titleSlug = cleanTitleKey.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+            const rawSlug = rawTitleKey.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 
             // 1. Update current category cache
             if (conf.cachePath) {
                 const cacheData = JSON.parse(fs.readFileSync(conf.cachePath, 'utf8')) || {};
-                cacheData[cKey] = `${conf.publicPath}/${safeFilename}`;
+                for (const k of keysToSet) {
+                    cacheData[k] = `${conf.publicPath}/${safeFilename}`;
+                }
                 fs.writeFileSync(conf.cachePath, JSON.stringify(cacheData, null, 2));
                 if (category === 'title-logos') titleLogoMemoryCache = cacheData;
                 if (category === 'horizontal-thumbs') horizontalThumbMemoryCache = cacheData;
@@ -3441,14 +3455,16 @@ router.post('/stored-media/apply-candidate', async (req, res) => {
             if (category === 'horizontal-thumbs') {
                 try {
                     const logoCache = JSON.parse(fs.readFileSync(vodTitleLogoCachePath, 'utf8')) || {};
-                    delete logoCache[cKey];
+                    for (const k of keysToSet) {
+                        delete logoCache[k];
+                    }
                     fs.writeFileSync(vodTitleLogoCachePath, JSON.stringify(logoCache, null, 2));
                     titleLogoMemoryCache = logoCache;
                 } catch (_) {}
                 if (fs.existsSync(TITLE_LOGO_UPLOAD_DIR)) {
                     const existingLogos = fs.readdirSync(TITLE_LOGO_UPLOAD_DIR);
                     for (const f of existingLogos) {
-                        if (f.startsWith(`${titleSlug}-`) || f.startsWith(`${titleSlug}.`)) {
+                        if (f.startsWith(`${titleSlug}-`) || f.startsWith(`${titleSlug}.`) || f.startsWith(`${rawSlug}-`) || f.startsWith(`${rawSlug}.`)) {
                             try { fs.unlinkSync(path.join(TITLE_LOGO_UPLOAD_DIR, f)); } catch (_) {}
                         }
                     }
@@ -3456,14 +3472,16 @@ router.post('/stored-media/apply-candidate', async (req, res) => {
             } else if (category === 'title-logos') {
                 try {
                     const thumbCache = JSON.parse(fs.readFileSync(vodHorizontalThumbCachePath, 'utf8')) || {};
-                    delete thumbCache[cKey];
+                    for (const k of keysToSet) {
+                        delete thumbCache[k];
+                    }
                     fs.writeFileSync(vodHorizontalThumbCachePath, JSON.stringify(thumbCache, null, 2));
                     horizontalThumbMemoryCache = thumbCache;
                 } catch (_) {}
                 if (fs.existsSync(HORIZONTAL_THUMB_UPLOAD_DIR)) {
                     const existingThumbs = fs.readdirSync(HORIZONTAL_THUMB_UPLOAD_DIR);
                     for (const f of existingThumbs) {
-                        if (f.startsWith(`${titleSlug}-`) || f.startsWith(`${titleSlug}.`)) {
+                        if (f.startsWith(`${titleSlug}-`) || f.startsWith(`${titleSlug}.`) || f.startsWith(`${rawSlug}-`) || f.startsWith(`${rawSlug}.`)) {
                             try { fs.unlinkSync(path.join(HORIZONTAL_THUMB_UPLOAD_DIR, f)); } catch (_) {}
                         }
                     }

@@ -2861,7 +2861,8 @@
   }
   window.veloraStopAllStreams = stopAllActiveStreams;
 
-  function closeAdultView() {
+  function closeAdultView(navigateToHome = false) {
+    const wasAdultActive = isAdultOpen || document.body.classList.contains("vel-adult-active") || (document.body.dataset && document.body.dataset.velActiveTab === "adult");
     isAdultOpen = false;
     currentAdultView = null;
     if (activeVodSentinelObserver) {
@@ -2907,22 +2908,26 @@
     });
     const stickyTop = document.querySelector(".vel-sticky-top");
     if (stickyTop) stickyTop.style.removeProperty("display");
-    const homePage = document.getElementById("vel-home-empty-page");
-    if (homePage) {
-      homePage.classList.remove("hidden");
-      homePage.setAttribute("aria-hidden", "false");
-      homePage.style.removeProperty("display");
-    }
-    document.body.classList.add("vel-home-empty-active");
-    document.body.dataset.velActiveTab = "home";
-    document.body.dataset.velTopLevel = "home";
 
-    if (typeof window.veloraSetBottomNavActive === "function") {
-      window.veloraSetBottomNavActive("home");
-    }
+    // Only force return to home if explicitly requested (e.g. clicking the adult back button) and adult was active
+    if (navigateToHome && wasAdultActive) {
+      const homePage = document.getElementById("vel-home-empty-page");
+      if (homePage) {
+        homePage.classList.remove("hidden");
+        homePage.setAttribute("aria-hidden", "false");
+        homePage.style.removeProperty("display");
+      }
+      document.body.classList.add("vel-home-empty-active");
+      document.body.dataset.velActiveTab = "home";
+      document.body.dataset.velTopLevel = "home";
 
-    document.dispatchEvent(new CustomEvent("velora-show-home"));
-    document.dispatchEvent(new CustomEvent("velora-return-home"));
+      if (typeof window.veloraSetBottomNavActive === "function") {
+        window.veloraSetBottomNavActive("home");
+      }
+
+      document.dispatchEvent(new CustomEvent("velora-show-home"));
+      document.dispatchEvent(new CustomEvent("velora-return-home"));
+    }
   }
 
   window.veloraCloseAdultView = closeAdultView;
@@ -2933,6 +2938,9 @@
   // Multi-layer automatic stream cleanup on any navigation
   function handleGlobalNavExit(e) {
     if (!e || !e.target) return;
+    const isAdultActive = isAdultOpen || document.body.classList.contains("vel-adult-active") || (document.body.dataset && document.body.dataset.velActiveTab === "adult");
+    if (!isAdultActive) return;
+
     const navEl = e.target.closest(
       "nav, .nav-item, .nav-link, .sidebar-link, .vel-bottom-nav-item, [data-nav], [data-tab], [data-settings-tab], .vel-nav-btn, .navbar, .header-nav, #btn-home, #btn-live, #btn-movies, #btn-series, #btn-favorites, [id^='nav-btn-']"
     );
@@ -2940,15 +2948,15 @@
       const isAdultAction = navEl.id === "btn-adult" || (navEl.dataset && (navEl.dataset.tab === "adult" || navEl.dataset.nav === "adult")) || navEl.closest("#adult-view");
       if (!isAdultAction) {
         stopAllActiveStreams();
-        closeAdultView();
+        closeAdultView(false);
       }
     }
   }
 
   document.addEventListener("click", handleGlobalNavExit, true);
-  window.addEventListener("popstate", () => { stopAllActiveStreams(); closeAdultView(); });
-  window.addEventListener("pagehide", () => { stopAllActiveStreams(); closeAdultView(); });
-  window.addEventListener("beforeunload", () => { stopAllActiveStreams(); closeAdultView(); });
+  window.addEventListener("popstate", () => { stopAllActiveStreams(); closeAdultView(false); });
+  window.addEventListener("pagehide", () => { stopAllActiveStreams(); closeAdultView(false); });
+  window.addEventListener("beforeunload", () => { stopAllActiveStreams(); closeAdultView(false); });
 
   // Continuous observer: if adult view is hidden or body tab is no longer adult, force kill video
   try {
@@ -2991,7 +2999,7 @@
     // Back button in adult portal
     if (e.target && e.target.closest("#btn-adult-back-home")) {
       e.preventDefault();
-      closeAdultView();
+      closeAdultView(true);
       return;
     }
 

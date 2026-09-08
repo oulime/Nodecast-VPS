@@ -12,8 +12,9 @@
       if (typeof window.veloraStopAllStreams === "function") {
         try { window.veloraStopAllStreams(); } catch (_) {}
       }
-      if (typeof window.veloraCloseAdultView === "function") {
-        try { window.veloraCloseAdultView(); } catch (_) {}
+      const isAdultActive = document.body.classList.contains("vel-adult-active") || (document.body.dataset && document.body.dataset.velActiveTab === "adult");
+      if (isAdultActive && typeof window.veloraCloseAdultView === "function") {
+        try { window.veloraCloseAdultView(false); } catch (_) {}
       }
 
       // 2. Close active transcode sessions on the server
@@ -52,6 +53,9 @@
   // Global click interceptor for navigation links & bottom tabs
   document.addEventListener("click", function (e) {
     if (!e.target) return;
+    const isAdultActive = document.body.classList.contains("vel-adult-active") || (document.body.dataset && document.body.dataset.velActiveTab === "adult");
+    if (!isAdultActive) return;
+
     const navEl = e.target.closest(
       "nav, .nav-item, .nav-link, .sidebar-link, .vel-bottom-nav-item, [data-nav], [data-tab], [data-settings-tab], .vel-nav-btn, .navbar, .header-nav, #btn-home, #btn-live, #btn-movies, #btn-series, #btn-favorites"
     );

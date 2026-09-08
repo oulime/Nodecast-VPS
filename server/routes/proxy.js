@@ -1237,12 +1237,13 @@ router.get('/stream', async (req, res) => {
     }
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        let abortController = new AbortController();
+        let activeResponse = null;
+        let onClose = null;
         try {
-            const abortController = new AbortController();
-            let activeResponse = null;
-            const onClose = () => {
+            onClose = () => {
                 try {
-                    abortController.abort();
+                    abortController?.abort();
                 } catch {}
                 if (activeResponse?.body) {
                     try {
@@ -1257,7 +1258,7 @@ router.get('/stream', async (req, res) => {
 
             // If client has already disconnected or aborted before attempt, exit immediately
             if (req.destroyed || res.destroyed || res.writableEnded || abortController.signal.aborted) {
-                req.off('close', onClose);
+                if (onClose) req.off('close', onClose);
                 return;
             }
 
@@ -1297,7 +1298,7 @@ router.get('/stream', async (req, res) => {
             try {
                 response = await fetch(url, { headers, signal: abortController.signal });
             } catch (fetchErr) {
-                req.off('close', onClose);
+                if (onClose) req.off('close', onClose);
                 if (fetchErr.name === 'AbortError' || abortController.signal.aborted || req.destroyed || res.destroyed || res.writableEnded) {
                     return;
                 }
@@ -1312,7 +1313,7 @@ router.get('/stream', async (req, res) => {
             if ((response.status === 458 || response.status === 429 || response.status >= 500) && isM3u8Url && liveManifestCache.has(url)) {
                 const cached = liveManifestCache.get(url);
                 if (Date.now() - cached.timestamp < LIVE_MANIFEST_STALE_TTL_MS) {
-                    req.off('close', onClose);
+                    if (onClose) req.off('close', onClose);
                     res.set('Access-Control-Allow-Origin', '*');
                     res.set('X-Accel-Buffering', 'no');
                     res.set('Content-Type', 'application/vnd.apple.mpegurl');
@@ -1325,7 +1326,7 @@ router.get('/stream', async (req, res) => {
             // Retry on 5xx errors or transient burst rate limits (458, 429) ONLY for m3u8 playlists when client is still connected
             if ((response.status >= 500 || ((response.status === 458 || response.status === 429) && isM3u8Url)) && attempt < maxRetries) {
                 if (req.destroyed || res.destroyed || res.writableEnded || abortController.signal.aborted) {
-                    req.off('close', onClose);
+                    if (onClose) req.off('close', onClose);
                     return;
                 }
                 const delay = retryDelays[attempt - 1] || 800;
@@ -1338,7 +1339,7 @@ router.get('/stream', async (req, res) => {
                 // If upstream failed with 458/429/5xx and we have a cached manifest, serve it to prevent player stutter
                 if (isM3u8Url && liveManifestCache.has(url)) {
                     const cached = liveManifestCache.get(url);
-                    req.off('close', onClose);
+                    if (onClose) req.off('close', onClose);
                     res.set('Access-Control-Allow-Origin', '*');
                     res.set('X-Accel-Buffering', 'no');
                     res.set('Content-Type', 'application/vnd.apple.mpegurl');
@@ -1346,7 +1347,7 @@ router.get('/stream', async (req, res) => {
                     res.set('X-Velora-Manifest-Fallback', 'STALE_200');
                     return res.send(cached.manifest);
                 }
-                req.off('close', onClose);
+                if (onClose) req.off('close', onClose);
                 console.error(`Upstream error for ${url.substring(0, 80)}...: ${response.status} ${response.statusText}`);
                 if (response.status === 403) {
                     const errorBody = await response.text().catch(() => 'N/A');
@@ -1393,7 +1394,7 @@ router.get('/stream', async (req, res) => {
 
             if (first.done) {
                 res.set('Content-Type', contentType || 'application/octet-stream');
-                req.off('close', onClose);
+                if (onClose) req.off('close', onClose);
                 return res.end();
             }
 
@@ -1473,7 +1474,7 @@ router.get('/stream', async (req, res) => {
                     const cached = liveManifestCache.get(url);
                     if (incomingSeq !== null && typeof cached.sequence === 'number' && incomingSeq < cached.sequence) {
                         console.warn(`[Proxy] Dropped out-of-order CDN manifest for ${url.substring(0, 70)} (incoming seq ${incomingSeq} < cached ${cached.sequence})`);
-                        req.off('close', onClose);
+                        if (onClose) req.off('close', onClose);
                         res.set('X-Velora-Manifest-Monotonic', 'PREVENT_REGRESSION');
                         return res.send(cached.manifest);
                     }
@@ -1492,7 +1493,7 @@ router.get('/stream', async (req, res) => {
                     }
                 }
 
-                req.off('close', onClose);
+                if (onClose) req.off('close', onClose);
                 return res.send(manifest);
             }
 
@@ -1517,22 +1518,23 @@ router.get('/stream', async (req, res) => {
                 }
                 result = await iterator.next();
             }
-            req.off('close', onClose);
+            if (onClose) req.off('close', onClose);
             res.end();
             console.log(`[Proxy Stream] CLOSE: ${cleanUrl.substring(0, 80)}`);
             return; // Success - exit the retry loop
 
         } catch (err) {
             lastError = err;
-            if (err.name === 'AbortError' || abortController.signal.aborted || req.destroyed || res.destroyed || res.writableEnded) {
-                req.off('close', onClose);
+            if (onClose) {
+                try { req.off('close', onClose); } catch {}
+            }
+            if (err.name === 'AbortError' || abortController?.signal?.aborted || req.destroyed || res.destroyed || res.writableEnded) {
                 return;
             }
             const cleanUrl = String(url || '').replace(/\/(live|movie|series)\/([^/?#]+)\/([^/?#]+)\//gi, '/$1/***/***/').replace(/([?&](?:password|pass|token|key)=)[^&#]+/gi, '$1***');
             const detail = err.cause ? ` (${err.cause?.message || err.cause?.code || err.cause})` : '';
             console.error(`Stream proxy error for ${cleanUrl.substring(0, 80)} (attempt ${attempt}/${maxRetries}): ${err.message}${detail}`);
             if (res.headersSent || req.destroyed || res.destroyed || res.writableEnded) {
-                req.off('close', onClose);
                 return;
             }
             if (attempt < maxRetries) {

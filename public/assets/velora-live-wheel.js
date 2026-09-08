@@ -363,24 +363,11 @@
       break;
     }
     if (trimmed.startsWith("data:image/") || trimmed.startsWith("/uploads/") || trimmed.startsWith("/logos/")) return true;
+    if (trimmed.includes("image.tmdb.org") || trimmed.includes("tmdb.org") || trimmed.includes("/w600_and_h900_bestv2/")) return false;
     try {
       const parsed = new URL(trimmed);
-      const host = parsed.hostname.toLowerCase();
-      return (
-        host.includes("iptv-org.github.io") ||
-        host.includes("raw.githubusercontent.com") ||
-        host.includes("github.io") ||
-        host.includes("wikimedia.org") ||
-        host.includes("wikipedia.org") ||
-        host.includes("wikidata.org") ||
-        host.includes("imgur.com") ||
-        host.includes("flagcdn.com") ||
-        host.includes("themoviedb.org") ||
-        host.includes("tmdb.org") ||
-        host.includes("thetvdb.com") ||
-        host.includes("freebox.cdn.scw.iliad.fr") ||
-        host.includes("cloudfront.net")
-      );
+      if (/\.(ts|m3u8|mpd|mp4|m4s)$/i.test(parsed.pathname)) return false;
+      return true;
     } catch {
       return false;
     }

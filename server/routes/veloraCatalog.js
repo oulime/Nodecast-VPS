@@ -400,12 +400,15 @@ router.post('/inventory/:sourceId/vod/:categoryId/posters/refresh', requireAuth,
 });
 
 router.post('/warm', (req, res) => {
-    const job = veloraCatalogCache.startWarm({ reason: 'manual' });
+    const syncSources = req.body?.syncSources !== false && req.query?.sync !== '0';
+    const job = veloraCatalogCache.startWarm({ reason: 'manual', syncSources });
     job.promise.catch(() => {});
     res.status(job.started ? 202 : 200).json({
         ok: true,
         started: job.started,
-        message: job.started ? 'Velora local catalogue warm-up started' : 'Velora local catalogue warm-up already running',
+        message: job.started
+            ? (syncSources ? 'Synchronisation des fournisseurs IPTV et réchauffement du cache lancés' : 'Réchauffement du cache catalogue lancé')
+            : 'Réchauffement du cache catalogue déjà en cours',
         status: veloraCatalogCache.getStatus()
     });
 });

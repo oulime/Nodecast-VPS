@@ -266,7 +266,7 @@
           if (!status.error) loadInventory();
         }
       } catch (_) {}
-      if (attempts >= 70 && pollTimer) {
+      if (attempts >= 180 && pollTimer) {
         window.clearInterval(pollTimer);
         pollTimer = null;
       }

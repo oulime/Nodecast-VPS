@@ -13,6 +13,7 @@ class SyncService {
         this.lastSyncTime = null; // Track when global sync last completed
         this._syncTimer = null;   // Server-side sync timer
         this._currentInterval = null;
+        this._activeGlobalSync = null; // Promise lock for ongoing global sync
     }
 
     /**
@@ -20,6 +21,33 @@ class SyncService {
      */
     getLastSyncTime() {
         return this.lastSyncTime;
+    }
+
+    /**
+     * Sync all enabled IPTV sources into SQLite (without rebuilding cache snapshot)
+     */
+    async syncAllSourcesOnly() {
+        if (this._activeGlobalSync) {
+            console.log('[Sync] Global sync already in progress, awaiting existing job...');
+            return this._activeGlobalSync;
+        }
+
+        this._activeGlobalSync = (async () => {
+            console.log('[Sync] Starting sync for all enabled IPTV sources...');
+            const allSources = await sources.getAll();
+            for (const source of allSources) {
+                if (source.enabled) {
+                    // Run sequentially to avoid overloading the provider or local SQLite
+                    await this.syncSource(source.id);
+                }
+            }
+            this.lastSyncTime = new Date();
+            console.log('[Sync] All enabled sources synced at', this.lastSyncTime.toISOString());
+        })().finally(() => {
+            this._activeGlobalSync = null;
+        });
+
+        return this._activeGlobalSync;
     }
 
     /**
@@ -84,21 +112,13 @@ class SyncService {
     }
 
     /**
-     * Sync all enabled sources
+     * Sync all enabled sources and rebuild the Velora snapshot cache
      */
     async syncAll() {
         console.log('[Sync] Starting global sync...');
         try {
-            const allSources = await sources.getAll();
-            for (const source of allSources) {
-                if (source.enabled) {
-                    // Run sequentially to not overload
-                    await this.syncSource(source.id);
-                }
-            }
-            this.lastSyncTime = new Date();
-            console.log('[Sync] Global sync completed at', this.lastSyncTime.toISOString());
-            await veloraCatalogCache.warm({ reason: 'source-sync' });
+            await this.syncAllSourcesOnly();
+            await veloraCatalogCache.warm({ reason: 'source-sync', syncSources: false });
         } catch (err) {
             console.error('[Sync] Global sync failed:', err);
         }

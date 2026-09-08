@@ -442,8 +442,9 @@ async function buildSnapshot(reason) {
     status = {
         ...status,
         running: true,
+        phase: 'building_snapshot',
         reason,
-        startedAt: new Date().toISOString(),
+        startedAt: status.startedAt || new Date().toISOString(),
         completedAt: null,
         error: null,
         posterStats: null
@@ -502,6 +503,7 @@ async function buildSnapshot(reason) {
     status = {
         running: false,
         ready: true,
+        phase: 'ready',
         reason,
         startedAt: status.startedAt,
         completedAt: new Date().toISOString(),
@@ -524,6 +526,7 @@ async function buildSnapshot(reason) {
 
 async function warm(options = {}) {
     const reason = options.reason || 'manual';
+    const shouldSyncSources = options.syncSources === true;
     if (activeWarm) {
         pendingWarmReason = reason;
         return activeWarm;
@@ -531,11 +534,31 @@ async function warm(options = {}) {
 
     activeWarm = (async () => {
         let nextReason = reason;
+        let nextSyncSources = shouldSyncSources;
         let result = null;
         while (nextReason) {
             pendingWarmReason = null;
+            if (nextSyncSources) {
+                try {
+                    status = {
+                        ...status,
+                        running: true,
+                        phase: 'syncing_sources',
+                        reason: nextReason,
+                        startedAt: new Date().toISOString(),
+                        completedAt: null,
+                        error: null
+                    };
+                    writeStatus();
+                    const syncService = require('./syncService');
+                    await syncService.syncAllSourcesOnly();
+                } catch (syncErr) {
+                    console.error('[Velora cache] Failed to sync sources before snapshot build:', syncErr);
+                }
+            }
             result = await buildSnapshot(nextReason);
             nextReason = pendingWarmReason;
+            nextSyncSources = false;
         }
         return result;
     })()
@@ -543,6 +566,7 @@ async function warm(options = {}) {
             status = {
                 ...status,
                 running: false,
+                phase: 'error',
                 error: err.message,
                 completedAt: new Date().toISOString()
             };
@@ -567,10 +591,10 @@ function startAutoWarmTimer() {
     if (autoWarmTimer) return;
     const intervalMs = AUTO_WARM_HOURS * 60 * 60 * 1000;
     autoWarmTimer = setInterval(() => {
-        startWarm({ reason: 'scheduled' }).promise.catch(() => {});
+        startWarm({ reason: 'scheduled', syncSources: true }).promise.catch(() => {});
     }, intervalMs);
     if (typeof autoWarmTimer.unref === 'function') autoWarmTimer.unref();
-    console.log(`[Velora cache] Local snapshot timer started: every ${AUTO_WARM_HOURS} hours`);
+    console.log(`[Velora cache] Local snapshot timer started: every ${AUTO_WARM_HOURS} hours (with automatic IPTV sources sync)`);
 }
 
 module.exports = {

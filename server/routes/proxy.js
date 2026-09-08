@@ -1252,12 +1252,14 @@ router.get('/stream', async (req, res) => {
 
     // Automatically terminate any previous active proxy connection for the same IPTV account/client
     // so the provider never sees 2 simultaneous streams (which causes HTTP 458)
+    const cleanUrl = String(url || '').replace(/\/(live|movie|series)\/([^/?#]+)\/([^/?#]+)\//gi, '/$1/***/***/').replace(/([?&](?:password|pass|token|key)=)[^&#]+/gi, '$1***');
     const accountKey = getStreamAccountKey(url, req);
     if (activeStreamControllersByAccount.has(accountKey)) {
         const prev = activeStreamControllersByAccount.get(accountKey);
         if (prev?.abortController && !prev.abortController.signal.aborted) {
             try { prev.abortController.abort(); } catch (_) {}
             try { prev.activeResponse?.body?.cancel?.().catch?.(() => {}); } catch (_) {}
+            console.log(`[Proxy Stream] CLOSE (replaced by new seek/stream): ${cleanUrl.substring(0, 80)}`);
         }
         activeStreamControllersByAccount.delete(accountKey);
         // Short pause to allow Node.js and remote CDN load-balancer to cleanly finalize the TCP socket closure
@@ -1284,6 +1286,7 @@ router.get('/stream', async (req, res) => {
                 if (activeStreamControllersByAccount.get(accountKey)?.abortController === abortController) {
                     activeStreamControllersByAccount.delete(accountKey);
                 }
+                console.log(`[Proxy Stream] CLOSE (client disconnect): ${cleanUrl.substring(0, 80)}`);
             };
             req.on('close', onClose);
             activeStreamControllersByAccount.set(accountKey, { abortController, activeResponse });
@@ -1337,7 +1340,6 @@ router.get('/stream', async (req, res) => {
                 throw fetchErr;
             }
             activeResponse = response;
-            const cleanUrl = String(url || '').replace(/\/(live|movie|series)\/([^/?#]+)\/([^/?#]+)\//gi, '/$1/***/***/').replace(/([?&](?:password|pass|token|key)=)[^&#]+/gi, '$1***');
             console.log(`[Proxy Stream] OPEN: Range: ${rangeHeader || 'None'} -> ${cleanUrl.substring(0, 80)}`);
 
             // If upstream returns 458/429/5xx for an m3u8 and we have a cached manifest, serve it IMMEDIATELY
@@ -1552,7 +1554,7 @@ router.get('/stream', async (req, res) => {
             }
             if (onClose) req.off('close', onClose);
             res.end();
-            console.log(`[Proxy Stream] CLOSE: ${cleanUrl.substring(0, 80)}`);
+            console.log(`[Proxy Stream] CLOSE (finished): ${cleanUrl.substring(0, 80)}`);
             return; // Success - exit the retry loop
 
         } catch (err) {

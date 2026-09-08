@@ -105,7 +105,8 @@ class TranscodeSession extends EventEmitter {
         }
 
         this.status = 'starting';
-        console.log(`[TranscodeSession ${this.id}] Starting session for: ${this.url}`);
+        const cleanUrl = String(this.url || '').replace(/\/(live|movie|series)\/([^/?#]+)\/([^/?#]+)\//gi, '/$1/***/***/').replace(/([?&](?:password|pass|token|key)=)[^&#]+/gi, '$1***');
+        console.log(`[Transcode Engine] [START FFMPEG] Session ${this.id} for ${cleanUrl} (seekOffset=${this.options.seekOffset || 0}s, videoMode=${this.options.videoMode || 'encode'})`);
 
         // Create session directory
         try {
@@ -119,8 +120,6 @@ class TranscodeSession extends EventEmitter {
         // Build FFmpeg arguments for HLS output
         const args = this.buildFFmpegArgs();
 
-        console.log(`[TranscodeSession ${this.id}] Command: ${this.options.ffmpegPath} ${args.join(' ')}`);
-
         try {
             this.process = spawn(this.options.ffmpegPath, args, {
                 cwd: this.dir,
@@ -128,6 +127,7 @@ class TranscodeSession extends EventEmitter {
             });
 
             this.status = 'running';
+            console.log(`[Transcode Engine] [FFMPEG SPAWNED] Session ${this.id} (PID: ${this.process.pid})`);
 
             // Handle stdout (should be empty for file output)
             this.process.stdout.on('data', (data) => {
@@ -606,7 +606,9 @@ class TranscodeSession extends EventEmitter {
      */
     stop() {
         if (this.process) {
-            console.log(`[TranscodeSession ${this.id}] Force stopping FFmpeg process`);
+            const pid = this.process.pid;
+            const ranForSec = Math.round((Date.now() - this.startTime) / 1000);
+            console.log(`[Transcode Engine] [FFMPEG STOP] Session ${this.id} PID=${pid} stopped (ran for ${ranForSec}s)`);
             try {
                 this.process.kill('SIGKILL');
             } catch (_) {}
@@ -782,7 +784,7 @@ async function createSession(url, options = {}) {
     // Terminate any older active sessions for the same stream URL to prevent concurrent IPTV connections throttling
     for (const [existingId, existingSession] of sessions.entries()) {
         if (existingSession.url === url && ['running', 'starting', 'pending'].includes(existingSession.status)) {
-            console.log(`[TranscodeSession] Terminating older active session ${existingId} for same URL to avoid upstream connection throttle`);
+            console.log(`[Transcode Engine] [KILL PREVIOUS] Session ${existingId} killed to free IPTV slot before new session`);
             try {
                 existingSession.stop();
                 existingSession.cleanup().catch(() => {});

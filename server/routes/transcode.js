@@ -337,20 +337,7 @@ router.post('/session', async (req, res) => {
         }
     }
 
-    console.log('[Transcode] Session request:', {
-        url: redactStreamUrlForLogs(url),
-        requestedMode: requestedMode || 'empty',
-        normalizedMode: normalizedMode || 'empty',
-        inferredVodMode,
-        isVodMode,
-        seekOffset: effectiveSeekOffset,
-        videoMode,
-        videoCodec,
-        audioCodec,
-        audioChannels,
-        upstreamProxy: upstreamProxy ? 'configured' : 'none',
-        routedThroughVps: streamUrl !== url
-    });
+    console.log(`[VOD/Live Session] >>> REQUEST: seekOffset=${effectiveSeekOffset}s, mode=${normalizedMode}, videoMode=${videoMode || 'default'}, url=${redactStreamUrlForLogs(url)}`);
 
     try {
         const baseSessionOptions = {
@@ -445,19 +432,7 @@ router.post('/session', async (req, res) => {
             ffmpegExitCode
         };
 
-        console.log('[Transcode] Session ready:', {
-            sessionId: responsePayload.sessionId,
-            playlistUrl: responsePayload.playlistUrl,
-            status: responsePayload.status,
-            startAt: responsePayload.startAt,
-            durationSeconds: responsePayload.durationSeconds,
-            durationPending: responsePayload.durationPending,
-            seekable: responsePayload.seekable,
-            mode: responsePayload.mode,
-            selectedEncoder: responsePayload.selectedEncoder,
-            didFallbackToSoftware: responsePayload.didFallbackToSoftware,
-            ffmpegExitCode: responsePayload.ffmpegExitCode
-        });
+        console.log(`[VOD/Live Session] <<< READY: sessionId=${responsePayload.sessionId}, startAt=${responsePayload.startAt}s, duration=${responsePayload.durationSeconds}s, encoder=${responsePayload.selectedEncoder}`);
 
         res.json(responsePayload);
 
@@ -527,6 +502,7 @@ router.get('/:sessionId/:segment', async (req, res) => {
  */
 router.delete('/:sessionId', async (req, res) => {
     const { sessionId } = req.params;
+    console.log(`[VOD/Live Session] --- CLOSED BY CLIENT: sessionId=${sessionId}`);
 
     try {
         await transcodeSession.removeSession(sessionId);

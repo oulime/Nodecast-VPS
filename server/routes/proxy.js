@@ -1304,6 +1304,8 @@ router.get('/stream', async (req, res) => {
                 throw fetchErr;
             }
             activeResponse = response;
+            const cleanUrl = String(url || '').replace(/\/(live|movie|series)\/([^/?#]+)\/([^/?#]+)\//gi, '/$1/***/***/').replace(/([?&](?:password|pass|token|key)=)[^&#]+/gi, '$1***');
+            console.log(`[Proxy Stream] OPEN: Range: ${rangeHeader || 'None'} -> ${cleanUrl.substring(0, 80)}`);
 
             // If upstream returns 458/429/5xx for an m3u8 and we have a cached manifest, serve it IMMEDIATELY
             // without slamming upstream or sleeping 800ms
@@ -1517,15 +1519,20 @@ router.get('/stream', async (req, res) => {
             }
             req.off('close', onClose);
             res.end();
+            console.log(`[Proxy Stream] CLOSE: ${cleanUrl.substring(0, 80)}`);
             return; // Success - exit the retry loop
 
         } catch (err) {
             lastError = err;
-            if (err.name === 'AbortError' || req.destroyed || res.destroyed || res.writableEnded) {
+            if (err.name === 'AbortError' || abortController.signal.aborted || req.destroyed || res.destroyed || res.writableEnded) {
+                req.off('close', onClose);
                 return;
             }
-            console.error(`Stream proxy error (attempt ${attempt}/${maxRetries}):`, err.message);
+            const cleanUrl = String(url || '').replace(/\/(live|movie|series)\/([^/?#]+)\/([^/?#]+)\//gi, '/$1/***/***/').replace(/([?&](?:password|pass|token|key)=)[^&#]+/gi, '$1***');
+            const detail = err.cause ? ` (${err.cause?.message || err.cause?.code || err.cause})` : '';
+            console.error(`Stream proxy error for ${cleanUrl.substring(0, 80)} (attempt ${attempt}/${maxRetries}): ${err.message}${detail}`);
             if (res.headersSent || req.destroyed || res.destroyed || res.writableEnded) {
+                req.off('close', onClose);
                 return;
             }
             if (attempt < maxRetries) {

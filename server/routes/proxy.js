@@ -1230,43 +1230,50 @@ function getCachedMediaRange(mediaUrl, rangeHeader) {
     if (!match) return null;
 
     const reqStart = parseInt(match[1], 10);
-    const reqEnd = match[2] ? parseInt(match[2], 10) : (entry.totalLength ? entry.totalLength - 1 : null);
+    const hasExplicitEnd = Boolean(match[2]);
+    const reqEnd = hasExplicitEnd ? parseInt(match[2], 10) : (entry.totalLength ? entry.totalLength - 1 : null);
 
-    if (reqEnd === null || isNaN(reqStart) || isNaN(reqEnd) || reqStart > reqEnd) return null;
+    if (isNaN(reqStart) || (hasExplicitEnd && (isNaN(reqEnd) || reqStart > reqEnd))) return null;
 
-    // Check if fully contained in cached headChunk (e.g. initial headers)
-    if (entry.headChunk && reqStart >= entry.headChunk.start && reqEnd <= entry.headChunk.end) {
+    // 1. Check if reqStart falls within cached headChunk (e.g. bytes=0-, bytes=4410-, bytes=13062-)
+    if (entry.headChunk && reqStart >= entry.headChunk.start && reqStart <= entry.headChunk.end) {
+        const actualEnd = hasExplicitEnd ? Math.min(reqEnd, entry.headChunk.end) : entry.headChunk.end;
         const sliceStart = reqStart - entry.headChunk.start;
-        const sliceEnd = reqEnd - entry.headChunk.start + 1;
+        const sliceEnd = actualEnd - entry.headChunk.start + 1;
         const slice = entry.headChunk.buffer.subarray(sliceStart, sliceEnd);
-        return {
-            status: 206,
-            contentRange: `bytes ${reqStart}-${reqEnd}/${entry.totalLength}`,
-            contentLength: slice.length,
-            contentType: entry.contentType,
-            buffer: slice
-        };
+        if (slice.length > 0) {
+            return {
+                status: 206,
+                contentRange: `bytes ${reqStart}-${actualEnd}/${entry.totalLength}`,
+                contentLength: slice.length,
+                contentType: entry.contentType,
+                buffer: slice
+            };
+        }
     }
 
-    // Check if fully contained in cached tailChunk (e.g. MKV Cues index / MP4 moov atom at tail)
-    if (entry.tailChunk && reqStart >= entry.tailChunk.start && reqEnd <= entry.tailChunk.end) {
+    // 2. Check if reqStart falls within cached tailChunk (e.g. MKV Cues index at file tail)
+    if (entry.tailChunk && reqStart >= entry.tailChunk.start && reqStart <= entry.tailChunk.end) {
+        const actualEnd = hasExplicitEnd ? Math.min(reqEnd, entry.tailChunk.end) : entry.tailChunk.end;
         const sliceStart = reqStart - entry.tailChunk.start;
-        const sliceEnd = reqEnd - entry.tailChunk.start + 1;
+        const sliceEnd = actualEnd - entry.tailChunk.start + 1;
         const slice = entry.tailChunk.buffer.subarray(sliceStart, sliceEnd);
-        return {
-            status: 206,
-            contentRange: `bytes ${reqStart}-${reqEnd}/${entry.totalLength}`,
-            contentLength: slice.length,
-            contentType: entry.contentType,
-            buffer: slice
-        };
+        if (slice.length > 0) {
+            return {
+                status: 206,
+                contentRange: `bytes ${reqStart}-${actualEnd}/${entry.totalLength}`,
+                contentLength: slice.length,
+                contentType: entry.contentType,
+                buffer: slice
+            };
+        }
     }
 
     return null;
 }
 
 function saveMediaChunkToCache(mediaUrl, rangeStart, rangeEnd, totalLength, contentType, chunkBuffer, isHead = false) {
-    if (!mediaUrl || !chunkBuffer || !totalLength) return;
+    if (!mediaUrl || !chunkBuffer || !totalLength || chunkBuffer.length === 0) return;
     let entry = mediaIndexCache.get(mediaUrl);
     if (!entry) {
         if (mediaIndexCache.size >= MEDIA_INDEX_CACHE_MAX) {
@@ -1287,17 +1294,21 @@ function saveMediaChunkToCache(mediaUrl, rangeStart, rangeEnd, totalLength, cont
     if (contentType) entry.contentType = contentType;
 
     if (isHead) {
-        entry.headChunk = {
-            start: rangeStart,
-            end: rangeEnd,
-            buffer: chunkBuffer
-        };
+        if (!entry.headChunk || chunkBuffer.length >= entry.headChunk.buffer.length) {
+            entry.headChunk = {
+                start: rangeStart,
+                end: rangeEnd,
+                buffer: chunkBuffer
+            };
+        }
     } else {
-        entry.tailChunk = {
-            start: rangeStart,
-            end: rangeEnd,
-            buffer: chunkBuffer
-        };
+        if (!entry.tailChunk || rangeStart <= entry.tailChunk.start) {
+            entry.tailChunk = {
+                start: rangeStart,
+                end: rangeEnd,
+                buffer: chunkBuffer
+            };
+        }
     }
 }
 
@@ -1438,7 +1449,8 @@ router.get('/stream', async (req, res) => {
             const headers = {
                 'User-Agent': userAgent || 'VLC/3.0.18 LibVLC/3.0.18',
                 'Accept': '*/*',
-                'Accept-Language': 'en-US,en;q=0.9'
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Connection': 'close'
             };
 
             // Only send Origin/Referer when required (Pluto or non-IPTV).

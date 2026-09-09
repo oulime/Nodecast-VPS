@@ -633,7 +633,7 @@ function slugifySliderTitle(text) {
 async function enrichHeroSliderItem(item) {
     if (!item || !item.title) return item;
 
-    const baseSlug = slugifySliderTitle(String(item.id || item.title).replace('hero_', ''));
+    const baseSlug = slugifySliderTitle(item.title) || slugifySliderTitle(String(item.id || '').replace('hero_', ''));
 
     // Check if backdrop or logo are preserved manual files (/uploads/hero-slider/backdrops/hero-1- to hero-10-)
     const isPreservedManualBackdrop = item.backdrop && (
@@ -3078,6 +3078,105 @@ const STORED_MEDIA_DIRECTORIES = {
     }
 };
 
+function resolveStoredMediaTitle(filename, category) {
+    if (!filename) return null;
+    const fn = path.basename(String(filename).trim());
+
+    // 1. Check admin_hero_slider
+    try {
+        const heroRows = allRows('admin_hero_slider') || [];
+        for (const row of heroRows) {
+            if (!row || !row.title) continue;
+            const b = path.basename(String(row.backdrop || ''));
+            const l = path.basename(String(row.logo || ''));
+            const img = path.basename(String(row.image || ''));
+            if (b === fn || l === fn || img === fn) {
+                return { title: row.title, tmdbId: row.tmdb_id || '' };
+            }
+            if (row.country_mappings && typeof row.country_mappings === 'object') {
+                for (const cm of Object.values(row.country_mappings)) {
+                    if (!cm) continue;
+                    if (path.basename(String(cm.backdrop || '')) === fn ||
+                        path.basename(String(cm.logo || '')) === fn ||
+                        path.basename(String(cm.thumbUrl || '')) === fn) {
+                        return { title: cm.name || row.title, tmdbId: row.tmdb_id || '' };
+                    }
+                }
+            }
+        }
+
+        const tsMatch = fn.match(/(?:slider|hero)[-_](\d{10,})/i) || fn.match(/(\d{10,})/);
+        if (tsMatch && tsMatch[1]) {
+            const ts = tsMatch[1];
+            for (const row of heroRows) {
+                if (String(row.id || '').includes(ts)) {
+                    return { title: row.title, tmdbId: row.tmdb_id || '' };
+                }
+            }
+        }
+
+        const heroOrderMatch = fn.match(/^hero[-_](\d+)[-_]/i);
+        if (heroOrderMatch && heroOrderMatch[1]) {
+            const order = parseInt(heroOrderMatch[1], 10);
+            for (const row of heroRows) {
+                if (Number(row.sort_order) === order || String(row.id) === `hero_${order}` || String(row.id) === `hero-${order}`) {
+                    return { title: row.title, tmdbId: row.tmdb_id || '' };
+                }
+            }
+        }
+    } catch (_) {}
+
+    // 2. Check VOD Title Logo Cache
+    try {
+        if (fs.existsSync(vodTitleLogoCachePath)) {
+            const cache = JSON.parse(fs.readFileSync(vodTitleLogoCachePath, 'utf8'));
+            for (const [titleKey, entry] of Object.entries(cache)) {
+                const url = typeof entry === 'string' ? entry : (entry?.url || entry?.titleLogo || '');
+                if (path.basename(url) === fn) {
+                    return { title: titleKey.replace(/^(movies|series):/i, ''), tmdbId: entry?.tmdbId || '' };
+                }
+            }
+        }
+    } catch (_) {}
+
+    // 3. Check VOD Horizontal Thumb Cache
+    try {
+        if (fs.existsSync(vodHorizontalThumbCachePath)) {
+            const cache = JSON.parse(fs.readFileSync(vodHorizontalThumbCachePath, 'utf8'));
+            for (const [titleKey, entry] of Object.entries(cache)) {
+                const url = typeof entry === 'string' ? entry : (entry?.thumbUrl || entry?.horizontal_thumb || entry?.backdropUrl || '');
+                if (path.basename(url) === fn) {
+                    return { title: titleKey.replace(/^(movies|series):/i, ''), tmdbId: entry?.tmdbId || '' };
+                }
+            }
+        }
+    } catch (_) {}
+
+    // 4. Check Home Sections (for section-logos)
+    try {
+        const sectionRows = allRows('admin_home_sections') || [];
+        for (const sec of sectionRows) {
+            if (sec && (path.basename(String(sec.logo_url || '')) === fn || path.basename(String(sec.badge_logo_url || '')) === fn)) {
+                return { title: sec.title || sec.name || 'Section' };
+            }
+        }
+    } catch (_) {}
+
+    // 5. Fallback clean name from filename
+    var clean = fn.replace(/\.[^.]+$/, '')
+        .replace(/[-_]\d{10,}/g, '')
+        .replace(/^slider[-_]\d+[-_]?/i, '')
+        .replace(/^hero[-_]\d+[-_]?/i, '')
+        .replace(/[-_]+/g, ' ')
+        .trim();
+    if (clean && !/^\d+$/.test(clean)) {
+        clean = clean.charAt(0).toUpperCase() + clean.slice(1);
+        return { title: clean };
+    }
+
+    return null;
+}
+
 router.get('/stored-media/candidates', async (req, res) => {
     try {
         let rawTitle = String(req.query.title || '').trim();
@@ -3087,10 +3186,16 @@ router.get('/stored-media/candidates', async (req, res) => {
 
         if (!rawTitle && req.query.filename) {
             const fn = path.basename(String(req.query.filename));
-            const match = fn.match(/^(.*?)(?:-(\d+))?\.[a-zA-Z0-9]+$/);
-            if (match) {
-                rawTitle = match[1].replace(/[-_]+/g, ' ').trim();
-                if (match[2]) tmdbId = match[2];
+            const resolved = resolveStoredMediaTitle(fn, category);
+            if (resolved && resolved.title) {
+                rawTitle = resolved.title;
+                if (resolved.tmdbId && !tmdbId) tmdbId = resolved.tmdbId;
+            } else {
+                const match = fn.match(/^(.*?)(?:-(\d+))?\.[a-zA-Z0-9]+$/);
+                if (match) {
+                    rawTitle = match[1].replace(/[-_]+/g, ' ').trim();
+                    if (match[2] && match[2].length < 10) tmdbId = match[2];
+                }
             }
         }
 
@@ -3577,6 +3682,7 @@ router.get('/stored-media', async (req, res) => {
                 if (!file.isFile()) continue;
                 const filePath = path.join(conf.dir, file.name);
                 const stat = await fs.promises.stat(filePath);
+                const resolved = resolveStoredMediaTitle(file.name, key);
                 items.push({
                     id: `${key}:${file.name}`,
                     filename: file.name,
@@ -3584,7 +3690,9 @@ router.get('/stored-media', async (req, res) => {
                     categoryLabel: conf.label,
                     url: `${conf.publicPath}/${file.name}`,
                     sizeBytes: stat.size,
-                    mtime: stat.mtimeMs
+                    mtime: stat.mtimeMs,
+                    title: resolved?.title || '',
+                    tmdbId: resolved?.tmdbId || ''
                 });
             }
         }

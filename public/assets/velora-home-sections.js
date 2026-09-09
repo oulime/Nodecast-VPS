@@ -865,8 +865,16 @@ window.veloraRenderStoredMediaGrid = function() {
 
     var nameEl = document.createElement("div");
     nameEl.className = "vel-stored-media-card__name";
-    var cleanName = item.filename.replace(/\.[^.]+$/, '').replace(/-[0-9]+$/, '').replace(/[-_]+/g, ' ');
-    cleanName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+    var cleanName = (item.title || item.name || "").trim();
+    if (!cleanName) {
+      cleanName = item.filename.replace(/\.[^.]+$/, '')
+        .replace(/[-_]\d{10,}/g, '')
+        .replace(/^slider[-_]\d+[-_]?/i, '')
+        .replace(/^hero[-_]\d+[-_]?/i, '')
+        .replace(/[-_]+/g, ' ')
+        .trim();
+      cleanName = cleanName ? (cleanName.charAt(0).toUpperCase() + cleanName.slice(1)) : item.filename;
+    }
     nameEl.textContent = cleanName;
     nameEl.title = cleanName;
 
@@ -956,18 +964,22 @@ window.veloraOpenCandidatePicker = function(item) {
   var typeSelect = document.getElementById("stored-media-replace-type-select");
   var statusText = document.getElementById("stored-media-replace-status-text");
 
-  var rawTitle = item.name || item.title || item.filename || '';
+  var rawTitle = (item.title || item.name || '').trim();
   var fn = item.filename || '';
-  var match = fn.match(/^(.*?)(?:-(\d+))?\.[a-zA-Z0-9]+$/);
-  var extractedTitle = match ? match[1].replace(/[-_]+/g, ' ').trim() : rawTitle;
-  var tmdbId = match && match[2] ? match[2] : '';
+  var extractedTitle = rawTitle;
+  var tmdbId = item.tmdbId || '';
+  if (!extractedTitle) {
+    var match = fn.match(/^(.*?)(?:-(\d+))?\.[a-zA-Z0-9]+$/);
+    extractedTitle = match ? match[1].replace(/[-_]\d{10,}/g, '').replace(/^slider[-_]\d+[-_]?/i, '').replace(/^hero[-_]\d+[-_]?/i, '').replace(/[-_]+/g, ' ').trim() : fn;
+    if (match && match[2] && match[2].length < 10) tmdbId = match[2];
+  }
   if (extractedTitle) {
     extractedTitle = stripChannelPrefixes(extractedTitle);
     extractedTitle = extractedTitle.charAt(0).toUpperCase() + extractedTitle.slice(1);
   }
 
-  if (titleEl) titleEl.innerHTML = '<span>🎨 Choisir une nouvelle image pour : <strong>' + (extractedTitle || rawTitle) + '</strong></span>';
-  if (searchInput) searchInput.value = extractedTitle || rawTitle;
+  if (titleEl) titleEl.innerHTML = '<span>🎨 Choisir une nouvelle image pour : <strong>' + (extractedTitle || rawTitle || fn) + '</strong></span>';
+  if (searchInput) searchInput.value = extractedTitle || rawTitle || fn;
   if (typeSelect) {
     if (item.category === 'series' || item.contentType === 'series' || fn.includes('tv') || fn.includes('series')) typeSelect.value = 'tv';
     else if (item.category === 'movies' || item.contentType === 'movies' || fn.includes('movie')) typeSelect.value = 'movie';

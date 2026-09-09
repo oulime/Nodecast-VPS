@@ -1,7 +1,10 @@
 (function() {
   "use strict";
 
-  var currentSlideIndex = 0;
+  var currentRealIndex = 0;
+  var currentTrackIndex = 1;
+  var isAnimating = false;
+  var animationSafetyTimer = null;
   var sliderItems = [];
   var autoSlideTimer = null;
   var isPaused = false;
@@ -51,21 +54,6 @@
     }
   }
 
-  function getBadgeClass(badge, category) {
-    var b = String(badge || category || "").toLowerCase();
-    if (b.includes("cinéma") || b.includes("cinema")) return "vel-hero-badge--cinema";
-    if (b.includes("animé") || b.includes("anime") || b.includes("manga")) return "vel-hero-badge--anime";
-    return "vel-hero-badge--streaming";
-  }
-
-  function getBadgeLabel(item) {
-    if (item.badge) return item.badge;
-    var cat = String(item.category || "").toLowerCase();
-    if (cat === "series") return "Série";
-    if (cat === "anime") return "Animé";
-    return "Film";
-  }
-
   function playSlideItem(item) {
     if (!item) return;
     var stream = item.stream;
@@ -104,40 +92,133 @@
     }
   }
 
-  function goToSlide(index) {
-    if (!sliderItems.length) return;
-    if (index < 0) index = sliderItems.length - 1;
-    if (index >= sliderItems.length) index = 0;
-    currentSlideIndex = index;
-
-    var track = container.querySelector(".vel-hero-track");
-    if (track) {
-      track.style.transform = "translateX(-" + (currentSlideIndex * 100) + "%)";
+  function formatLogoUrl(url) {
+    if (!url) return "";
+    var u = String(url).trim();
+    if (u.includes("fanart.tv") || (!u.includes("tmdb.org") && (u.startsWith("http://") || u.startsWith("https://")))) {
+      return "/api/proxy/image?url=" + encodeURIComponent(u);
     }
+    return u;
+  }
+
+  function updateActiveStates() {
+    if (!container) return;
+    var count = sliderItems.length;
+    var realIdx = count > 1 ? ((currentTrackIndex - 1 + count) % count) : 0;
+    currentRealIndex = realIdx;
 
     var slides = container.querySelectorAll(".vel-hero-slide");
     slides.forEach(function(slide, idx) {
-      slide.classList.toggle("active", idx === currentSlideIndex);
+      slide.classList.toggle("active", idx === currentTrackIndex);
     });
 
     var dots = container.querySelectorAll(".vel-hero-dot");
     dots.forEach(function(dot, idx) {
-      dot.classList.toggle("active", idx === currentSlideIndex);
+      dot.classList.toggle("active", idx === realIdx);
     });
+  }
+
+  function handleTrackTransitionEnd() {
+    if (!container || !sliderItems.length) return;
+    if (animationSafetyTimer) {
+      clearTimeout(animationSafetyTimer);
+      animationSafetyTimer = null;
+    }
+
+    var track = container.querySelector(".vel-hero-track");
+    if (!track) {
+      isAnimating = false;
+      return;
+    }
+
+    var count = sliderItems.length;
+    if (count <= 1) {
+      isAnimating = false;
+      return;
+    }
+
+    // Wrapped forward: past last real slide to clone of first (track index = count + 1) -> jump to real first (1)
+    if (currentTrackIndex >= count + 1) {
+      currentTrackIndex = 1;
+      track.style.transition = "none";
+      track.style.transform = "translateX(-" + (currentTrackIndex * 100) + "%)";
+      void track.offsetHeight; // force reflow
+      track.style.transition = "";
+    }
+    // Wrapped backward: past first real slide to clone of last (track index = 0) -> jump to real last (count)
+    else if (currentTrackIndex <= 0) {
+      currentTrackIndex = count;
+      track.style.transition = "none";
+      track.style.transform = "translateX(-" + (currentTrackIndex * 100) + "%)";
+      void track.offsetHeight; // force reflow
+      track.style.transition = "";
+    }
+
+    updateActiveStates();
+    isAnimating = false;
+  }
+
+  function moveToTrackIndex(targetTrackIndex) {
+    if (!container || !sliderItems.length) return;
+    var track = container.querySelector(".vel-hero-track");
+    if (!track) return;
+
+    var count = sliderItems.length;
+    if (count <= 1) {
+      currentTrackIndex = 0;
+      currentRealIndex = 0;
+      track.style.transform = "translateX(0%)";
+      updateActiveStates();
+      return;
+    }
+
+    isAnimating = true;
+    currentTrackIndex = targetTrackIndex;
+    track.style.transform = "translateX(-" + (currentTrackIndex * 100) + "%)";
+    updateActiveStates();
+
+    if (animationSafetyTimer) clearTimeout(animationSafetyTimer);
+    animationSafetyTimer = setTimeout(function() {
+      if (isAnimating) {
+        handleTrackTransitionEnd();
+      }
+    }, 700);
 
     resetAutoSlideTimer();
   }
 
+  function goToSlide(realIndex) {
+    if (!sliderItems.length) return;
+    if (sliderItems.length <= 1) {
+      moveToTrackIndex(0);
+      return;
+    }
+    if (isAnimating) {
+      handleTrackTransitionEnd();
+    }
+    var targetTrackIndex = realIndex + 1;
+    moveToTrackIndex(targetTrackIndex);
+  }
+
   function nextSlide() {
-    goToSlide(currentSlideIndex + 1);
+    if (!sliderItems.length || sliderItems.length <= 1) return;
+    if (isAnimating) {
+      handleTrackTransitionEnd();
+    }
+    moveToTrackIndex(currentTrackIndex + 1);
   }
 
   function prevSlide() {
-    goToSlide(currentSlideIndex - 1);
+    if (!sliderItems.length || sliderItems.length <= 1) return;
+    if (isAnimating) {
+      handleTrackTransitionEnd();
+    }
+    moveToTrackIndex(currentTrackIndex - 1);
   }
 
   function startAutoSlide() {
     stopAutoSlide();
+    if (sliderItems.length <= 1) return;
     autoSlideTimer = setInterval(function() {
       if (!isPaused) {
         nextSlide();
@@ -157,19 +238,107 @@
     startAutoSlide();
   }
 
-  function formatLogoUrl(url) {
-    if (!url) return "";
-    var u = String(url).trim();
-    if (u.includes("fanart.tv") || (!u.includes("tmdb.org") && (u.startsWith("http://") || u.startsWith("https://")))) {
-      return "/api/proxy/image?url=" + encodeURIComponent(u);
+  function createSlideElement(item, realIndex, isClone) {
+    var slide = document.createElement("div");
+    slide.className = "vel-hero-slide" + (!isClone && realIndex === 0 ? " active" : "");
+    if (isClone) {
+      slide.setAttribute("data-is-clone", "true");
     }
-    return u;
+
+    var img = document.createElement("img");
+    img.className = "vel-hero-slide__bg";
+    var cleanTitle = formatCleanTitle(item.title);
+    img.alt = cleanTitle;
+    img.decoding = "async";
+    img.loading = (!isClone && realIndex === 0) ? "eager" : "lazy";
+    if (!isClone && realIndex === 0) {
+      img.setAttribute("fetchpriority", "high");
+    }
+    img.src = item.backdrop || item.image || "";
+
+    var overlay = document.createElement("div");
+    overlay.className = "vel-hero-slide__overlay";
+
+    var content = document.createElement("div");
+    content.className = "vel-hero-slide__content";
+
+    var logoUrl = (item.logo || item.logo_url || item.title_logo || (item.stream && item.stream.logo) || "").trim();
+    if (logoUrl) {
+      var logoWrap = document.createElement("h2");
+      logoWrap.className = "vel-hero-title-art";
+      logoWrap.setAttribute("aria-label", cleanTitle);
+
+      var logoImg = document.createElement("img");
+      logoImg.className = "vel-hero-title-logo";
+      logoImg.alt = cleanTitle;
+      logoImg.decoding = "async";
+      logoImg.loading = (!isClone && realIndex === 0) ? "eager" : "lazy";
+
+      logoImg.onerror = function() {
+        console.warn("[Hero Slider] Logo image failed to load for:", cleanTitle, logoUrl);
+        var fallbackTitle = document.createElement("h2");
+        fallbackTitle.className = "vel-hero-title";
+        fallbackTitle.textContent = cleanTitle;
+        if (logoWrap.parentNode) {
+          logoWrap.parentNode.replaceChild(fallbackTitle, logoWrap);
+        } else {
+          logoWrap.replaceWith(fallbackTitle);
+        }
+      };
+
+      var resolvedLogoSrc = formatLogoUrl(logoUrl);
+
+      function updateLogoAspect(imgEl) {
+        if (!imgEl || !imgEl.naturalWidth || !imgEl.naturalHeight) return;
+        var ratio = imgEl.naturalWidth / imgEl.naturalHeight;
+        imgEl.classList.remove("is-tall-logo", "is-wide-logo", "is-balanced-logo");
+        if (ratio < 1.85) {
+          imgEl.classList.add("is-tall-logo");
+        } else if (ratio > 3.2) {
+          imgEl.classList.add("is-wide-logo");
+        } else {
+          imgEl.classList.add("is-balanced-logo");
+        }
+      }
+
+      logoImg.onload = function() {
+        updateLogoAspect(logoImg);
+      };
+      logoImg.src = resolvedLogoSrc;
+      if (logoImg.complete && logoImg.naturalWidth > 0) {
+        updateLogoAspect(logoImg);
+      }
+
+      logoWrap.appendChild(logoImg);
+      content.appendChild(logoWrap);
+    } else {
+      var title = document.createElement("h2");
+      title.className = "vel-hero-title";
+      title.textContent = cleanTitle;
+      content.appendChild(title);
+    }
+
+    if (item.overview) {
+      var overview = document.createElement("p");
+      overview.className = "vel-hero-overview";
+      overview.textContent = item.overview;
+      content.appendChild(overview);
+    }
+
+    slide.appendChild(img);
+    slide.appendChild(overlay);
+    slide.appendChild(content);
+
+    slide.addEventListener("click", function() {
+      playSlideItem(item);
+    });
+
+    return slide;
   }
 
   function renderHeroSlider(items) {
     if (!container) return;
-    sliderItems = items;
-    currentSlideIndex = 0;
+    sliderItems = items || [];
 
     if (!items || !items.length) {
       container.innerHTML = "";
@@ -186,99 +355,43 @@
     var track = document.createElement("div");
     track.className = "vel-hero-track";
 
-    items.forEach(function(item, idx) {
-      var slide = document.createElement("div");
-      slide.className = "vel-hero-slide" + (idx === 0 ? " active" : "");
+    if (items.length > 1) {
+      // 1. Prepend clone of last item
+      var lastItem = items[items.length - 1];
+      var cloneLast = createSlideElement(lastItem, items.length - 1, true);
+      track.appendChild(cloneLast);
 
-      var img = document.createElement("img");
-      img.className = "vel-hero-slide__bg";
-      var cleanTitle = formatCleanTitle(item.title);
-      img.alt = cleanTitle;
-      img.decoding = "async";
-      img.loading = idx === 0 ? "eager" : "lazy";
-      if (idx === 0) {
-        img.setAttribute("fetchpriority", "high");
-      }
-      img.src = item.backdrop || item.image || "";
-
-      var overlay = document.createElement("div");
-      overlay.className = "vel-hero-slide__overlay";
-
-      var content = document.createElement("div");
-      content.className = "vel-hero-slide__content";
-
-      var logoUrl = (item.logo || item.logo_url || item.title_logo || (item.stream && item.stream.logo) || "").trim();
-      if (logoUrl) {
-        var logoWrap = document.createElement("h2");
-        logoWrap.className = "vel-hero-title-art";
-        logoWrap.setAttribute("aria-label", cleanTitle);
-
-        var logoImg = document.createElement("img");
-        logoImg.className = "vel-hero-title-logo";
-        logoImg.alt = cleanTitle;
-        logoImg.decoding = "async";
-        logoImg.loading = idx === 0 ? "eager" : "lazy";
-
-        logoImg.onerror = function() {
-          console.warn("[Hero Slider] Logo image failed to load for:", cleanTitle, logoUrl);
-          var fallbackTitle = document.createElement("h2");
-          fallbackTitle.className = "vel-hero-title";
-          fallbackTitle.textContent = cleanTitle;
-          if (logoWrap.parentNode) {
-            logoWrap.parentNode.replaceChild(fallbackTitle, logoWrap);
-          } else {
-            logoWrap.replaceWith(fallbackTitle);
-          }
-        };
-
-        var resolvedLogoSrc = formatLogoUrl(logoUrl);
-
-        function updateLogoAspect(img) {
-          if (!img || !img.naturalWidth || !img.naturalHeight) return;
-          var ratio = img.naturalWidth / img.naturalHeight;
-          img.classList.remove("is-tall-logo", "is-wide-logo", "is-balanced-logo");
-          if (ratio < 1.85) {
-            img.classList.add("is-tall-logo");
-          } else if (ratio > 3.2) {
-            img.classList.add("is-wide-logo");
-          } else {
-            img.classList.add("is-balanced-logo");
-          }
-        }
-
-        logoImg.onload = function() {
-          updateLogoAspect(logoImg);
-        };
-        logoImg.src = resolvedLogoSrc;
-        if (logoImg.complete && logoImg.naturalWidth > 0) {
-          updateLogoAspect(logoImg);
-        }
-
-        logoWrap.appendChild(logoImg);
-        content.appendChild(logoWrap);
-      } else {
-        var title = document.createElement("h2");
-        title.className = "vel-hero-title";
-        title.textContent = cleanTitle;
-        content.appendChild(title);
-      }
-
-      if (item.overview) {
-        var overview = document.createElement("p");
-        overview.className = "vel-hero-overview";
-        overview.textContent = item.overview;
-        content.appendChild(overview);
-      }
-
-      slide.appendChild(img);
-      slide.appendChild(overlay);
-      slide.appendChild(content);
-
-      slide.addEventListener("click", function() {
-        playSlideItem(item);
+      // 2. Append real slides
+      items.forEach(function(item, idx) {
+        var realSlide = createSlideElement(item, idx, false);
+        track.appendChild(realSlide);
       });
 
-      track.appendChild(slide);
+      // 3. Append clone of first item
+      var firstItem = items[0];
+      var cloneFirst = createSlideElement(firstItem, 0, true);
+      track.appendChild(cloneFirst);
+
+      // Initial track position at real slide 0 (track index 1)
+      currentTrackIndex = 1;
+      currentRealIndex = 0;
+      track.style.transition = "none";
+      track.style.transform = "translateX(-100%)";
+      void track.offsetHeight;
+      track.style.transition = "";
+    } else {
+      // Single slide
+      currentTrackIndex = 0;
+      currentRealIndex = 0;
+      var singleSlide = createSlideElement(items[0], 0, false);
+      track.appendChild(singleSlide);
+      track.style.transform = "translateX(0%)";
+    }
+
+    track.addEventListener("transitionend", function(e) {
+      if (e.target === track && (e.propertyName === "transform" || !e.propertyName)) {
+        handleTrackTransitionEnd();
+      }
     });
 
     slider.appendChild(track);
@@ -339,12 +452,16 @@
     var touchStartX = 0;
     var touchEndX = 0;
     slider.addEventListener("touchstart", function(e) {
-      touchStartX = e.changedTouches[0].screenX;
+      if (e.changedTouches && e.changedTouches[0]) {
+        touchStartX = e.changedTouches[0].screenX;
+      }
       isPaused = true;
     }, { passive: true });
 
     slider.addEventListener("touchend", function(e) {
-      touchEndX = e.changedTouches[0].screenX;
+      if (e.changedTouches && e.changedTouches[0]) {
+        touchEndX = e.changedTouches[0].screenX;
+      }
       isPaused = false;
       var diff = touchStartX - touchEndX;
       if (Math.abs(diff) > 45) {
@@ -354,6 +471,7 @@
     }, { passive: true });
 
     container.appendChild(slider);
+    updateActiveStates();
     startAutoSlide();
   }
 

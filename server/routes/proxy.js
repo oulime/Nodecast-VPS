@@ -1328,7 +1328,7 @@ function getStreamAccountKey(streamUrl = '', req) {
 
 router.get('/stream', async (req, res) => {
     const maxRetries = 3;
-    const retryDelays = [500, 1000, 1800];
+    const retryDelays = [1500, 2500, 3500];
     let lastError = null;
 
     let { url } = req.query;
@@ -1339,6 +1339,7 @@ router.get('/stream', async (req, res) => {
     const isM3u8Url = /\.m3u8(\?|$)/i.test(url);
     const cleanUrl = String(url || '').replace(/\/(live|movie|series)\/([^/?#]+)\/([^/?#]+)\//gi, '/$1/***/***/').replace(/([?&](?:password|pass|token|key)=)[^&#]+/gi, '$1***');
     const rangeHeader = req.get('range');
+    const isVodStream = /\/(movie|series)\//i.test(url) || /\.(mp4|mkv|mov|avi|webm)(\?|$)/i.test(url);
 
     // Fast-path 1: return freshly cached live manifest to avoid hammering upstream IPTV server concurrently
     if (isM3u8Url && liveManifestCache.has(url)) {
@@ -1372,25 +1373,34 @@ router.get('/stream', async (req, res) => {
     }
 
     // Automatically terminate any previous active proxy connection for the same IPTV account/client
-    // so the provider never sees 2 simultaneous streams (which causes HTTP 458)
+    // so the provider never sees 2 simultaneous streams (which causes HTTP 458).
+    // EXCEPTION: For VOD files (/movie/, /series/, .mp4, .mkv), browser demuxers issue multiple concurrent
+    // or rapid Range probes (head probe + moov atom index probe). We do NOT kill active connections for the
+    // SAME media URL, because abruptly aborting TCP connections triggers upstream CDN anti-flood 458 throttles.
     const accountKey = getStreamAccountKey(url, req);
     const requestId = crypto.randomBytes ? crypto.randomBytes(6).toString('hex') : Math.random().toString(36).slice(2, 8);
 
     if (activeStreamControllersByAccount.has(accountKey)) {
         const prev = activeStreamControllersByAccount.get(accountKey);
-        if (prev) {
-            prev.isCancelled = true;
-            try { prev.abortController?.abort(); } catch (_) {}
-            try { prev.activeResponse?.body?.cancel?.().catch?.(() => {}); } catch (_) {}
-            console.log(`[Proxy Stream] CLOSE (replaced by new seek/stream): ${cleanUrl.substring(0, 80)}`);
+        const isSameMedia = prev && prev.mediaUrl === url;
+        const isVodRange = isVodStream && Boolean(rangeHeader);
+
+        if (!isSameMedia || !isVodRange) {
+            if (prev) {
+                prev.isCancelled = true;
+                try { prev.abortController?.abort(); } catch (_) {}
+                try { prev.activeResponse?.body?.cancel?.().catch?.(() => {}); } catch (_) {}
+                console.log(`[Proxy Stream] CLOSE (replaced by new stream): ${cleanUrl.substring(0, 80)}`);
+            }
+            activeStreamControllersByAccount.delete(accountKey);
+            // Short pause to allow remote CDN load-balancer to cleanly finalize the TCP socket closure
+            await new Promise(r => setTimeout(r, 120));
         }
-        activeStreamControllersByAccount.delete(accountKey);
-        // Short pause to allow Node.js and remote CDN load-balancer to cleanly finalize the TCP socket closure
-        await new Promise(r => setTimeout(r, 120));
     }
 
     const currentEntry = {
         requestId,
+        mediaUrl: url,
         isCancelled: false,
         abortController: null,
         activeResponse: null
@@ -1450,7 +1460,7 @@ router.get('/stream', async (req, res) => {
                 'User-Agent': userAgent || 'VLC/3.0.18 LibVLC/3.0.18',
                 'Accept': '*/*',
                 'Accept-Language': 'en-US,en;q=0.9',
-                'Connection': 'close'
+                'Connection': 'keep-alive'
             };
 
             // Only send Origin/Referer when required (Pluto or non-IPTV).
@@ -1710,6 +1720,7 @@ router.get('/stream', async (req, res) => {
             }
 
             // Detect if this is a header probe or tail/index range to cache for instant seeking
+            const HEAD_CACHE_MAX_BYTES = 1048576; // 1 MB
             let isHeadRange = false;
             let isTailRange = false;
             let parsedStart = 0;
@@ -1724,21 +1735,21 @@ router.get('/stream', async (req, res) => {
                     parsedStart = parseInt(crMatch[1], 10);
                     parsedEnd = parseInt(crMatch[2], 10);
                     parsedTotal = parseInt(crMatch[3], 10);
-                    const rangeLen = parsedEnd - parsedStart + 1;
 
-                    // Head probe (starts at byte 0 and total requested <= 512KB)
-                    if (parsedStart === 0 && rangeLen <= 524288) {
+                    // Head probe (starts at byte 0) -> ALWAYS capture the first 1MB of video header
+                    if (parsedStart === 0) {
                         isHeadRange = true;
                         capturedChunks = [firstChunk];
                     }
-                    // Tail/index probe (near end of large file, <= 6MB range)
-                    else if (parsedTotal > 1048576 && parsedStart >= parsedTotal - 8388608 && rangeLen <= 6291456) {
+                    // Tail/index probe (near end of file, e.g. MP4 moov atom / MKV cues)
+                    else if (parsedTotal > 1048576 && parsedStart >= parsedTotal - 16777216) {
                         isTailRange = true;
                         capturedChunks = [firstChunk];
                     }
                 }
             } else if (rangeHeader === 'bytes=0-' || !rangeHeader) {
                 isHeadRange = true;
+                if (contentLength) parsedTotal = parseInt(contentLength, 10);
                 capturedChunks = [firstChunk];
             }
 
@@ -1754,10 +1765,10 @@ router.get('/stream', async (req, res) => {
                 const chunkBuf = Buffer.from(result.value);
                 if (capturedChunks) {
                     capturedBytes += chunkBuf.length;
-                    if (isTailRange || (isHeadRange && capturedBytes <= 524288)) {
+                    if (isTailRange && capturedBytes <= 8388608) {
                         capturedChunks.push(chunkBuf);
-                    } else if (isHeadRange) {
-                        capturedChunks = null;
+                    } else if (isHeadRange && capturedBytes <= HEAD_CACHE_MAX_BYTES) {
+                        capturedChunks.push(chunkBuf);
                     }
                 }
                 if (!res.write(chunkBuf)) {
@@ -1769,10 +1780,10 @@ router.get('/stream', async (req, res) => {
             // Save captured head or tail range into memory cache for instant future seeks
             if (capturedChunks && capturedChunks.length > 0 && parsedTotal > 0) {
                 const combined = Buffer.concat(capturedChunks);
-                if (isTailRange && parsedEnd === parsedTotal - 1) {
-                    saveMediaChunkToCache(url, parsedStart, parsedEnd, parsedTotal, contentType, combined, false);
+                if (isTailRange) {
+                    saveMediaChunkToCache(url, parsedStart, parsedStart + combined.length - 1, parsedTotal, contentType, combined, false);
                 } else if (isHeadRange) {
-                    saveMediaChunkToCache(url, parsedStart, parsedStart + combined.length - 1, parsedTotal, contentType, combined, true);
+                    saveMediaChunkToCache(url, 0, combined.length - 1, parsedTotal, contentType, combined, true);
                 }
             }
 

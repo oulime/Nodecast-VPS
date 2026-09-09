@@ -177,10 +177,10 @@ function analyzeProbeResult(probeResult, url, rangeInfo = {}) {
     const audioOk = BROWSER_AUDIO_CODECS.some(c => audioCodec.includes(c));
 
     // Browser-safe containers
-    // Note: We exclude 'webm' because ffprobe reports MKV as "matroska,webm", 
-    // and H.264/AAC in MKV/WebM is not universally supported. Best to remux to MP4.
-    const BROWSER_CONTAINERS = ['hls', 'mp4', 'mov'];
-    const containerOk = BROWSER_CONTAINERS.some(c => container.includes(c));
+    // Modern browsers (Chrome, Edge, Firefox, Android) natively support MP4, MOV, MKV, and WebM with standard codecs.
+    const BROWSER_CONTAINERS = ['hls', 'mp4', 'mov', 'matroska', 'webm'];
+    const isMkv = container.includes('matroska') || container.includes('webm') || url.endsWith('.mkv');
+    const containerOk = BROWSER_CONTAINERS.some(c => container.includes(c)) || isMkv;
 
     // Check if it's a raw TS stream (not HLS)
     const isRawTs = (container.includes('mpegts') || url.endsWith('.ts')) && !url.includes('.m3u8');
@@ -195,16 +195,12 @@ function analyzeProbeResult(probeResult, url, rangeInfo = {}) {
             codec: s.codec_name
         }));
 
-    // Determine what processing is needed
-    // 4. MKV files often cause OOM/decoding issues in browser fMP4 remux, 
-    // so we force them to "needsTranscode" which uses HLS (more robust).
-    // The frontend will still use "copy" mode if codecs are compatible.
-    const isMkv = container.includes('matroska') || container.includes('webm') || url.endsWith('.mkv');
+    // Determine what processing is needed:
+    // Only transcode if audio/video codecs are genuinely unsupported by web browsers.
+    // Standard H.264/AAC/MP3 in MKV or MP4 streams directly at 100% native speed and quality.
+    const needsTranscode = isHevcVideo || !audioOk || !videoOk;
 
-    // 1. Incompatible audio/video OR MKV -> Transcode (or HLS Copy)
-    const needsTranscode = isHevcVideo || !audioOk || !videoOk || isMkv;
-
-    // 2. Compatible audio/video but incompatible container (non-MKV) -> Remux (fMP4 pipe)
+    // Compatible audio/video but raw TS container -> Remux (fMP4 pipe)
     const needsRemux = !needsTranscode && (!containerOk || isRawTs);
 
     const compatible = !needsTranscode && !needsRemux;

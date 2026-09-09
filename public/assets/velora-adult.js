@@ -1607,7 +1607,8 @@
     if (playToken !== activeVodPlayToken) return;
 
     let finalUrl = null;
-    const isTranscodeContainer = !['mp4', 'm4v'].includes(ext) || ext === 'mkv' || ext === 'ts';
+    const isSafariOrIos = (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) || (/Safari/i.test(navigator.userAgent) && !/Chrome|CriOS|Chromium|Android/i.test(navigator.userAgent)));
+    const isTranscodeContainer = isSafariOrIos ? (!['mp4', 'm4v'].includes(ext) || ext === 'mkv' || ext === 'ts') : ext === 'ts';
 
     if (isTranscodeContainer) {
       try {

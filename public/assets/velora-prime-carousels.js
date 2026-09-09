@@ -373,7 +373,40 @@
         }
       }
     } catch (err) {
-      console.warn("[Velora Prime] Could not fetch package items:", err.message);
+      console.warn("[Velora Prime] Could not fetch package items from API:", err.message);
+    }
+
+    // Direct live Xtream catalog resolution for packages when on Accueil or standalone
+    if (typeof window.veloraGetHomeSectionContent === "function" && pkg.id) {
+      try {
+        const fullContent = await window.veloraGetHomeSectionContent(tab, pkg.id, false);
+        if (Array.isArray(fullContent) && fullContent.length > 0) {
+          const items = fullContent.map(it => {
+            const rawId = it.streamId || it.id;
+            return {
+              id: it.id || `feed:${pkg.id}:${rawId}`,
+              name: stripTitle(it.name || it.title || ""),
+              rawName: it.name || it.title || "",
+              thumbUrl: it.thumbUrl || it.posterUrl || it.backdropUrl || "",
+              posterUrl: it.posterUrl || it.thumbUrl || it.backdropUrl || "",
+              backdropUrl: it.backdropUrl || it.thumbUrl || "",
+              rating: it.rating || "",
+              year: it.year || "",
+              plot: it.plot || it.description || "",
+              streamId: rawId,
+              sourceId: it.sourceId || pkg.source_id,
+              globalStreamId: it.globalStreamId || rawId,
+              containerExtension: it.containerExtension || "",
+              contentType: it.contentType || tab,
+              packageId: it.packageId || pkg.id
+            };
+          });
+          packageFullItemsCache.set(cacheKey, items);
+          return items;
+        }
+      } catch (err) {
+        console.warn("[Velora Prime] Direct catalog fetch failed:", err);
+      }
     }
 
     if (Array.isArray(pkg.customItems) && pkg.customItems.length) {

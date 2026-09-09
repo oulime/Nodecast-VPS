@@ -11,24 +11,43 @@ const veloraCatalogCache = require('./services/veloraCatalogCache');
 const app = express();
 const PORT = Number.parseInt(process.env.PORT, 10) || 3000;
 
-// Configure global proxy dispatcher if UPSTREAM_PROXY, HTTP_PROXY, or db.json upstreamProxy is set
+// Configure selective proxy dispatcher:
+// Dino / Playmodx requires WARP/residential proxy to avoid datacenter 403 blocks.
+// Strong / World 8K and all other providers route 100% DIRECTLY to prevent multi-IP 458 collisions.
 try {
-    const { ProxyAgent, setGlobalDispatcher } = require('undici');
-    let proxyUrl = process.env.UPSTREAM_PROXY || process.env.HTTP_PROXY || process.env.http_proxy;
-    if (!proxyUrl) {
-        try {
-            const dbData = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'db.json'), 'utf8'));
-            if (dbData?.settings?.upstreamProxy && String(dbData.settings.upstreamProxy).trim()) {
-                proxyUrl = String(dbData.settings.upstreamProxy).trim();
+    const { Agent, ProxyAgent, Dispatcher, setGlobalDispatcher } = require('undici');
+    const proxyUrl = process.env.DINO_PROXY || process.env.UPSTREAM_PROXY || 'http://127.0.0.1:8118';
+    const directAgent = new Agent({
+        connect: { timeout: 15000 }
+    });
+    const proxyAgent = new ProxyAgent(proxyUrl);
+
+    function isDinoTarget(target) {
+        if (!target) return false;
+        const lower = String(target).toLowerCase();
+        return lower.includes('playmodx') || lower.includes('103.176.90.');
+    }
+
+    class SelectiveRoutingDispatcher extends Dispatcher {
+        dispatch(opts, handler) {
+            const target = String(opts.origin || '') + String(opts.path || '');
+            if (isDinoTarget(target)) {
+                return proxyAgent.dispatch(opts, handler);
             }
-        } catch (_) {}
+            return directAgent.dispatch(opts, handler);
+        }
+        close() {
+            return Promise.all([directAgent.close(), proxyAgent.close()]);
+        }
+        destroy() {
+            return Promise.all([directAgent.destroy(), proxyAgent.destroy()]);
+        }
     }
-    if (proxyUrl) {
-        setGlobalDispatcher(new ProxyAgent(proxyUrl));
-        console.log(`[Proxy] Global undici dispatcher configured with ${proxyUrl}`);
-    }
+
+    setGlobalDispatcher(new SelectiveRoutingDispatcher());
+    console.log(`[Proxy] Selective routing dispatcher enabled: Dino -> ${proxyUrl}, Strong/others -> direct VPS IP`);
 } catch (e) {
-    console.warn('[Proxy] Failed to configure global undici dispatcher:', e.message);
+    console.warn('[Proxy] Failed to configure selective undici dispatcher:', e.message);
 }
 const VPS_DATA_API_BASE = String(
     process.env.VPS_DATA_API_BASE || 'https://nodecast.veloravip.net'

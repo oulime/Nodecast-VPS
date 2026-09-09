@@ -83,7 +83,7 @@ class TranscodeSession extends EventEmitter {
         this.options = {
             ffmpegPath: options.ffmpegPath || 'ffmpeg',
             userAgent: options.userAgent || 'Mozilla/5.0',
-            upstreamProxy: options.upstreamProxy || process.env.UPSTREAM_PROXY || process.env.HTTP_PROXY || process.env.http_proxy || null,
+            upstreamProxy: options.upstreamProxy || (String(options.url || '').toLowerCase().includes('playmodx') ? (process.env.DINO_PROXY || process.env.UPSTREAM_PROXY || 'http://127.0.0.1:8118') : null),
             seekOffset: options.seekOffset || 0,
             hwEncoder: options.hwEncoder || 'software',
             maxResolution: options.maxResolution || '1080p',

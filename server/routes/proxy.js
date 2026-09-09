@@ -1312,17 +1312,30 @@ function saveMediaChunkToCache(mediaUrl, rangeStart, rangeEnd, totalLength, cont
     }
 }
 
+function getClientIdentifier(req) {
+    if (!req) return 'client';
+    const xff = req.headers ? (req.headers['x-forwarded-for'] || req.headers['x-real-ip']) : null;
+    if (xff) {
+        const first = String(xff).split(',')[0].trim();
+        if (first) return first;
+    }
+    return req.ip || req.socket?.remoteAddress || 'client';
+}
+
 function getStreamAccountKey(streamUrl = '', req) {
+    const clientId = getClientIdentifier(req);
     try {
         const parsed = new URL(streamUrl);
         const match = parsed.pathname.match(/\/(live|movie|series)\/([^/]+)\/([^/]+)/i);
         if (match) {
-            // match[2] is the IPTV username. Key is host:username so switching live<->movie cancels old stream immediately.
-            return `${parsed.host}:${match[2]}`;
+            // Key includes client IP + upstream host + IPTV username.
+            // This ensures concurrent visitors watching from different IPs/devices never interfere,
+            // while switching titles for the same visitor terminates their previous stream cleanly.
+            return `${clientId}:${parsed.host}:${match[2]}`;
         }
-        return `${parsed.host}:${req.ip || 'client'}`;
+        return `${clientId}:${parsed.host}`;
     } catch (_) {
-        return `${req.ip || 'client'}`;
+        return `${clientId}`;
     }
 }
 
@@ -1372,30 +1385,34 @@ router.get('/stream', async (req, res) => {
         }
     }
 
-    // Automatically terminate any previous active proxy connection for the same IPTV account/client
+    // Automatically terminate any previous active proxy connection for the same visitor/account
     // so the provider never sees 2 simultaneous streams (which causes HTTP 458).
-    // EXCEPTION: For VOD files (/movie/, /series/, .mp4, .mkv), browser demuxers issue multiple concurrent
-    // or rapid Range probes (head probe + moov atom index probe). We do NOT kill active connections for the
-    // SAME media URL, because abruptly aborting TCP connections triggers upstream CDN anti-flood 458 throttles.
     const accountKey = getStreamAccountKey(url, req);
     const requestId = crypto.randomBytes ? crypto.randomBytes(6).toString('hex') : Math.random().toString(36).slice(2, 8);
 
     if (activeStreamControllersByAccount.has(accountKey)) {
         const prev = activeStreamControllersByAccount.get(accountKey);
-        const isSameMedia = prev && prev.mediaUrl === url;
-        const isVodRange = isVodStream && Boolean(rangeHeader);
+        if (prev && prev.requestId !== requestId) {
+            prev.isCancelled = true;
+            try { prev.abortController?.abort(); } catch (_) {}
+            try {
+                const cancelPromise = prev.activeResponse?.body?.cancel?.();
+                if (cancelPromise && typeof cancelPromise.catch === 'function') {
+                    cancelPromise.catch(() => {});
+                }
+            } catch (_) {}
 
-        if (!isSameMedia || !isVodRange) {
-            if (prev) {
-                prev.isCancelled = true;
-                try { prev.abortController?.abort(); } catch (_) {}
-                try { prev.activeResponse?.body?.cancel?.().catch?.(() => {}); } catch (_) {}
+            if (prev.mediaUrl !== url) {
                 console.log(`[Proxy Stream] CLOSE (replaced by new stream): ${cleanUrl.substring(0, 80)}`);
+                // Give upstream load balancer 600ms to finalize TCP socket teardown
+                await new Promise(r => setTimeout(r, 600));
+            } else {
+                console.log(`[Proxy Stream] CLOSE (superseded range chunk): ${cleanUrl.substring(0, 80)}`);
+                // For the same media, brief pause so upstream closes previous socket before opening new range chunk
+                await new Promise(r => setTimeout(r, 120));
             }
-            activeStreamControllersByAccount.delete(accountKey);
-            // Short pause to allow remote CDN load-balancer to cleanly finalize the TCP socket closure
-            await new Promise(r => setTimeout(r, 120));
         }
+        activeStreamControllersByAccount.delete(accountKey);
     }
 
     const currentEntry = {
@@ -1788,6 +1805,9 @@ router.get('/stream', async (req, res) => {
             }
 
             if (onClose) req.off('close', onClose);
+            if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
+                activeStreamControllersByAccount.delete(accountKey);
+            }
             res.end();
             console.log(`[Proxy Stream] CLOSE (finished): ${cleanUrl.substring(0, 80)}`);
             return; // Success - exit the retry loop
@@ -1796,6 +1816,9 @@ router.get('/stream', async (req, res) => {
             lastError = err;
             if (onClose) {
                 try { req.off('close', onClose); } catch {}
+            }
+            if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
+                activeStreamControllersByAccount.delete(accountKey);
             }
             const isAborted = (
                 err.name === 'AbortError' ||

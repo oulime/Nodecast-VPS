@@ -426,7 +426,10 @@ router.all('/', async (req, res) => {
             // Already aborted.
         }
         try {
-            upstreamRef?.body?.cancel?.();
+            const p = upstreamRef?.body?.cancel?.();
+            if (p && typeof p.catch === 'function') {
+                p.catch(() => {});
+            }
         } catch {}
     });
 

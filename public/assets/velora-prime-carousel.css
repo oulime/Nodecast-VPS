@@ -336,8 +336,8 @@ body.vel-home-empty-active {
 
 /* Card Item - Vertical 2:3 Poster Ratio */
 .NQEYQF {
-  flex: 0 0 clamp(130px, 15vw, 195px);
-  max-width: clamp(130px, 15vw, 195px);
+  flex: 0 0 clamp(148px, 17vw, 215px);
+  max-width: clamp(148px, 17vw, 215px);
   box-sizing: border-box;
 }
 

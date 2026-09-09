@@ -584,12 +584,21 @@
 
       const closeBtn = modal.querySelector("#vel-pkg-modal-close");
       const backdrop = modal.querySelector(".vel-pkg-modal__backdrop");
+      const dialog = modal.querySelector(".vel-pkg-modal__dialog");
       const closeModal = () => {
         modal.classList.remove("is-open");
         document.body.classList.remove("vel-modal-active");
+        if (bodyEl) { bodyEl.scrollTop = 0; bodyEl.scrollTo({ top: 0, left: 0, behavior: "instant" }); }
+        if (dialog) dialog.scrollTop = 0;
+        modal.scrollTop = 0;
       };
-      closeBtn.addEventListener("click", closeModal);
-      backdrop.addEventListener("click", closeModal);
+      if (closeBtn) closeBtn.addEventListener("click", closeModal);
+      if (backdrop) backdrop.addEventListener("click", closeModal);
+      modal.addEventListener("click", (e) => {
+        if (e.target && e.target.closest("#vel-pkg-modal-close, .vel-pkg-modal__close, .vel-pkg-modal__backdrop")) {
+          closeModal();
+        }
+      });
       document.addEventListener("keydown", (e) => {
         if (e.key === "Escape" && modal.classList.contains("is-open")) closeModal();
       });
@@ -599,6 +608,18 @@
     const countEl = modal.querySelector("#vel-pkg-modal-count");
     const searchInput = modal.querySelector("#vel-pkg-modal-search");
     const bodyEl = modal.querySelector("#vel-pkg-modal-body");
+    const dialogEl = modal.querySelector(".vel-pkg-modal__dialog");
+
+    const resetModalScroll = () => {
+      if (bodyEl) {
+        bodyEl.scrollTop = 0;
+        try { bodyEl.scrollTo({ top: 0, left: 0, behavior: "instant" }); } catch (_) { bodyEl.scrollTop = 0; }
+      }
+      if (dialogEl) dialogEl.scrollTop = 0;
+      modal.scrollTop = 0;
+    };
+
+    resetModalScroll();
 
     const pkgTitle = formatPackageTitle(pkg.name);
     const initialCount = pkg.totalCount || (Array.isArray(pkg.customItems) ? pkg.customItems.length : (Array.isArray(pkg.items) ? pkg.items.length : 0));
@@ -615,6 +636,7 @@
 
     modal.classList.add("is-open");
     document.body.classList.add("vel-modal-active");
+    resetModalScroll();
 
     const allItems = await fetchPackageFullItems(tab, pkg);
     countEl.textContent = getCountLabel(allItems.length, tab);
@@ -625,10 +647,12 @@
 
       if (!filtered.length) {
         bodyEl.innerHTML = `<div class="vel-pkg-modal__empty">Aucun résultat trouvé pour « ${filterText} ».</div>`;
+        resetModalScroll();
         return;
       }
 
       bodyEl.innerHTML = "";
+      resetModalScroll();
       const grid = document.createElement("div");
       grid.className = "vel-pkg-modal__grid";
 
@@ -666,6 +690,7 @@
           e.stopPropagation();
           modal.classList.remove("is-open");
           document.body.classList.remove("vel-modal-active");
+          resetModalScroll();
           openItem(tab, pkg, item, card);
         };
 
@@ -678,6 +703,8 @@
       });
 
       bodyEl.appendChild(grid);
+      resetModalScroll();
+      requestAnimationFrame(resetModalScroll);
     }
 
     renderGrid();
@@ -686,6 +713,51 @@
       renderGrid(e.target.value);
     };
   }
+
+  window.veloraOpenPrimePackageModal = openPackageModal;
+  window.veloraOpenHomeCustomSectionModal = function (sectionNode, sectionTitle, contentType, isHorizontal) {
+    const oldModal = document.getElementById("vel-home-custom-section-modal");
+    if (oldModal) oldModal.remove();
+
+    let secObj = null;
+    if (typeof window.veloraGetHomeSectionByNodeOrTitle === "function") {
+      secObj = window.veloraGetHomeSectionByNodeOrTitle(sectionNode, sectionTitle);
+    }
+
+    const cards = sectionNode ? Array.from(sectionNode.querySelectorAll(".vel-home-section__rail > .vel-home-section__card:not(.vel-home-section__package-link)")) : [];
+    const firstCard = cards[0];
+    const packageId = String(sectionNode?.dataset?.packageId || firstCard?.dataset?.packageId || secObj?.package_id || "").trim();
+    const effectiveContentType = contentType || sectionNode?.dataset?.contentType || secObj?.content_type || "movies";
+    const customList = (secObj && Array.isArray(secObj.custom_entries) && secObj.custom_entries.length > 0)
+      ? secObj.custom_entries
+      : null;
+
+    let matchedPkg = null;
+    if (window.veloraHomeSectionsState && Array.isArray(window.veloraHomeSectionsState.packages)) {
+      if (packageId) {
+        matchedPkg = window.veloraHomeSectionsState.packages.find(p => String(p.id) === packageId);
+      }
+      if (!matchedPkg && sectionTitle) {
+        const sTitle = String(sectionTitle).trim().toLowerCase();
+        matchedPkg = window.veloraHomeSectionsState.packages.find(p => String(p.name || "").trim().toLowerCase() === sTitle);
+      }
+    }
+
+    const finalKind = effectiveContentType || (matchedPkg && matchedPkg.kind === "series" ? "series" : "movies");
+    return openPackageModal(finalKind, {
+      id: packageId || (matchedPkg && matchedPkg.id) || secObj?.id || sectionTitle,
+      name: sectionTitle,
+      category_id: matchedPkg?.category_id,
+      source_id: matchedPkg?.source_id,
+      country_id: matchedPkg?.country_id || secObj?.country_id,
+      customItems: customList || undefined
+    });
+  };
+
+  try {
+    const oldModal = document.getElementById("vel-home-custom-section-modal");
+    if (oldModal) oldModal.remove();
+  } catch (_) {}
 
   // Build Hero Spotlight Banner
   function buildHeroSpotlight(tab, heroItem, pkg) {

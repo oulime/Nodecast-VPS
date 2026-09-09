@@ -6,6 +6,9 @@
   function openCustomSectionModal(sectionNode, sectionTitle, contentType, isHorizontal) {
     if (!sectionNode && !sectionTitle) return;
 
+    const oldModal = document.getElementById("vel-home-custom-section-modal");
+    if (oldModal) oldModal.remove();
+
     let secObj = null;
     if (typeof window.veloraGetHomeSectionByNodeOrTitle === "function") {
       secObj = window.veloraGetHomeSectionByNodeOrTitle(sectionNode, sectionTitle);
@@ -30,125 +33,30 @@
       }
     }
 
+    const finalKind = effectiveContentType || (matchedPkg && matchedPkg.kind === "series" ? "series" : "movies");
+    const payload = {
+      id: packageId || (matchedPkg && matchedPkg.id) || secObj?.id || sectionTitle,
+      name: sectionTitle,
+      category_id: matchedPkg?.category_id,
+      source_id: matchedPkg?.source_id,
+      country_id: matchedPkg?.country_id || secObj?.country_id,
+      customItems: customList || undefined
+    };
+
     if (typeof window.veloraOpenPrimePackageModal === "function") {
-      const finalKind = effectiveContentType || (matchedPkg && matchedPkg.kind === "series" ? "series" : "movies");
-      window.veloraOpenPrimePackageModal(finalKind, {
-        id: packageId || (matchedPkg && matchedPkg.id) || secObj?.id || sectionTitle,
-        name: sectionTitle,
-        category_id: matchedPkg?.category_id,
-        source_id: matchedPkg?.source_id,
-        country_id: matchedPkg?.country_id || secObj?.country_id,
-        customItems: customList || undefined
-      });
-      return;
-    }
-
-    let modal = document.getElementById("vel-home-custom-section-modal");
-    if (!modal) {
-      modal = document.createElement("div");
-      modal.id = "vel-home-custom-section-modal";
-      modal.className = "vel-home-custom-section-modal vel-pkg-modal";
-      modal.innerHTML = `
-        <div class="vel-home-custom-section-modal__backdrop vel-pkg-modal__backdrop"></div>
-        <div class="vel-home-custom-section-modal__dialog vel-pkg-modal__dialog" role="dialog" aria-modal="true">
-          <div class="vel-home-custom-section-modal__header vel-pkg-modal__header">
-            <div class="vel-home-custom-section-modal__header-info vel-pkg-modal__titles">
-              <h2 class="vel-home-custom-section-modal__title vel-pkg-modal__title"></h2>
-              <span class="vel-home-custom-section-modal__badge vel-pkg-modal__count"></span>
-            </div>
-            <button type="button" class="vel-home-custom-section-modal__close vel-pkg-modal__close" aria-label="Fermer" title="Fermer">✕</button>
-          </div>
-          <div class="vel-home-custom-section-modal__body vel-pkg-modal__body">
-            <div class="vel-home-custom-section-modal__grid vel-pkg-modal__grid"></div>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(modal);
-
-      const closeBtn = modal.querySelector(".vel-home-custom-section-modal__close");
-      const backdrop = modal.querySelector(".vel-home-custom-section-modal__backdrop");
-      const closeModal = () => {
-        modal.classList.add("hidden");
-        modal.classList.remove("is-open");
-        document.body.classList.remove("vel-modal-active");
-      };
-      closeBtn.addEventListener("click", closeModal);
-      backdrop.addEventListener("click", closeModal);
-      document.addEventListener("keydown", e => {
-        if (e.key === "Escape" && !modal.classList.contains("hidden")) closeModal();
-      });
-    }
-
-    const titleEl = modal.querySelector(".vel-home-custom-section-modal__title");
-    const badgeEl = modal.querySelector(".vel-home-custom-section-modal__badge");
-    const gridEl = modal.querySelector(".vel-home-custom-section-modal__grid");
-    const bodyEl = modal.querySelector(".vel-home-custom-section-modal__body");
-
-    titleEl.textContent = sectionTitle || "Section Accueil";
-
-    if (isHorizontal) {
-      gridEl.classList.add("vel-home-custom-section-modal__grid--horizontal");
+      window.veloraOpenPrimePackageModal(finalKind, payload);
     } else {
-      gridEl.classList.remove("vel-home-custom-section-modal__grid--horizontal");
-    }
-
-    gridEl.replaceChildren();
-
-    const itemsToRender = Array.isArray(customList) && customList.length > 0 ? customList : cards;
-
-    if (badgeEl) {
-      const count = itemsToRender.length;
-      badgeEl.textContent = count + (count > 1 ? " éléments" : " élément");
-    }
-
-    if (Array.isArray(customList) && customList.length > 0) {
-      customList.forEach(item => {
-        const cardBtn = document.createElement("button");
-        cardBtn.type = "button";
-        cardBtn.className = "vel-home-section__card vel-home-section__card--" + effectiveContentType;
-        const name = item.name || item.title || "";
-        cardBtn.setAttribute("aria-label", name);
-        const thumb = item.thumbUrl || item.posterUrl || item.backdropUrl || "";
-        if (thumb) {
-          const img = document.createElement("img");
-          img.src = thumb;
-          img.alt = "";
-          img.loading = "lazy";
-          img.className = "vel-home-section__media";
-          cardBtn.appendChild(img);
+      let attempts = 0;
+      const timer = setInterval(() => {
+        attempts++;
+        if (typeof window.veloraOpenPrimePackageModal === "function") {
+          clearInterval(timer);
+          window.veloraOpenPrimePackageModal(finalKind, payload);
+        } else if (attempts > 30) {
+          clearInterval(timer);
         }
-        const nameSpan = document.createElement("span");
-        nameSpan.className = "vel-home-section__name";
-        nameSpan.textContent = name;
-        cardBtn.appendChild(nameSpan);
-
-        cardBtn.addEventListener("click", () => {
-          modal.classList.add("hidden");
-          modal.classList.remove("is-open");
-          document.body.classList.remove("vel-modal-active");
-          if (typeof window.veloraOpenHomeCacheEntry === "function") {
-            window.veloraOpenHomeCacheEntry(secObj || { content_type: effectiveContentType }, item, cardBtn);
-          }
-        });
-        gridEl.appendChild(cardBtn);
-      });
-    } else {
-      cards.forEach(cardNode => {
-        const clone = cardNode.cloneNode(true);
-        clone.addEventListener("click", () => {
-          modal.classList.add("hidden");
-          modal.classList.remove("is-open");
-          document.body.classList.remove("vel-modal-active");
-          cardNode.click();
-        });
-        gridEl.appendChild(clone);
-      });
+      }, 50);
     }
-
-    if (bodyEl) bodyEl.scrollTop = 0;
-    modal.classList.remove("hidden");
-    modal.classList.add("is-open");
-    document.body.classList.add("vel-modal-active");
   }
 
   window.veloraOpenHomeCustomSectionModal = openCustomSectionModal;

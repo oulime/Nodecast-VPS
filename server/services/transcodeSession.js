@@ -119,6 +119,8 @@ class TranscodeSession extends EventEmitter {
 
         // Build FFmpeg arguments for HLS output
         const args = this.buildFFmpegArgs();
+        const maskedArgs = args.map(a => String(a).replace(/\/(live|movie|series)\/([^/?#]+)\/([^/?#]+)\//gi, '/$1/***/***/').replace(/([?&](?:password|pass|token|key)=)[^&#]+/gi, '$1***'));
+        console.log(`[Transcode Engine] [FFMPEG EXEC] ${this.options.ffmpegPath} ${maskedArgs.join(' ')}`);
 
         try {
             this.process = spawn(this.options.ffmpegPath, args, {
@@ -136,6 +138,7 @@ class TranscodeSession extends EventEmitter {
 
             // Handle stderr (FFmpeg progress/errors)
             let stderrBuffer = '';
+            let lastProgressLogTime = 0;
             this.process.stderr.on('data', (data) => {
                 const str = data.toString();
                 stderrBuffer += str;
@@ -152,10 +155,10 @@ class TranscodeSession extends EventEmitter {
                     }
                 }
 
-                // Log periodically to avoid spam
-                const lines = stderrBuffer.split('\n');
-                if (lines.length > 1) {
-                    lines.slice(0, -1).forEach(line => {
+                // Log periodically to avoid spam, splitting on either \r or \n
+                const parts = stderrBuffer.split(/[\r\n]+/);
+                if (parts.length > 1) {
+                    parts.slice(0, -1).forEach(line => {
                         const trimmed = line.trim();
                         if (!trimmed) return;
                         // Suppress harmless repetitive demuxer/container noise
@@ -166,9 +169,18 @@ class TranscodeSession extends EventEmitter {
                             trimmed.includes('co located POCs unavailable')) {
                             return;
                         }
+                        const isProgress = trimmed.startsWith('frame=') || trimmed.startsWith('size=');
+                        if (isProgress) {
+                            const now = Date.now();
+                            if (now - lastProgressLogTime > 2500) {
+                                lastProgressLogTime = now;
+                                console.log(`[FFmpeg ${this.id}] [Progress] ${trimmed}`);
+                            }
+                            return;
+                        }
                         console.log(`[FFmpeg ${this.id}] ${trimmed}`);
                     });
-                    stderrBuffer = lines[lines.length - 1];
+                    stderrBuffer = parts[parts.length - 1];
                 }
             });
 
@@ -239,10 +251,10 @@ class TranscodeSession extends EventEmitter {
         // Input options (common)
         if (isVodMode) {
             args.push(
-                '-seekable', '0',
+                '-seekable', this.options.seekOffset > 0 ? '1' : '0',
                 '-probesize', '2000000',
                 '-analyzeduration', '2000000',
-                '-fflags', '+genpts+discardcorrupt+nobuffer',
+                '-fflags', '+genpts+discardcorrupt+nobuffer+fastseek',
                 '-err_detect', 'ignore_err',
                 '-rw_timeout', '15000000',
                 '-reconnect', '1',
@@ -698,12 +710,25 @@ class TranscodeSession extends EventEmitter {
      */
     async waitForPlaylist(timeoutMs = 10000, minSegments = 1) {
         const startTime = Date.now();
+        let lastReport = 0;
         while (Date.now() - startTime < timeoutMs) {
-            if (await this.isPlaylistReadyForSegments(minSegments)) {
+            const ready = await this.isPlaylistReadyForSegments(minSegments);
+            const elapsed = Math.round((Date.now() - startTime) / 1000);
+            if (ready) {
+                console.log(`[TranscodeSession ${this.id}] ✅ Playlist READY (>=${minSegments} segment) in ${elapsed}s`);
                 return true;
+            }
+            if (Date.now() - lastReport >= 2500) {
+                lastReport = Date.now();
+                console.log(`[TranscodeSession ${this.id}] ⏳ Waiting for playlist... elapsed=${elapsed}s/${Math.round(timeoutMs/1000)}s, status=${this.status}, dir=${this.dir}`);
+            }
+            if (this.status === 'stopped' || this.status === 'error') {
+                console.warn(`[TranscodeSession ${this.id}] ❌ FFmpeg stopped while waiting for playlist (status=${this.status}, error=${this.error || 'none'})`);
+                return false;
             }
             await new Promise(resolve => setTimeout(resolve, 200));
         }
+        console.warn(`[TranscodeSession ${this.id}] ⏱ Timeout reached after ${Math.round(timeoutMs/1000)}s waiting for playlist.`);
         return false;
     }
 

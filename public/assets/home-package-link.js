@@ -4,13 +4,27 @@
   const root = document.getElementById("vel-home-sections");
 
   function openCustomSectionModal(sectionNode, sectionTitle, contentType, isHorizontal) {
-    if (!sectionNode) return;
-    const cards = Array.from(sectionNode.querySelectorAll(".vel-home-section__rail > .vel-home-section__card:not(.vel-home-section__package-link)"));
-    const firstCard = cards[0];
-    const packageId = String(firstCard?.dataset?.packageId || sectionNode.dataset.packageId || "").trim();
+    if (!sectionNode && !sectionTitle) return;
 
-    if (packageId && typeof window.veloraOpenPrimePackageModal === "function") {
-      window.veloraOpenPrimePackageModal(contentType || "movies", { id: packageId, name: sectionTitle });
+    let secObj = null;
+    if (typeof window.veloraGetHomeSectionByNodeOrTitle === "function") {
+      secObj = window.veloraGetHomeSectionByNodeOrTitle(sectionNode, sectionTitle);
+    }
+
+    const cards = sectionNode ? Array.from(sectionNode.querySelectorAll(".vel-home-section__rail > .vel-home-section__card:not(.vel-home-section__package-link)")) : [];
+    const firstCard = cards[0];
+    const packageId = String(sectionNode?.dataset?.packageId || firstCard?.dataset?.packageId || secObj?.package_id || "").trim();
+    const effectiveContentType = contentType || sectionNode?.dataset?.contentType || secObj?.content_type || "movies";
+    const customList = (secObj && Array.isArray(secObj.custom_entries) && secObj.custom_entries.length > 0)
+      ? secObj.custom_entries
+      : (secObj && Array.isArray(secObj.entries) && secObj.entries.length > 0 ? secObj.entries : null);
+
+    if (typeof window.veloraOpenPrimePackageModal === "function") {
+      window.veloraOpenPrimePackageModal(effectiveContentType, {
+        id: packageId || secObj?.id || sectionTitle,
+        name: sectionTitle,
+        customItems: customList
+      });
       return;
     }
 
@@ -65,20 +79,56 @@
 
     gridEl.replaceChildren();
 
+    const itemsToRender = Array.isArray(customList) && customList.length > 0 ? customList : cards;
+
     if (badgeEl) {
-      badgeEl.textContent = cards.length + (cards.length > 1 ? " éléments" : " élément");
+      const count = itemsToRender.length;
+      badgeEl.textContent = count + (count > 1 ? " éléments" : " élément");
     }
 
-    cards.forEach(cardNode => {
-      const clone = cardNode.cloneNode(true);
-      clone.addEventListener("click", () => {
-        modal.classList.add("hidden");
-        modal.classList.remove("is-open");
-        document.body.classList.remove("vel-modal-active");
-        cardNode.click();
+    if (Array.isArray(customList) && customList.length > 0) {
+      customList.forEach(item => {
+        const cardBtn = document.createElement("button");
+        cardBtn.type = "button";
+        cardBtn.className = "vel-home-section__card vel-home-section__card--" + effectiveContentType;
+        const name = item.name || item.title || "";
+        cardBtn.setAttribute("aria-label", name);
+        const thumb = item.thumbUrl || item.posterUrl || item.backdropUrl || "";
+        if (thumb) {
+          const img = document.createElement("img");
+          img.src = thumb;
+          img.alt = "";
+          img.loading = "lazy";
+          img.className = "vel-home-section__media";
+          cardBtn.appendChild(img);
+        }
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "vel-home-section__name";
+        nameSpan.textContent = name;
+        cardBtn.appendChild(nameSpan);
+
+        cardBtn.addEventListener("click", () => {
+          modal.classList.add("hidden");
+          modal.classList.remove("is-open");
+          document.body.classList.remove("vel-modal-active");
+          if (typeof window.veloraOpenHomeCacheEntry === "function") {
+            window.veloraOpenHomeCacheEntry(secObj || { content_type: effectiveContentType }, item, cardBtn);
+          }
+        });
+        gridEl.appendChild(cardBtn);
       });
-      gridEl.appendChild(clone);
-    });
+    } else {
+      cards.forEach(cardNode => {
+        const clone = cardNode.cloneNode(true);
+        clone.addEventListener("click", () => {
+          modal.classList.add("hidden");
+          modal.classList.remove("is-open");
+          document.body.classList.remove("vel-modal-active");
+          cardNode.click();
+        });
+        gridEl.appendChild(clone);
+      });
+    }
 
     if (bodyEl) bodyEl.scrollTop = 0;
     modal.classList.remove("hidden");
@@ -103,21 +153,34 @@
 
       const rail = sectionNode.querySelector(":scope > .vel-home-section__rail, :scope > .vel-home-section__rail-wrap > .vel-home-section__rail");
       const firstCard = rail ? rail.querySelector(":scope > .vel-home-section__card") : null;
-      const packageId = String(firstCard?.dataset?.packageId || sectionNode.dataset.packageId || "").trim();
-      const contentType = String(firstCard?.dataset?.contentType || sectionNode.dataset.contentType || "movies");
-      const isHorizontal = sectionNode.classList.contains("vel-home-section--horizontal");
-
-      let header = sectionNode.querySelector(":scope > .vel-home-section__header, :scope > .QHjixV");
       let heading = sectionNode.querySelector(".vel-home-section__heading, .qwttco");
       const sectionTitle = heading ? (heading.querySelector("[data-testid='carousel-title']") ? heading.querySelector("[data-testid='carousel-title']").textContent.trim() : heading.textContent.trim()) : "";
 
       if (!sectionTitle) return;
 
+      let secObj = null;
+      if (typeof window.veloraGetHomeSectionByNodeOrTitle === "function") {
+        secObj = window.veloraGetHomeSectionByNodeOrTitle(sectionNode, sectionTitle);
+      }
+
+      const packageId = String(sectionNode.dataset.packageId || firstCard?.dataset?.packageId || secObj?.package_id || "").trim();
+      const contentType = String(sectionNode.dataset.contentType || firstCard?.dataset?.contentType || secObj?.content_type || "movies");
+      const isHorizontal = sectionNode.classList.contains("vel-home-section--horizontal");
+      const customList = (secObj && Array.isArray(secObj.custom_entries) && secObj.custom_entries.length > 0)
+        ? secObj.custom_entries
+        : (secObj && Array.isArray(secObj.entries) && secObj.entries.length > 0 ? secObj.entries : null);
+
+      let header = sectionNode.querySelector(":scope > .vel-home-section__header, :scope > .QHjixV");
+
       const onOpen = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (packageId && typeof window.veloraOpenPrimePackageModal === "function") {
-          window.veloraOpenPrimePackageModal(contentType, { id: packageId, name: sectionTitle });
+        if (typeof window.veloraOpenPrimePackageModal === "function") {
+          window.veloraOpenPrimePackageModal(contentType, {
+            id: packageId || secObj?.id || sectionTitle,
+            name: sectionTitle,
+            customItems: customList
+          });
         } else {
           openCustomSectionModal(sectionNode, sectionTitle, contentType, isHorizontal);
         }

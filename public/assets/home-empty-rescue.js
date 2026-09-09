@@ -70,6 +70,8 @@
       var block = document.createElement("div");
       block.className = "UI3iHJ vel-home-section" + (isHorizontal ? " vel-home-section--horizontal" : "");
       block.dataset.testid = "navigation-carousel-wrapper";
+      block.dataset.sectionId = String(section.id || "");
+      block.dataset.contentType = String(section.content_type || "movies");
       if (section.package_id) block.dataset.packageId = String(section.package_id);
 
       var headerSec = document.createElement("section");
@@ -91,8 +93,15 @@
       var openSec = function (e) {
         e.preventDefault();
         e.stopPropagation();
-        if (section.package_id && typeof window.veloraOpenPrimePackageModal === "function") {
-          window.veloraOpenPrimePackageModal(section.content_type || "movies", { id: section.package_id, name: section.title });
+        var customList = Array.isArray(section.custom_entries) && section.custom_entries.length > 0
+          ? section.custom_entries
+          : (Array.isArray(section.entries) && section.entries.length > 0 ? section.entries : null);
+        if (typeof window.veloraOpenPrimePackageModal === "function") {
+          window.veloraOpenPrimePackageModal(section.content_type || "movies", {
+            id: section.package_id || section.id || section.title,
+            name: section.title,
+            customItems: customList
+          });
         } else if (typeof window.veloraOpenHomeCustomSectionModal === "function") {
           window.veloraOpenHomeCustomSectionModal(block, section.title, section.content_type, section.card_orientation === "horizontal");
         }

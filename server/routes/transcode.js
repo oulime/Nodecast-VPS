@@ -405,7 +405,14 @@ router.post('/session', async (req, res) => {
                 selectedEncoder = 'software';
                 session = await startSessionWithEncoder('software');
             } else {
-                throw err;
+                const isUpstreamBusy = ffmpegExitCode === 8 || String(err.message || '').includes('458') || String(err.message || '').includes('Client Error');
+                if (isUpstreamBusy) {
+                    console.warn('[Transcode] Upstream returned 4XX/busy during startup, waiting 800ms cooldown and retrying once...');
+                    await new Promise(r => setTimeout(r, 800));
+                    session = await startSessionWithEncoder('software');
+                } else {
+                    throw err;
+                }
             }
         }
 

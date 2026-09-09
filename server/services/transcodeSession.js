@@ -249,7 +249,7 @@ class TranscodeSession extends EventEmitter {
                 '-reconnect_streamed', '1',
                 '-reconnect_at_eof', '0',
                 '-reconnect_on_network_error', '1',
-                '-reconnect_on_http_error', '5xx',
+                '-reconnect_on_http_error', '4xx,5xx',
                 '-reconnect_delay_max', '4'
             );
         } else {
@@ -630,6 +630,10 @@ class TranscodeSession extends EventEmitter {
             } catch (_) {}
             this.process = null;
         }
+        const accountKey = getXtreamAccountKey(this.url);
+        if (accountKey) {
+            lastSessionStopTimeByAccount.set(accountKey, Date.now());
+        }
         this.status = 'stopped';
     }
 
@@ -808,6 +812,8 @@ class TranscodeSession extends EventEmitter {
  * Session Manager
  */
 
+const lastSessionStopTimeByAccount = new Map();
+
 function getXtreamAccountKey(streamUrl = '') {
     try {
         const parsed = new URL(streamUrl);
@@ -837,7 +843,6 @@ async function createSession(url, options = {}) {
 
     // 2. Terminate any older active sessions for the same stream URL or same Xtream account to prevent concurrent IPTV connections throttling
     const targetAccountKey = getXtreamAccountKey(url);
-    let hadKilledSession = false;
     for (const [existingId, existingSession] of sessions.entries()) {
         const sessionAccountKey = getXtreamAccountKey(existingSession.url);
         const isSameAccount = targetAccountKey && sessionAccountKey && targetAccountKey === sessionAccountKey;
@@ -848,13 +853,17 @@ async function createSession(url, options = {}) {
                 existingSession.cleanup().catch(() => {});
             } catch (_) {}
             sessions.delete(existingId);
-            hadKilledSession = true;
         }
     }
 
-    if (hadKilledSession) {
-        // Small grace pause to ensure upstream CDN frees the TCP connection slot
-        await new Promise(r => setTimeout(r, 120));
+    // 3. Ensure a clean socket cooldown (850ms) between old stream closure and new stream opening on the provider's CDN
+    if (targetAccountKey && lastSessionStopTimeByAccount.has(targetAccountKey)) {
+        const elapsed = Date.now() - (lastSessionStopTimeByAccount.get(targetAccountKey) || 0);
+        const minCooldownMs = 850;
+        if (elapsed < minCooldownMs) {
+            const waitMs = minCooldownMs - elapsed;
+            await new Promise(r => setTimeout(r, waitMs));
+        }
     }
 
     const session = new TranscodeSession(url, options);

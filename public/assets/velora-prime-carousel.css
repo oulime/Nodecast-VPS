@@ -347,15 +347,19 @@ body.vel-home-empty-active {
   border-radius: 10px;
   overflow: hidden;
   background: #12121a;
-  transition: transform 0.28s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.28s ease;
+  transition: none;
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
 }
 
-.ulDoOY:hover {
-  transform: translateY(-6px) scale(1.04);
-  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.22);
-  z-index: 10;
+.ulDoOY:hover,
+.ulDoOY:focus,
+.ulDoOY:focus-visible,
+.ulDoOY:active {
+  transform: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  outline: none;
+  z-index: 1;
 }
 
 .BVySw9 {
@@ -390,11 +394,15 @@ body.vel-home-empty-active {
   aspect-ratio: 2 / 3;
   object-fit: cover;
   display: block;
-  transition: transform 0.35s ease;
+  transition: none;
+  transform: none;
 }
 
-.ulDoOY:hover .dJLfVG {
-  transform: scale(1.06);
+.ulDoOY:hover .dJLfVG,
+.ulDoOY:focus .dJLfVG,
+.ulDoOY:focus-visible .dJLfVG,
+.ulDoOY:active .dJLfVG {
+  transform: none;
 }
 
 /* Gradient Overlay */
@@ -421,7 +429,10 @@ body.vel-home-empty-active {
   pointer-events: none;
 }
 
-.ulDoOY:hover .MaQfAR {
+.ulDoOY:hover .MaQfAR,
+.ulDoOY:focus .MaQfAR,
+.ulDoOY:focus-visible .MaQfAR,
+.ulDoOY:active .MaQfAR {
   opacity: 1;
 }
 
@@ -435,11 +446,14 @@ body.vel-home-empty-active {
   justify-content: center;
   box-shadow: 0 4px 16px rgba(229, 9, 20, 0.6);
   transform: scale(0.85);
-  transition: transform 0.2s ease;
+  transition: none;
 }
 
-.ulDoOY:hover .U6kOYF {
-  transform: scale(1);
+.ulDoOY:hover .U6kOYF,
+.ulDoOY:focus .U6kOYF,
+.ulDoOY:focus-visible .U6kOYF,
+.ulDoOY:active .U6kOYF {
+  transform: scale(0.85);
 }
 
 .U6kOYF svg {

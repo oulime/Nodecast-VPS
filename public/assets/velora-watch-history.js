@@ -48,15 +48,18 @@
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.52) !important;
         display: block !important;
         cursor: pointer !important;
-        transition: transform 0.28s cubic-bezier(0.2, 0, 0, 1), opacity 0.28s cubic-bezier(0.2, 0, 0, 1), width 0.28s cubic-bezier(0.2, 0, 0, 1), min-width 0.28s cubic-bezier(0.2, 0, 0, 1), max-width 0.28s cubic-bezier(0.2, 0, 0, 1), margin 0.28s cubic-bezier(0.2, 0, 0, 1), padding 0.28s cubic-bezier(0.2, 0, 0, 1), border-color 0.28s ease, box-shadow 0.28s ease !important;
+        transition: opacity 0.28s cubic-bezier(0.2, 0, 0, 1), width 0.28s cubic-bezier(0.2, 0, 0, 1), min-width 0.28s cubic-bezier(0.2, 0, 0, 1), max-width 0.28s cubic-bezier(0.2, 0, 0, 1), margin 0.28s cubic-bezier(0.2, 0, 0, 1), padding 0.28s cubic-bezier(0.2, 0, 0, 1) !important;
+        transform: none !important;
       }
       .vel-home-section__card--resume:hover,
-      .vel-home-section__card--resume:focus-visible {
-        transform: translateY(-4px) scale(1.035) !important;
-        border-color: rgba(255, 255, 255, 0.88) !important;
-        box-shadow: 0 20px 48px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.88), 0 0 24px rgba(229, 9, 20, 0.4) !important;
+      .vel-home-section__card--resume:focus,
+      .vel-home-section__card--resume:focus-visible,
+      .vel-home-section__card--resume:active {
+        transform: none !important;
+        border-color: rgba(255, 255, 255, 0.18) !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.52) !important;
         outline: none !important;
-        z-index: 5 !important;
+        z-index: 1 !important;
       }
       .vel-home-section__card--resume::before {
         content: "" !important;
@@ -65,7 +68,7 @@
         background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.08) 35%, rgba(3, 2, 8, 0.65) 70%, rgba(3, 2, 8, 0.94) 100%) !important;
         pointer-events: none !important;
         z-index: 2 !important;
-        transition: opacity 220ms ease !important;
+        transition: none !important;
       }
       .vel-home-section__card--resume.is-removing {
         opacity: 0 !important;
@@ -91,17 +94,20 @@
         object-fit: cover !important;
         border-radius: inherit !important;
         background: #090811 !important;
-        transition: transform 320ms cubic-bezier(0.2, 0.9, 0.4, 1) !important;
+        transition: none !important;
+        transform: none !important;
       }
       .vel-home-section__card--resume:hover .vel-home-section__media,
-      .vel-home-section__card--resume:focus-visible .vel-home-section__media {
-        transform: scale(1.055) !important;
+      .vel-home-section__card--resume:focus .vel-home-section__media,
+      .vel-home-section__card--resume:focus-visible .vel-home-section__media,
+      .vel-home-section__card--resume:active .vel-home-section__media {
+        transform: none !important;
       }
       .vel-resume-play-center {
         position: absolute;
         top: 42%;
         left: 50%;
-        transform: translate(-50%, -50%);
+        transform: translate(-50%, -50%) !important;
         width: 2.6rem;
         height: 2.6rem;
         border-radius: 50%;
@@ -114,7 +120,7 @@
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
-        transition: transform 0.18s ease, background 0.18s ease;
+        transition: none !important;
         pointer-events: none;
       }
       .vel-resume-play-center svg {
@@ -123,10 +129,13 @@
         margin-left: 2px;
         fill: currentColor;
       }
-      .vel-home-section__card--resume:hover .vel-resume-play-center {
-        transform: translate(-50%, -50%) scale(1.12);
-        background: #e50914;
-        border-color: #fff;
+      .vel-home-section__card--resume:hover .vel-resume-play-center,
+      .vel-home-section__card--resume:focus .vel-resume-play-center,
+      .vel-home-section__card--resume:focus-visible .vel-resume-play-center,
+      .vel-home-section__card--resume:active .vel-resume-play-center {
+        transform: translate(-50%, -50%) !important;
+        background: rgba(15, 12, 28, 0.72) !important;
+        border-color: rgba(255, 255, 255, 0.55) !important;
       }
       .vel-resume-badge {
         position: absolute;

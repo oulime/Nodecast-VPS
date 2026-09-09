@@ -52,7 +52,7 @@
   cursor: pointer;
 }
 
-/* Backdrop Image with Subtle Cinematic Camera Drift */
+/* Backdrop Image */
 .vel-hero-slide__bg {
   position: absolute;
   inset: 0;
@@ -60,14 +60,12 @@
   height: 100%;
   object-fit: cover;
   object-position: center 18%;
-  transform: scale(1);
-  transform-origin: center 20%;
-  transition: transform 7s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease;
-  will-change: transform;
+  transform: none;
+  transition: opacity 0.4s ease;
 }
 
 .vel-hero-slide.active .vel-hero-slide__bg {
-  transform: scale(1.025);
+  transform: none;
 }
 
 /* Multi-layer Cinematic Vignettes & Gradients (Prime Video style left + bottom scrims) */

@@ -8,21 +8,33 @@
 
   function cleanupAllActiveMediaAndSessions() {
     try {
-      // 1. Close and stop adult player and all adult streams
+      // 1. Native app bundle teardown
+      if (typeof window.veloraStopAllPlayback === "function") {
+        try { window.veloraStopAllPlayback(); } catch (_) {}
+      }
+      if (typeof window.veloraStopVod === "function") {
+        try { window.veloraStopVod(); } catch (_) {}
+      }
+      if (typeof window.veloraStopLive === "function") {
+        try { window.veloraStopLive(); } catch (_) {}
+      }
       if (typeof window.veloraStopAllStreams === "function") {
         try { window.veloraStopAllStreams(); } catch (_) {}
       }
+
+      // 2. Adult player teardown
       const isAdultActive = document.body.classList.contains("vel-adult-active") || (document.body.dataset && document.body.dataset.velActiveTab === "adult");
       if (isAdultActive && typeof window.veloraCloseAdultView === "function") {
         try { window.veloraCloseAdultView(false); } catch (_) {}
       }
 
-      // 2. Close active transcode sessions on the server
+      // 3. Close active server-side transcode sessions
       if (typeof window.veloraCloseActiveTranscodeSession === "function") {
         try { window.veloraCloseActiveTranscodeSession(); } catch (_) {}
       }
 
-      // 3. Stop all HTML5 <video> and <audio> elements in the entire document
+      // 4. Forcefully abort all HTML5 <video> and <audio> elements in the document
+      // Removing src and calling .load() immediately causes the browser to send a TCP FIN/RST
       document.querySelectorAll("video, audio").forEach(function (v) {
         try {
           if (v && !v.paused) {
@@ -33,18 +45,26 @@
             try { v.hls.destroy(); } catch (_) {}
             v.hls = null;
           }
-          if (v && v.id === "vel-adult-video") {
-            v.removeAttribute("src");
-            try { v.load(); } catch (_) {}
-          }
+          v.removeAttribute("src");
+          try { v.load(); } catch (_) {}
         } catch (_) {}
       });
+
+      // 5. Fire instant stream stop beacon to backend proxy
+      try {
+        const stopUrl = "/api/proxy/stream/stop";
+        if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+          navigator.sendBeacon(stopUrl);
+        } else {
+          fetch(stopUrl, { method: "POST", keepalive: true }).catch(function () {});
+        }
+      } catch (_) {}
     } catch (_) {}
   }
 
   window.veloraCleanupAllMedia = cleanupAllActiveMediaAndSessions;
 
-  // Cleanup active streams when leaving page or changing route
+  // Cleanup active streams when leaving page, closing tab, or navigating history
   window.addEventListener("pagehide", cleanupAllActiveMediaAndSessions);
   window.addEventListener("beforeunload", cleanupAllActiveMediaAndSessions);
   window.addEventListener("popstate", cleanupAllActiveMediaAndSessions);
@@ -53,18 +73,14 @@
   // Global click interceptor for navigation links & bottom tabs
   document.addEventListener("click", function (e) {
     if (!e.target) return;
-    const isAdultActive = document.body.classList.contains("vel-adult-active") || (document.body.dataset && document.body.dataset.velActiveTab === "adult");
-    if (!isAdultActive) return;
 
     const navEl = e.target.closest(
-      "nav, .nav-item, .nav-link, .sidebar-link, .vel-bottom-nav-item, [data-nav], [data-tab], [data-settings-tab], .vel-nav-btn, .navbar, .header-nav, #btn-home, #btn-live, #btn-movies, #btn-series, #btn-favorites"
+      "nav, .nav-item, .nav-link, .sidebar-link, .vel-bottom-nav-item, [data-nav], [data-tab], [data-settings-tab], .vel-nav-btn, .navbar, .header-nav, #btn-home, #btn-live, #btn-movies, #btn-series, #btn-favorites, #btn-adult, .vod-back-btn, .player-back-btn, [data-action='back'], [data-action='close-player']"
     );
+
     if (navEl) {
-      // If clicking away from adult, immediately kill adult video stream
-      const isAdultNav = navEl.id === "btn-adult" || (navEl.dataset && (navEl.dataset.tab === "adult" || navEl.dataset.nav === "adult"));
-      if (!isAdultNav) {
-        cleanupAllActiveMediaAndSessions();
-      }
+      // If clicking home, major section tab, or back button, kill any playing media immediately
+      cleanupAllActiveMediaAndSessions();
     }
   }, true);
 

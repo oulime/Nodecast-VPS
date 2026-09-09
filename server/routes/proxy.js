@@ -1314,6 +1314,10 @@ function saveMediaChunkToCache(mediaUrl, rangeStart, rangeEnd, totalLength, cont
 
 function getClientIdentifier(req) {
     if (!req) return 'client';
+    const queryId = req.query?.client_id || req.body?.client_id || req.headers?.['x-velora-client-id'];
+    if (queryId && typeof queryId === 'string' && queryId.trim()) {
+        return queryId.trim();
+    }
     const xff = req.headers ? (req.headers['x-forwarded-for'] || req.headers['x-real-ip']) : null;
     if (xff) {
         const first = String(xff).split(',')[0].trim();
@@ -1328,7 +1332,7 @@ function getStreamAccountKey(streamUrl = '', req) {
         const parsed = new URL(streamUrl);
         const match = parsed.pathname.match(/\/(live|movie|series)\/([^/]+)\/([^/]+)/i);
         if (match) {
-            // Key includes client IP + upstream host + IPTV username.
+            // Key includes client IP/ID + upstream host + IPTV username.
             // This ensures concurrent visitors watching from different IPs/devices never interfere,
             // while switching titles for the same visitor terminates their previous stream cleanly.
             return `${clientId}:${parsed.host}:${match[2]}`;
@@ -1338,6 +1342,44 @@ function getStreamAccountKey(streamUrl = '', req) {
         return `${clientId}`;
     }
 }
+
+router.all('/stream/stop', (req, res) => {
+    const url = req.query?.url || req.body?.url || '';
+    const accountKey = getStreamAccountKey(url, req);
+    let stopped = false;
+
+    if (url && activeStreamControllersByAccount.has(accountKey)) {
+        const entry = activeStreamControllersByAccount.get(accountKey);
+        if (entry) {
+            entry.isCancelled = true;
+            try { entry.abortController?.abort(); } catch (_) {}
+            try {
+                const p = entry.activeResponse?.body?.cancel?.();
+                if (p && typeof p.catch === 'function') p.catch(() => {});
+            } catch (_) {}
+            stopped = true;
+        }
+        activeStreamControllersByAccount.delete(accountKey);
+    } else {
+        const clientId = getClientIdentifier(req);
+        for (const [key, entry] of activeStreamControllersByAccount.entries()) {
+            if (key.startsWith(`${clientId}:`) || key === clientId) {
+                entry.isCancelled = true;
+                try { entry.abortController?.abort(); } catch (_) {}
+                try {
+                    const p = entry.activeResponse?.body?.cancel?.();
+                    if (p && typeof p.catch === 'function') p.catch(() => {});
+                } catch (_) {}
+                activeStreamControllersByAccount.delete(key);
+                stopped = true;
+            }
+        }
+    }
+
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+    res.status(200).json({ ok: true, stopped });
+});
 
 router.get('/stream', async (req, res) => {
     const maxRetries = 3;
@@ -1436,6 +1478,12 @@ router.get('/stream', async (req, res) => {
         currentEntry.abortController = abortController;
         let activeResponse = null;
         let onClose = null;
+        const cleanupListeners = () => {
+            if (onClose) {
+                try { req.off('close', onClose); } catch (_) {}
+                try { res.off('close', onClose); } catch (_) {}
+            }
+        };
         try {
             onClose = () => {
                 currentEntry.isCancelled = true;
@@ -1453,13 +1501,19 @@ router.get('/stream', async (req, res) => {
                 if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
                     activeStreamControllersByAccount.delete(accountKey);
                 }
+                try {
+                    if (!res.writableEnded && !res.destroyed) {
+                        res.destroy();
+                    }
+                } catch {}
                 console.log(`[Proxy Stream] CLOSE (client disconnect): ${cleanUrl.substring(0, 80)}`);
             };
             req.on('close', onClose);
+            res.on('close', onClose);
 
             // If client has already disconnected or aborted before attempt, exit immediately
             if (currentEntry.isCancelled || req.destroyed || res.destroyed || res.writableEnded || abortController.signal.aborted) {
-                if (onClose) req.off('close', onClose);
+                cleanupListeners();
                 if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
                     activeStreamControllersByAccount.delete(accountKey);
                 }
@@ -1503,7 +1557,7 @@ router.get('/stream', async (req, res) => {
             try {
                 response = await fetch(url, { headers, signal: abortController.signal });
             } catch (fetchErr) {
-                if (onClose) req.off('close', onClose);
+                cleanupListeners();
                 if (fetchErr.name === 'AbortError' || abortController.signal.aborted || currentEntry.isCancelled || req.destroyed || res.destroyed || res.writableEnded) {
                     if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
                         activeStreamControllersByAccount.delete(accountKey);
@@ -1521,7 +1575,7 @@ router.get('/stream', async (req, res) => {
             if ((response.status === 458 || response.status === 429 || response.status >= 500) && isM3u8Url && liveManifestCache.has(url)) {
                 const cached = liveManifestCache.get(url);
                 if (Date.now() - cached.timestamp < LIVE_MANIFEST_STALE_TTL_MS) {
-                    if (onClose) req.off('close', onClose);
+                    cleanupListeners();
                     if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
                         activeStreamControllersByAccount.delete(accountKey);
                     }
@@ -1536,9 +1590,7 @@ router.get('/stream', async (req, res) => {
 
             // Retry on 5xx errors or transient burst rate limits (458, 429) when client is still connected
             if ((response.status >= 500 || response.status === 458 || response.status === 429) && attempt < maxRetries) {
-                if (onClose) {
-                    try { req.off('close', onClose); } catch {}
-                }
+                cleanupListeners();
                 try { abortController.abort(); } catch {}
                 try { response.body?.cancel?.().catch?.(() => {}); } catch {}
 
@@ -1562,9 +1614,7 @@ router.get('/stream', async (req, res) => {
             }
 
             if (!response.ok) {
-                if (onClose) {
-                    try { req.off('close', onClose); } catch {}
-                }
+                cleanupListeners();
                 try { abortController.abort(); } catch {}
                 try { response.body?.cancel?.().catch?.(() => {}); } catch {}
                 if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
@@ -1626,7 +1676,7 @@ router.get('/stream', async (req, res) => {
 
             if (first.done) {
                 res.set('Content-Type', contentType || 'application/octet-stream');
-                if (onClose) req.off('close', onClose);
+                cleanupListeners();
                 return res.end();
             }
 
@@ -1772,7 +1822,7 @@ router.get('/stream', async (req, res) => {
 
             let result = await iterator.next();
             while (!result.done) {
-                if (req.destroyed || res.destroyed || res.writableEnded) {
+                if (currentEntry.isCancelled || req.destroyed || res.destroyed || res.writableEnded) {
                     try {
                         const c = response.body?.cancel?.();
                         if (c && typeof c.catch === 'function') c.catch(() => {});
@@ -1789,7 +1839,37 @@ router.get('/stream', async (req, res) => {
                     }
                 }
                 if (!res.write(chunkBuf)) {
-                    await new Promise(resolve => res.once('drain', resolve));
+                    if (currentEntry.isCancelled || req.destroyed || res.destroyed || res.writableEnded) {
+                        try {
+                            const c = response.body?.cancel?.();
+                            if (c && typeof c.catch === 'function') c.catch(() => {});
+                        } catch {}
+                        break;
+                    }
+                    await new Promise(resolve => {
+                        let done = false;
+                        const cleanup = () => {
+                            if (done) return;
+                            done = true;
+                            res.off('drain', onDrain);
+                            res.off('close', onAbort);
+                            req.off('close', onAbort);
+                            resolve();
+                        };
+                        const onDrain = () => cleanup();
+                        const onAbort = () => {
+                            currentEntry.isCancelled = true;
+                            try { abortController?.abort(); } catch (_) {}
+                            try {
+                                const c = response.body?.cancel?.();
+                                if (c && typeof c.catch === 'function') c.catch(() => {});
+                            } catch (_) {}
+                            cleanup();
+                        };
+                        res.once('drain', onDrain);
+                        res.once('close', onAbort);
+                        req.once('close', onAbort);
+                    });
                 }
                 result = await iterator.next();
             }
@@ -1804,7 +1884,7 @@ router.get('/stream', async (req, res) => {
                 }
             }
 
-            if (onClose) req.off('close', onClose);
+            cleanupListeners();
             if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
                 activeStreamControllersByAccount.delete(accountKey);
             }
@@ -1814,9 +1894,7 @@ router.get('/stream', async (req, res) => {
 
         } catch (err) {
             lastError = err;
-            if (onClose) {
-                try { req.off('close', onClose); } catch {}
-            }
+            cleanupListeners();
             if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
                 activeStreamControllersByAccount.delete(accountKey);
             }

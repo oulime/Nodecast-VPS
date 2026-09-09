@@ -725,6 +725,16 @@
     syncProgressToDatabase(entry);
   }
 
+  function formatPlaybackTimestamp(seconds) {
+    if (!Number.isFinite(seconds) || seconds < 0) return "00:00";
+    var totalSecs = Math.max(0, Math.floor(seconds));
+    var h = Math.floor(totalSecs / 3600);
+    var m = Math.floor((totalSecs % 3600) / 60);
+    var hStr = h < 10 ? "0" + h : String(h);
+    var mStr = m < 10 ? "0" + m : String(m);
+    return hStr + ":" + mStr;
+  }
+
   function formatRemainingTime(seconds) {
     if (!Number.isFinite(seconds) || seconds <= 0) return "";
     var mins = Math.round(seconds / 60);
@@ -1394,15 +1404,26 @@
 
     if (!deduplicated.length) return null;
 
-    var block = document.createElement("section");
-    block.className = "vel-home-section vel-home-section--resume vel-home-section--horizontal";
+    var block = document.createElement("div");
+    block.className = "UI3iHJ vel-home-section vel-home-section--resume vel-home-section--horizontal";
+    block.dataset.testid = "navigation-carousel-wrapper";
 
-    var heading = document.createElement("h3");
-    heading.className = "vel-home-section__heading";
-    heading.textContent = "Continuer de regarder";
+    var headerSec = document.createElement("section");
+    headerSec.className = "QHjixV vel-home-section__header";
+    var tvxgSpan = document.createElement("span");
+    tvxgSpan.className = "TvxgS1";
+    var heading = document.createElement("h2");
+    heading.className = "qwttco vel-home-section__heading";
+    heading.innerHTML = '<span data-testid="carousel-title"><span>Continuer de regarder</span></span>';
+    tvxgSpan.appendChild(heading);
+    headerSec.appendChild(tvxgSpan);
 
+    var railWrap = document.createElement("div");
+    railWrap.className = "vJYTdI LiEb2X UEOrk2 CHGlLt OH_E2I vel-home-section__rail-wrap";
     var rail = document.createElement("div");
-    rail.className = "vel-home-section__rail";
+    rail.className = "lw1NJZ vel-home-section__rail";
+    rail.dataset.testid = "card-container-list";
+    railWrap.appendChild(rail);
 
     deduplicated.forEach(function (item) {
       if (!isValidMediaEntry(item)) return;
@@ -1474,42 +1495,17 @@
       centerPlay.className = "vel-resume-play-center";
       centerPlay.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>';
 
-      // Single Clean Top-Left Badge (S1:E3 for series, or remaining time for movies)
+      // Single Clean Top-Left Badge (S1:E3 for series, or HH:MM elapsed position for movies)
       var badge = document.createElement("span");
       badge.className = "vel-resume-badge";
-      var remainingSeconds = Math.max(0, (item.duration || 0) - (item.currentTime || 0));
-      var timeStr = formatRemainingTime(remainingSeconds);
 
       if (isSeries && item.seasonNumber != null && item.episodeNumber != null) {
         badge.textContent = "S" + item.seasonNumber + ":E" + item.episodeNumber;
-      } else if (timeStr) {
-        badge.textContent = timeStr;
-      } else if (item.progressPercent) {
-        badge.textContent = item.progressPercent + "%";
       } else {
-        badge.textContent = "Film";
-      }
-
-      // Title & Subtitle Name Overlay at Bottom
-      var nameEl = document.createElement("span");
-      nameEl.className = "vel-home-section__name";
-      var titleStrong = document.createElement("strong");
-      titleStrong.textContent = item.seriesName || item.name || "";
-      nameEl.appendChild(titleStrong);
-
-      if (isSeries) {
-        var epSub = "";
-        if (item.seasonNumber != null && item.episodeNumber != null) {
-          epSub = "S" + item.seasonNumber + ":E" + item.episodeNumber;
-        }
-        if (item.episodeTitle && item.episodeTitle.trim()) {
-          epSub = (epSub ? epSub + " \u2022 " : "") + item.episodeTitle.trim();
-        }
-        if (epSub) {
-          var subSmall = document.createElement("small");
-          subSmall.textContent = epSub;
-          nameEl.appendChild(subSmall);
-        }
+        var curSec = item.currentTime != null && !isNaN(item.currentTime)
+          ? Number(item.currentTime)
+          : (item.duration && item.progressPercent ? (item.duration * item.progressPercent / 100) : 0);
+        badge.textContent = formatPlaybackTimestamp(curSec);
       }
 
       // Netflix-Style Red Progress Bar
@@ -1564,7 +1560,7 @@
       removeBtn.addEventListener("touchend", stopBubble, { passive: false });
       removeBtn.addEventListener("click", handleRemoveAction);
 
-      card.append(media, centerPlay, badge, removeBtn, nameEl, progressBar);
+      card.append(media, centerPlay, badge, removeBtn, progressBar);
 
       if (typeof window.veloraEnsureCardBackdrop === "function") {
         window.veloraEnsureCardBackdrop(card, media, sectionMeta, entryForOpen);
@@ -1593,7 +1589,7 @@
     });
 
     if (rail.children.length === 0) return null;
-    block.append(heading, rail);
+    block.append(headerSec, railWrap);
     return block;
   };
 

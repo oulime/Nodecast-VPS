@@ -66,19 +66,56 @@
     if (!sections.length) return;
     root.replaceChildren();
     sections.forEach(function (section) {
-      var block = document.createElement("section");
-      block.className = "vel-home-section";
-      var heading = document.createElement("h3");
-      heading.className = "vel-home-section__heading";
-      heading.textContent = section.title || "";
+      var isHorizontal = section.card_orientation === "horizontal";
+      var block = document.createElement("div");
+      block.className = "UI3iHJ vel-home-section" + (isHorizontal ? " vel-home-section--horizontal" : "");
+      block.dataset.testid = "navigation-carousel-wrapper";
+      if (section.package_id) block.dataset.packageId = String(section.package_id);
+
+      var headerSec = document.createElement("section");
+      headerSec.className = "QHjixV vel-home-section__header";
+      var tvxgSpan = document.createElement("span");
+      tvxgSpan.className = "TvxgS1";
+      var heading = document.createElement("h2");
+      heading.className = "qwttco vel-home-section__heading";
+      heading.style.cursor = "pointer";
+      heading.innerHTML = '<span data-testid="carousel-title"><span>' + (section.title || "") + '</span></span>';
+
+      var seeMore = document.createElement("a");
+      seeMore.href = "#";
+      seeMore.className = "toEceS vel-home-section__see-more";
+      seeMore.dataset.testid = "see-more";
+      seeMore.setAttribute("aria-label", section.title || "");
+      seeMore.innerHTML = '<span class="IcIpJ_">Voir plus</span><svg class="_22qEau" viewBox="0 0 24 24" height="24" width="24" role="img" aria-hidden="true"><title>Link Arrow</title><path stroke="currentColor" stroke-width="2" d="M9.5 17.5l5-5-5-5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
+
+      var openSec = function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (section.package_id && typeof window.veloraOpenPrimePackageModal === "function") {
+          window.veloraOpenPrimePackageModal(section.content_type || "movies", { id: section.package_id, name: section.title });
+        } else if (typeof window.veloraOpenHomeCustomSectionModal === "function") {
+          window.veloraOpenHomeCustomSectionModal(block, section.title, section.content_type, section.card_orientation === "horizontal");
+        }
+      };
+      heading.addEventListener("click", openSec);
+      seeMore.addEventListener("click", openSec);
+
+      tvxgSpan.append(heading, seeMore);
+      headerSec.appendChild(tvxgSpan);
+
+      var railWrap = document.createElement("div");
+      railWrap.className = "vJYTdI LiEb2X UEOrk2 CHGlLt OH_E2I vel-home-section__rail-wrap";
       var rail = document.createElement("div");
-      rail.className = "vel-home-section__rail";
+      rail.className = "lw1NJZ vel-home-section__rail";
+      rail.dataset.testid = "card-container-list";
+      railWrap.appendChild(rail);
+
       var entries = Array.isArray(section.entries) ? section.entries : [];
       if (typeof window.veloraApplyHomeChannelRules === "function") entries = window.veloraApplyHomeChannelRules(section, entries);
       entries.forEach(function (entry) {
         rail.appendChild(card(section, entry));
       });
-      block.append(heading, rail);
+      block.append(headerSec, railWrap);
       root.appendChild(block);
     });
     renderedCountry = country;

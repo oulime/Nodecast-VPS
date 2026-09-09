@@ -472,13 +472,30 @@
     root.replaceChildren();
     sections.forEach(function (section) {
       var isHorizontal = section.card_orientation === "horizontal";
-      var block = document.createElement("section");
-      block.className = "vel-home-section vel-home-section--skeleton" + (isHorizontal ? " vel-home-section--horizontal" : "");
-      var heading = document.createElement("h3");
-      heading.className = "vel-home-section__heading";
-      heading.textContent = section.title || "";
+      var block = document.createElement("div");
+      block.className = "UI3iHJ vel-home-section vel-home-section--skeleton" + (isHorizontal ? " vel-home-section--horizontal" : "");
+      block.dataset.testid = "navigation-carousel-wrapper";
+      var headerSec = document.createElement("section");
+      headerSec.className = "QHjixV vel-home-section__header";
+      var tvxgSpan = document.createElement("span");
+      tvxgSpan.className = "TvxgS1";
+      var heading = document.createElement("h2");
+      heading.className = "qwttco vel-home-section__heading";
+      heading.innerHTML = '<span data-testid="carousel-title"><span>' + (section.title || "") + '</span></span>';
+      var seeMore = document.createElement("a");
+      seeMore.href = "#";
+      seeMore.className = "toEceS vel-home-section__see-more";
+      seeMore.dataset.testid = "see-more";
+      seeMore.setAttribute("aria-label", section.title || "");
+      seeMore.innerHTML = '<span class="IcIpJ_">Voir plus</span><svg class="_22qEau" viewBox="0 0 24 24" height="24" width="24" role="img" aria-hidden="true"><title>Link Arrow</title><path stroke="currentColor" stroke-width="2" d="M9.5 17.5l5-5-5-5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
+      tvxgSpan.append(heading, seeMore);
+      headerSec.appendChild(tvxgSpan);
+      var railWrap = document.createElement("div");
+      railWrap.className = "vJYTdI LiEb2X UEOrk2 CHGlLt OH_E2I vel-home-section__rail-wrap";
       var rail = document.createElement("div");
-      rail.className = "vel-home-section__rail";
+      rail.className = "lw1NJZ vel-home-section__rail";
+      rail.dataset.testid = "card-container-list";
+      railWrap.appendChild(rail);
       var count = Math.max(4, Math.min(8, Array.isArray(section.entries) ? section.entries.length : 6));
       for (var index = 0; index < count; index += 1) {
         var placeholder = document.createElement("span");
@@ -486,7 +503,7 @@
         placeholder.setAttribute("aria-hidden", "true");
         rail.appendChild(placeholder);
       }
-      block.append(heading, rail);
+      block.append(headerSec, railWrap);
       root.appendChild(block);
     });
     revealHomeFirstPaint();
@@ -498,24 +515,6 @@
     var fragment = document.createDocumentFragment();
     for (var index = start; index < end; index += 1) fragment.appendChild(createCard(section, entries[index]));
     rail.appendChild(fragment);
-    var total = Number(section.entryCount || entries.length);
-    if (end >= total) return;
-    var more = document.createElement("button");
-    more.type = "button";
-    more.className = "vel-home-section__more";
-    more.textContent = "Voir plus";
-    more.addEventListener("click", function () {
-      more.disabled = true;
-      more.textContent = "Chargement…";
-      more.remove();
-      loadSectionPage(section, end).then(function (page) {
-        if (!page) return;
-        var nextEntries = entries.concat(Array.isArray(page.entries) ? page.entries : []);
-        section.entryCount = page.entryCount || total;
-        window.setTimeout(function () { appendRailPage(rail, section, nextEntries, end); }, 0);
-      }).catch(function () {});
-    }, { once: true });
-    rail.appendChild(more);
   }
 
   function render(payload) {
@@ -530,13 +529,43 @@
     }
     matching.forEach(function (section) {
       var isHorizontal = section.card_orientation === "horizontal";
-      var block = document.createElement("section");
-      block.className = "vel-home-section" + (isHorizontal ? " vel-home-section--horizontal" : "");
-      var heading = document.createElement("h3");
-      heading.className = "vel-home-section__heading";
-      heading.textContent = section.title || "";
+      var block = document.createElement("div");
+      block.className = "UI3iHJ vel-home-section" + (isHorizontal ? " vel-home-section--horizontal" : "");
+      block.dataset.testid = "navigation-carousel-wrapper";
+      if (section.package_id) block.dataset.packageId = String(section.package_id);
+      var headerSec = document.createElement("section");
+      headerSec.className = "QHjixV vel-home-section__header";
+      var tvxgSpan = document.createElement("span");
+      tvxgSpan.className = "TvxgS1";
+      var heading = document.createElement("h2");
+      heading.className = "qwttco vel-home-section__heading";
+      heading.style.cursor = "pointer";
+      heading.innerHTML = '<span data-testid="carousel-title"><span>' + (section.title || "") + '</span></span>';
+      var seeMore = document.createElement("a");
+      seeMore.href = "#";
+      seeMore.className = "toEceS vel-home-section__see-more";
+      seeMore.dataset.testid = "see-more";
+      seeMore.setAttribute("aria-label", section.title || "");
+      seeMore.innerHTML = '<span class="IcIpJ_">Voir plus</span><svg class="_22qEau" viewBox="0 0 24 24" height="24" width="24" role="img" aria-hidden="true"><title>Link Arrow</title><path stroke="currentColor" stroke-width="2" d="M9.5 17.5l5-5-5-5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
+      var openSec = function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (section.package_id && typeof window.veloraOpenPrimePackageModal === "function") {
+          window.veloraOpenPrimePackageModal(section.content_type || "movies", { id: section.package_id, name: section.title });
+        } else if (typeof window.veloraOpenHomeCustomSectionModal === "function") {
+          window.veloraOpenHomeCustomSectionModal(block, section.title, section.content_type, section.card_orientation === "horizontal");
+        }
+      };
+      heading.addEventListener("click", openSec);
+      seeMore.addEventListener("click", openSec);
+      tvxgSpan.append(heading, seeMore);
+      headerSec.appendChild(tvxgSpan);
+      var railWrap = document.createElement("div");
+      railWrap.className = "vJYTdI LiEb2X UEOrk2 CHGlLt OH_E2I vel-home-section__rail-wrap";
       var rail = document.createElement("div");
-      rail.className = "vel-home-section__rail";
+      rail.className = "lw1NJZ vel-home-section__rail";
+      rail.dataset.testid = "card-container-list";
+      railWrap.appendChild(rail);
       var entries = Array.isArray(section.entries) ? section.entries : [];
       var sourceCounts = {};
       entries.forEach(function (entry) {
@@ -550,7 +579,7 @@
         return !dominantSource || String(entry.sourceId || "") === dominantSource;
       });
       appendRailPage(rail, section, filteredEntries, 0);
-      block.append(heading, rail);
+      block.append(headerSec, railWrap);
       fragment.appendChild(block);
     });
     if (version !== renderVersion) return false;

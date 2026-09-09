@@ -376,11 +376,32 @@
       console.warn("[Velora Prime] Could not fetch package items:", err.message);
     }
 
+    if (Array.isArray(pkg.customItems) && pkg.customItems.length) {
+      return pkg.customItems.map(it => ({
+        id: it.id || it.streamId,
+        name: stripTitle(it.name || it.title || ""),
+        rawName: it.name || it.title || "",
+        thumbUrl: it.thumbUrl || it.posterUrl || it.backdropUrl || "",
+        posterUrl: it.posterUrl || it.thumbUrl || it.backdropUrl || "",
+        backdropUrl: it.backdropUrl || it.thumbUrl || "",
+        rating: it.rating || "",
+        year: it.year || "",
+        plot: it.plot || it.description || "",
+        streamId: it.streamId || it.id,
+        sourceId: it.sourceId || pkg.source_id,
+        globalStreamId: it.globalStreamId || it.streamId,
+        containerExtension: it.containerExtension || "",
+        contentType: tab || it.contentType || "movies",
+        packageId: pkg.id
+      }));
+    }
+
     return Array.isArray(pkg.items) ? pkg.items : [];
   }
 
   // Open Full Package Content Modal (Popup)
   async function openPackageModal(tab, pkg) {
+    window.veloraOpenPrimePackageModal = openPackageModal;
     let modal = document.getElementById("vel-pkg-modal");
     if (!modal) {
       modal = document.createElement("div");

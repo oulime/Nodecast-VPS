@@ -17,13 +17,28 @@
     const effectiveContentType = contentType || sectionNode?.dataset?.contentType || secObj?.content_type || "movies";
     const customList = (secObj && Array.isArray(secObj.custom_entries) && secObj.custom_entries.length > 0)
       ? secObj.custom_entries
-      : (secObj && Array.isArray(secObj.entries) && secObj.entries.length > 0 ? secObj.entries : null);
+      : null;
+
+    let matchedPkg = null;
+    if (window.veloraHomeSectionsState && Array.isArray(window.veloraHomeSectionsState.packages)) {
+      if (packageId) {
+        matchedPkg = window.veloraHomeSectionsState.packages.find(p => String(p.id) === packageId);
+      }
+      if (!matchedPkg && sectionTitle) {
+        const sTitle = String(sectionTitle).trim().toLowerCase();
+        matchedPkg = window.veloraHomeSectionsState.packages.find(p => String(p.name || "").trim().toLowerCase() === sTitle);
+      }
+    }
 
     if (typeof window.veloraOpenPrimePackageModal === "function") {
-      window.veloraOpenPrimePackageModal(effectiveContentType, {
-        id: packageId || secObj?.id || sectionTitle,
+      const finalKind = effectiveContentType || (matchedPkg && matchedPkg.kind === "series" ? "series" : "movies");
+      window.veloraOpenPrimePackageModal(finalKind, {
+        id: packageId || (matchedPkg && matchedPkg.id) || secObj?.id || sectionTitle,
         name: sectionTitle,
-        customItems: customList
+        category_id: matchedPkg?.category_id,
+        source_id: matchedPkg?.source_id,
+        country_id: matchedPkg?.country_id || secObj?.country_id,
+        customItems: customList || undefined
       });
       return;
     }
@@ -168,7 +183,18 @@
       const isHorizontal = sectionNode.classList.contains("vel-home-section--horizontal");
       const customList = (secObj && Array.isArray(secObj.custom_entries) && secObj.custom_entries.length > 0)
         ? secObj.custom_entries
-        : (secObj && Array.isArray(secObj.entries) && secObj.entries.length > 0 ? secObj.entries : null);
+        : null;
+
+      let matchedPkg = null;
+      if (window.veloraHomeSectionsState && Array.isArray(window.veloraHomeSectionsState.packages)) {
+        if (packageId) {
+          matchedPkg = window.veloraHomeSectionsState.packages.find(p => String(p.id) === packageId);
+        }
+        if (!matchedPkg && sectionTitle) {
+          const sTitle = String(sectionTitle).trim().toLowerCase();
+          matchedPkg = window.veloraHomeSectionsState.packages.find(p => String(p.name || "").trim().toLowerCase() === sTitle);
+        }
+      }
 
       let header = sectionNode.querySelector(":scope > .vel-home-section__header, :scope > .QHjixV");
 
@@ -176,10 +202,14 @@
         e.preventDefault();
         e.stopPropagation();
         if (typeof window.veloraOpenPrimePackageModal === "function") {
-          window.veloraOpenPrimePackageModal(contentType, {
-            id: packageId || secObj?.id || sectionTitle,
+          const finalKind = contentType || (matchedPkg && matchedPkg.kind === "series" ? "series" : "movies");
+          window.veloraOpenPrimePackageModal(finalKind, {
+            id: packageId || (matchedPkg && matchedPkg.id) || secObj?.id || sectionTitle,
             name: sectionTitle,
-            customItems: customList
+            category_id: matchedPkg?.category_id,
+            source_id: matchedPkg?.source_id,
+            country_id: matchedPkg?.country_id || secObj?.country_id,
+            customItems: customList || undefined
           });
         } else {
           openCustomSectionModal(sectionNode, sectionTitle, contentType, isHorizontal);

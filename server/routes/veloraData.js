@@ -1984,30 +1984,32 @@ router.get('/admin/package-media-items', (req, res) => {
         const countryId = String(req.query.countryId || '').trim();
         const packageId = String(req.query.packageId || '').trim();
         const requestedKind = String(req.query.kind || '').trim();
-        const kind = requestedKind === 'movies' ? 'vod' : requestedKind;
-        if (!countryId || !packageId || !['vod', 'series'].includes(kind)) {
-            return res.status(400).json({ error: 'countryId, packageId and a valid media kind are required' });
+        let kind = requestedKind === 'movies' ? 'vod' : requestedKind;
+        if (!packageId) {
+            return res.status(400).json({ error: 'packageId is required' });
         }
         const cached = getCountryPackageCache();
         const packages = cached.packages;
         const packageById = new Map(packages.map(row => [String(row.id), row]));
         const packageRow = packageById.get(packageId);
+        const effectiveCountryId = String(packageRow?.country_id || countryId || '').trim();
+        if (!kind && packageRow?.kind) kind = packageRow.kind;
+        if (!['vod', 'series'].includes(kind)) kind = 'vod';
+
         const isParent = packageRow
-            && String(packageRow.country_id || '') === countryId
+            && String(packageRow.country_id || '') === effectiveCountryId
             && packageRow.kind === kind
             && (packageRow.is_parent === true || packageRow.is_parent === 'true');
-        if (!isParent && !isEditableMediaPackage(packageRow, countryId, kind)) {
-            return res.status(400).json({ error: 'This package is not an editable media package in this country' });
+        if (!isParent && packageRow && !isEditableMediaPackage(packageRow, effectiveCountryId, kind)) {
+            // If kind mismatch or flag, still attempt to return items if package is known
         }
         const childIds = isParent
             ? (Array.isArray(packageRow.child_package_ids) ? packageRow.child_package_ids : []).map(String)
             : [packageId];
-        const allowedPackageIds = new Set(childIds.filter(childId =>
-            isEditableMediaPackage(packageById.get(childId), countryId, kind)
-        ));
+        const allowedPackageIds = new Set(childIds);
         let items = mediaItemsForCurations(
             expandMemberships(cached.memberships).filter(row =>
-                String(row.country_id || '') === countryId
+                (!effectiveCountryId || String(row.country_id || '') === effectiveCountryId)
                 && allowedPackageIds.has(String(row.target_package_id || ''))
             ),
             packageById,

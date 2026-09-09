@@ -95,12 +95,12 @@
         e.stopPropagation();
         var customList = Array.isArray(section.custom_entries) && section.custom_entries.length > 0
           ? section.custom_entries
-          : (Array.isArray(section.entries) && section.entries.length > 0 ? section.entries : null);
+          : null;
         if (typeof window.veloraOpenPrimePackageModal === "function") {
           window.veloraOpenPrimePackageModal(section.content_type || "movies", {
             id: section.package_id || section.id || section.title,
             name: section.title,
-            customItems: customList
+            customItems: customList || undefined
           });
         } else if (typeof window.veloraOpenHomeCustomSectionModal === "function") {
           window.veloraOpenHomeCustomSectionModal(block, section.title, section.content_type, section.card_orientation === "horizontal");

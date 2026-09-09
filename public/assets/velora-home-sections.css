@@ -1510,15 +1510,15 @@
   background: rgba(139, 92, 246, 0.75);
 }
 
-/* Card Grid inside Popup */
+/* Card Grid inside Popup - Always Vertical 2:3 */
 .vel-home-custom-section-modal__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(clamp(8.5rem, 15vw, 11rem), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(clamp(8.5rem, 15vw, 11rem), 1fr)) !important;
   gap: 1.25rem 1rem;
   align-items: stretch;
 }
 .vel-home-custom-section-modal__grid--horizontal {
-  grid-template-columns: repeat(auto-fill, minmax(clamp(14rem, 24vw, 18rem), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(clamp(8.5rem, 15vw, 11rem), 1fr)) !important;
 }
 
 /* Full Card presentation inside Popup */
@@ -1554,7 +1554,8 @@
 }
 .vel-home-custom-section-modal__grid--horizontal .vel-home-section__media,
 .vel-home-custom-section-modal__grid .vel-home-section__card--horizontal .vel-home-section__media {
-  aspect-ratio: 16/9 !important;
+  aspect-ratio: 2/3 !important;
+  object-fit: cover !important;
 }
 .vel-home-custom-section-modal__grid .vel-home-section__card--live .vel-home-section__media {
   aspect-ratio: 1/1 !important;

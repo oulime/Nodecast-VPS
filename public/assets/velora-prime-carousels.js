@@ -281,7 +281,7 @@
   // Helper to extract vertical poster vs backdrop from raw stream item
   function extractMediaImages(it) {
     if (!it) return { poster: "", backdrop: "" };
-    let poster = it.poster || it.poster_path || it.stream_icon || it.cover || it.cover_big || it.movie_image || it.series_image || it.thumbUrl || it.posterUrl || "";
+    let poster = it.poster || it.poster_path || it.stream_icon || it.cover || it.cover_big || it.movie_image || it.series_image || it.posterUrl || "";
     if (Array.isArray(poster) && poster.length > 0) poster = poster[0];
     if (typeof poster === "string" && poster.startsWith("/")) poster = "https://image.tmdb.org/t/p/w500" + poster;
 
@@ -289,13 +289,21 @@
     if (Array.isArray(backdrop) && backdrop.length > 0) backdrop = backdrop[0];
     if (typeof backdrop === "string" && backdrop.startsWith("/")) backdrop = "https://image.tmdb.org/t/p/w780" + backdrop;
 
-    // If poster is an obvious horizontal landscape TMDb backdrop (w1280), try not to use it as poster
-    if (typeof poster === "string" && (poster.includes("/w1280/") || poster.includes("/backdrop/"))) {
+    // If poster is a horizontal thumb, look for an actual vertical poster
+    if (typeof poster === "string" && (poster.includes("/horizontal-thumbs/") || poster.includes("/w1280/") || poster.includes("/backdrop/"))) {
       if (!backdrop) backdrop = poster;
+      const rawPoster = it.stream_icon || it.cover || it.posterUrl || it.poster || "";
+      if (rawPoster && typeof rawPoster === "string" && !rawPoster.includes("/horizontal-thumbs/") && !rawPoster.includes("/w1280/")) {
+        poster = rawPoster.startsWith("/") ? "https://image.tmdb.org/t/p/w500" + rawPoster : rawPoster;
+      }
     }
 
-    const finalPoster = poster || backdrop;
-    const finalBackdrop = backdrop || poster;
+    if (!poster && it.thumbUrl && !String(it.thumbUrl).includes("/horizontal-thumbs/")) {
+      poster = it.thumbUrl;
+    }
+
+    const finalPoster = poster || it.thumbUrl || backdrop || "";
+    const finalBackdrop = backdrop || poster || it.thumbUrl || "";
     return { poster: finalPoster, backdrop: finalBackdrop };
   }
 
@@ -385,52 +393,9 @@
       }
     }
 
-    // 3. Direct live Xtream catalog resolution (kw & Dh) via window.veloraGetHomeSectionContent
-    if (typeof window.veloraGetHomeSectionContent === "function") {
-      const targetIdsToTry = [pkg.id, pkg.category_id].filter(Boolean);
-      if (window.veloraHomeSectionsState && Array.isArray(window.veloraHomeSectionsState.packages) && pkg.name) {
-        const pMatch = window.veloraHomeSectionsState.packages.find(p => String(p.name || "").trim().toLowerCase() === String(pkg.name).trim().toLowerCase());
-        if (pMatch) {
-          if (pMatch.id && !targetIdsToTry.includes(pMatch.id)) targetIdsToTry.push(pMatch.id);
-          if (pMatch.category_id && !targetIdsToTry.includes(pMatch.category_id)) targetIdsToTry.push(pMatch.category_id);
-        }
-      }
+    const isUuid = (val) => typeof val === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
 
-      for (const targetId of targetIdsToTry) {
-        try {
-          const fullContent = await window.veloraGetHomeSectionContent(tab, targetId, false);
-          if (Array.isArray(fullContent) && fullContent.length > 0) {
-            const items = fullContent.map(it => {
-              const rawId = it.streamId || it.id;
-              const { poster, backdrop } = extractMediaImages(it);
-              return {
-                id: it.id || `feed:${pkg.id || targetId}:${rawId}`,
-                name: stripTitle(it.name || it.title || ""),
-                rawName: it.name || it.title || "",
-                thumbUrl: poster || it.thumbUrl || it.posterUrl || "",
-                posterUrl: poster || it.posterUrl || it.thumbUrl || "",
-                backdropUrl: backdrop || it.backdropUrl || "",
-                rating: it.rating || "",
-                year: it.year || "",
-                plot: it.plot || it.description || "",
-                streamId: rawId,
-                sourceId: it.sourceId || pkg.source_id,
-                globalStreamId: it.globalStreamId || rawId,
-                containerExtension: it.containerExtension || "",
-                contentType: it.contentType || tab,
-                packageId: it.packageId || targetId
-              };
-            });
-            packageFullItemsCache.set(cacheKey, items);
-            return items;
-          }
-        } catch (err) {
-          console.warn("[Velora Prime] Direct catalog fetch failed for " + targetId + ":", err);
-        }
-      }
-    }
-
-    // 4. Fetch from backend package-media-items API
+    // 3. Fetch from backend package-media-items API for Admin Packages
     const candidatePkgIds = [pkg.id, pkg.package_id, pkg.category_id].filter(Boolean);
     if (window.veloraHomeSectionsState && Array.isArray(window.veloraHomeSectionsState.packages) && pkg.name) {
       const pMatch = window.veloraHomeSectionsState.packages.find(p => String(p.name || "").trim().toLowerCase() === String(pkg.name).trim().toLowerCase());
@@ -472,6 +437,50 @@
         }
       } catch (err) {
         console.warn("[Velora Prime] Could not fetch package items from API for " + targetPkgId + ":", err.message);
+      }
+    }
+
+    // 4. Direct live Xtream catalog resolution (kw & Dh) via window.veloraGetHomeSectionContent (only for non-UUID category IDs)
+    if (typeof window.veloraGetHomeSectionContent === "function") {
+      const targetIdsToTry = [pkg.category_id, pkg.id].filter(id => id && !isUuid(id));
+      if (window.veloraHomeSectionsState && Array.isArray(window.veloraHomeSectionsState.packages) && pkg.name) {
+        const pMatch = window.veloraHomeSectionsState.packages.find(p => String(p.name || "").trim().toLowerCase() === String(pkg.name).trim().toLowerCase());
+        if (pMatch && pMatch.category_id && !isUuid(pMatch.category_id) && !targetIdsToTry.includes(pMatch.category_id)) {
+          targetIdsToTry.push(pMatch.category_id);
+        }
+      }
+
+      for (const targetId of targetIdsToTry) {
+        try {
+          const fullContent = await window.veloraGetHomeSectionContent(tab, targetId, false);
+          if (Array.isArray(fullContent) && fullContent.length > 0) {
+            const items = fullContent.map(it => {
+              const rawId = it.streamId || it.id;
+              const { poster, backdrop } = extractMediaImages(it);
+              return {
+                id: it.id || `feed:${pkg.id || targetId}:${rawId}`,
+                name: stripTitle(it.name || it.title || ""),
+                rawName: it.name || it.title || "",
+                thumbUrl: poster || it.thumbUrl || it.posterUrl || "",
+                posterUrl: poster || it.posterUrl || it.thumbUrl || "",
+                backdropUrl: backdrop || it.backdropUrl || "",
+                rating: it.rating || "",
+                year: it.year || "",
+                plot: it.plot || it.description || "",
+                streamId: rawId,
+                sourceId: it.sourceId || pkg.source_id,
+                globalStreamId: it.globalStreamId || rawId,
+                containerExtension: it.containerExtension || "",
+                contentType: it.contentType || tab,
+                packageId: it.packageId || targetId
+              };
+            });
+            packageFullItemsCache.set(cacheKey, items);
+            return items;
+          }
+        } catch (err) {
+          console.warn("[Velora Prime] Direct catalog fetch failed for " + targetId + ":", err);
+        }
       }
     }
 

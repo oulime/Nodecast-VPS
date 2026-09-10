@@ -573,6 +573,50 @@
     return promise;
   }
 
+  // ---------------------------------------------------------------------------
+  // Shared probe + videoMode helpers — mirrors the main player's logic exactly
+  // ---------------------------------------------------------------------------
+  let _adultSettingsUa = null;
+  async function getAdultUserAgent(token) {
+    if (_adultSettingsUa) return _adultSettingsUa;
+    try {
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await fetch("/api/settings", { headers });
+      if (res.ok) {
+        const s = await res.json();
+        const ua = typeof s.userAgentPreset === "string" ? s.userAgentPreset.trim().toLowerCase() : "vlc";
+        _adultSettingsUa = ua || "vlc";
+      }
+    } catch (_) {}
+    return _adultSettingsUa || "vlc";
+  }
+
+  async function probeAdultStream(url, token) {
+    try {
+      const ua = await getAdultUserAgent(token);
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const probeUrl = `/api/probe?url=${encodeURIComponent(url)}&ua=${encodeURIComponent(ua)}`;
+      const res = await fetch(probeUrl, { headers });
+      if (res.ok) {
+        const json = await res.json();
+        return json && typeof json === "object" ? json : null;
+      }
+    } catch (e) {
+      console.warn("[Adult] Probe failed:", e.message);
+    }
+    return null;
+  }
+
+  function computeAdultVideoMode(probe, videoCodec) {
+    const codecStr = [videoCodec, probe?.video, probe?.videoCodecTag, probe?.videoCodecLongName]
+      .filter(Boolean).join(" ").toLowerCase();
+    const isHevc = /hevc|h265|h\.265|hev1|hvc1/.test(codecStr);
+    const isH264 = !isHevc && /h264|avc|avc1/.test(codecStr);
+    return isH264 ? "copy" : "encode";
+  }
+
   async function fetchLiveChannelsForPackage(pkg) {
     const key = `${pkg.source_id}:${pkg.category_id}`;
     if (adultLiveChannelCache.has(key)) return adultLiveChannelCache.get(key);
@@ -1256,24 +1300,57 @@
     const errEl = document.getElementById("vel-adult-player-error");
     if (!video) return;
 
-    // Reset video volume and ensure unmuted state
     video.muted = false;
     video.volume = 1;
 
     if (errEl) errEl.classList.add("hidden");
     if (buffering) buffering.classList.remove("hidden");
 
-    const apiUrl = `/api/proxy/xtream/${encodeURIComponent(channel.source_id)}/stream/${encodeURIComponent(channel.stream_id)}/live`;
-    const resolvedUrl = await resolveStreamMediaUrl(apiUrl);
-    const finalUrl = resolvedUrl || apiUrl;
-
+    // Destroy any existing HLS instance before starting a new session
     if (video.hls && typeof video.hls.destroy === "function") {
       try { video.hls.destroy(); } catch (_) {}
       video.hls = null;
     }
 
-    const isHls = finalUrl.includes(".m3u8") || finalUrl.includes("/live") || finalUrl.includes("/stream");
-    if (isHls && window.Hls && window.Hls.isSupported()) {
+    const token = localStorage.getItem("authToken");
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    // Step 1: Resolve the direct stream URL from the xtream proxy (same as normal live player)
+    const apiUrl = `/api/proxy/xtream/${encodeURIComponent(channel.source_id)}/stream/${encodeURIComponent(channel.stream_id)}/live`;
+    let directUrl = null;
+    try {
+      const metaRes = await fetch(apiUrl, { headers });
+      if (metaRes.ok) {
+        const json = await metaRes.json();
+        if (json && json.url) directUrl = String(json.url).trim();
+      }
+    } catch (_) {}
+    if (!directUrl) directUrl = apiUrl;
+
+    // Step 2: Create a transcode session (mode=live) — same as the main live player
+    let finalUrl = null;
+    try {
+      const sessionRes = await fetch("/api/transcode/session", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ url: directUrl, mode: "live" })
+      });
+      if (sessionRes.ok) {
+        const sessionData = await sessionRes.json();
+        if (sessionData && sessionData.playlistUrl) {
+          finalUrl = sessionData.playlistUrl;
+        }
+      }
+    } catch (e) {
+      console.warn("[Adult Live] Transcode session failed:", e.message);
+    }
+
+    // Fallback: direct HLS.js (no proxy/stream wrapper — avoids 405 on manifests)
+    if (!finalUrl) finalUrl = directUrl;
+
+    // Step 3: Play via HLS.js (same as main live player)
+    if (window.Hls && window.Hls.isSupported()) {
       const hls = new window.Hls({
         enableWorker: true,
         maxBufferLength: 20,
@@ -1304,7 +1381,7 @@
         if (p && typeof p.catch === "function") {
           p.catch(() => {
             video.muted = true;
-            video.play().catch(e => console.warn("[Adult Live] Autoplay fallback notice:", e));
+            video.play().catch(e => console.warn("[Adult Live] Autoplay fallback:", e));
           });
         }
       });
@@ -1329,7 +1406,6 @@
         console.warn("[Adult Live] HLS notice:", data.type, data.details, data.response?.code);
         const statusCode = data.response?.code;
 
-        // HTTP 500 / 404 / 410 -> Stream unavailable on upstream server: do NOT retry, show message
         if (statusCode === 500 || statusCode === 404 || statusCode === 410) {
           console.log("[Adult Live] Channel unavailable at source (Status " + statusCode + "). Stopping retries.");
           try { hls.destroy(); } catch (_) {}
@@ -1341,12 +1417,11 @@
 
         if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR || statusCode === 503 || statusCode === 458 || statusCode === 429) {
           setTimeout(() => {
-            if (video && video.hls === hls) {
-              hls.startLoad();
-            }
+            if (video && video.hls === hls) hls.startLoad();
           }, 1500);
           return;
         }
+
         if (data.fatal) {
           switch (data.type) {
             case window.Hls.ErrorTypes.NETWORK_ERROR:
@@ -1362,12 +1437,11 @@
               break;
           }
         } else if (data.details === "bufferStalledError") {
-          if (video && !video.paused) {
-            video.currentTime = video.currentTime + 0.1;
-          }
+          if (video && !video.paused) video.currentTime = video.currentTime + 0.1;
         }
       });
-    } else {
+    } else if (video.canPlayType("application/vnd.apple.mpegurl") || video.canPlayType("application/x-mpegURL")) {
+      // Native HLS (Safari / iOS)
       video.muted = false;
       video.volume = 1;
       video.src = finalUrl;
@@ -1383,6 +1457,7 @@
   }
 
   window.veloraPlayAdultLiveChannelByIndex = playAdultLiveChannelByIndex;
+
 
   async function openAdultLivePlayerDirectly() {
     setAdultPlayerHeaderVisible(false);
@@ -1580,7 +1655,6 @@
     const errEl = document.getElementById("vel-adult-player-error");
     if (!video) return;
 
-    // Reset video volume and ensure unmuted state
     video.muted = false;
     video.volume = 1;
 
@@ -1594,6 +1668,7 @@
     const headers = { "Content-Type": "application/json" };
     if (token) headers.Authorization = `Bearer ${token}`;
 
+    // Step 1: Resolve the direct source URL from the xtream proxy
     let directSourceUrl = null;
     try {
       const metaRes = await fetch(apiUrl, { headers });
@@ -1602,55 +1677,67 @@
         if (json && json.url) directSourceUrl = String(json.url).trim();
       }
     } catch (_) {}
-
     if (!directSourceUrl) directSourceUrl = apiUrl;
     if (playToken !== activeVodPlayToken) return;
 
-    let finalUrl = null;
-    const isSafariOrIos = (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) || (/Safari/i.test(navigator.userAgent) && !/Chrome|CriOS|Chromium|Android/i.test(navigator.userAgent)));
-    const isTranscodeContainer = isSafariOrIos ? (!['mp4', 'm4v'].includes(ext) || ext === 'mkv' || ext === 'ts') : ext === 'ts';
+    // Step 2: Probe the stream to detect codec — same as main player
+    const probe = await probeAdultStream(directSourceUrl, token);
+    if (playToken !== activeVodPlayToken) return;
 
-    if (isTranscodeContainer) {
-      try {
-        const sessionRes = await fetch('/api/transcode/session', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            url: directSourceUrl,
-            mode: 'vod',
-            metadata: movie,
-            duration: movie.duration_secs || movie.duration || null
-          })
-        });
-        if (sessionRes.ok) {
-          const sessionData = await sessionRes.json();
-          if (playToken !== activeVodPlayToken) {
-            if (sessionData && sessionData.sessionId) {
-              fetch(`/api/transcode/${encodeURIComponent(sessionData.sessionId)}`, { method: "DELETE", headers, keepalive: true }).catch(() => {});
-            }
-            return;
+    // Step 3: Compute videoMode from probe — mirrors main player bp() logic
+    const videoCodec = probe?.video || null;
+    const audioCodec = probe?.audio || null;
+    const audioChannels = probe?.audioChannels || null;
+    const videoMode = computeAdultVideoMode(probe, videoCodec);
+
+    // Step 4: Always use transcode session with full codec params — same as main player
+    let finalUrl = null;
+    try {
+      const sessionRes = await fetch("/api/transcode/session", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          url: directSourceUrl,
+          mode: "vod",
+          metadata: movie,
+          duration: movie.duration_secs || movie.duration || null,
+          videoMode,
+          videoCodec,
+          audioCodec,
+          audioChannels
+        })
+      });
+      if (sessionRes.ok) {
+        const sessionData = await sessionRes.json();
+        if (playToken !== activeVodPlayToken) {
+          if (sessionData && sessionData.sessionId) {
+            fetch(`/api/transcode/${encodeURIComponent(sessionData.sessionId)}`, { method: "DELETE", headers, keepalive: true }).catch(() => {});
           }
-          if (sessionData && sessionData.playlistUrl) {
-            activeAdultTranscodeSessionId = sessionData.sessionId;
-            finalUrl = sessionData.playlistUrl;
-          }
+          return;
         }
-      } catch (e) {
-        console.warn("[Adult VOD] Transcode session failed:", e);
+        if (sessionData && sessionData.playlistUrl) {
+          activeAdultTranscodeSessionId = sessionData.sessionId;
+          finalUrl = sessionData.playlistUrl;
+        }
       }
+    } catch (e) {
+      console.warn("[Adult VOD] Transcode session failed:", e.message);
     }
 
     if (!finalUrl) {
-      finalUrl = `/api/proxy/stream?url=${encodeURIComponent(directSourceUrl)}`;
+      if (buffering) buffering.classList.add("hidden");
+      if (errEl) errEl.classList.remove("hidden");
+      return;
     }
 
+    // Step 5: Destroy any existing HLS instance
     if (video.hls && typeof video.hls.destroy === "function") {
       try { video.hls.destroy(); } catch (_) {}
       video.hls = null;
     }
 
-    const isHls = finalUrl.includes(".m3u8") || finalUrl.includes("m3u8");
-    if (isHls && window.Hls && window.Hls.isSupported()) {
+    // Step 6: Play via HLS.js — same path as main player VOD
+    if (window.Hls && window.Hls.isSupported()) {
       const hls = new window.Hls({
         enableWorker: true,
         maxBufferLength: 30,
@@ -1670,7 +1757,7 @@
         if (p && typeof p.catch === "function") {
           p.catch(() => {
             video.muted = true;
-            video.play().catch(e => console.warn("[Adult VOD] Autoplay fallback notice:", e));
+            video.play().catch(e => console.warn("[Adult VOD] Autoplay fallback:", e));
           });
         }
       });
@@ -1717,16 +1804,12 @@
           }
         }
       });
-    } else {
+    } else if (video.canPlayType("application/vnd.apple.mpegurl") || video.canPlayType("application/x-mpegURL")) {
+      // Native HLS (Safari / iOS)
       video.muted = false;
       video.volume = 1;
-      if (video.getAttribute("src") !== finalUrl) {
-        video.src = finalUrl;
-      }
-      video.onerror = () => {
-        if (buffering) buffering.classList.add("hidden");
-        if (errEl) errEl.classList.remove("hidden");
-      };
+      video.src = finalUrl;
+      video.load();
       const p = video.play();
       if (p && typeof p.catch === "function") {
         p.catch(() => {

@@ -1835,7 +1835,10 @@ router.get('/stream', async (req, res) => {
 
                 if (liveManifestCache.has(url)) {
                     const cached = liveManifestCache.get(url);
-                    if (incomingSeq !== null && typeof cached.sequence === 'number' && incomingSeq < cached.sequence) {
+                    const age = Date.now() - (cached.timestamp || 0);
+                    // Only drop minor backward drift (1 to 5 segments) within a recent 12s window.
+                    // If sequence gap is large (> 5) or older than 12s, upstream encoder has reset or started a new session.
+                    if (incomingSeq !== null && typeof cached.sequence === 'number' && incomingSeq < cached.sequence && (cached.sequence - incomingSeq) <= 5 && age < 12000) {
                         console.warn(`[Proxy] Dropped out-of-order CDN manifest for ${url.substring(0, 70)} (incoming seq ${incomingSeq} < cached ${cached.sequence})`);
                         if (onClose) req.off('close', onClose);
                         res.set('X-Velora-Manifest-Monotonic', 'PREVENT_REGRESSION');

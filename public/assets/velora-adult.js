@@ -957,6 +957,9 @@
         header.style.removeProperty("display");
       }
     }
+    if (document.body) {
+      document.body.classList.toggle("vel-adult-player-active", !visible);
+    }
   }
 
   function formatAdultPlayerClock(secs) {
@@ -1356,7 +1359,7 @@
     subHeader.innerHTML = `
       <button type="button" id="btn-adult-back-to-hub-live" class="vel-adult-back-btn" title="Retour aux choix">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-        <span>← Retour</span>
+        <span>Retour</span>
       </button>
       <div class="vel-adult-movie-search-wrap" style="flex:1;max-width:480px;">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -1825,7 +1828,7 @@
     subHeader.innerHTML = `
       <button type="button" id="btn-adult-back-to-hub" class="vel-adult-back-btn" title="Retour aux choix">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-        <span>← Retour</span>
+        <span>Retour</span>
       </button>
       <div class="vel-adult-movie-search-wrap" style="flex:1;max-width:480px;">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -2132,12 +2135,31 @@
     return true;
   }
 
+  function resetAdultScrollPosition() {
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      if (document.documentElement) document.documentElement.scrollTop = 0;
+      if (document.body) document.body.scrollTop = 0;
+      const portal = document.getElementById("adult-view");
+      if (portal) portal.scrollTop = 0;
+      const container = document.getElementById("vel-adult-packages-container");
+      if (container) container.scrollTop = 0;
+      const mainEl = document.querySelector(".main--velora");
+      if (mainEl) mainEl.scrollTop = 0;
+      const dashEl = document.querySelector(".vel-dashboard");
+      if (dashEl) dashEl.scrollTop = 0;
+    } catch (_) {}
+  }
+
   async function renderAdultPortal() {
     setAdultPlayerHeaderVisible(true);
+    resetAdultScrollPosition();
 
     const portal = document.getElementById("adult-view");
     const container = document.getElementById("vel-adult-packages-container");
     if (!portal || !container) return;
+
+    resetAdultScrollPosition();
 
     portal.classList.remove("hidden");
     portal.setAttribute("aria-hidden", "false");
@@ -2145,28 +2167,32 @@
 
     container.replaceChildren();
     container.innerHTML = `
-      <div class="vel-adult-portal-hub" style="display:flex;flex-wrap:wrap;gap:24px;justify-content:center;align-items:center;padding:40px 20px;max-width:860px;margin:0 auto;">
+      <div class="vel-adult-portal-hub">
         
-        <div id="vel-adult-hub-live" class="vel-adult-hub-card" style="flex:1 1 320px;max-width:380px;background:linear-gradient(145deg,rgba(16,185,129,0.12),rgba(15,23,42,0.6));border:1px solid rgba(16,185,129,0.3);border-radius:20px;padding:32px 24px;text-align:center;cursor:pointer;transition:all 0.25s cubic-bezier(0.16,1,0.3,1);box-shadow:0 12px 36px rgba(0,0,0,0.4);">
-          <div style="width:72px;height:72px;border-radius:20px;background:rgba(16,185,129,0.2);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;border:1px solid rgba(16,185,129,0.4);color:#10b981;">
-            <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
+        <div id="vel-adult-hub-live" class="vel-adult-hub-card vel-adult-hub-card--live">
+          <div class="vel-adult-hub-card__icon">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
           </div>
-          <h2 style="font-size:1.35rem;font-weight:800;color:#fff;margin:0 0 8px;">TV en Direct</h2>
-          <p style="font-size:0.9rem;color:#94a3b8;margin:0 0 24px;line-height:1.5;">Accéder aux chaînes de télévision adultes en direct.</p>
-          <button type="button" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-weight:800;font-size:0.95rem;cursor:pointer;">
-            ▶ Lancer la TV en Direct
-          </button>
+          <div class="vel-adult-hub-card__body">
+            <h2 class="vel-adult-hub-card__title">TV en Direct</h2>
+            <p class="vel-adult-hub-card__desc">Accéder aux chaînes de télévision adultes en direct.</p>
+            <button type="button" class="vel-adult-hub-card__btn">
+              ▶ Lancer la TV en Direct
+            </button>
+          </div>
         </div>
 
-        <div id="vel-adult-hub-vod" class="vel-adult-hub-card" style="flex:1 1 320px;max-width:380px;background:linear-gradient(145deg,rgba(225,29,72,0.14),rgba(15,23,42,0.6));border:1px solid rgba(225,29,72,0.35);border-radius:20px;padding:32px 24px;text-align:center;cursor:pointer;transition:all 0.25s cubic-bezier(0.16,1,0.3,1);box-shadow:0 12px 36px rgba(0,0,0,0.4);">
-          <div style="width:72px;height:72px;border-radius:20px;background:rgba(225,29,72,0.2);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;border:1px solid rgba(244,63,94,0.4);color:#f43f5e;">
-            <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+        <div id="vel-adult-hub-vod" class="vel-adult-hub-card vel-adult-hub-card--vod">
+          <div class="vel-adult-hub-card__icon">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
           </div>
-          <h2 style="font-size:1.35rem;font-weight:800;color:#fff;margin:0 0 8px;">Films & VOD</h2>
-          <p style="font-size:0.9rem;color:#94a3b8;margin:0 0 24px;line-height:1.5;">Accéder au lecteur et au catalogue des films adultes.</p>
-          <button type="button" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:linear-gradient(135deg,#e11d48,#be123c);color:#fff;font-weight:800;font-size:0.95rem;cursor:pointer;">
-            ▶ Lancer les Films (VOD)
-          </button>
+          <div class="vel-adult-hub-card__body">
+            <h2 class="vel-adult-hub-card__title">Films & VOD</h2>
+            <p class="vel-adult-hub-card__desc">Accéder au lecteur et au catalogue des films adultes.</p>
+            <button type="button" class="vel-adult-hub-card__btn">
+              ▶ Lancer les Films (VOD)
+            </button>
+          </div>
         </div>
 
       </div>
@@ -2174,15 +2200,11 @@
 
     const liveCard = document.getElementById("vel-adult-hub-live");
     if (liveCard) {
-      liveCard.onmouseenter = () => { liveCard.style.transform = "translateY(-4px)"; liveCard.style.borderColor = "#10b981"; };
-      liveCard.onmouseleave = () => { liveCard.style.transform = "none"; liveCard.style.borderColor = "rgba(16,185,129,0.3)"; };
       liveCard.onclick = () => openAdultLivePlayerDirectly();
     }
 
     const vodCard = document.getElementById("vel-adult-hub-vod");
     if (vodCard) {
-      vodCard.onmouseenter = () => { vodCard.style.transform = "translateY(-4px)"; vodCard.style.borderColor = "#f43f5e"; };
-      vodCard.onmouseleave = () => { vodCard.style.transform = "none"; vodCard.style.borderColor = "rgba(225,29,72,0.35)"; };
       vodCard.onclick = () => openAdultMoviesPlayerDirectly();
     }
 
@@ -2884,9 +2906,9 @@
     isAdultOpen = true;
     currentAdultView = null; // Unselected by default
     document.body.classList.add("vel-adult-active");
+    document.body.classList.remove("vel-adult-player-active", "vel-home-empty-active", "vel-home-choice-picked");
     document.body.dataset.velActiveTab = "adult";
     document.body.dataset.velTopLevel = "adult";
-    document.body.classList.remove("vel-home-empty-active", "vel-home-choice-picked");
 
     // Clear active highlight from Accueil and other bottom tabs
     if (typeof window.veloraSetBottomNavActive === "function") {
@@ -2953,6 +2975,7 @@
     }
     stopAllActiveStreams();
     setAdultPlayerHeaderVisible(true);
+    resetAdultScrollPosition();
     document.body.classList.remove("vel-adult-active", "vel-adult-player-active");
     delete document.body.dataset.veloraReturnAdult;
 

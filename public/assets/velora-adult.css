@@ -125,10 +125,176 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 16px;
-  padding-bottom: 20px;
+  gap: 12px;
+  padding-bottom: 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 680px) {
+  .vel-adult-header {
+    gap: 10px;
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Adult Portal Hub (TV en Direct & Films VOD Choice Cards)
+   -------------------------------------------------------------------------- */
+.vel-adult-portal-hub {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 6px 4px 16px;
+  box-sizing: border-box;
+}
+
+@media (min-width: 681px) {
+  .vel-adult-portal-hub {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(280px, 380px));
+    gap: 24px;
+    justify-content: center;
+    padding: 24px 16px;
+  }
+}
+
+.vel-adult-hub-card {
+  position: relative;
+  border-radius: 18px;
+  padding: 16px 18px;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  text-align: left;
+  gap: 14px;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.vel-adult-hub-card--live {
+  background: linear-gradient(145deg, rgba(168, 85, 247, 0.16), rgba(15, 23, 42, 0.7));
+  border: 1px solid rgba(168, 85, 247, 0.35);
+}
+
+.vel-adult-hub-card--live:hover {
+  transform: translateY(-3px);
+  border-color: #a855f7;
+  box-shadow: 0 12px 32px rgba(168, 85, 247, 0.28);
+}
+
+.vel-adult-hub-card--vod {
+  background: linear-gradient(145deg, rgba(225, 29, 72, 0.18), rgba(15, 23, 42, 0.7));
+  border: 1px solid rgba(225, 29, 72, 0.38);
+}
+
+.vel-adult-hub-card--vod:hover {
+  transform: translateY(-3px);
+  border-color: #f43f5e;
+  box-shadow: 0 12px 32px rgba(225, 29, 72, 0.3);
+}
+
+.vel-adult-hub-card__icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.vel-adult-hub-card--live .vel-adult-hub-card__icon {
+  background: rgba(168, 85, 247, 0.22);
+  border: 1px solid rgba(168, 85, 247, 0.5);
+  color: #c084fc;
+}
+
+.vel-adult-hub-card--vod .vel-adult-hub-card__icon {
+  background: rgba(225, 29, 72, 0.22);
+  border: 1px solid rgba(244, 63, 94, 0.5);
+  color: #f43f5e;
+}
+
+.vel-adult-hub-card__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vel-adult-hub-card__title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #fff;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.vel-adult-hub-card__desc {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin: 0 0 8px 0;
+  line-height: 1.35;
+}
+
+.vel-adult-hub-card__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: none;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.85rem;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: opacity 0.18s;
+}
+
+.vel-adult-hub-card--live .vel-adult-hub-card__btn {
+  background: linear-gradient(135deg, #9333ea, #7e22ce);
+}
+
+.vel-adult-hub-card--vod .vel-adult-hub-card__btn {
+  background: linear-gradient(135deg, #e11d48, #be123c);
+}
+
+@media (min-width: 681px) {
+  .vel-adult-hub-card {
+    flex-direction: column;
+    text-align: center;
+    padding: 30px 24px;
+    gap: 0;
+  }
+  .vel-adult-hub-card__icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 16px;
+  }
+  .vel-adult-hub-card__title {
+    font-size: 1.3rem;
+    margin-bottom: 6px;
+  }
+  .vel-adult-hub-card__desc {
+    font-size: 0.88rem;
+    margin-bottom: 20px;
+  }
+  .vel-adult-hub-card__btn {
+    width: 100%;
+    padding: 12px 20px;
+    font-size: 0.92rem;
+    align-self: stretch;
+  }
 }
 
 .vel-adult-header__left {
@@ -1630,32 +1796,192 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
    Mobile Full Horizontal Expansion (< 768px): Zero Wasted Side Margins
    -------------------------------------------------------------------------- */
 @media (max-width: 767.98px) {
-  /* Landing portal: expand full width with minimal horizontal padding */
-  .vel-adult-portal {
-    padding: 10px 8px calc(var(--vel-bottom-nav-height, 76px) + 20px) 8px !important;
+  /* When Adult Hub is open (no player / list active), fit screen seamlessly */
+  body.vel-adult-active:not(.vel-adult-player-active),
+  body.vel-adult-active:not(.vel-adult-player-active) html {
+    overflow: hidden !important;
+    height: 100% !important;
+    max-height: 100% !important;
+  }
+
+  body.vel-adult-active:not(.vel-adult-player-active) .main--velora {
+    overflow: hidden !important;
+    height: calc(100dvh - var(--vel-bottom-nav-height, 70px)) !important;
+    max-height: calc(100dvh - var(--vel-bottom-nav-height, 70px)) !important;
+    min-height: 0 !important;
+  }
+
+  body.vel-adult-active:not(.vel-adult-player-active) .vel-adult-portal {
+    height: calc(100dvh - var(--vel-bottom-nav-height, 70px)) !important;
+    max-height: calc(100dvh - var(--vel-bottom-nav-height, 70px)) !important;
+    min-height: 0 !important;
+    padding: 10px 14px 14px 14px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+  }
+
+  body.vel-adult-active:not(.vel-adult-player-active) #vel-adult-packages-container {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    min-height: 0 !important;
+    width: 100% !important;
+  }
+
+  .vel-adult-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+    padding-bottom: 8px !important;
+    margin-bottom: 8px !important;
     width: 100% !important;
     box-sizing: border-box !important;
   }
 
-  .vel-adult-header {
-    gap: 10px !important;
-    padding-bottom: 12px !important;
-    margin-bottom: 14px !important;
+  .vel-adult-header__left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+    flex: 1 !important;
+  }
+
+  .vel-adult-header .vel-adult-back-btn {
+    padding: 6px 10px !important;
+    font-size: 0.78rem !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+  }
+
+  .vel-adult-header .vel-adult-back-btn svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .vel-adult-brand {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    min-width: 0 !important;
+  }
+
+  .vel-adult-brand img {
+    width: 24px !important;
+    height: 24px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .vel-adult-brand__text {
+    min-width: 0 !important;
+  }
+
+  .vel-adult-brand__text h1 {
+    font-size: 0.95rem !important;
+    font-weight: 800 !important;
+    white-space: nowrap !important;
+    margin: 0 !important;
   }
 
   .vel-adult-actions {
-    max-width: 100% !important;
-    width: 100% !important;
-    gap: 8px !important;
-    margin: 4px 0 8px 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    flex-shrink: 0 !important;
   }
 
-  .vel-adult-action-btn {
-    min-width: 0 !important;
+  #vel-adult-pin-settings-btn {
+    padding: 6px 10px !important;
+    font-size: 0.78rem !important;
+    white-space: nowrap !important;
+  }
+
+  .vel-adult-portal-hub {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 14px !important;
     width: 100% !important;
-    flex: 1 1 100% !important;
-    padding: 10px 14px !important;
-    border-radius: 12px !important;
+    max-width: 440px !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .vel-adult-hub-card {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    padding: 16px 18px !important;
+    border-radius: 18px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+    cursor: pointer !important;
+  }
+
+  .vel-adult-hub-card__icon {
+    width: 52px !important;
+    height: 52px !important;
+    border-radius: 14px !important;
+    margin: 0 auto 10px auto !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+  }
+
+  .vel-adult-hub-card__icon svg {
+    width: 26px !important;
+    height: 26px !important;
+  }
+
+  .vel-adult-hub-card__body {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 0 !important;
+  }
+
+  .vel-adult-hub-card__title {
+    font-size: 1.2rem !important;
+    font-weight: 800 !important;
+    color: #fff !important;
+    margin: 0 0 4px 0 !important;
+    line-height: 1.25 !important;
+  }
+
+  .vel-adult-hub-card__desc {
+    font-size: 0.78rem !important;
+    color: #94a3b8 !important;
+    margin: 0 auto 12px auto !important;
+    line-height: 1.35 !important;
+    max-width: 300px !important;
+  }
+
+  .vel-adult-hub-card__btn {
+    width: 100% !important;
+    padding: 11px 18px !important;
+    font-size: 0.88rem !important;
+    font-weight: 800 !important;
+    border-radius: 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    box-sizing: border-box !important;
+    align-self: stretch !important;
   }
 
   .vel-adult-packages-grid {

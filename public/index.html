@@ -1584,7 +1584,7 @@
   <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-54"></script>
   <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-54"></script>
   <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-54"></script>
-  <link rel="stylesheet" href="/assets/velora-favorites.css?v=instant-nav-v20260821-54" />
+  <link rel="stylesheet" href="/assets/velora-favorites.css?v=white-logo-v20260911-1" />
   <script defer src="/assets/velora-favorites.js?v=20260902-scroll-top-v2"></script>
   <script defer src="/assets/velora-watch-history.js?v=20260909-no-bottom-text-v1"></script>
   <script defer src="/assets/velora-catalog-scroll-memory.js?v=20260902-scroll-memory-v6"></script>
@@ -2114,11 +2114,14 @@
       display: none !important;
     }
 
-    /* Static TV Live background with identical purple/cyan nebula grid - 0% CPU/GPU overhead */
+    /* Static TV Live & Accueil background with purple/cyan nebula grid - 0% CPU/GPU overhead */
     body[data-vel-active-tab="live"] .main--velora,
     body[data-vel-top-level="live"] .main--velora,
     .main--velora.main--velora-live-package,
-    body:not(.vel-home-empty-active):not([data-vel-active-tab="movies"]):not([data-vel-active-tab="series"]) .main--velora {
+    body.vel-home-empty-active .main--velora,
+    body[data-vel-active-tab="home"] .main--velora,
+    body[data-vel-top-level="home"] .main--velora,
+    body:not([data-vel-active-tab="movies"]):not([data-vel-active-tab="series"]) .main--velora {
       background-color: #060511 !important;
       background-image:
         radial-gradient(ellipse 90% 50% at 50% -10%, rgba(56, 189, 248, 0.18), transparent 70%),
@@ -2128,6 +2131,7 @@
         linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px) !important;
       background-size: auto, auto, auto, 44px 44px, 44px 44px !important;
       background-repeat: no-repeat, no-repeat, no-repeat, repeat, repeat !important;
+      background-attachment: fixed !important;
     }
 
     body[data-vel-active-tab="movies"] .main--velora,

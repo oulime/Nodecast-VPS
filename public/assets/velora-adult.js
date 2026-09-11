@@ -24,6 +24,36 @@
     return `${kind}:${sourceId}:${categoryId}`;
   }
 
+  function decodeGlobalStreamId(rawId) {
+    const str = String(rawId || "").trim();
+    if (!str) return null;
+    const candidates = [str];
+    try {
+      const b64 = str.replace(/-/g, "+").replace(/_/g, "/");
+      const pad = b64.padEnd(b64.length + (4 - b64.length % 4) % 4, "=");
+      const decoded = atob(pad);
+      if (decoded && decoded.includes(":")) {
+        candidates.push(decoded);
+      }
+    } catch (_) {}
+    for (const c of candidates) {
+      const idx = c.indexOf(":");
+      if (idx > 0) {
+        const sourceId = c.slice(0, idx).trim();
+        const itemId = c.slice(idx + 1).trim();
+        if (sourceId && itemId) return { sourceId, itemId };
+      }
+    }
+    return null;
+  }
+
+  function cleanStreamId(rawId) {
+    if (!rawId) return "";
+    const str = String(rawId).trim();
+    const decoded = decodeGlobalStreamId(str);
+    return decoded ? decoded.itemId : str;
+  }
+
   function cleanChannelTitle(name) {
     let clean = String(name || "").trim();
     for (let pass = 0; pass < 4; pass++) {
@@ -843,7 +873,7 @@
           source_id: String(pkg.source_id),
           source_name: pkg.source_name || "",
           package_name: pkg.name || "",
-          stream_id: String(ch.stream_id || ch.id || "")
+          stream_id: cleanStreamId(ch.raw_stream_id || ch.stream_id || ch.id || "")
         })) : [];
         adultLiveChannelCache.set(key, list);
         try { sessionStorage.setItem(sessionKey, JSON.stringify(list)); } catch (_) {}
@@ -1656,7 +1686,7 @@
           source_id: String(pkg.source_id),
           source_name: pkg.source_name || "",
           package_name: pkg.name || "",
-          stream_id: String(m.stream_id || m.id || ""),
+          stream_id: cleanStreamId(m.raw_stream_id || m.stream_id || m.id || ""),
           name: cleanChannelTitle(m.name || m.title || "Film Adulte"),
           stream_icon: m.stream_icon || m.cover || "",
           container_extension: m.container_extension || "mp4",
@@ -1776,23 +1806,6 @@
         });
       }
     }
-
-    // Step 3: Record playback to history
-    try {
-      fetch("/api/history", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          item_id: String(movie.stream_id),
-          item_type: "movie",
-          title: movie.name || "Film Adulte",
-          source_id: String(movie.source_id || ""),
-          progress_percent: 0,
-          current_time: 0,
-          duration: Number(movie.duration_secs || movie.duration) || 0
-        })
-      }).catch(() => {});
-    } catch (_) {}
   }
 
   window.veloraPlayAdultMovieByIndex = playAdultMovieByIndex;

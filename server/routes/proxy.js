@@ -841,12 +841,19 @@ router.get('/xtream/:sourceId/vod_info', async (req, res) => {
 // Returns the direct stream URL for a given stream ID
 router.get('/xtream/:sourceId/stream/:streamId/:type', async (req, res) => {
     try {
-        const source = await resolvePlayableSource(req.params.sourceId);
+        let sourceId = req.params.sourceId;
+        let streamId = req.params.streamId;
+        const decoded = decodeGlobalId(streamId);
+        if (decoded) {
+            sourceId = decoded.sourceId || sourceId;
+            streamId = decoded.itemId;
+        }
+
+        const source = await resolvePlayableSource(sourceId);
         if (!source || source.type !== 'xtream' || !source.enabled) {
             return res.status(404).json({ error: 'Xtream source not found or disabled' });
         }
 
-        const streamId = req.params.streamId;
         const type = req.params.type || 'live';
         const container = req.query.container || 'm3u8';
 
@@ -860,7 +867,7 @@ router.get('/xtream/:sourceId/stream/:streamId/:type', async (req, res) => {
 
         if (type === 'live') {
             streamUrl = `${baseUrl}/live/${source.username}/${source.password}/${streamId}.${container}`;
-        } else if (type === 'movie') {
+        } else if (type === 'movie' || type === 'vod') {
             streamUrl = `${baseUrl}/movie/${source.username}/${source.password}/${streamId}.${container}`;
         } else if (type === 'series') {
             streamUrl = `${baseUrl}/series/${source.username}/${source.password}/${streamId}.${container}`;
@@ -1089,13 +1096,21 @@ router.get('/xtream/:sourceId/:action', async (req, res) => {
  */
 router.get('/xtream/:sourceId/stream/:streamId/:type?', async (req, res) => {
     try {
-        const source = await resolvePlayableSource(req.params.sourceId);
+        let sourceId = req.params.sourceId;
+        let streamId = req.params.streamId;
+        const decoded = decodeGlobalId(streamId);
+        if (decoded) {
+            sourceId = decoded.sourceId || sourceId;
+            streamId = decoded.itemId;
+        }
+
+        const source = await resolvePlayableSource(sourceId);
         if (!source || source.type !== 'xtream' || !source.enabled) {
             return res.status(404).json({ error: 'Xtream source not found or disabled' });
         }
 
         const api = xtreamApi.createFromSource(source);
-        const { streamId, type = 'live' } = req.params;
+        const { type = 'live' } = req.params;
         const { container = 'm3u8' } = req.query;
 
         const url = api.buildStreamUrl(streamId, type, container);

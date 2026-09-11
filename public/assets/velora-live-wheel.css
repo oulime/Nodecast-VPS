@@ -552,7 +552,7 @@ body[data-vel-top-level="live"] #content-view {
 }
 
 /* =========================================================
-   Subtle Minimal Brightness Tile for Channel Logos
+   Solid White Tile for Channel Logos
    ========================================================= */
 .main--velora .media-item__thumb,
 .media-item__thumb {
@@ -561,13 +561,15 @@ body[data-vel-top-level="live"] #content-view {
   height: 48px;
   flex-shrink: 0;
   border-radius: 12px !important;
-  background: #080612 !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 2px 6px rgba(0, 0, 0, 0.45) !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25) !important;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  padding: 4px !important;
+  box-sizing: border-box;
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
@@ -576,7 +578,7 @@ body[data-vel-top-level="live"] #content-view {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 5px;
+  padding: 0 !important;
   box-sizing: border-box;
   filter: none !important;
   transition: transform 0.2s ease;
@@ -587,9 +589,9 @@ body[data-vel-top-level="live"] #content-view {
 .vel-media-item-row.vel-media-item-row--active .media-item__thumb,
 .media-item__main.selected .media-item__thumb,
 .vel-media-item-row:focus-within .media-item__thumb {
-  border-color: rgba(192, 132, 252, 0.5) !important;
-  background: rgba(255, 255, 255, 0.16) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 0 10px rgba(168, 85, 247, 0.3) !important;
+  border-color: rgba(192, 132, 252, 0.9) !important;
+  background: #ffffff !important;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.4), 0 2px 6px rgba(0, 0, 0, 0.25) !important;
   transform: scale(1.03);
 }
 
@@ -599,12 +601,22 @@ body[data-vel-top-level="live"] #content-view {
   filter: none !important;
 }
 
+/* Empty fallback */
+.media-item__thumb--empty,
+.media-item__thumb:empty {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
 /* Exclude full-cover VOD posters */
 .media-item__thumb--cover,
 .media-item__thumb.is-cover {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
+  padding: 0 !important;
 }
 
 .media-item__thumb--cover img,
@@ -613,34 +625,6 @@ body[data-vel-top-level="live"] #content-view {
   padding: 0 !important;
   object-fit: cover !important;
   filter: none !important;
-}
-
-/* =========================================================
-   Solid White Tile for Channel Logos in Dark Mode (High Specificity)
-   ========================================================= */
-.main--velora .media-item__thumb.vel-dark-logo-mode,
-.main--velora .media-item__thumb[class*="vel-dark-logo-mode"],
-.media-item__thumb.vel-dark-logo-mode,
-.media-item__thumb[class*="vel-dark-logo-mode"],
-.vel-image-loaded-host.vel-dark-logo-mode {
-  background: #ffffff !important;
-  border-color: rgba(255, 255, 255, 0.92) !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
-}
-
-.main--velora .media-item__thumb.vel-dark-logo-mode img,
-.media-item__thumb.vel-dark-logo-mode img,
-.vel-image-loaded-host.vel-dark-logo-mode img {
-  filter: none !important;
-}
-
-.main--velora .vel-media-item-row:hover .media-item__thumb.vel-dark-logo-mode,
-.main--velora .vel-media-item-row.vel-media-item-row--active .media-item__thumb.vel-dark-logo-mode,
-.main--velora .media-item__main.selected .media-item__thumb.vel-dark-logo-mode,
-.main--velora .vel-media-item-row:focus-within .media-item__thumb.vel-dark-logo-mode {
-  background: #ffffff !important;
-  border-color: rgba(192, 132, 252, 0.9) !important;
-  box-shadow: 0 0 12px rgba(168, 85, 247, 0.4), 0 2px 8px rgba(0, 0, 0, 0.35) !important;
 }
 
 

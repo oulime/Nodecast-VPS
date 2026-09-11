@@ -574,18 +574,11 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Shared probe + videoMode + robust HLS streaming engine helpers
+  // Direct streaming & robust HLS streaming engine helpers
   // ---------------------------------------------------------------------------
-  let activeAdultTranscodeSessionId = null;
   let currentAdultVodSourceUrl = null;
   let currentAdultVodDuration = null;
   let currentAdultVodStartAt = 0;
-  let isAdultVodSeekableTranscode = false;
-  let isAdultVodSeekingInFlight = false;
-  let currentAdultVideoMode = "copy";
-  let currentAdultVideoCodec = null;
-  let currentAdultAudioCodec = null;
-  let currentAdultAudioChannels = null;
   let currentAdultMovieMetadata = null;
 
   let adultNetworkRetryCount = 0;
@@ -645,26 +638,9 @@
     };
   }
 
-  async function closeAdultTranscodeSession() {
-    if (!activeAdultTranscodeSessionId) return;
-    const sid = activeAdultTranscodeSessionId;
-    activeAdultTranscodeSessionId = null;
-    try {
-      const token = localStorage.getItem("authToken");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      fetch(`/api/transcode/${encodeURIComponent(sid)}`, {
-        method: "DELETE",
-        headers,
-        keepalive: true
-      }).catch(() => {});
-    } catch (_) {}
-  }
-  window.veloraCloseActiveAdultTranscodeSession = closeAdultTranscodeSession;
-
-  async function seekAdultVod(targetSeconds) {
+  function seekAdultVod(targetSeconds) {
     const video = document.getElementById("vel-adult-video");
     if (!video) return;
-    if (isAdultVodSeekingInFlight) return;
 
     const totalDuration = (Number.isFinite(currentAdultVodDuration) && currentAdultVodDuration > 0)
       ? currentAdultVodDuration
@@ -672,55 +648,14 @@
 
     const clampedTarget = Math.max(0, Math.min(targetSeconds, totalDuration || targetSeconds));
 
-    if (activeAdultTranscodeSessionId && isAdultVodSeekableTranscode && currentAdultVodSourceUrl) {
-      isAdultVodSeekingInFlight = true;
-      try {
-        const buffering = document.getElementById("vel-adult-player-buffering");
-        if (buffering) buffering.classList.remove("hidden");
-        video.pause();
-
-        await closeAdultTranscodeSession();
-
-        const token = localStorage.getItem("authToken");
-        const headers = { "Content-Type": "application/json" };
-        if (token) headers.Authorization = `Bearer ${token}`;
-
-        const sessionRes = await fetch("/api/transcode/session", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            url: currentAdultVodSourceUrl,
-            mode: "vod",
-            startAt: clampedTarget,
-            seekOffset: clampedTarget,
-            metadata: currentAdultMovieMetadata,
-            duration: totalDuration || null,
-            videoMode: currentAdultVideoMode,
-            videoCodec: currentAdultVideoCodec,
-            audioCodec: currentAdultAudioCodec,
-            audioChannels: currentAdultAudioChannels
-          })
-        });
-
-        if (sessionRes.ok) {
-          const sessionData = await sessionRes.json();
-          if (sessionData && sessionData.playlistUrl) {
-            activeAdultTranscodeSessionId = sessionData.sessionId;
-            currentAdultVodStartAt = Number(sessionData.startAt ?? sessionData.seekOffset ?? clampedTarget) || 0;
-            currentAdultVodDuration = sessionData.durationSeconds ?? currentAdultVodDuration;
-            isAdultVodSeekableTranscode = sessionData.seekable === true;
-            playAdultHlsStream(sessionData.playlistUrl, false);
-          }
-        }
-      } catch (e) {
-        console.warn("[Adult VOD] Seek session restart failed:", e.message);
-      } finally {
-        isAdultVodSeekingInFlight = false;
-      }
+    if (video.hls) {
+      video.currentTime = clampedTarget;
+    } else if (Number.isFinite(video.duration) && video.duration > 0) {
+      video.currentTime = clampedTarget;
     } else {
-      if (Number.isFinite(video.duration) && video.duration > 0) {
+      try {
         video.currentTime = clampedTarget;
-      }
+      } catch (_) {}
     }
   }
 
@@ -875,48 +810,6 @@
       video.src = url;
       video.play().catch(() => {});
     }
-  }
-
-  let _adultSettingsUa = null;
-  async function getAdultUserAgent(token) {
-    if (_adultSettingsUa) return _adultSettingsUa;
-    try {
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers.Authorization = `Bearer ${token}`;
-      const res = await fetch("/api/settings", { headers });
-      if (res.ok) {
-        const s = await res.json();
-        const ua = typeof s.userAgentPreset === "string" ? s.userAgentPreset.trim().toLowerCase() : "vlc";
-        _adultSettingsUa = ua || "vlc";
-      }
-    } catch (_) {}
-    return _adultSettingsUa || "vlc";
-  }
-
-  async function probeAdultStream(url, token) {
-    try {
-      const ua = await getAdultUserAgent(token);
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers.Authorization = `Bearer ${token}`;
-      const probeUrl = `/api/probe?url=${encodeURIComponent(url)}&ua=${encodeURIComponent(ua)}`;
-      const res = await fetch(probeUrl, { headers });
-      if (res.ok) {
-        const json = await res.json();
-        return json && typeof json === "object" ? json : null;
-      }
-    } catch (e) {
-      console.warn("[Adult] Probe failed:", e.message);
-    }
-    return null;
-  }
-
-  function computeAdultVideoMode(probe, videoCodec) {
-    const codecStr = [videoCodec, probe?.video, probe?.videoCodecTag, probe?.videoCodecLongName]
-      .filter(Boolean).join(" ").toLowerCase();
-    const isHevc = /hevc|h265|h\.265|hev1|hvc1/.test(codecStr);
-    if (isHevc) return "encode";
-    const isH264 = /h264|avc|avc1/.test(codecStr);
-    return isH264 ? "copy" : "encode";
   }
 
   async function fetchLiveChannelsForPackage(pkg) {
@@ -1590,8 +1483,6 @@
     const list = window._veloraAdultLiveChannels;
     if (!list || index < 0 || index >= list.length) return;
 
-    await closeAdultTranscodeSession();
-
     window._veloraAdultLiveCurrentIndex = index;
     const channel = list[index];
 
@@ -1623,7 +1514,7 @@
     const headers = { "Content-Type": "application/json" };
     if (token) headers.Authorization = `Bearer ${token}`;
 
-    // Step 1: Resolve the direct stream URL from the xtream proxy
+    // Step 1: Resolve the stream URL from the xtream proxy
     const apiUrl = `/api/proxy/xtream/${encodeURIComponent(channel.source_id)}/stream/${encodeURIComponent(channel.stream_id)}/live`;
     let directUrl = null;
     try {
@@ -1635,44 +1526,16 @@
     } catch (_) {}
     if (!directUrl) directUrl = apiUrl;
 
-    adultCurrentDirectUrl = directUrl;
-    adultIsUsingProxy = false;
-
-    // Step 2: Probe the stream for codecs
-    const probe = await probeAdultStream(directUrl, token);
-
-    let finalUrl = directUrl;
-    if (probe && (probe.needsTranscode || computeAdultVideoMode(probe, probe.video) === "encode")) {
-      const videoMode = computeAdultVideoMode(probe, probe.video);
-      try {
-        const sessionRes = await fetch("/api/transcode/session", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            url: directUrl,
-            mode: "live",
-            videoMode,
-            videoCodec: probe.video,
-            audioCodec: probe.audio,
-            audioChannels: probe.audioChannels
-          })
-        });
-        if (sessionRes.ok) {
-          const sessionData = await sessionRes.json();
-          if (sessionData && sessionData.playlistUrl) {
-            activeAdultTranscodeSessionId = sessionData.sessionId;
-            finalUrl = sessionData.playlistUrl;
-          }
-        }
-      } catch (e) {
-        console.warn("[Adult Live] Transcode session failed:", e.message);
-      }
-    } else if (probe && probe.needsRemux) {
-      finalUrl = `/api/remux?url=${encodeURIComponent(directUrl)}`;
+    let finalPlayUrl = directUrl;
+    if (!directUrl.startsWith("/api/proxy/stream")) {
+      finalPlayUrl = `/api/proxy/stream?url=${encodeURIComponent(directUrl)}`;
     }
 
-    // Step 3: Play via unified HLS.js engine with 90s/250MB buffer
-    playAdultHlsStream(finalUrl, true);
+    adultCurrentDirectUrl = directUrl;
+    adultIsUsingProxy = true;
+
+    // Step 2: Play directly via unified rock-solid HLS.js engine
+    playAdultHlsStream(finalPlayUrl, true);
   }
 
   window.veloraPlayAdultLiveChannelByIndex = playAdultLiveChannelByIndex;
@@ -1831,15 +1694,12 @@
     const list = window._veloraAdultVodMovies;
     if (!list || index < 0 || index >= list.length) return;
 
-    await closeAdultTranscodeSession();
-
     const playToken = ++activeVodPlayToken;
     window._veloraAdultVodCurrentIndex = index;
     const movie = list[index];
     currentAdultMovieMetadata = movie;
     currentAdultVodStartAt = 0;
     currentAdultVodDuration = Number(movie.duration_secs || movie.duration) || null;
-    isAdultVodSeekableTranscode = false;
 
     const rows = document.querySelectorAll(".vel-adult-movie-row");
     rows.forEach((row, idx) => {
@@ -1888,67 +1748,51 @@
 
     currentAdultVodSourceUrl = directSourceUrl;
     adultCurrentDirectUrl = directSourceUrl;
-    adultIsUsingProxy = false;
+    adultIsUsingProxy = true;
 
-    // Step 2: Probe the stream to detect codec
-    const probe = await probeAdultStream(directSourceUrl, token);
-    if (playToken !== activeVodPlayToken) return;
+    let finalPlayUrl = directSourceUrl;
+    if (!directSourceUrl.startsWith("/api/proxy/stream")) {
+      finalPlayUrl = `/api/proxy/stream?url=${encodeURIComponent(directSourceUrl)}`;
+    }
 
-    const videoCodec = probe?.video || null;
-    const audioCodec = probe?.audio || null;
-    const audioChannels = probe?.audioChannels || null;
-    const videoMode = computeAdultVideoMode(probe, videoCodec);
+    // Step 2: Direct playback for VOD (matching normal Movies/VOD in VeloraVIP)
+    const isM3u8 = /\.m3u8(\?|#|&|$)/i.test(directSourceUrl) || /[?&]container=m3u8(?:\b|$)/i.test(directSourceUrl);
 
-    currentAdultVideoMode = videoMode;
-    currentAdultVideoCodec = videoCodec;
-    currentAdultAudioCodec = audioCodec;
-    currentAdultAudioChannels = audioChannels;
+    if (video.hls && typeof video.hls.destroy === "function") {
+      try { video.hls.destroy(); } catch (_) {}
+      video.hls = null;
+    }
 
-    // Step 3: Always use transcode session for VOD stability & seeking
-    let finalUrl = null;
+    if (isM3u8) {
+      playAdultHlsStream(finalPlayUrl, false);
+    } else {
+      video.src = finalPlayUrl;
+      video.load();
+      const p = video.play();
+      if (p && typeof p.catch === "function") {
+        p.catch(() => {
+          video.muted = true;
+          video.play().catch(e => console.warn("[Adult VOD] Autoplay fallback notice:", e));
+        });
+      }
+    }
+
+    // Step 3: Record playback to history
     try {
-      const sessionRes = await fetch("/api/transcode/session", {
+      fetch("/api/history", {
         method: "POST",
         headers,
         body: JSON.stringify({
-          url: directSourceUrl,
-          mode: "vod",
-          startAt: 0,
-          seekOffset: 0,
-          metadata: movie,
-          duration: movie.duration_secs || movie.duration || null,
-          videoMode,
-          videoCodec,
-          audioCodec,
-          audioChannels
+          item_id: String(movie.stream_id),
+          item_type: "movie",
+          title: movie.name || "Film Adulte",
+          source_id: String(movie.source_id || ""),
+          progress_percent: 0,
+          current_time: 0,
+          duration: Number(movie.duration_secs || movie.duration) || 0
         })
-      });
-      if (sessionRes.ok) {
-        const sessionData = await sessionRes.json();
-        if (playToken !== activeVodPlayToken) {
-          if (sessionData && sessionData.sessionId) {
-            fetch(`/api/transcode/${encodeURIComponent(sessionData.sessionId)}`, { method: "DELETE", headers, keepalive: true }).catch(() => {});
-          }
-          return;
-        }
-        if (sessionData && sessionData.playlistUrl) {
-          activeAdultTranscodeSessionId = sessionData.sessionId;
-          currentAdultVodStartAt = Number(sessionData.startAt ?? sessionData.seekOffset ?? 0) || 0;
-          currentAdultVodDuration = sessionData.durationSeconds ?? currentAdultVodDuration;
-          isAdultVodSeekableTranscode = sessionData.seekable === true;
-          finalUrl = sessionData.playlistUrl;
-        }
-      }
-    } catch (e) {
-      console.warn("[Adult VOD] Transcode session failed:", e.message);
-    }
-
-    if (!finalUrl) {
-      finalUrl = directSourceUrl;
-    }
-
-    // Step 4: Play via unified HLS.js engine with deep buffer
-    playAdultHlsStream(finalUrl, false);
+      }).catch(() => {});
+    } catch (_) {}
   }
 
   window.veloraPlayAdultMovieByIndex = playAdultMovieByIndex;

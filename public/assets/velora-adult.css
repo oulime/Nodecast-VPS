@@ -1142,11 +1142,13 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 10px 14px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.4) 70%, transparent 100%);
+  padding: 12px 14px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.6) 70%, transparent 100%);
   z-index: 12;
   opacity: 1;
   transition: opacity 0.25s ease;
+  display: flex;
+  flex-direction: column;
 }
 
 .vel-adult-toolbar.idle {
@@ -1158,24 +1160,37 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
 }
 
 .vel-adult-tool-btn {
-  background: transparent;
-  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   color: #fff;
   cursor: pointer;
   padding: 6px;
-  border-radius: 6px;
-  display: flex;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   transition: all 0.18s ease;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 .vel-adult-tool-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.4);
   color: #fda4af;
+  transform: scale(1.06);
+}
+
+.vel-adult-tool-btn:active {
+  transform: scale(0.94);
 }
 
 .vel-adult-tool-btn:disabled {
@@ -1183,26 +1198,46 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
   cursor: not-allowed;
 }
 
-.vel-adult-time {
-  font-size: 0.78rem;
+.vel-adult-time-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.8rem;
   font-weight: 700;
   color: #cbd5e1;
-  min-width: 40px;
+  font-variant-numeric: tabular-nums;
   user-select: none;
+  margin-left: 2px;
+}
+
+.vel-adult-time {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #cbd5e1;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+.vel-adult-time-sep {
+  color: #64748b;
+  font-size: 0.75rem;
+  margin: 0 1px;
 }
 
 .vel-adult-seek-track {
   position: relative;
   flex: 1;
-  height: 6px;
+  height: 5px;
   background: rgba(255, 255, 255, 0.25);
   border-radius: 9999px;
   cursor: pointer;
-  transition: height 0.15s ease;
+  transition: height 0.15s ease, background 0.15s ease;
+  touch-action: none;
 }
 
 .vel-adult-seek-track:hover {
   height: 8px;
+  background: rgba(255, 255, 255, 0.35);
 }
 
 .vel-adult-seek-fill {
@@ -1211,22 +1246,100 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
   top: 0;
   bottom: 0;
   width: 0%;
-  background: #e11d48;
+  background: linear-gradient(90deg, #e11d48 0%, #f43f5e 60%, #fb7185 100%);
   border-radius: 9999px;
   pointer-events: none;
+  box-shadow: 0 0 8px rgba(225, 29, 72, 0.6);
 }
 
 .vel-adult-seek-handle {
   position: absolute;
   top: 50%;
   left: 0%;
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
   background: #fff;
   border-radius: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) scale(0.9);
   pointer-events: none;
-  box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.7), 0 0 8px rgba(244, 63, 94, 0.7);
+  transition: transform 0.15s ease;
+}
+
+.vel-adult-seek-track:hover .vel-adult-seek-handle {
+  transform: translate(-50%, -50%) scale(1.2);
+}
+
+/* Mobile & Compact Screen: Progress bar UNDER the controls */
+@media (max-width: 768px) {
+  .vel-adult-toolbar {
+    padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px)) 12px;
+  }
+
+  .vel-adult-toolbar-row {
+    flex-wrap: wrap;
+    gap: 8px 8px;
+    align-items: center;
+  }
+
+  /* Controls on top line */
+  .vel-adult-toolbar-row #vel-adult-prev,
+  .vel-adult-toolbar-row #vel-adult-play-bar,
+  .vel-adult-toolbar-row #vel-adult-next {
+    order: 1;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 5px;
+  }
+
+  .vel-adult-toolbar-row .vel-adult-time-wrap,
+  .vel-adult-toolbar-row #vel-adult-current-time,
+  .vel-adult-toolbar-row .vel-adult-time-sep,
+  .vel-adult-toolbar-row #vel-adult-duration {
+    order: 2;
+    font-size: 0.72rem;
+  }
+
+  .vel-adult-toolbar-row #vel-adult-volume-btn {
+    order: 3;
+    margin-left: auto;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 5px;
+  }
+
+  .vel-adult-toolbar-row #vel-adult-fullscreen {
+    order: 4;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 5px;
+  }
+
+  /* Progress bar UNDER the controls: 100% full width */
+  .vel-adult-toolbar-row #vel-adult-seek-track {
+    order: 5;
+    width: 100%;
+    min-width: 100%;
+    flex: 0 0 100%;
+    height: 6px;
+    margin-top: 4px;
+    margin-bottom: 2px;
+  }
+
+  .vel-adult-toolbar-row #vel-adult-seek-track::before {
+    content: "";
+    position: absolute;
+    top: -14px;
+    bottom: -14px;
+    left: 0;
+    right: 0;
+  }
 }
 
 .vel-adult-now-playing-title {

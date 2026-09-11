@@ -66,14 +66,16 @@
     function (event) {
       var button =
         event.target instanceof Element
-          ? event.target.closest("#live-ctl-fullscreen, #vod-ctl-fullscreen")
+          ? event.target.closest("#live-ctl-fullscreen, #vod-ctl-fullscreen, #vel-adult-fullscreen")
           : null;
       if (!button) return;
 
       var video =
         button.id === "live-ctl-fullscreen"
           ? document.getElementById("video")
-          : document.getElementById("video-vod");
+          : (button.id === "vel-adult-fullscreen"
+             ? document.getElementById("vel-adult-video")
+             : document.getElementById("video-vod"));
 
       if (!enterNativeFullscreen(video)) return;
 

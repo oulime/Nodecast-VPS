@@ -1027,12 +1027,15 @@
             <button id="vel-adult-next" class="vel-adult-tool-btn" title="Film suivant" aria-label="Film suivant">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
             </button>
-            <span id="vel-adult-current-time" class="vel-adult-time">00:00</span>
+            <div class="vel-adult-time-wrap">
+              <span id="vel-adult-current-time" class="vel-adult-time">00:00</span>
+              <span class="vel-adult-time-sep">/</span>
+              <span id="vel-adult-duration" class="vel-adult-time">00:00</span>
+            </div>
             <div id="vel-adult-seek-track" class="vel-adult-seek-track">
               <div id="vel-adult-seek-fill" class="vel-adult-seek-fill"></div>
               <div id="vel-adult-seek-handle" class="vel-adult-seek-handle"></div>
             </div>
-            <span id="vel-adult-duration" class="vel-adult-time">00:00</span>
             ` : `<span style="font-size:0.75rem;font-weight:800;color:#10b981;letter-spacing:0.05em;margin-left:8px;">● DIRECT</span><div style="flex:1;"></div>`}
             <button id="vel-adult-volume-btn" class="vel-adult-tool-btn" title="Activer / Couper le son" aria-label="Son">
               <svg id="vel-adult-vol-icon-on" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
@@ -1112,59 +1115,134 @@
       };
     }
 
+    const hoverControlsQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
+    function usesHoverControls() {
+      return hoverControlsQuery.matches;
+    }
+
+    let hideTimer = null;
+
+    function controlsAreVisible() {
+      return centerControls && !centerControls.classList.contains("idle") && toolbar && !toolbar.classList.contains("idle");
+    }
+
     function hideControls() {
-      if (idleTimer) clearTimeout(idleTimer);
-      if (centerControls) centerControls.classList.add("idle");
-      if (toolbar) toolbar.classList.add("idle");
+      if (hideTimer) {
+        clearTimeout(hideTimer);
+        hideTimer = null;
+      }
+      if (centerControls) {
+        centerControls.classList.add("idle");
+        centerControls.setAttribute("aria-hidden", "true");
+      }
+      if (toolbar) {
+        toolbar.classList.add("idle");
+        toolbar.setAttribute("aria-hidden", "true");
+      }
     }
 
     function showControls(autoHide = true) {
-      if (idleTimer) clearTimeout(idleTimer);
-      if (centerControls) centerControls.classList.remove("idle");
-      if (toolbar) toolbar.classList.remove("idle");
-      if (autoHide && video && !video.paused) {
-        idleTimer = setTimeout(() => {
-          hideControls();
-        }, 3500);
+      if (hideTimer) {
+        clearTimeout(hideTimer);
+        hideTimer = null;
+      }
+      if (centerControls) {
+        centerControls.classList.remove("idle");
+        centerControls.setAttribute("aria-hidden", "false");
+      }
+      if (toolbar) {
+        toolbar.classList.remove("idle");
+        toolbar.setAttribute("aria-hidden", "false");
+      }
+      if (autoHide && video && !video.paused && !video.ended) {
+        const hideDelay = usesHoverControls() ? 3000 : 2800;
+        hideTimer = setTimeout(() => {
+          if (video && !video.paused && !video.ended) {
+            hideControls();
+          }
+        }, hideDelay);
       }
     }
 
-    function toggleControls() {
-      const isVisible = centerControls && !centerControls.classList.contains("idle");
-      if (isVisible) {
-        hideControls();
-      } else {
-        showControls(true);
-      }
+    let controlsVisibleAtTapStart = null;
+    let revealOnlyTap = false;
+    let lastTapStart = 0;
+
+    function consumeTapEvent(e) {
+      if (e.cancelable) e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
     }
 
-    let lastTapTime = 0;
-    function handleScreenTap(e) {
-      const now = Date.now();
-      if (now - lastTapTime < 220) return;
-      lastTapTime = now;
-
-      // If video was muted, tap automatically un-mutes
-      if (video && video.muted) {
-        video.muted = false;
-        video.volume = 1;
-        syncVolumeUI();
-      }
-
-      // If clicking directly on an interactive button or seekbar, keep controls awake
-      if (e && e.target && (e.target.closest("button") || e.target.closest(".vel-adult-seek-track"))) {
-        showControls(true);
+    function rememberControlsAtTapStart(e) {
+      const touchLike = e.type === "touchstart" || e.pointerType === "touch" ||
+        e.pointerType === "pen" || (!e.pointerType && !usesHoverControls());
+      if (!touchLike) return;
+      if (!(e.target instanceof Element) || !e.target.closest("#vel-adult-player-container .vel-adult-video-wrapper")) return;
+      if (e.target.closest("button, [role='slider'], .vel-adult-center-btn, .vel-adult-tool-btn, .vel-adult-seek-track")) {
+        revealOnlyTap = false;
+        controlsVisibleAtTapStart = true;
         return;
       }
-
-      // Toggle controls on/off
-      toggleControls();
+      const now = Date.now();
+      if (now - lastTapStart < 80) {
+        if (revealOnlyTap) consumeTapEvent(e);
+        return;
+      }
+      lastTapStart = now;
+      controlsVisibleAtTapStart = controlsAreVisible();
+      revealOnlyTap = controlsVisibleAtTapStart !== true;
+      if (revealOnlyTap) {
+        if (video && video.muted) {
+          video.muted = false;
+          video.volume = 1;
+          syncVolumeUI();
+        }
+        showControls(true);
+        consumeTapEvent(e);
+      }
     }
+
+    window.addEventListener("pointerdown", rememberControlsAtTapStart, true);
+    window.addEventListener("touchstart", rememberControlsAtTapStart, { capture: true, passive: false });
 
     const wrapper = container.querySelector(".vel-adult-video-wrapper");
     if (wrapper) {
-      wrapper.onmousemove = () => showControls(true);
-      wrapper.addEventListener("click", handleScreenTap);
+      wrapper.addEventListener("mouseenter", () => {
+        if (usesHoverControls()) showControls(true);
+      });
+      wrapper.addEventListener("mousemove", () => {
+        if (usesHoverControls()) showControls(true);
+      });
+      wrapper.addEventListener("mouseleave", () => {
+        if (usesHoverControls()) hideControls();
+      });
+      wrapper.addEventListener("click", (e) => {
+        if (e.target.closest("button, [role='slider'], .vel-adult-center-btn, .vel-adult-tool-btn, .vel-adult-seek-track")) {
+          revealOnlyTap = false;
+          return;
+        }
+        if (revealOnlyTap) {
+          revealOnlyTap = false;
+          controlsVisibleAtTapStart = null;
+          consumeTapEvent(e);
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        if (video && video.muted) {
+          video.muted = false;
+          video.volume = 1;
+          syncVolumeUI();
+        }
+        if (usesHoverControls()) {
+          showControls(true);
+          return;
+        }
+        const shouldHide = controlsVisibleAtTapStart === true;
+        controlsVisibleAtTapStart = null;
+        if (shouldHide) hideControls(); else showControls(true);
+      }, true);
     }
 
     function togglePlay(e) {
@@ -1245,29 +1323,132 @@
       };
     }
 
+    const updateFullscreenIcon = () => {
+      if (!fullscreenBtn) return;
+      const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+      if (isFs) {
+        fullscreenBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>';
+        fullscreenBtn.setAttribute("title", "Quitter le plein écran");
+        fullscreenBtn.setAttribute("aria-label", "Quitter le plein écran");
+      } else {
+        fullscreenBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>';
+        fullscreenBtn.setAttribute("title", "Plein écran");
+        fullscreenBtn.setAttribute("aria-label", "Plein écran");
+      }
+    };
+
+    const handleFullscreenChange = () => {
+      updateFullscreenIcon();
+      const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+      if (!isFs) {
+        if (window.screen && window.screen.orientation && typeof window.screen.orientation.unlock === "function") {
+          try {
+            window.screen.orientation.unlock();
+          } catch (_) {}
+        }
+      }
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
+    document.addEventListener("MSFullscreenChange", handleFullscreenChange);
+
     if (fullscreenBtn) {
-      fullscreenBtn.onclick = (e) => {
+      fullscreenBtn.onclick = async (e) => {
         e.stopPropagation();
-        if (!document.fullscreenElement) {
-          if (wrapper && wrapper.requestFullscreen) wrapper.requestFullscreen().catch(() => {});
+        const isCurrentlyFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+        if (!isCurrentlyFullscreen) {
+          const targetEl = wrapper || container;
+          const reqFs = targetEl?.requestFullscreen || targetEl?.webkitRequestFullscreen || targetEl?.mozRequestFullScreen || targetEl?.msRequestFullscreen;
+          if (reqFs) {
+            try {
+              await reqFs.call(targetEl);
+            } catch (err) {
+              if (video && typeof video.webkitEnterFullscreen === "function") {
+                try { video.webkitEnterFullscreen(); } catch (_) {}
+              }
+            }
+          } else if (video && typeof video.webkitEnterFullscreen === "function") {
+            try { video.webkitEnterFullscreen(); } catch (_) {}
+          }
+
+          if (window.screen && window.screen.orientation && typeof window.screen.orientation.lock === "function") {
+            try {
+              await window.screen.orientation.lock("landscape");
+            } catch (_) {
+              try {
+                await window.screen.orientation.lock("landscape-primary");
+              } catch (_) {}
+            }
+          }
         } else {
-          if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+          const exitFs = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+          if (exitFs) {
+            try {
+              await exitFs.call(document);
+            } catch (_) {}
+          }
+          if (window.screen && window.screen.orientation && typeof window.screen.orientation.unlock === "function") {
+            try {
+              window.screen.orientation.unlock();
+            } catch (_) {}
+          }
         }
       };
     }
 
     if (seekTrack) {
-      seekTrack.onclick = (e) => {
-        e.stopPropagation();
+      let isSeeking = false;
+      const getPosFromEvent = (e) => {
+        const rect = seekTrack.getBoundingClientRect();
+        if (!rect.width) return 0;
+        const clientX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+        return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      };
+
+      const applySeekPos = (pos, commit = false) => {
         const totalDuration = (Number.isFinite(currentAdultVodDuration) && currentAdultVodDuration > 0)
           ? currentAdultVodDuration
           : (video && Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0);
         if (!totalDuration || totalDuration <= 0) return;
-        const rect = seekTrack.getBoundingClientRect();
-        const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-        seekAdultVod(pos * totalDuration);
+        const pct = pos * 100;
+        if (seekFill) seekFill.style.width = `${pct}%`;
+        if (seekHandle) seekHandle.style.left = `${pct}%`;
+        if (curTime) curTime.textContent = formatAdultPlayerClock(pos * totalDuration);
+        if (commit) {
+          seekAdultVod(pos * totalDuration);
+        }
+      };
+
+      seekTrack.addEventListener("pointerdown", (e) => {
+        e.stopPropagation();
+        isSeeking = true;
+        try { seekTrack.setPointerCapture(e.pointerId); } catch (_) {}
+        const pos = getPosFromEvent(e);
+        applySeekPos(pos, true);
+        showControls();
+      });
+
+      seekTrack.addEventListener("pointermove", (e) => {
+        if (!isSeeking) return;
+        e.stopPropagation();
+        const pos = getPosFromEvent(e);
+        applySeekPos(pos, false);
+        showControls();
+      });
+
+      const finishSeek = (e) => {
+        if (!isSeeking) return;
+        isSeeking = false;
+        try { seekTrack.releasePointerCapture(e.pointerId); } catch (_) {}
+        const pos = getPosFromEvent(e);
+        applySeekPos(pos, true);
         showControls();
       };
+
+      seekTrack.addEventListener("pointerup", finishSeek);
+      seekTrack.addEventListener("pointercancel", finishSeek);
     }
 
     if (video) {
@@ -1285,8 +1466,7 @@
         const barPlaySvg = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
         if (centerPlay) centerPlay.innerHTML = playSvg;
         if (barPlay) barPlay.innerHTML = barPlaySvg;
-        if (centerControls) centerControls.classList.remove("idle");
-        if (toolbar) toolbar.classList.remove("idle");
+        showControls(false);
       };
 
       video.onwaiting = () => {

@@ -7,7 +7,11 @@ const source = fs.readFileSync(
   "utf8"
 );
 
-function createHarness({ throwOnEnter = false } = {}) {
+function createHarness({
+  throwOnEnter = false,
+  buttonId = "live-ctl-fullscreen",
+  videoId = "video",
+} = {}) {
   const documentListeners = new Map();
   const videoListeners = new Map();
   const calls = [];
@@ -25,7 +29,7 @@ function createHarness({ throwOnEnter = false } = {}) {
     },
   };
 
-  const button = { id: "live-ctl-fullscreen" };
+  const button = { id: buttonId };
   const context = {
     Element: function Element() {},
     Promise,
@@ -50,7 +54,7 @@ function createHarness({ throwOnEnter = false } = {}) {
         documentListeners.set(name, listener);
       },
       getElementById(id) {
-        return id === "video" ? video : null;
+        return id === videoId ? video : null;
       },
     },
   };
@@ -95,6 +99,25 @@ function createHarness({ throwOnEnter = false } = {}) {
 
   assert.deepEqual(harness.calls, ["enter"]);
   assert.equal(harness.videoListeners.size, 0);
+}
+
+{
+  const harness = createHarness({
+    buttonId: "vel-adult-fullscreen",
+    videoId: "vel-adult-video",
+  });
+  harness.documentListeners.get("click")(harness.event);
+
+  assert.deepEqual(harness.calls, ["enter", "prevent", "stop"]);
+  harness.videoListeners.get("webkitbeginfullscreen")();
+  assert.deepEqual(harness.calls, [
+    "enter",
+    "prevent",
+    "stop",
+    "lock:landscape",
+  ]);
+  harness.videoListeners.get("webkitendfullscreen")();
+  assert.equal(harness.calls.at(-1), "unlock");
 }
 
 console.log("iOS native fullscreen behavior tests passed");

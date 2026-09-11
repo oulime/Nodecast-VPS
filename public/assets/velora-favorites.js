@@ -35,14 +35,15 @@
   }
 
   function normalize(item) {
+    var rawName = String(item.name || item.label || item.title || item.series_name || "").trim();
     return {
       id: item.id,
       source_id: String(item.source_id ?? item.sourceId ?? ""),
-      item_id: String(item.item_id ?? item.itemId ?? ""),
+      item_id: String(item.item_id ?? item.itemId ?? item.stream_id ?? item.streamId ?? ""),
       item_type: String(item.item_type ?? item.itemType ?? "channel"),
-      name: String(item.name || ""),
-      thumb_url: String(item.thumb_url ?? item.thumbUrl ?? ""),
-      package_id: String(item.package_id ?? item.packageId ?? ""),
+      name: rawName,
+      thumb_url: String(item.thumb_url ?? item.thumbUrl ?? item.stream_icon ?? item.cover ?? ""),
+      package_id: String(item.package_id ?? item.packageId ?? item.category_id ?? ""),
       global_stream_id: String(item.global_stream_id ?? item.globalStreamId ?? ""),
       container_extension: String(item.container_extension ?? item.containerExtension ?? ""),
       created_at: item.created_at || new Date().toISOString()

@@ -674,18 +674,26 @@
       // Hook veloraDescribeFavoriteCard for custom live wheel rows
       const originalDescribe = window.veloraDescribeFavoriteCard;
       window.veloraDescribeFavoriteCard = (card) => {
+        if (typeof originalDescribe === "function") {
+          const desc = originalDescribe(card);
+          if (desc && desc.name && desc.itemId) return desc;
+        }
         if (card && card.classList.contains("vel-media-item-row")) {
           const sId = card.dataset.streamId;
           if (sId) {
-            const btn = card.querySelector(".media-item__main");
+            const titleEl = card.querySelector("h4") || card.querySelector(".media-info h4") || card.querySelector(".media-item__main");
+            const rawTitle = titleEl ? (titleEl.getAttribute("title") || titleEl.textContent || titleEl.getAttribute("aria-label") || "") : "";
+            const cleanTitle = rawTitle.replace(/\s+/g, " ").trim();
             const img = card.querySelector("img");
+            const state = typeof window.veloraGetState === "function" ? window.veloraGetState() : null;
+            const srcId = card.dataset.favoriteSourceId || card.dataset.sourceId || (state && state.nodecastXtreamSourceId) || "1";
             return {
-              sourceId: String(card.dataset.favoriteSourceId || "1"),
+              sourceId: String(srcId),
               itemId: String(sId),
               itemType: "channel",
-              name: btn ? (btn.getAttribute("aria-label") || "") : "",
-              thumbUrl: img ? (img.getAttribute("src") || "") : "",
-              packageId: String(card.dataset.favoritePackageId || "")
+              name: cleanTitle || "Chaîne",
+              thumbUrl: img ? (img.getAttribute("src") || img.src || "") : "",
+              packageId: String(card.dataset.favoritePackageId || card.dataset.packageId || "")
             };
           }
         }

@@ -1580,12 +1580,12 @@
   <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-54"></script>
   <script defer src="/assets/velora-home-sections.js?v=20260909-vertical-popup-v1"></script>
   <script defer src="/assets/velora-home-cache-fallback.js?v=20260909-full-cat-v4"></script>
-  <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=20260911-fav-channel-v4"></script>
+  <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=20260911-search-fav-name-v5"></script>
   <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-54"></script>
   <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-54"></script>
   <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-54"></script>
   <link rel="stylesheet" href="/assets/velora-favorites.css?v=white-logo-v20260911-1" />
-  <script defer src="/assets/velora-favorites.js?v=20260902-scroll-top-v2"></script>
+  <script defer src="/assets/velora-favorites.js?v=20260911-search-fav-name-v5"></script>
   <script defer src="/assets/velora-watch-history.js?v=20260909-no-bottom-text-v1"></script>
   <script defer src="/assets/velora-catalog-scroll-memory.js?v=20260902-scroll-memory-v6"></script>
   <script defer src="/assets/velora-cache-inventory.js?v=instant-nav-v20260821-54"></script>
@@ -12103,16 +12103,29 @@
 
           // 3. Add Favorite Heart button to search result
           if (typeof window.veloraCreateFavoriteHeart === "function") {
-            var favId = String(item.id || "").replace(/^(?:live|movies|series):[^:]+:/, "").replace(/:\d+$/, "");
-            var favType = item.type === "channel" ? "channel" : item.type === "series" ? "series" : "movie";
-            if (favId) {
+            var underlyingItem = item.item || {};
+            var sourceId = String(item.sourceId || item.source_id || item.nodecast_source_id || underlyingItem.nodecast_source_id || underlyingItem.source_id || "");
+            var streamId = String(item.streamId || item.stream_id || item.itemId || item.item_id || underlyingItem.stream_id || underlyingItem.series_id || underlyingItem.streamId || "");
+            if (!streamId && item.id) {
+              streamId = String(item.id).replace(/^cache:(?:live|movie|series):/, "").replace(/^(?:live|movies|series):[^:]+:/, "").replace(/:\d+$/, "");
+            }
+            var favType = item.type === "channel" || item.type === "live" || sectionKey === "live" ? "channel" : (item.type === "series" || sectionKey === "series") ? "series" : "movie";
+            var favName = String(item.label || item.name || underlyingItem.name || underlyingItem.title || underlyingItem.series_name || "").trim();
+            var favThumb = item.thumbUrl || (underlyingItem && (underlyingItem.stream_icon || underlyingItem.cover)) || "";
+            var favPackage = String(item.packageId || item.package_id || underlyingItem.category_id || underlyingItem.package_id || "");
+            var favGlobal = String(item.globalStreamId || item.nodecast_global_stream_id || underlyingItem.nodecast_global_stream_id || "");
+            var favExt = String(item.containerExtension || underlyingItem.container_extension || "");
+
+            if (favName) {
               var heart = window.veloraCreateFavoriteHeart({
-                sourceId: String(item.sourceId || item.nodecast_source_id || ""),
-                itemId: favId,
+                sourceId: sourceId,
+                itemId: streamId,
                 itemType: favType,
-                name: item.label || item.name || "",
-                thumbUrl: item.thumbUrl || "",
-                packageId: String(item.packageId || "")
+                name: favName,
+                thumbUrl: favThumb,
+                packageId: favPackage,
+                globalStreamId: favGlobal,
+                containerExtension: favExt
               });
               if (heart) {
                 heart.classList.add("vel-global-search__heart");
@@ -17256,7 +17269,7 @@
     })();
   </script>
   <script defer src="/assets/cast-bridge.js?v=20260821-cast-airplay-v1"></script>
-  <script defer src="/assets/velora-live-wheel.js?v=20260908-wheel-v10"></script>
+  <script defer src="/assets/velora-live-wheel.js?v=20260911-fav-name-v11"></script>
   <link rel="stylesheet" href="/assets/velora-prime-carousel.css?v=20260909-vertical-popup-v1" />
   <script defer src="/assets/velora-prime-carousels.js?v=20260909-unify-popup-v3"></script>
   <script>

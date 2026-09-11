@@ -7196,7 +7196,6 @@
           </div>
         </div>
 
-        <div id="vel-global-search-status" class="vel-global-search__status"></div>
         <div id="vel-global-search-results" class="vel-global-search__results" role="listbox"></div>
       </div>
     </div>
@@ -11529,7 +11528,7 @@
         var status = document.getElementById("vel-global-search-status");
         var results = document.getElementById("vel-global-search-results");
         var filterTabs = document.getElementById("vel-global-search-filter-tabs");
-        if (!trigger || !dialog || !form || !input || !close || !status || !results) return;
+        if (!trigger || !dialog || !form || !input || !close || !results) return;
 
         var runId = 0;
         var renderedQuery = "";
@@ -11586,6 +11585,7 @@
         }
 
         function setStatus(text, badgeText) {
+          if (!status) return;
           if (!text && !badgeText) {
             status.replaceChildren();
             status.classList.add("is-empty");
@@ -11597,6 +11597,7 @@
         }
 
         function setSearchLoading(loading) {
+          if (!status) return;
           status.classList.toggle("is-loading", !!loading);
         }
 
@@ -12271,21 +12272,7 @@
 
               header.appendChild(headerLeft);
 
-              // For VOD sections only, allow toggle between Slider and Grid in the "all" tab
               var isExpanded = expandedSections.has(section.key) || currentFilterTab === section.key;
-              if (isVodSection && section.items.length > 5 && currentFilterTab === "all") {
-                var toggleBtn = document.createElement("button");
-                toggleBtn.type = "button";
-                toggleBtn.className = "vel-global-search__group-toggle";
-                toggleBtn.dataset.expandSection = section.key;
-                if (isExpanded) {
-                  toggleBtn.innerHTML = '<span>Mode Slider</span> <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-                } else {
-                  toggleBtn.innerHTML = '<span>Grille (' + section.items.length + ')</span> <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>';
-                }
-                header.appendChild(toggleBtn);
-              }
-
               group.appendChild(header);
 
               if (isLiveSection) {
@@ -12691,7 +12678,7 @@
             return;
           }
 
-          var expandBtn = event.target && event.target.closest(".vel-global-search__more[data-expand-section], .vel-global-search__group-toggle[data-expand-section], .vel-global-search__slider-see-all[data-expand-section]");
+          var expandBtn = event.target && event.target.closest(".vel-global-search__more[data-expand-section], .vel-global-search__slider-see-all[data-expand-section]");
           if (expandBtn) {
             var secKey = expandBtn.dataset.expandSection;
             if (secKey) {
@@ -15845,13 +15832,13 @@
       width: 2.85rem;
       height: 2.85rem;
       border-radius: 10px;
-      background: rgba(0, 0, 0, 0.55);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: #ffffff !important;
+      border: 1px solid rgba(255, 255, 255, 0.95);
       display: grid;
       place-items: center;
       overflow: hidden;
-      padding: 3px;
-      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+      padding: 4px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
     }
 
     .vel-global-search__result--channel .vel-global-search__thumb img {
@@ -15859,7 +15846,14 @@
       max-height: 100%;
       object-fit: contain;
       display: block;
-      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+      filter: none;
+    }
+
+    .vel-global-search__result--channel .vel-global-search__thumb.vel-global-search__thumb--fallback,
+    .vel-global-search__result--channel .vel-global-search__thumb:empty {
+      background: rgba(255, 255, 255, 0.1) !important;
+      border-color: rgba(255, 255, 255, 0.15);
+      box-shadow: none;
     }
 
     .vel-global-search__result--channel .vel-global-search__thumb:empty::before {

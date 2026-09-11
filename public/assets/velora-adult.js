@@ -574,8 +574,309 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Shared probe + videoMode helpers — mirrors the main player's logic exactly
+  // Shared probe + videoMode + robust HLS streaming engine helpers
   // ---------------------------------------------------------------------------
+  let activeAdultTranscodeSessionId = null;
+  let currentAdultVodSourceUrl = null;
+  let currentAdultVodDuration = null;
+  let currentAdultVodStartAt = 0;
+  let isAdultVodSeekableTranscode = false;
+  let isAdultVodSeekingInFlight = false;
+  let currentAdultVideoMode = "copy";
+  let currentAdultVideoCodec = null;
+  let currentAdultAudioCodec = null;
+  let currentAdultAudioChannels = null;
+  let currentAdultMovieMetadata = null;
+
+  let adultNetworkRetryCount = 0;
+  let adultLastNetworkErrorTime = 0;
+  let adultMediaErrorCount = 0;
+  let adultLastRecoveryAttempt = 0;
+  let adultLastDiscontinuity = -1;
+  let adultIsUsingProxy = false;
+  let adultCurrentDirectUrl = null;
+
+  function getAdultHlsConfig(isLive = true) {
+    if (isLive) {
+      return {
+        enableWorker: true,
+        maxBufferLength: 90,           // Buffer up to 90 seconds of content
+        maxMaxBufferLength: 180,        // Absolute max buffer 180 seconds
+        maxBufferSize: 250 * 1000 * 1000, // 250MB max buffer size
+        maxBufferHole: 1.5,            // Allow 1.5s holes in buffer (discontinuities)
+        maxFragLookUpTolerance: 1.5,   // Smooth segment transition
+        liveSyncMode: "buffered",
+        liveSyncDurationCount: 3,      // 3 segments behind live edge (stable HLS)
+        liveMaxLatencyDurationCount: 10,
+        maxLiveSyncPlaybackRate: 1,    // Strict 1.0x playback
+        liveBackBufferLength: 30,      // 30s back buffer
+        stretchShortVideoTrack: true,  // Stretch short segments to avoid gaps
+        forceKeyFrameOnDiscontinuity: true,
+        maxAudioFramesDrift: 8,        // Allow ~185ms audio drift before correction
+        progressive: false,
+        nudgeOffset: 0.2,              // Larger nudge steps for recovery
+        nudgeMaxRetry: 6,              // More retry attempts
+        levelLoadingMaxRetry: 4,
+        manifestLoadingMaxRetry: 4,
+        fragLoadingMaxRetry: 6,
+        lowLatencyMode: false,
+        enableCEA708Captions: true,
+        enableWebVTT: true,
+        renderTextTracksNatively: true
+      };
+    }
+    return {
+      enableWorker: true,
+      maxBufferLength: 60,
+      maxMaxBufferLength: 120,
+      maxBufferSize: 120 * 1000 * 1000,
+      maxBufferHole: 1.5,
+      maxFragLookUpTolerance: 1.5,
+      stretchShortVideoTrack: true,
+      forceKeyFrameOnDiscontinuity: true,
+      maxAudioFramesDrift: 8,
+      progressive: false,
+      nudgeOffset: 0.2,
+      nudgeMaxRetry: 6,
+      levelLoadingMaxRetry: 4,
+      manifestLoadingMaxRetry: 4,
+      fragLoadingMaxRetry: 6,
+      lowLatencyMode: false
+    };
+  }
+
+  async function closeAdultTranscodeSession() {
+    if (!activeAdultTranscodeSessionId) return;
+    const sid = activeAdultTranscodeSessionId;
+    activeAdultTranscodeSessionId = null;
+    try {
+      const token = localStorage.getItem("authToken");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      fetch(`/api/transcode/${encodeURIComponent(sid)}`, {
+        method: "DELETE",
+        headers,
+        keepalive: true
+      }).catch(() => {});
+    } catch (_) {}
+  }
+  window.veloraCloseActiveAdultTranscodeSession = closeAdultTranscodeSession;
+
+  async function seekAdultVod(targetSeconds) {
+    const video = document.getElementById("vel-adult-video");
+    if (!video) return;
+    if (isAdultVodSeekingInFlight) return;
+
+    const totalDuration = (Number.isFinite(currentAdultVodDuration) && currentAdultVodDuration > 0)
+      ? currentAdultVodDuration
+      : (Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0);
+
+    const clampedTarget = Math.max(0, Math.min(targetSeconds, totalDuration || targetSeconds));
+
+    if (activeAdultTranscodeSessionId && isAdultVodSeekableTranscode && currentAdultVodSourceUrl) {
+      isAdultVodSeekingInFlight = true;
+      try {
+        const buffering = document.getElementById("vel-adult-player-buffering");
+        if (buffering) buffering.classList.remove("hidden");
+        video.pause();
+
+        await closeAdultTranscodeSession();
+
+        const token = localStorage.getItem("authToken");
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers.Authorization = `Bearer ${token}`;
+
+        const sessionRes = await fetch("/api/transcode/session", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            url: currentAdultVodSourceUrl,
+            mode: "vod",
+            startAt: clampedTarget,
+            seekOffset: clampedTarget,
+            metadata: currentAdultMovieMetadata,
+            duration: totalDuration || null,
+            videoMode: currentAdultVideoMode,
+            videoCodec: currentAdultVideoCodec,
+            audioCodec: currentAdultAudioCodec,
+            audioChannels: currentAdultAudioChannels
+          })
+        });
+
+        if (sessionRes.ok) {
+          const sessionData = await sessionRes.json();
+          if (sessionData && sessionData.playlistUrl) {
+            activeAdultTranscodeSessionId = sessionData.sessionId;
+            currentAdultVodStartAt = Number(sessionData.startAt ?? sessionData.seekOffset ?? clampedTarget) || 0;
+            currentAdultVodDuration = sessionData.durationSeconds ?? currentAdultVodDuration;
+            isAdultVodSeekableTranscode = sessionData.seekable === true;
+            playAdultHlsStream(sessionData.playlistUrl, false);
+          }
+        }
+      } catch (e) {
+        console.warn("[Adult VOD] Seek session restart failed:", e.message);
+      } finally {
+        isAdultVodSeekingInFlight = false;
+      }
+    } else {
+      if (Number.isFinite(video.duration) && video.duration > 0) {
+        video.currentTime = clampedTarget;
+      }
+    }
+  }
+
+  function playAdultHlsStream(url, isLive = true) {
+    const video = document.getElementById("vel-adult-video");
+    const buffering = document.getElementById("vel-adult-player-buffering");
+    const errEl = document.getElementById("vel-adult-player-error");
+    if (!video) return;
+
+    if (video.hls && typeof video.hls.destroy === "function") {
+      try { video.hls.destroy(); } catch (_) {}
+      video.hls = null;
+    }
+
+    adultLastDiscontinuity = -1;
+    adultNetworkRetryCount = 0;
+    adultMediaErrorCount = 0;
+
+    if (window.Hls && window.Hls.isSupported()) {
+      const hls = new window.Hls(getAdultHlsConfig(isLive));
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      video.hls = hls;
+
+      hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+        if (errEl) errEl.classList.add("hidden");
+        video.muted = false;
+        video.volume = 1;
+        const p = video.play();
+        if (p && typeof p.catch === "function") {
+          p.catch(() => {
+            video.muted = true;
+            video.play().catch(e => console.warn("[Adult] Autoplay fallback:", e));
+          });
+        }
+      });
+
+      hls.on(window.Hls.Events.AUDIO_TRACKS_UPDATED, () => {
+        if (hls.audioTracks && hls.audioTracks.length > 0 && hls.audioTrack === -1) {
+          hls.audioTrack = 0;
+        }
+      });
+
+      hls.on(window.Hls.Events.FRAG_BUFFERED, () => {
+        if (buffering) buffering.classList.add("hidden");
+        if (errEl) errEl.classList.add("hidden");
+      });
+
+      hls.on(window.Hls.Events.FRAG_LOADED, () => {
+        if (buffering) buffering.classList.add("hidden");
+        if (errEl) errEl.classList.add("hidden");
+      });
+
+      hls.on(window.Hls.Events.FRAG_CHANGED, (event, data) => {
+        const frag = data.frag;
+        if (frag && frag.sn !== "initSegment") {
+          if (frag.cc !== undefined && frag.cc !== adultLastDiscontinuity) {
+            adultLastDiscontinuity = frag.cc;
+            if (!video.paused && video.currentTime > 0) {
+              video.currentTime += 0.01;
+            }
+          }
+        }
+      });
+
+      hls.on(window.Hls.Events.ERROR, (event, data) => {
+        console.warn("[Adult] HLS event:", data.type, data.details, data.response?.code);
+        const statusCode = data.response?.code;
+
+        if (statusCode === 500 || statusCode === 404 || statusCode === 410) {
+          try { hls.destroy(); } catch (_) {}
+          video.hls = null;
+          if (buffering) buffering.classList.add("hidden");
+          if (errEl) errEl.classList.remove("hidden");
+          return;
+        }
+
+        if (data.fatal) {
+          switch (data.type) {
+            case window.Hls.ErrorTypes.NETWORK_ERROR: {
+              adultNetworkRetryCount++;
+              const now = Date.now();
+              if (now - adultLastNetworkErrorTime > 30000) adultNetworkRetryCount = 1;
+              adultLastNetworkErrorTime = now;
+
+              if (adultNetworkRetryCount <= 3 && !adultIsUsingProxy) {
+                const retryDelay = adultNetworkRetryCount * 1000;
+                setTimeout(() => {
+                  if (video && video.hls === hls) hls.startLoad();
+                }, retryDelay);
+              } else if (!adultIsUsingProxy && adultCurrentDirectUrl && !adultCurrentDirectUrl.startsWith("/api/")) {
+                adultNetworkRetryCount = 0;
+                adultIsUsingProxy = true;
+                const proxied = `/api/proxy/stream?url=${encodeURIComponent(adultCurrentDirectUrl)}`;
+                hls.loadSource(proxied);
+                hls.startLoad();
+              } else {
+                hls.startLoad();
+              }
+              break;
+            }
+            case window.Hls.ErrorTypes.MEDIA_ERROR: {
+              const now = Date.now();
+              if (now - adultLastRecoveryAttempt > 2000) {
+                adultLastRecoveryAttempt = now;
+                adultMediaErrorCount++;
+                if (adultMediaErrorCount >= 3) {
+                  hls.swapAudioCodec();
+                  adultMediaErrorCount = 0;
+                }
+                hls.recoverMediaError();
+              }
+              break;
+            }
+            default:
+              hls.destroy();
+              if (buffering) buffering.classList.add("hidden");
+              if (errEl) errEl.classList.remove("hidden");
+              break;
+          }
+        } else if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
+          const now = Date.now();
+          if (now - adultLastRecoveryAttempt > 2000) {
+            adultLastRecoveryAttempt = now;
+            adultMediaErrorCount++;
+            if (adultMediaErrorCount >= 3) {
+              hls.swapAudioCodec();
+              adultMediaErrorCount = 0;
+            }
+            hls.recoverMediaError();
+          }
+        } else if (data.details === "bufferStalledError" || data.details === "bufferAppendError") {
+          hls.recoverMediaError();
+          if (video && !video.paused) video.currentTime += 0.05;
+        }
+      });
+    } else if (video.canPlayType("application/vnd.apple.mpegurl") || video.canPlayType("application/x-mpegURL")) {
+      video.muted = false;
+      video.volume = 1;
+      video.src = url;
+      video.load();
+      const p = video.play();
+      if (p && typeof p.catch === "function") {
+        p.catch(() => {
+          video.muted = true;
+          video.play().catch(e => console.warn("[Adult] Direct play notice:", e));
+        });
+      }
+    } else {
+      video.muted = false;
+      video.volume = 1;
+      video.src = url;
+      video.play().catch(() => {});
+    }
+  }
+
   let _adultSettingsUa = null;
   async function getAdultUserAgent(token) {
     if (_adultSettingsUa) return _adultSettingsUa;
@@ -613,7 +914,8 @@
     const codecStr = [videoCodec, probe?.video, probe?.videoCodecTag, probe?.videoCodecLongName]
       .filter(Boolean).join(" ").toLowerCase();
     const isHevc = /hevc|h265|h\.265|hev1|hvc1/.test(codecStr);
-    const isH264 = !isHevc && /h264|avc|avc1/.test(codecStr);
+    if (isHevc) return "encode";
+    const isH264 = /h264|avc|avc1/.test(codecStr);
     return isH264 ? "copy" : "encode";
   }
 
@@ -981,7 +1283,8 @@
       back10.onclick = (e) => {
         e.stopPropagation();
         if (video) {
-          video.currentTime = Math.max(0, video.currentTime - 10);
+          const currentLogical = currentAdultVodStartAt + (video.currentTime || 0);
+          seekAdultVod(currentLogical - 10);
           showControls();
         }
       };
@@ -991,7 +1294,8 @@
       fwd10.onclick = (e) => {
         e.stopPropagation();
         if (video) {
-          video.currentTime = Math.min(video.duration || 0, video.currentTime + 10);
+          const currentLogical = currentAdultVodStartAt + (video.currentTime || 0);
+          seekAdultVod(currentLogical + 10);
           showControls();
         }
       };
@@ -1029,10 +1333,13 @@
     if (seekTrack) {
       seekTrack.onclick = (e) => {
         e.stopPropagation();
-        if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return;
+        const totalDuration = (Number.isFinite(currentAdultVodDuration) && currentAdultVodDuration > 0)
+          ? currentAdultVodDuration
+          : (video && Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0);
+        if (!totalDuration || totalDuration <= 0) return;
         const rect = seekTrack.getBoundingClientRect();
         const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-        video.currentTime = pos * video.duration;
+        seekAdultVod(pos * totalDuration);
         showControls();
       };
     }
@@ -1077,15 +1384,19 @@
           buffering.classList.add("hidden");
         }
         if (!isLive && curTime && durTime && seekFill && seekHandle) {
-          if (!Number.isFinite(video.duration) || video.duration <= 0) {
-            curTime.textContent = formatAdultPlayerClock(video.currentTime);
-            return;
+          const displayedCurrent = currentAdultVodStartAt + (video.currentTime || 0);
+          const totalDuration = (Number.isFinite(currentAdultVodDuration) && currentAdultVodDuration > 0)
+            ? currentAdultVodDuration
+            : (Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0);
+
+          curTime.textContent = formatAdultPlayerClock(displayedCurrent);
+          durTime.textContent = formatAdultPlayerClock(totalDuration);
+
+          if (totalDuration > 0) {
+            const pct = Math.min(100, Math.max(0, (displayedCurrent / totalDuration) * 100));
+            seekFill.style.width = `${pct}%`;
+            seekHandle.style.left = `${pct}%`;
           }
-          curTime.textContent = formatAdultPlayerClock(video.currentTime);
-          durTime.textContent = formatAdultPlayerClock(video.duration);
-          const pct = (video.currentTime / video.duration) * 100;
-          seekFill.style.width = `${pct}%`;
-          seekHandle.style.left = `${pct}%`;
 
           if (prevBtn) prevBtn.disabled = !window._veloraAdultVodMovies || window._veloraAdultVodCurrentIndex <= 0;
           if (nextBtn) nextBtn.disabled = !window._veloraAdultVodMovies || window._veloraAdultVodCurrentIndex >= window._veloraAdultVodMovies.length - 1;
@@ -1279,6 +1590,8 @@
     const list = window._veloraAdultLiveChannels;
     if (!list || index < 0 || index >= list.length) return;
 
+    await closeAdultTranscodeSession();
+
     window._veloraAdultLiveCurrentIndex = index;
     const channel = list[index];
 
@@ -1306,17 +1619,11 @@
     if (errEl) errEl.classList.add("hidden");
     if (buffering) buffering.classList.remove("hidden");
 
-    // Destroy any existing HLS instance before starting a new session
-    if (video.hls && typeof video.hls.destroy === "function") {
-      try { video.hls.destroy(); } catch (_) {}
-      video.hls = null;
-    }
-
     const token = localStorage.getItem("authToken");
     const headers = { "Content-Type": "application/json" };
     if (token) headers.Authorization = `Bearer ${token}`;
 
-    // Step 1: Resolve the direct stream URL from the xtream proxy (same as normal live player)
+    // Step 1: Resolve the direct stream URL from the xtream proxy
     const apiUrl = `/api/proxy/xtream/${encodeURIComponent(channel.source_id)}/stream/${encodeURIComponent(channel.stream_id)}/live`;
     let directUrl = null;
     try {
@@ -1328,132 +1635,44 @@
     } catch (_) {}
     if (!directUrl) directUrl = apiUrl;
 
-    // Step 2: Create a transcode session (mode=live) — same as the main live player
-    let finalUrl = null;
-    try {
-      const sessionRes = await fetch("/api/transcode/session", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ url: directUrl, mode: "live" })
-      });
-      if (sessionRes.ok) {
-        const sessionData = await sessionRes.json();
-        if (sessionData && sessionData.playlistUrl) {
-          finalUrl = sessionData.playlistUrl;
-        }
-      }
-    } catch (e) {
-      console.warn("[Adult Live] Transcode session failed:", e.message);
-    }
+    adultCurrentDirectUrl = directUrl;
+    adultIsUsingProxy = false;
 
-    // Fallback: direct HLS.js (no proxy/stream wrapper — avoids 405 on manifests)
-    if (!finalUrl) finalUrl = directUrl;
+    // Step 2: Probe the stream for codecs
+    const probe = await probeAdultStream(directUrl, token);
 
-    // Step 3: Play via HLS.js (same as main live player)
-    if (window.Hls && window.Hls.isSupported()) {
-      const hls = new window.Hls({
-        enableWorker: true,
-        maxBufferLength: 20,
-        maxMaxBufferLength: 30,
-        maxBufferSize: 30 * 1000 * 1000,
-        liveSyncDurationCount: 5,
-        liveMaxLatencyDurationCount: 8,
-        startFragPrefetch: false,
-        manifestLoadingMaxRetry: 10,
-        manifestLoadingRetryDelay: 2000,
-        manifestLoadingMaxRetryTimeout: 30000,
-        levelLoadingMaxRetry: 10,
-        levelLoadingRetryDelay: 2000,
-        levelLoadingMaxRetryTimeout: 30000,
-        fragLoadingMaxRetry: 10,
-        fragLoadingRetryDelay: 2000,
-        fragLoadingMaxRetryTimeout: 30000
-      });
-      hls.loadSource(finalUrl);
-      hls.attachMedia(video);
-      video.hls = hls;
-
-      hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
-        if (errEl) errEl.classList.add("hidden");
-        video.muted = false;
-        video.volume = 1;
-        const p = video.play();
-        if (p && typeof p.catch === "function") {
-          p.catch(() => {
-            video.muted = true;
-            video.play().catch(e => console.warn("[Adult Live] Autoplay fallback:", e));
-          });
-        }
-      });
-
-      hls.on(window.Hls.Events.AUDIO_TRACKS_UPDATED, () => {
-        if (hls.audioTracks && hls.audioTracks.length > 0 && hls.audioTrack === -1) {
-          hls.audioTrack = 0;
-        }
-      });
-
-      hls.on(window.Hls.Events.FRAG_BUFFERED, () => {
-        if (buffering) buffering.classList.add("hidden");
-        if (errEl) errEl.classList.add("hidden");
-      });
-
-      hls.on(window.Hls.Events.FRAG_LOADED, () => {
-        if (buffering) buffering.classList.add("hidden");
-        if (errEl) errEl.classList.add("hidden");
-      });
-
-      hls.on(window.Hls.Events.ERROR, (event, data) => {
-        console.warn("[Adult Live] HLS notice:", data.type, data.details, data.response?.code);
-        const statusCode = data.response?.code;
-
-        if (statusCode === 500 || statusCode === 404 || statusCode === 410) {
-          console.log("[Adult Live] Channel unavailable at source (Status " + statusCode + "). Stopping retries.");
-          try { hls.destroy(); } catch (_) {}
-          video.hls = null;
-          if (buffering) buffering.classList.add("hidden");
-          if (errEl) errEl.classList.remove("hidden");
-          return;
-        }
-
-        if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR || statusCode === 503 || statusCode === 458 || statusCode === 429) {
-          setTimeout(() => {
-            if (video && video.hls === hls) hls.startLoad();
-          }, 1500);
-          return;
-        }
-
-        if (data.fatal) {
-          switch (data.type) {
-            case window.Hls.ErrorTypes.NETWORK_ERROR:
-              hls.startLoad();
-              break;
-            case window.Hls.ErrorTypes.MEDIA_ERROR:
-              hls.recoverMediaError();
-              break;
-            default:
-              hls.destroy();
-              if (buffering) buffering.classList.add("hidden");
-              if (errEl) errEl.classList.remove("hidden");
-              break;
-          }
-        } else if (data.details === "bufferStalledError") {
-          if (video && !video.paused) video.currentTime = video.currentTime + 0.1;
-        }
-      });
-    } else if (video.canPlayType("application/vnd.apple.mpegurl") || video.canPlayType("application/x-mpegURL")) {
-      // Native HLS (Safari / iOS)
-      video.muted = false;
-      video.volume = 1;
-      video.src = finalUrl;
-      video.load();
-      const p = video.play();
-      if (p && typeof p.catch === "function") {
-        p.catch(() => {
-          video.muted = true;
-          video.play().catch(e => console.warn("[Adult Live] Direct play notice:", e));
+    let finalUrl = directUrl;
+    if (probe && (probe.needsTranscode || computeAdultVideoMode(probe, probe.video) === "encode")) {
+      const videoMode = computeAdultVideoMode(probe, probe.video);
+      try {
+        const sessionRes = await fetch("/api/transcode/session", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            url: directUrl,
+            mode: "live",
+            videoMode,
+            videoCodec: probe.video,
+            audioCodec: probe.audio,
+            audioChannels: probe.audioChannels
+          })
         });
+        if (sessionRes.ok) {
+          const sessionData = await sessionRes.json();
+          if (sessionData && sessionData.playlistUrl) {
+            activeAdultTranscodeSessionId = sessionData.sessionId;
+            finalUrl = sessionData.playlistUrl;
+          }
+        }
+      } catch (e) {
+        console.warn("[Adult Live] Transcode session failed:", e.message);
       }
+    } else if (probe && probe.needsRemux) {
+      finalUrl = `/api/remux?url=${encodeURIComponent(directUrl)}`;
     }
+
+    // Step 3: Play via unified HLS.js engine with 90s/250MB buffer
+    playAdultHlsStream(finalUrl, true);
   }
 
   window.veloraPlayAdultLiveChannelByIndex = playAdultLiveChannelByIndex;
@@ -1607,23 +1826,6 @@
     } catch (_) {}
   }
 
-  let activeAdultTranscodeSessionId = null;
-  async function closeAdultTranscodeSession() {
-    if (!activeAdultTranscodeSessionId) return;
-    const sid = activeAdultTranscodeSessionId;
-    activeAdultTranscodeSessionId = null;
-    try {
-      const token = localStorage.getItem("authToken");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      fetch(`/api/transcode/${encodeURIComponent(sid)}`, {
-        method: "DELETE",
-        headers,
-        keepalive: true
-      }).catch(() => {});
-    } catch (_) {}
-  }
-  window.veloraCloseActiveAdultTranscodeSession = closeAdultTranscodeSession;
-
   let activeVodPlayToken = 0;
   async function playAdultMovieByIndex(index) {
     const list = window._veloraAdultVodMovies;
@@ -1634,6 +1836,10 @@
     const playToken = ++activeVodPlayToken;
     window._veloraAdultVodCurrentIndex = index;
     const movie = list[index];
+    currentAdultMovieMetadata = movie;
+    currentAdultVodStartAt = 0;
+    currentAdultVodDuration = Number(movie.duration_secs || movie.duration) || null;
+    isAdultVodSeekableTranscode = false;
 
     const rows = document.querySelectorAll(".vel-adult-movie-row");
     rows.forEach((row, idx) => {
@@ -1680,17 +1886,25 @@
     if (!directSourceUrl) directSourceUrl = apiUrl;
     if (playToken !== activeVodPlayToken) return;
 
-    // Step 2: Probe the stream to detect codec — same as main player
+    currentAdultVodSourceUrl = directSourceUrl;
+    adultCurrentDirectUrl = directSourceUrl;
+    adultIsUsingProxy = false;
+
+    // Step 2: Probe the stream to detect codec
     const probe = await probeAdultStream(directSourceUrl, token);
     if (playToken !== activeVodPlayToken) return;
 
-    // Step 3: Compute videoMode from probe — mirrors main player bp() logic
     const videoCodec = probe?.video || null;
     const audioCodec = probe?.audio || null;
     const audioChannels = probe?.audioChannels || null;
     const videoMode = computeAdultVideoMode(probe, videoCodec);
 
-    // Step 4: Always use transcode session with full codec params — same as main player
+    currentAdultVideoMode = videoMode;
+    currentAdultVideoCodec = videoCodec;
+    currentAdultAudioCodec = audioCodec;
+    currentAdultAudioChannels = audioChannels;
+
+    // Step 3: Always use transcode session for VOD stability & seeking
     let finalUrl = null;
     try {
       const sessionRes = await fetch("/api/transcode/session", {
@@ -1699,6 +1913,8 @@
         body: JSON.stringify({
           url: directSourceUrl,
           mode: "vod",
+          startAt: 0,
+          seekOffset: 0,
           metadata: movie,
           duration: movie.duration_secs || movie.duration || null,
           videoMode,
@@ -1717,6 +1933,9 @@
         }
         if (sessionData && sessionData.playlistUrl) {
           activeAdultTranscodeSessionId = sessionData.sessionId;
+          currentAdultVodStartAt = Number(sessionData.startAt ?? sessionData.seekOffset ?? 0) || 0;
+          currentAdultVodDuration = sessionData.durationSeconds ?? currentAdultVodDuration;
+          isAdultVodSeekableTranscode = sessionData.seekable === true;
           finalUrl = sessionData.playlistUrl;
         }
       }
@@ -1725,99 +1944,11 @@
     }
 
     if (!finalUrl) {
-      if (buffering) buffering.classList.add("hidden");
-      if (errEl) errEl.classList.remove("hidden");
-      return;
+      finalUrl = directSourceUrl;
     }
 
-    // Step 5: Destroy any existing HLS instance
-    if (video.hls && typeof video.hls.destroy === "function") {
-      try { video.hls.destroy(); } catch (_) {}
-      video.hls = null;
-    }
-
-    // Step 6: Play via HLS.js — same path as main player VOD
-    if (window.Hls && window.Hls.isSupported()) {
-      const hls = new window.Hls({
-        enableWorker: true,
-        maxBufferLength: 30,
-        maxMaxBufferLength: 60,
-        maxBufferSize: 60 * 1000 * 1000
-      });
-      hls.loadSource(finalUrl);
-      hls.attachMedia(video);
-      video.hls = hls;
-
-      hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
-        if (playToken !== activeVodPlayToken) return;
-        if (errEl) errEl.classList.add("hidden");
-        video.muted = false;
-        video.volume = 1;
-        const p = video.play();
-        if (p && typeof p.catch === "function") {
-          p.catch(() => {
-            video.muted = true;
-            video.play().catch(e => console.warn("[Adult VOD] Autoplay fallback:", e));
-          });
-        }
-      });
-
-      hls.on(window.Hls.Events.AUDIO_TRACKS_UPDATED, () => {
-        if (hls.audioTracks && hls.audioTracks.length > 0 && hls.audioTrack === -1) {
-          hls.audioTrack = 0;
-        }
-      });
-
-      hls.on(window.Hls.Events.FRAG_BUFFERED, () => {
-        if (buffering) buffering.classList.add("hidden");
-        if (errEl) errEl.classList.add("hidden");
-      });
-
-      hls.on(window.Hls.Events.FRAG_LOADED, () => {
-        if (buffering) buffering.classList.add("hidden");
-        if (errEl) errEl.classList.add("hidden");
-      });
-
-      hls.on(window.Hls.Events.ERROR, (event, data) => {
-        const statusCode = data.response?.code;
-        if (statusCode === 500 || statusCode === 404 || statusCode === 410) {
-          console.log("[Adult VOD] Video unavailable at source (Status " + statusCode + ").");
-          try { hls.destroy(); } catch (_) {}
-          video.hls = null;
-          if (buffering) buffering.classList.add("hidden");
-          if (errEl) errEl.classList.remove("hidden");
-          return;
-        }
-        if (data.fatal) {
-          switch (data.type) {
-            case window.Hls.ErrorTypes.NETWORK_ERROR:
-              hls.startLoad();
-              break;
-            case window.Hls.ErrorTypes.MEDIA_ERROR:
-              hls.recoverMediaError();
-              break;
-            default:
-              hls.destroy();
-              if (buffering) buffering.classList.add("hidden");
-              if (errEl) errEl.classList.remove("hidden");
-              break;
-          }
-        }
-      });
-    } else if (video.canPlayType("application/vnd.apple.mpegurl") || video.canPlayType("application/x-mpegURL")) {
-      // Native HLS (Safari / iOS)
-      video.muted = false;
-      video.volume = 1;
-      video.src = finalUrl;
-      video.load();
-      const p = video.play();
-      if (p && typeof p.catch === "function") {
-        p.catch(() => {
-          video.muted = true;
-          video.play().catch(e => console.warn("[Adult VOD] Direct play notice:", e));
-        });
-      }
-    }
+    // Step 4: Play via unified HLS.js engine with deep buffer
+    playAdultHlsStream(finalUrl, false);
   }
 
   window.veloraPlayAdultMovieByIndex = playAdultMovieByIndex;

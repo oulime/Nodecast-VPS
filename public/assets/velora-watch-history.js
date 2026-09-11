@@ -793,19 +793,44 @@
     rewindContinuousSeconds: 0
   };
 
-  function updateSessionTrackerMedia(mediaId) {
+  function updateSessionTrackerMedia(mediaId, mediaObj) {
     if (!mediaId) return;
     if (sessionTracker.mediaId === mediaId) return;
     var history = getLocalHistory();
     var alreadySaved = history.some(function (it) {
       return String(it.id) === String(mediaId);
     });
+
+    var isRewindEpisode = false;
+    if (mediaObj && mediaObj.type === "series") {
+      var sId = String(mediaObj.seriesId || mediaObj.streamId || "");
+      var sNorm = normalizeTitle(mediaObj.name || mediaObj.seriesName || "");
+      var curSeason = Number(mediaObj.seasonNumber) || 1;
+      var curEpisode = Number(mediaObj.episodeNumber) || 1;
+
+      var existingSeriesEp = history.find(function (it) {
+        if (!it || it.type !== "series") return false;
+        var itSId = String(it.seriesId || it.streamId || "");
+        if (sId && itSId === sId) return true;
+        if (sNorm && it.name && normalizeTitle(it.name) === sNorm) return true;
+        return false;
+      });
+
+      if (existingSeriesEp) {
+        var exSeason = Number(existingSeriesEp.seasonNumber) || 1;
+        var exEpisode = Number(existingSeriesEp.episodeNumber) || 1;
+        if (curSeason < exSeason || (curSeason === exSeason && curEpisode < exEpisode)) {
+          isRewindEpisode = true;
+        }
+      }
+    }
+
     sessionTracker.mediaId = mediaId;
     sessionTracker.continuousSeconds = 0;
     sessionTracker.lastTick = null;
     sessionTracker.qualified = alreadySaved;
     sessionTracker.seekFromTime = 0;
-    sessionTracker.rewindActive = false;
+    sessionTracker.rewindActive = isRewindEpisode;
     sessionTracker.rewindStartTime = 0;
     sessionTracker.rewindContinuousSeconds = 0;
   }
@@ -901,13 +926,25 @@
       return String(item.id) !== String(id);
     });
 
-    // If rewound or replaying a series episode before completion, remove unstarted placeholder next-episodes
-    if (media.type === "series" && !isFinished) {
+    // If user is watching a series episode, prune any subsequent episodes of this series (e.g. Ep 8 when currently watching Ep 4) and unstarted placeholders
+    if (media.type === "series") {
       var activeSeriesId = String(media.seriesId || media.streamId || "");
+      var sNorm = normalizeTitle(media.name || media.seriesName || "");
+      var curSeason = Number(media.seasonNumber) || 1;
+      var curEpisode = Number(media.episodeNumber) || 1;
+
       items = items.filter(function (it) {
         if (!it || it.type !== "series") return true;
         var itSId = String(it.seriesId || it.streamId || "");
-        if (activeSeriesId && itSId === activeSeriesId) {
+        var sameSeries = (activeSeriesId && itSId === activeSeriesId) || (sNorm && it.name && normalizeTitle(it.name) === sNorm);
+        if (sameSeries) {
+          var itSeason = Number(it.seasonNumber) || 1;
+          var itEpisode = Number(it.episodeNumber) || 1;
+          // 1. If it's a later episode than the one currently being watched (e.g. Ep 8 when currently watching Ep 4), forget/remove it!
+          if (itSeason > curSeason || (itSeason === curSeason && itEpisode > curEpisode)) {
+            return false;
+          }
+          // 2. If it's an unstarted placeholder episode for this series, remove it
           if (it.currentTime === 0 && (it.progressPercent === 0 || it.progressPercent == null) && !it.isFinished) {
             return false;
           }
@@ -1693,7 +1730,7 @@
       updatedAt: Date.now()
     };
 
-    updateSessionTrackerMedia(state.currentPlaying.id);
+    updateSessionTrackerMedia(state.currentPlaying.id, state.currentPlaying);
   });
 
   // Helper to get minimum watch seconds required for Reprendre rail (default 3 mins = 180s)
@@ -1757,26 +1794,20 @@
 
     seriesGroups.forEach(function (epsList, sKey) {
       epsList.sort(function (a, b) {
-        var sa = (Number(a.seasonNumber) || 1) * 1000 + (Number(a.episodeNumber) || 1);
-        var sb = (Number(b.seasonNumber) || 1) * 1000 + (Number(b.episodeNumber) || 1);
-        if (sa !== sb) return sb - sa;
         return (b.updatedAt || 0) - (a.updatedAt || 0);
       });
 
-      // 1. In-progress episode takes precedence
-      var inProgress = epsList.find(function (e) {
-        return !e.isFinished && (e.progressPercent == null || e.progressPercent < FINISHED_WATCH_PERCENT);
-      });
+      var activeEp = epsList[0];
+      if (!activeEp) return;
 
-      if (inProgress) {
-        resolvedSeriesCards.push(inProgress);
+      // 1. In-progress episode takes precedence
+      if (!activeEp.isFinished && (activeEp.progressPercent == null || activeEp.progressPercent < FINISHED_WATCH_PERCENT)) {
+        resolvedSeriesCards.push(activeEp);
         return;
       }
 
       // 2. All recorded episodes are finished: advance to next episode
-      var latestFinished = epsList[0];
-      if (!latestFinished) return;
-
+      var latestFinished = activeEp;
       var sId = latestFinished.seriesId || latestFinished.streamId;
       var cachedEps = getSeriesEpisodesCache(sId);
       if (cachedEps && cachedEps.length > 0) {

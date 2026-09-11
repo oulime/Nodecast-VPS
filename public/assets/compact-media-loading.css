@@ -231,7 +231,7 @@ body.vel-media-package-sweeping.vel-media-package-sweeping-leaving::after,
   position: absolute;
   inset: -6px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(168, 85, 247, 0.35) 0%, rgba(99, 102, 241, 0.15) 50%, transparent 72%);
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.25) 0%, transparent 70%);
   filter: blur(8px);
   animation: vel-channel-halo-pulse 2.2s ease-in-out infinite;
   pointer-events: none;
@@ -242,10 +242,10 @@ body.vel-media-package-sweeping.vel-media-package-sweeping-leaving::after,
   inset: 0;
   border-radius: 50%;
   border: 2.5px solid transparent;
-  border-top-color: #c084fc;
-  border-right-color: #a855f7;
-  border-bottom-color: #6366f1;
-  box-shadow: 0 0 24px rgba(168, 85, 247, 0.45), inset 0 0 14px rgba(168, 85, 247, 0.2);
+  border-top-color: #38bdf8;
+  border-right-color: #0284c7;
+  border-bottom-color: rgba(56, 189, 248, 0.4);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
   animation: vel-channel-spin 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 

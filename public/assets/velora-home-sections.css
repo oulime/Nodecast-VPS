@@ -296,8 +296,8 @@
   gap: 0.75rem !important;
   padding: 1rem !important;
   text-align: center !important;
-  background: radial-gradient(120% 120% at 50% 40%, rgba(139, 92, 246, 0.16) 0%, rgba(13, 11, 24, 0.96) 100%) !important;
-  border: 1px solid rgba(139, 92, 246, 0.35) !important;
+  background: #10121e !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
   border-radius: 10px !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
   cursor: pointer !important;
@@ -320,8 +320,8 @@
 .vel-home-section__package-link:focus-visible,
 .vel-home-section__package-link:active {
   transform: none !important;
-  border-color: rgba(139, 92, 246, 0.35) !important;
-  background: radial-gradient(120% 120% at 50% 40%, rgba(139, 92, 246, 0.16) 0%, rgba(13, 11, 24, 0.96) 100%) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  background: #141726 !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
   outline: none !important;
 }

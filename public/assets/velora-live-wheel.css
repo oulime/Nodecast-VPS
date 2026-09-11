@@ -74,7 +74,7 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active):not(.vel-favorites-o
   display: block !important;
   width: 100% !important;
   aspect-ratio: 16 / 9 !important;
-  background: radial-gradient(circle at 50% 45%, #12101b 0%, #050508 100%) !important;
+  background: #050508 !important;
   border-radius: 12px !important;
   overflow: hidden !important;
   position: relative !important;

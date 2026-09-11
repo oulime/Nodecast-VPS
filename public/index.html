@@ -2114,21 +2114,14 @@
       display: none !important;
     }
 
-    /* Static TV Live background - 0% CPU/GPU overhead */
+    /* Ultra-light unified solid dark background everywhere (0% CPU/GPU overhead) */
+    html,
+    body,
+    .main--velora,
+    body .main--velora,
     body[data-vel-active-tab="live"] .main--velora,
     body[data-vel-top-level="live"] .main--velora,
-    .main--velora.main--velora-live-package {
-      background-color: #060511 !important;
-      background-image:
-        radial-gradient(ellipse 90% 50% at 50% -10%, rgba(56, 189, 248, 0.18), transparent 70%),
-        radial-gradient(circle 500px at 0% 75%, rgba(37, 99, 235, 0.14), transparent 70%),
-        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px) !important;
-      background-size: auto, auto, 44px 44px, 44px 44px !important;
-      background-repeat: no-repeat, no-repeat, repeat, repeat !important;
-      background-attachment: fixed !important;
-    }
-
+    .main--velora.main--velora-live-package,
     body[data-vel-active-tab="movies"] .main--velora,
     body[data-vel-active-tab="series"] .main--velora,
     body[data-vel-top-level="movies"] .main--velora,
@@ -2138,7 +2131,7 @@
     body.vel-home-empty-active .main--velora,
     .vel-home-empty-page,
     #vel-home-empty-page,
-    body:not([data-vel-active-tab="live"]) .main--velora {
+    body.velora-tv-mode .main--velora {
       background-color: #06050a !important;
       background-image: none !important;
     }
@@ -14672,7 +14665,7 @@
         width: 100% !important;
         max-height: 32vh !important;
         aspect-ratio: 16 / 9 !important;
-        background: radial-gradient(circle at 50% 45%, #141120 0%, #06050a 100%) !important;
+        background: #06050a !important;
       }
 
       body[data-vel-active-tab="live"] #player-container #video,
@@ -14852,11 +14845,7 @@
       max-height: 100%;
       padding:
         max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) var(--vel-search-bottom-space) max(16px, env(safe-area-inset-left, 0px));
-      background:
-        radial-gradient(circle at 50% 0%, rgba(124, 58, 237, 0.22), transparent 50%),
-        radial-gradient(circle at 85% 90%, rgba(14, 165, 233, 0.14), transparent 45%),
-        radial-gradient(circle at 15% 85%, rgba(225, 29, 72, 0.12), transparent 40%),
-        rgba(4, 6, 14, 0.88);
+      background: rgba(4, 6, 14, 0.95);
       -webkit-backdrop-filter: blur(28px) saturate(160%);
       backdrop-filter: blur(28px) saturate(160%);
       overflow: hidden;

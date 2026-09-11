@@ -12037,16 +12037,24 @@
           thumb.className = "vel-global-search__thumb";
           thumb.setAttribute("aria-hidden", "true");
 
-          if (item.thumbUrl) {
+          var thumbUrl = item.thumbUrl || (item.item && (item.item.stream_icon || item.item.cover)) || "";
+          if (thumbUrl) {
             var image = document.createElement("img");
             image.alt = "";
             image.loading = "lazy";
             image.decoding = "async";
-            image.src = item.thumbUrl;
+            image.src = thumbUrl;
             image.addEventListener("error", function () {
               image.remove();
+              if (!isVod && !thumb.textContent) {
+                thumb.textContent = "📺";
+                thumb.classList.add("vel-global-search__thumb--fallback");
+              }
             });
             thumb.appendChild(image);
+          } else if (!isVod) {
+            thumb.textContent = "📺";
+            thumb.classList.add("vel-global-search__thumb--fallback");
           }
 
           // Quality Badge overlay

@@ -277,12 +277,15 @@ async function getIndexedCategory(action, category, snapshotVersion, type) {
         const name = cleanText(item.name || item.title || item.series_name, 500);
         if (itemId === undefined || itemId === null || !name) return null;
         if (type === 'live' && veloraData.isHomeChannelHidden(name)) return null;
+        const icon = type === 'live'
+            ? veloraData.sanitizeChannelIcon(name, item.stream_icon || item.cover, '', { categoryId: category.categoryId, sourceId: category.sourceId, streamId: itemId })
+            : cleanText(item.stream_icon || item.cover, 2000);
         return {
             sourceId: category.sourceId,
             itemId: String(itemId),
             normalizedName: normalizeText(name),
             name,
-            streamIcon: cleanText(item.stream_icon || item.cover, 2000),
+            streamIcon: cleanText(icon, 2000),
             containerExtension: cleanText(item.container_extension, 32),
             categoryId: category.categoryId
         };
@@ -307,14 +310,18 @@ async function getIndexedSnapshot(action, snapshotVersion, type) {
         const name = cleanText(item.name || item.title || item.series_name, 500);
         if (!Number.isInteger(sourceId) || itemId == null || !name) return null;
         if (type === 'live' && veloraData.isHomeChannelHidden(name)) return null;
+        const catId = cleanText(item.raw_category_id || item.category_id, 160);
+        const icon = type === 'live'
+            ? veloraData.sanitizeChannelIcon(name, item.stream_icon || item.cover, '', { categoryId: catId, sourceId, streamId: itemId })
+            : cleanText(item.stream_icon || item.cover, 2000);
         return {
             sourceId,
             itemId: String(itemId),
             normalizedName: normalizeText(name),
             name,
-            streamIcon: cleanText(item.stream_icon || item.cover, 2000),
+            streamIcon: cleanText(icon, 2000),
             containerExtension: cleanText(item.container_extension, 32),
-            categoryId: cleanText(item.raw_category_id || item.category_id, 160)
+            categoryId: catId
         };
     }).filter(Boolean);
     setCategoryIndex(key, indexedRows);
@@ -339,14 +346,18 @@ async function getIndexedCountrySnapshot(action, snapshotVersion, type, countryS
         if (type === 'live' && veloraData.isHomeChannelHidden(name)) return null;
         const countryAssignment = getCountryItemAssignment(countryScope, sourceId, itemId);
         if (!countryAssignment) return null;
+        const catId = cleanText(item.raw_category_id || item.category_id, 160);
+        const icon = type === 'live'
+            ? veloraData.sanitizeChannelIcon(name, item.stream_icon || item.cover, countryAssignment.packageCover || '', { categoryId: catId, sourceId, streamId: itemId, packageId: countryAssignment.packageId, packageName: countryAssignment.packageName })
+            : cleanText(item.stream_icon || item.cover, 2000);
         return {
             sourceId,
             itemId: String(itemId),
             normalizedName: normalizeText(name),
             name,
-            streamIcon: cleanText(item.stream_icon || item.cover, 2000),
+            streamIcon: cleanText(icon, 2000),
             containerExtension: cleanText(item.container_extension, 32),
-            categoryId: cleanText(item.raw_category_id || item.category_id, 160),
+            categoryId: catId,
             countryAssignment
         };
     }).filter(Boolean);
@@ -462,13 +473,16 @@ async function searchSource(sourceId, type, categoryMap, normalizedQuery, allowe
         const globalStreamId = encodeGlobalId(sourceId, itemId);
         const priority = category.priority;
         const score = calculateScore(normName, normalizedQuery, tokens, priority);
+        const icon = type === 'live'
+            ? veloraData.sanitizeChannelIcon(name, item.stream_icon || item.cover, countryAssignment?.packageCover || '', { categoryId: String(item.category_id ?? category.categoryId), sourceId, streamId: itemId, packageId: category.packageId, packageName: category.packageName })
+            : cleanText(item.stream_icon || item.cover, 2000);
         results.push({
             id: `api:${type}:${globalStreamId}`,
             sourceId,
             itemId: String(itemId),
             globalStreamId,
             name,
-            streamIcon: cleanText(item.stream_icon || item.cover, 2000),
+            streamIcon: cleanText(icon, 2000),
             containerExtension: cleanText(item.container_extension, 32),
             categoryId: String(item.category_id ?? category.categoryId),
             packageId: category.packageId,
@@ -629,13 +643,20 @@ router.post('/', async (req, res) => {
         }
 
         res.json({ query, type, source: 'provider-api', results, partial: errors.length > 0 });
-    } catch (err) {
-        console.error('Search API error:', err);
-        res.status(500).json({ error: 'Search API unavailable.' });
+    } catch (error) {
+        console.error('[Search] Request error:', error);
+        res.status(500).json({ error: 'Search failed', details: error.message });
     }
 });
 
+function clearSearchIndex() {
+    categorySearchIndex.clear();
+    countryScopeIndex.clear();
+    indexedSnapshotVersion = null;
+}
+
 module.exports = router;
+module.exports.clearSearchIndex = clearSearchIndex;
 module.exports._test = {
     normalizeText,
     getQueryTokens,
@@ -646,5 +667,6 @@ module.exports._test = {
     getCountrySearchScope,
     getCountryItemAssignment,
     resolveSearchCategory,
-    searchSnapshot
+    searchSnapshot,
+    clearSearchIndex
 };

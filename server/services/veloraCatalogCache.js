@@ -173,16 +173,25 @@ function listStreams(sourceIds, type) {
             const globalStreamId = encodeGlobalId(item.source_id, item.item_id);
             const globalCategoryId = encodeGlobalId(item.source_id, item.category_id);
             let poster = String(item.stream_icon || posterCache[`${item.source_id}:${item.item_id}`] || '').trim();
-            if (type === 'live' && !poster) {
+            if (type === 'live') {
                 try {
-                    const channelLogoMatcher = require('./channelLogoMatcher');
-                    const matched = channelLogoMatcher.matchChannelLogo(item.name);
-                    if (matched && matched.logo) {
-                        poster = matched.logo;
-                    } else if (typeof channelLogoMatcher.resolveChannelPackageLogo === 'function') {
-                        poster = channelLogoMatcher.resolveChannelPackageLogo(item.name, item.category_id, item.source_id, item.item_id) || '';
-                    }
-                } catch (_) {}
+                    const veloraData = require('../routes/veloraData');
+                    poster = veloraData.sanitizeChannelIcon(item.name, poster, '', {
+                        categoryId: item.category_id,
+                        sourceId: item.source_id,
+                        streamId: item.item_id
+                    });
+                } catch (_) {
+                    try {
+                        const channelLogoMatcher = require('./channelLogoMatcher');
+                        const matched = channelLogoMatcher.matchChannelLogo(item.name);
+                        if (matched && matched.logo) {
+                            poster = matched.logo;
+                        } else if (typeof channelLogoMatcher.resolveChannelPackageLogo === 'function') {
+                            poster = channelLogoMatcher.resolveChannelPackageLogo(item.name, item.category_id, item.source_id, item.item_id) || '';
+                        }
+                    } catch (_) {}
+                }
             }
             return {
                 ...data,

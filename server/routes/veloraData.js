@@ -1005,6 +1005,10 @@ function invalidateCountryPackageCache() {
     // Home sections and media feeds are derived views of the same package memberships.
     removeCacheFile(homeCachePath);
     removeCacheFile(mediaFeedCachePath);
+    try {
+        const searchRouter = require('./search');
+        if (typeof searchRouter.clearSearchIndex === 'function') searchRouter.clearSearchIndex();
+    } catch (_) {}
 }
 
 function invalidateHomeCache() {

@@ -1142,11 +1142,12 @@
     requestDecorateEpisodes();
   }
 
-  // Safe seek handler once video playback actively starts
+  // Safe seek handler once video playback actively starts (Netflix-style 5s rewind buffer)
   window.veloraResumePlayback = function (item) {
     if (!isValidMediaEntry(item)) return;
     var isSeries = item.type === "series";
-    var targetSeconds = Math.max(0, Number(item.currentTime) || 0);
+    var rawSeconds = Number(item.currentTime) || 0;
+    var targetSeconds = Math.max(0, rawSeconds - 5);
     window.__veloraPendingResumeSeek = { targetSeconds: targetSeconds, applied: false, timestamp: Date.now() };
 
     // 1. Close home page
@@ -1277,8 +1278,9 @@
       var saved = findHistoryForEpisodeRow(epBtn, history, sName, sId);
 
       if (saved && saved.currentTime > 3 && !saved.isFinished && (saved.progressPercent == null || saved.progressPercent < FINISHED_WATCH_PERCENT)) {
-        window.__veloraPendingResumeSeek = { targetSeconds: saved.currentTime, applied: false, timestamp: Date.now() };
-        console.info("[Watch History] Clicked episode resume armed at", saved.currentTime, "seconds.");
+        var targetEpSeek = Math.max(0, (saved.currentTime || 0) - 5);
+        window.__veloraPendingResumeSeek = { targetSeconds: targetEpSeek, applied: false, timestamp: Date.now() };
+        console.info("[Watch History] Clicked episode resume armed at", targetEpSeek, "seconds (with -5s rewind buffer).");
       } else {
         window.__veloraPendingResumeSeek = null;
       }
@@ -1294,8 +1296,9 @@
           return it && it.type !== "series" && String(it.streamId) === String(activeCard.dataset.streamId);
         });
         if (mSaved && mSaved.currentTime > 3 && !mSaved.isFinished && (mSaved.progressPercent == null || mSaved.progressPercent < FINISHED_WATCH_PERCENT)) {
-          window.__veloraPendingResumeSeek = { targetSeconds: mSaved.currentTime, applied: false, timestamp: Date.now() };
-          console.info("[Watch History] Clicked movie resume armed at", mSaved.currentTime, "seconds.");
+          var targetMovieSeek = Math.max(0, (mSaved.currentTime || 0) - 5);
+          window.__veloraPendingResumeSeek = { targetSeconds: targetMovieSeek, applied: false, timestamp: Date.now() };
+          console.info("[Watch History] Clicked movie resume armed at", targetMovieSeek, "seconds (with -5s rewind buffer).");
         } else {
           window.__veloraPendingResumeSeek = null;
         }
@@ -1358,9 +1361,9 @@
 
     var initialSeekTime = 0;
     if (savedProgress && savedProgress.currentTime > 3 && !savedProgress.isFinished && (savedProgress.progressPercent == null || savedProgress.progressPercent < FINISHED_WATCH_PERCENT)) {
-      initialSeekTime = savedProgress.currentTime;
+      initialSeekTime = Math.max(0, (savedProgress.currentTime || 0) - 5);
       window.__veloraPendingResumeSeek = { targetSeconds: initialSeekTime, applied: false, timestamp: Date.now() };
-      console.info("[Watch History] Auto-resuming at", initialSeekTime, "seconds for", d.name || d.episodeTitle || d.seriesName);
+      console.info("[Watch History] Auto-resuming with -5s buffer at", initialSeekTime, "seconds (saved was", savedProgress.currentTime, "s) for", d.name || d.episodeTitle || d.seriesName);
     } else {
       window.__veloraPendingResumeSeek = null;
     }

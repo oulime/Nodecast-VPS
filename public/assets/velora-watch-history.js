@@ -542,6 +542,167 @@
     return null;
   }
 
+  // ============================================================
+  // Series Episodes Cache & Next Episode Engine
+  // ============================================================
+  window.__veloraSeriesEpisodesCache = window.__veloraSeriesEpisodesCache || {};
+
+  function parseEpisodesFromSeriesInfo(s) {
+    if (!s || typeof s !== "object") return [];
+    var d = (s.data && typeof s.data === "object") ? s.data : s;
+    var epsObj = d.episodes;
+    if (!epsObj || typeof epsObj !== "object" || Array.isArray(epsObj)) {
+      if (Array.isArray(d.episodes)) return d.episodes;
+      return [];
+    }
+    var result = [];
+    var seasonKeys = Object.keys(epsObj).sort(function (a, b) { return Number(a) - Number(b); });
+    for (var sIdx = 0; sIdx < seasonKeys.length; sIdx++) {
+      var seasonNum = Number(seasonKeys[sIdx]);
+      var list = epsObj[seasonKeys[sIdx]];
+      if (!Array.isArray(list)) continue;
+      var sorted = list.slice().sort(function (a, b) {
+        var ea = Number((a && (a.episode_num ?? a.episode_number)) || 0);
+        var eb = Number((b && (b.episode_num ?? b.episode_number)) || 0);
+        return ea - eb;
+      });
+      for (var eIdx = 0; eIdx < sorted.length; eIdx++) {
+        var ep = sorted[eIdx];
+        if (!ep || typeof ep !== "object") continue;
+        var streamId = Number(ep.stream_id ?? ep.id);
+        if (!Number.isFinite(streamId) || streamId <= 0) continue;
+        var epNum = Number(ep.episode_num ?? ep.episode_number ?? 0);
+        var season = ep.season != null && Number.isFinite(Number(ep.season)) ? Number(ep.season) : seasonNum;
+        var title = String(ep.title || ep.name || "").trim() || (Number.isFinite(epNum) ? ("Épisode " + epNum) : "Épisode");
+        var duration = (ep.info && typeof ep.info === "object" && typeof ep.info.duration === "string") ? ep.info.duration.trim() : "";
+        var containerExtension = typeof ep.container_extension === "string" ? ep.container_extension.trim().toLowerCase() : "mp4";
+        result.push({
+          episodeStreamId: streamId,
+          seasonNumber: season,
+          episodeNum: epNum,
+          title: title,
+          duration: duration,
+          containerExtension: containerExtension
+        });
+      }
+    }
+    return result;
+  }
+
+  function getSeriesEpisodesCache(seriesId) {
+    if (!seriesId) return null;
+    var sId = String(seriesId).trim();
+    if (window.__veloraSeriesEpisodesCache && window.__veloraSeriesEpisodesCache[sId]) {
+      return window.__veloraSeriesEpisodesCache[sId];
+    }
+    try {
+      var raw = localStorage.getItem("velora_series_eps_" + sId);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          window.__veloraSeriesEpisodesCache[sId] = parsed;
+          return parsed;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  window.veloraCacheSeriesEpisodes = function (seriesId, episodes) {
+    if (!seriesId || !Array.isArray(episodes) || !episodes.length) return;
+    var sId = String(seriesId).trim();
+    window.__veloraSeriesEpisodesCache[sId] = episodes;
+    try {
+      localStorage.setItem("velora_series_eps_" + sId, JSON.stringify(episodes));
+    } catch (_) {}
+  };
+
+  async function fetchSeriesEpisodes(seriesId, sourceId) {
+    if (!seriesId) return [];
+    var sId = String(seriesId).trim();
+    var cached = getSeriesEpisodesCache(sId);
+    if (cached && cached.length > 0) return cached;
+
+    var token = authToken();
+    var src = sourceId || "";
+    if (!src) {
+      if (window.__veloraActiveSourceId) src = window.__veloraActiveSourceId;
+      else {
+        try {
+          var userRaw = localStorage.getItem("velora_user") || localStorage.getItem("user");
+          if (userRaw) {
+            var u = JSON.parse(userRaw);
+            src = u.nodecastXtreamSourceId || u.sourceId || "";
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (src) {
+      try {
+        var urls = [
+          "/api/proxy/xtream/" + encodeURIComponent(src) + "/series_info?series_id=" + encodeURIComponent(sId),
+          "/api/proxy/xtream/" + encodeURIComponent(src) + "/player_api?action=get_series_info&series_id=" + encodeURIComponent(sId)
+        ];
+        for (var u of urls) {
+          var res = await fetch(u, { headers: token ? { Authorization: "Bearer " + token } : {} });
+          if (res.ok) {
+            var data = await res.json();
+            var eps = parseEpisodesFromSeriesInfo(data);
+            if (eps && eps.length > 0) {
+              window.veloraCacheSeriesEpisodes(sId, eps);
+              return eps;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("[Watch History] Failed fetching series episodes for", sId, e);
+      }
+    }
+    return [];
+  }
+
+  function findNextEpisodeInList(episodes, currentSeason, currentEpisode, episodeStreamId) {
+    if (!Array.isArray(episodes) || episodes.length === 0) return null;
+
+    var sorted = episodes.slice().sort(function (a, b) {
+      if (a.seasonNumber !== b.seasonNumber) return a.seasonNumber - b.seasonNumber;
+      return a.episodeNum - b.episodeNum;
+    });
+
+    var curIdx = -1;
+    if (episodeStreamId) {
+      curIdx = sorted.findIndex(function (e) {
+        return String(e.episodeStreamId) === String(episodeStreamId);
+      });
+    }
+
+    if (curIdx === -1 && currentSeason != null && currentEpisode != null) {
+      curIdx = sorted.findIndex(function (e) {
+        return Number(e.seasonNumber) === Number(currentSeason) && Number(e.episodeNum) === Number(currentEpisode);
+      });
+    }
+
+    if (curIdx !== -1) {
+      if (curIdx + 1 < sorted.length) {
+        return sorted[curIdx + 1];
+      } else {
+        return null;
+      }
+    }
+
+    if (currentSeason != null) {
+      var next = sorted.find(function (e) {
+        if (e.seasonNumber > Number(currentSeason)) return true;
+        if (e.seasonNumber === Number(currentSeason) && e.episodeNum > Number(currentEpisode || 0)) return true;
+        return false;
+      });
+      return next || null;
+    }
+
+    return null;
+  }
+
   // Database Sync
   async function syncProgressToDatabase(entry) {
     if (!isValidMediaEntry(entry)) return;
@@ -625,7 +786,11 @@
     mediaId: null,
     continuousSeconds: 0,
     lastTick: null,
-    qualified: false
+    qualified: false,
+    seekFromTime: 0,
+    rewindActive: false,
+    rewindStartTime: 0,
+    rewindContinuousSeconds: 0
   };
 
   function updateSessionTrackerMedia(mediaId) {
@@ -639,6 +804,10 @@
     sessionTracker.continuousSeconds = 0;
     sessionTracker.lastTick = null;
     sessionTracker.qualified = alreadySaved;
+    sessionTracker.seekFromTime = 0;
+    sessionTracker.rewindActive = false;
+    sessionTracker.rewindStartTime = 0;
+    sessionTracker.rewindContinuousSeconds = 0;
   }
 
   function tickHeartbeat() {
@@ -653,6 +822,15 @@
       var delta = (now - sessionTracker.lastTick) / 1000;
       if (delta > 0 && delta < 8) {
         sessionTracker.continuousSeconds += delta;
+        if (sessionTracker.rewindActive) {
+          sessionTracker.rewindContinuousSeconds += delta;
+          if (sessionTracker.rewindContinuousSeconds >= 5) {
+            sessionTracker.rewindActive = false;
+            sessionTracker.rewindContinuousSeconds = 0;
+            sessionTracker.qualified = true;
+            recordProgress(vodVideo, false, false, true);
+          }
+        }
       }
     }
     sessionTracker.lastTick = now;
@@ -669,7 +847,7 @@
   }
 
   // Record playback progress (Strictly for VOD Movies & Series Episodes only)
-  function recordProgress(video, isEnd, isThrottled) {
+  function recordProgress(video, isEnd, isThrottled, isRewindCommit) {
     if (!video || video.id === "video" || video.id === "vel-adult-video" || isNaN(video.currentTime) || (video.currentTime < MIN_WATCH_SECONDS && !isEnd)) return;
     if (document.body.dataset.velActiveTab === "live" || document.body.dataset.velActiveTab === "adult" || document.body.dataset.veloraReturnAdult === "true" || document.body.classList.contains("vel-adult-active")) return;
     if (!isVodPlayerVisible()) return;
@@ -714,7 +892,7 @@
     var percent = isEnd ? 100 : (duration > 0 ? Math.round((currentPos / duration) * 100) : 5);
     var isFinished = isEnd || (duration > 0 && percent >= FINISHED_WATCH_PERCENT);
 
-    if (!isFinished && !sessionTracker.qualified && !existingEntry) {
+    if (!isFinished && !sessionTracker.qualified && !existingEntry && !isRewindCommit) {
       // User has not watched continuously for the required minimum time yet and video is not finished
       return;
     }
@@ -722,6 +900,22 @@
     var items = getLocalHistory().filter(function (item) {
       return String(item.id) !== String(id);
     });
+
+    // If rewound or replaying a series episode before completion, remove unstarted placeholder next-episodes
+    if (media.type === "series" && !isFinished) {
+      var activeSeriesId = String(media.seriesId || media.streamId || "");
+      items = items.filter(function (it) {
+        if (!it || it.type !== "series") return true;
+        var itSId = String(it.seriesId || it.streamId || "");
+        if (activeSeriesId && itSId === activeSeriesId) {
+          if (it.currentTime === 0 && (it.progressPercent === 0 || it.progressPercent == null) && !it.isFinished) {
+            return false;
+          }
+        }
+        return true;
+      });
+    }
+
     var thumb = cleanCoverUrl(media.thumbUrl || (existingEntry ? existingEntry.thumbUrl : "") || "");
     var backdrop = cleanCoverUrl(media.backdropUrl || (existingEntry ? existingEntry.backdropUrl : "") || media.thumbUrl || "");
 
@@ -751,10 +945,84 @@
     if (!isValidMediaEntry(entry)) return;
 
     items.unshift(entry);
-    saveLocalHistory(items, isThrottled || isVodPlayerVisible());
+
+    if (media.type === "series" && isFinished) {
+      var sId = media.seriesId || media.streamId;
+      var cachedEps = getSeriesEpisodesCache(sId);
+      if (cachedEps && cachedEps.length > 0) {
+        var nextEp = findNextEpisodeInList(cachedEps, media.seasonNumber, media.episodeNumber, media.episodeStreamId);
+        if (nextEp) {
+          var nextId = "series:" + sId + ":ep:" + nextEp.episodeStreamId;
+          var existingNext = items.find(function (it) { return String(it.id) === String(nextId); });
+          if (!existingNext) {
+            var nextEntry = {
+              id: nextId,
+              type: "series",
+              streamId: media.streamId || null,
+              seriesId: media.seriesId || null,
+              episodeStreamId: nextEp.episodeStreamId,
+              seasonNumber: nextEp.seasonNumber,
+              episodeNumber: nextEp.episodeNum,
+              name: media.name,
+              seriesName: media.seriesName || media.name || null,
+              episodeTitle: nextEp.title || null,
+              thumbUrl: thumb,
+              backdropUrl: backdrop || thumb,
+              packageId: media.packageId || "",
+              sourceId: media.sourceId || "",
+              containerExtension: nextEp.containerExtension || media.containerExtension || "mp4",
+              currentTime: 0,
+              duration: 0,
+              progressPercent: 0,
+              isFinished: false,
+              updatedAt: Date.now() + 1
+            };
+            items.unshift(nextEntry);
+          }
+        }
+      } else {
+        fetchSeriesEpisodes(sId, media.sourceId).then(function (eps) {
+          if (eps && eps.length > 0) {
+            var nextEpAsync = findNextEpisodeInList(eps, media.seasonNumber, media.episodeNumber, media.episodeStreamId);
+            if (nextEpAsync) {
+              var curHist = getLocalHistory();
+              var nextIdAsync = "series:" + sId + ":ep:" + nextEpAsync.episodeStreamId;
+              if (!curHist.some(function (it) { return String(it.id) === String(nextIdAsync); })) {
+                var nextEntryAsync = {
+                  id: nextIdAsync,
+                  type: "series",
+                  streamId: media.streamId || null,
+                  seriesId: media.seriesId || null,
+                  episodeStreamId: nextEpAsync.episodeStreamId,
+                  seasonNumber: nextEpAsync.seasonNumber,
+                  episodeNumber: nextEpAsync.episodeNum,
+                  name: media.name,
+                  seriesName: media.seriesName || media.name || null,
+                  episodeTitle: nextEpAsync.title || null,
+                  thumbUrl: thumb,
+                  backdropUrl: backdrop || thumb,
+                  packageId: media.packageId || "",
+                  sourceId: media.sourceId || "",
+                  containerExtension: nextEpAsync.containerExtension || media.containerExtension || "mp4",
+                  currentTime: 0,
+                  duration: 0,
+                  progressPercent: 0,
+                  isFinished: false,
+                  updatedAt: Date.now() + 1
+                };
+                curHist.unshift(nextEntryAsync);
+                saveLocalHistory(curHist);
+              }
+            }
+          }
+        });
+      }
+    }
+
+    saveLocalHistory(items, !isRewindCommit && (isThrottled || isVodPlayerVisible()));
 
     var now = Date.now();
-    if (isEnd || !isThrottled || (now - state.lastDbSyncTimestamp >= 30000)) {
+    if (isEnd || isRewindCommit || !isThrottled || (now - state.lastDbSyncTimestamp >= 30000)) {
       state.lastDbSyncTimestamp = now;
       syncProgressToDatabase(entry);
     }
@@ -1088,7 +1356,12 @@
         sessionTracker.lastTick = null;
       }
 
+      var lastKnownVodTime = 0;
+
       vodVideo.addEventListener("timeupdate", function () {
+        if (!vodVideo.seeking && Number.isFinite(vodVideo.currentTime) && vodVideo.currentTime > 0) {
+          lastKnownVodTime = vodVideo.currentTime;
+        }
         tryApplySeekOnActiveVideo(vodVideo);
       }, { passive: true });
 
@@ -1099,10 +1372,34 @@
       }, { passive: true });
 
       vodVideo.addEventListener("seeking", function () {
+        sessionTracker.seekFromTime = lastKnownVodTime || (Number.isFinite(vodVideo.currentTime) ? vodVideo.currentTime : 0);
         if (!sessionTracker.qualified) {
           sessionTracker.continuousSeconds = 0;
           sessionTracker.lastTick = null;
         }
+      }, { passive: true });
+
+      vodVideo.addEventListener("seeked", function () {
+        var toTime = Number.isFinite(vodVideo.currentTime) ? vodVideo.currentTime : 0;
+        var fromTime = sessionTracker.seekFromTime || 0;
+        var history = getLocalHistory();
+        var curEntry = history.find(function (it) {
+          return state.currentPlaying && String(it.id) === String(state.currentPlaying.id);
+        });
+        var refTime = Math.max(fromTime, curEntry && Number.isFinite(curEntry.currentTime) ? curEntry.currentTime : 0);
+
+        if (toTime < refTime - 2) {
+          // Backward seek (rewind): arm 5-second continuous watch timer to commit new resume point
+          sessionTracker.rewindActive = true;
+          sessionTracker.rewindStartTime = toTime;
+          sessionTracker.rewindContinuousSeconds = 0;
+          sessionTracker.lastTick = Date.now();
+        } else {
+          // Forward seek / normal scrubbing
+          sessionTracker.rewindActive = false;
+          sessionTracker.rewindContinuousSeconds = 0;
+        }
+        lastKnownVodTime = toTime;
       }, { passive: true });
 
       vodVideo.addEventListener("waiting", function () {
@@ -1119,14 +1416,21 @@
 
       vodVideo.addEventListener("pause", function () {
         stopHeartbeat();
-        recordProgress(vodVideo, false, false);
+        if (sessionTracker.rewindActive && sessionTracker.rewindContinuousSeconds >= 5) {
+          sessionTracker.rewindActive = false;
+          sessionTracker.rewindContinuousSeconds = 0;
+          sessionTracker.qualified = true;
+          recordProgress(vodVideo, false, false, true);
+        } else {
+          recordProgress(vodVideo, false, false, false);
+        }
       }, { passive: true });
 
       vodVideo.addEventListener("ended", function () {
         stopHeartbeat();
         sessionTracker.lastTick = null;
         sessionTracker.qualified = true;
-        recordProgress(vodVideo, true, false);
+        recordProgress(vodVideo, true, false, false);
       }, { passive: true });
     }
 
@@ -1147,8 +1451,8 @@
     if (!isValidMediaEntry(item)) return;
     var isSeries = item.type === "series";
     var rawSeconds = Number(item.currentTime) || 0;
-    var targetSeconds = Math.max(0, rawSeconds - 5);
-    window.__veloraPendingResumeSeek = { targetSeconds: targetSeconds, applied: false, timestamp: Date.now() };
+    var targetSeconds = rawSeconds > 0 ? Math.max(0, rawSeconds - 5) : 0;
+    window.__veloraPendingResumeSeek = targetSeconds > 0 ? { targetSeconds: targetSeconds, applied: false, timestamp: Date.now() } : null;
 
     // 1. Close home page
     delete document.body.dataset.velTopLevel;
@@ -1432,41 +1736,77 @@
     var allItems = getLocalHistory();
     if (!allItems || !allItems.length) return null;
 
-    var validInProgress = allItems.filter(function (it) {
-      if (!isValidMediaEntry(it) || it.isFinished) return false;
-      if (it.type !== "series" && it.type !== "movie" && it.type !== "movies") return false;
-      if (it.progressPercent != null && it.progressPercent >= FINISHED_WATCH_PERCENT) return false;
-      return true;
+    var seriesGroups = new Map();
+    var movieItems = [];
+
+    allItems.forEach(function (it) {
+      if (!isValidMediaEntry(it)) return;
+      if (it.type === "movie" || it.type === "movies") {
+        if (!it.isFinished && (it.progressPercent == null || it.progressPercent < FINISHED_WATCH_PERCENT)) {
+          movieItems.push(it);
+        }
+      } else if (it.type === "series") {
+        var sKey = String(it.seriesId || it.name || "").trim().toLowerCase();
+        if (!sKey) sKey = String(it.streamId || "");
+        if (!seriesGroups.has(sKey)) seriesGroups.set(sKey, []);
+        seriesGroups.get(sKey).push(it);
+      }
     });
 
-    if (!validInProgress.length) return null;
+    var resolvedSeriesCards = [];
 
-    var seenSeries = new Map();
-    var deduplicated = [];
+    seriesGroups.forEach(function (epsList, sKey) {
+      epsList.sort(function (a, b) {
+        var sa = (Number(a.seasonNumber) || 1) * 1000 + (Number(a.episodeNumber) || 1);
+        var sb = (Number(b.seasonNumber) || 1) * 1000 + (Number(b.episodeNumber) || 1);
+        if (sa !== sb) return sb - sa;
+        return (b.updatedAt || 0) - (a.updatedAt || 0);
+      });
 
-    validInProgress.forEach(function (item) {
-      var isSeries = item.type === "series";
-      if (!isSeries) {
-        deduplicated.push(item);
+      // 1. In-progress episode takes precedence
+      var inProgress = epsList.find(function (e) {
+        return !e.isFinished && (e.progressPercent == null || e.progressPercent < FINISHED_WATCH_PERCENT);
+      });
+
+      if (inProgress) {
+        resolvedSeriesCards.push(inProgress);
         return;
       }
 
-      var sKey = String(item.seriesId || item.name || "").trim().toLowerCase();
-      var existing = seenSeries.get(sKey);
-      if (!existing) {
-        seenSeries.set(sKey, item);
-        deduplicated.push(item);
-      } else {
-        var curScore = (Number(item.seasonNumber) || 1) * 1000 + (Number(item.episodeNumber) || 1);
-        var exScore = (Number(existing.seasonNumber) || 1) * 1000 + (Number(existing.episodeNumber) || 1);
-        if (curScore >= exScore) {
-          var idx = deduplicated.indexOf(existing);
-          if (idx !== -1) {
-            deduplicated[idx] = item;
-            seenSeries.set(sKey, item);
-          }
+      // 2. All recorded episodes are finished: advance to next episode
+      var latestFinished = epsList[0];
+      if (!latestFinished) return;
+
+      var sId = latestFinished.seriesId || latestFinished.streamId;
+      var cachedEps = getSeriesEpisodesCache(sId);
+      if (cachedEps && cachedEps.length > 0) {
+        var nextEp = findNextEpisodeInList(cachedEps, latestFinished.seasonNumber, latestFinished.episodeNumber, latestFinished.episodeStreamId);
+        if (nextEp) {
+          var nextCardItem = Object.assign({}, latestFinished, {
+            id: "series:" + sId + ":ep:" + nextEp.episodeStreamId,
+            episodeStreamId: nextEp.episodeStreamId,
+            seasonNumber: nextEp.seasonNumber,
+            episodeNumber: nextEp.episodeNum,
+            episodeTitle: nextEp.title,
+            currentTime: 0,
+            duration: 0,
+            progressPercent: 0,
+            isFinished: false,
+            updatedAt: latestFinished.updatedAt || Date.now()
+          });
+          resolvedSeriesCards.push(nextCardItem);
         }
+      } else {
+        fetchSeriesEpisodes(sId, latestFinished.sourceId).then(function (eps) {
+          if (eps && eps.length > 0) {
+            injectResumeSectionDirectly();
+          }
+        });
       }
+    });
+
+    var deduplicated = movieItems.concat(resolvedSeriesCards).sort(function (a, b) {
+      return (b.updatedAt || 0) - (a.updatedAt || 0);
     });
 
     if (!deduplicated.length) return null;

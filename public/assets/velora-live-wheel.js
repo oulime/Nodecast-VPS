@@ -648,6 +648,7 @@
       this.lastThemedIndex = -1;
       this.colorAnimFrameId = null;
       this.refreshDebounceTimer = null;
+      this.visibilityDebounceTimer = null;
       this.init();
     }
 
@@ -662,9 +663,9 @@
     }
 
     scheduleCheckVisibility(delay = 40) {
-      if (this.refreshDebounceTimer) clearTimeout(this.refreshDebounceTimer);
-      this.refreshDebounceTimer = setTimeout(() => {
-        this.refreshDebounceTimer = null;
+      if (this.visibilityDebounceTimer) clearTimeout(this.visibilityDebounceTimer);
+      this.visibilityDebounceTimer = setTimeout(() => {
+        this.visibilityDebounceTimer = null;
         this.checkVisibility();
       }, delay);
     }
@@ -1165,7 +1166,7 @@
           this.currentLoadedPkgId = currentPkg ? currentPkg.id : "";
           this.onPackageSettled(currentPkg, { isInitialLoad: isFirstOpen, skipScroll: true });
         }
-        if (packagesListChanged && this.packages.length >= 1) {
+        if ((packagesListChanged || !this.stage || this.stage.children.length === 0) && this.packages.length >= 1) {
           this.renderMainCards();
         }
       } else {
@@ -1303,14 +1304,16 @@
 
       if (badgeEl) {
         badgeEl.classList.remove("is-shimmering", "is-animating");
-        void badgeEl.offsetWidth; // trigger reflow
-        badgeEl.classList.add("is-shimmering", "is-animating");
+        requestAnimationFrame(() => {
+          if (badgeEl) badgeEl.classList.add("is-shimmering", "is-animating");
+        });
       }
 
       if (this.pointer) {
         this.pointer.classList.remove("is-settled-flare");
-        void this.pointer.offsetWidth;
-        this.pointer.classList.add("is-settled-flare");
+        requestAnimationFrame(() => {
+          if (this.pointer) this.pointer.classList.add("is-settled-flare");
+        });
       }
 
       // Extract color / apply theme with fluid HTML5 transition
@@ -1360,11 +1363,6 @@
     async loadPackageChannels(pkg, options = {}) {
       if (!this.isLiveActive() || !pkg) return;
 
-      const dynamicList = document.getElementById("dynamic-list");
-      if (dynamicList) {
-        dynamicList.classList.add("vel-list-fading");
-      }
-
       this.currentLoadReqId = (this.currentLoadReqId || 0) + 1;
       const reqId = this.currentLoadReqId;
 
@@ -1374,12 +1372,17 @@
       const packagesView = document.getElementById("packages-view");
       if (packagesView) packagesView.classList.add("hidden");
 
-      // Fast path: Instant cached channels for buttery fluidity
+      // Fast path: Instant cached channels for buttery fluidity (zero delay, zero flicker)
       if (Array.isArray(pkg._cachedChannels) && pkg._cachedChannels.length > 0) {
         this.allChannels = pkg._cachedChannels;
         this.ensurePackageLogoFromChannels(pkg, pkg._cachedChannels);
         this.filterAndRenderChannels(options);
         return;
+      }
+
+      const dynamicList = document.getElementById("dynamic-list");
+      if (dynamicList) {
+        dynamicList.classList.add("vel-list-fading");
       }
 
       this.isLoadingChannels = true;

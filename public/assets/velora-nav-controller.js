@@ -74,12 +74,28 @@
   document.addEventListener("click", function (e) {
     if (!e.target) return;
 
+    // Ignore country picker, profile menu, search triggers, or popups
+    if (
+      e.target.closest(
+        "#vel-bottom-country-menu, #vel-bottom-profile-menu, #country-select, .country-select, .country-select-trigger, .velora-country-select-menu, [data-bottom-nav='country'], [data-bottom-nav='profile'], #vel-home-profile-trigger, #vel-floating-search, [data-bottom-nav='search']"
+      )
+    ) {
+      return;
+    }
+
     const navEl = e.target.closest(
-      "nav, .nav-item, .nav-link, .sidebar-link, .vel-bottom-nav-item, [data-nav], [data-tab], [data-settings-tab], .vel-nav-btn, .navbar, .header-nav, #btn-home, #btn-live, #btn-movies, #btn-series, #btn-favorites, #btn-adult, .vod-back-btn, .player-back-btn, [data-action='back'], [data-action='close-player']"
+      ".nav-item, .nav-link, .sidebar-link, .vel-bottom-nav-item, [data-bottom-nav], [data-nav], [data-tab], [data-settings-tab], .vel-nav-btn, .navbar, .header-nav, #btn-home, #btn-live, #btn-movies, #btn-series, #btn-favorites, #btn-adult, .vod-back-btn, .player-back-btn, [data-action='back'], [data-action='close-player']"
     );
 
     if (navEl) {
-      // If clicking home, major section tab, or back button, kill any playing media immediately
+      // Check if clicking the same active section tab (e.g. clicking Live while already on Live)
+      const bottomNavAction = navEl.getAttribute("data-bottom-nav");
+      const activeTab = document.body.dataset ? document.body.dataset.velActiveTab : "";
+      if (bottomNavAction && bottomNavAction === activeTab && activeTab !== "home") {
+        // Already on this section tab, do not kill playing media
+        return;
+      }
+      // If clicking home, major section tab switch, or back button, kill any playing media immediately
       cleanupAllActiveMediaAndSessions();
     }
   }, true);

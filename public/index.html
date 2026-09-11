@@ -7787,10 +7787,28 @@
           homePage.classList.add("hidden");
           homePage.setAttribute("aria-hidden", "true");
         }
+        var isLiveTab = tabName === "live";
         var packagesView = document.getElementById("packages-view");
         if (packagesView) {
-          packagesView.classList.remove("hidden");
-          packagesView.setAttribute("aria-hidden", "false");
+          if (isLiveTab) {
+            packagesView.classList.add("hidden");
+            packagesView.setAttribute("aria-hidden", "true");
+          } else {
+            packagesView.classList.remove("hidden");
+            packagesView.setAttribute("aria-hidden", "false");
+          }
+        }
+        var contentView = document.getElementById("content-view");
+        if (contentView && isLiveTab) {
+          contentView.classList.remove("hidden");
+          contentView.setAttribute("aria-hidden", "false");
+        }
+        if (isLiveTab) {
+          var livePlayerContainer = document.getElementById("player-container");
+          if (livePlayerContainer) {
+            livePlayerContainer.classList.remove("hidden");
+            livePlayerContainer.setAttribute("aria-hidden", "false");
+          }
         }
         document.dispatchEvent(new CustomEvent("velora-home-tab", {
           detail: { tab: tabName }
@@ -8219,7 +8237,11 @@
           homeCountryTrigger.setAttribute("aria-expanded", open ? "true" : "false");
           if (open) {
             var selected = homeCountryMenu.querySelector(".velora-tv-focus, .is-selected");
-            if (selected) selected.scrollIntoView({ block: "nearest" });
+            if (selected) {
+              try {
+                homeCountryMenu.scrollTop = Math.max(0, selected.offsetTop - 30);
+              } catch (_) {}
+            }
           }
         }
 
@@ -8377,10 +8399,28 @@
           document.body.classList.add("vel-home-choice-picked");
           syncHomeCountryOptions();
           syncPackagesSectionTitle(tabName);
+          var isLiveTab = tabName === "live";
           var packagesView = document.getElementById("packages-view");
           if (packagesView) {
-            packagesView.classList.remove("hidden");
-            packagesView.setAttribute("aria-hidden", "false");
+            if (isLiveTab) {
+              packagesView.classList.add("hidden");
+              packagesView.setAttribute("aria-hidden", "true");
+            } else {
+              packagesView.classList.remove("hidden");
+              packagesView.setAttribute("aria-hidden", "false");
+            }
+          }
+          var contentView = document.getElementById("content-view");
+          if (contentView && isLiveTab) {
+            contentView.classList.remove("hidden");
+            contentView.setAttribute("aria-hidden", "false");
+          }
+          if (isLiveTab) {
+            var livePlayerContainer = document.getElementById("player-container");
+            if (livePlayerContainer) {
+              livePlayerContainer.classList.remove("hidden");
+              livePlayerContainer.setAttribute("aria-hidden", "false");
+            }
           }
           var homePage = document.getElementById("vel-home-empty-page");
           if (homePage) {
@@ -14463,10 +14503,11 @@
       margin-top: 0 !important;
     }
 
-    /* Player Mutual Exclusivity - Never show both players simultaneously */
-    #player-container.hidden,
+    /* Player Mutual Exclusivity - Hide players when hidden, except on Live TV where #player-container is the pinned placeholder */
+    body:not([data-vel-active-tab="live"]):not([data-vel-top-level="live"]) #player-container.hidden,
     #vod-player-container.hidden,
-    .player-container.hidden {
+    .player-container.player-container--vod.hidden,
+    .vel-adult-player-container.hidden {
       display: none !important;
       visibility: hidden !important;
       height: 0 !important;
@@ -14475,8 +14516,24 @@
       padding: 0 !important;
     }
 
-    body:has(#vod-player-container:not(.hidden)) #player-container,
-    .main--velora:has(#vod-player-container:not(.hidden)) #player-container {
+    /* Live TV player placeholder: ALWAYS active and sized on Live TV tab, even before playback starts */
+    body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]):not(.vel-favorites-open) #player-container,
+    body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]):not(.vel-favorites-open) #player-container.hidden,
+    body[data-vel-top-level="live"]:not(.vel-home-empty-active):not(.vel-favorites-open) #player-container,
+    body[data-vel-top-level="live"]:not(.vel-home-empty-active):not(.vel-favorites-open) #player-container.hidden {
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      position: relative !important;
+      z-index: 10 !important;
+      flex: 0 0 auto !important;
+      width: 100% !important;
+      height: auto !important;
+      min-height: auto !important;
+    }
+
+    body:has(#vod-player-container:not(.hidden)) #player-container:not([data-vel-active-tab="live"]),
+    .main--velora:has(#vod-player-container:not(.hidden)) #player-container:not([data-vel-active-tab="live"]) {
       display: none !important;
       visibility: hidden !important;
       height: 0 !important;
@@ -14599,13 +14656,18 @@
         z-index: 10 !important;
       }
 
+      body[data-vel-active-tab="live"] #player-container .video-wrapper,
+      body[data-vel-top-level="live"] #player-container .video-wrapper,
       .main--velora:has(#player-container:not(.hidden)) #player-container .video-wrapper,
       .main--velora:has(#vod-player-container:not(.hidden)) #vod-player-container .video-wrapper {
         width: 100% !important;
         max-height: 32vh !important;
-        aspect-ratio: 16 / 9;
+        aspect-ratio: 16 / 9 !important;
+        background: radial-gradient(circle at 50% 45%, #141120 0%, #06050a 100%) !important;
       }
 
+      body[data-vel-active-tab="live"] #player-container #video,
+      body[data-vel-top-level="live"] #player-container #video,
       .main--velora:has(#player-container:not(.hidden)) #player-container #video,
       .main--velora:has(#vod-player-container:not(.hidden)) #vod-player-container #video-vod {
         max-height: 32vh !important;
@@ -16455,15 +16517,33 @@
           homePage.classList.add("hidden");
           homePage.setAttribute("aria-hidden", "true");
         }
+        var isLive = tab === "live";
         var contentView = document.getElementById("content-view");
         if (contentView) {
-          contentView.classList.add("hidden");
-          contentView.setAttribute("aria-hidden", "true");
+          if (isLive) {
+            contentView.classList.remove("hidden");
+            contentView.setAttribute("aria-hidden", "false");
+          } else {
+            contentView.classList.add("hidden");
+            contentView.setAttribute("aria-hidden", "true");
+          }
         }
         var packagesView = document.getElementById("packages-view");
         if (packagesView) {
-          packagesView.classList.remove("hidden");
-          packagesView.setAttribute("aria-hidden", "false");
+          if (isLive) {
+            packagesView.classList.add("hidden");
+            packagesView.setAttribute("aria-hidden", "true");
+          } else {
+            packagesView.classList.remove("hidden");
+            packagesView.setAttribute("aria-hidden", "false");
+          }
+        }
+        if (isLive) {
+          var livePlayerContainer = document.getElementById("player-container");
+          if (livePlayerContainer) {
+            livePlayerContainer.classList.remove("hidden");
+            livePlayerContainer.setAttribute("aria-hidden", "false");
+          }
         }
         try {
           var state = window.history.state && typeof window.history.state === "object" ? window.history.state : {};
@@ -16693,7 +16773,11 @@
         if (bottomCountryButton) bottomCountryButton.setAttribute("aria-expanded", "true");
         setActive("country");
         var selected = bottomCountryMenu.querySelector(".is-selected");
-        if (selected) selected.scrollIntoView({ block: "nearest" });
+        if (selected) {
+          try {
+            bottomCountryMenu.scrollTop = Math.max(0, selected.offsetTop - 30);
+          } catch (_) {}
+        }
       }
 
       function openFavorites() {
@@ -16747,14 +16831,18 @@
 
       function handleNavAction(button, event) {
         if (!button) return;
+        if (event) {
+          try {
+            event.preventDefault();
+            event.stopPropagation();
+          } catch (_) {}
+        }
         var action = button.getAttribute("data-bottom-nav");
         if (!action) return;
         var now = Date.now();
-        if (lastNavTriggerAction === action && now - lastNavTriggerAt < 300) return;
+        if (lastNavTriggerAction === action && now - lastNavTriggerAt < 250) return;
         lastNavTriggerAt = now;
         lastNavTriggerAction = action;
-
-        setActive(action);
 
         if (action === "home") showHome();
         else if (action === "live" || action === "movies" || action === "series") openTab(action);
@@ -16762,13 +16850,6 @@
         else if (action === "search") openSearch();
         else if (action === "favorites") openFavorites();
       }
-
-      nav.addEventListener("pointerdown", function (event) {
-        if (event.pointerType === "mouse" && event.button !== 0) return;
-        var button = event.target.closest("[data-bottom-nav]");
-        if (!button) return;
-        handleNavAction(button, event);
-      }, true);
 
       nav.addEventListener("click", function (event) {
         var button = event.target.closest("[data-bottom-nav]");

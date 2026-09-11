@@ -56,9 +56,61 @@ body[data-vel-top-level="live"]:not(.vel-home-empty-active):not(.vel-favorites-o
   scroll-behavior: smooth;
 }
 
+/* =========================================================
+   Live TV Fixed Media Player Placeholder & Reserved Dimensions
+   Prevents the wheel from jumping when the video player opens
+   ========================================================= */
 body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]):not(.vel-favorites-open) #player-container,
 body[data-vel-top-level="live"]:not(.vel-home-empty-active):not(.vel-favorites-open) #player-container {
   display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: 10 !important;
+}
+
+body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]):not(.vel-favorites-open) #player-container .video-wrapper,
+body[data-vel-top-level="live"]:not(.vel-home-empty-active):not(.vel-favorites-open) #player-container .video-wrapper {
+  display: block !important;
+  width: 100% !important;
+  aspect-ratio: 16 / 9 !important;
+  background: radial-gradient(circle at 50% 45%, #12101b 0%, #050508 100%) !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  position: relative !important;
+}
+
+@media (max-width: 767.98px) {
+  body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]):not(.vel-favorites-open) #player-container,
+  body[data-vel-top-level="live"]:not(.vel-home-empty-active):not(.vel-favorites-open) #player-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 0 0.35rem 0 !important;
+    border-radius: 0 0 12px 12px !important;
+  }
+  body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]):not(.vel-favorites-open) #player-container .video-wrapper,
+  body[data-vel-top-level="live"]:not(.vel-home-empty-active):not(.vel-favorites-open) #player-container .video-wrapper {
+    max-height: 32vh !important;
+    aspect-ratio: 16 / 9 !important;
+  }
+}
+
+@media (min-width: 768px) {
+  body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]):not(.vel-favorites-open) #player-container,
+  body[data-vel-top-level="live"]:not(.vel-home-empty-active):not(.vel-favorites-open) #player-container {
+    max-width: min(calc(50vh * (16 / 9)), calc(100vw - 2rem)) !important;
+    width: min(100%, calc(50vh * (16 / 9))) !important;
+    max-height: 50vh !important;
+    margin: 0.25rem auto 0.35rem !important;
+    border-radius: 14px !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 20px rgba(138, 43, 226, 0.25) !important;
+  }
+  body[data-vel-active-tab="live"]:not(.vel-home-empty-active):not([data-vel-top-level="home"]):not(.vel-favorites-open) #player-container .video-wrapper,
+  body[data-vel-top-level="live"]:not(.vel-home-empty-active):not(.vel-favorites-open) #player-container .video-wrapper {
+    height: 50vh !important;
+    max-height: 50vh !important;
+    aspect-ratio: 16 / 9 !important;
+  }
 }
 
 body[data-vel-active-tab="live"] #btn-header-back,

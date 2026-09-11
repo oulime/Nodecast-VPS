@@ -1213,6 +1213,39 @@ const LIVE_MANIFEST_CACHE_TTL_MS = 6500;
 const LIVE_MANIFEST_STALE_TTL_MS = 120000;
 const activeStreamControllersByAccount = new Map();
 
+// Pinned CDN session map for Live TV:
+// Prevents round-robin DNS from jumping between different CDN edge servers on repeated manifest polls.
+const pinnedLiveCdnMap = new Map();
+const PINNED_LIVE_CDN_TTL_MS = 120000; // 2 minutes inactivity TTL
+
+function getLiveChannelKey(streamUrl, req) {
+    if (!streamUrl) return null;
+    const isLive = /\/live\//i.test(streamUrl) || /\.m3u8(\?|$)/i.test(streamUrl);
+    if (!isLive) return null;
+    try {
+        const parsed = new URL(streamUrl);
+        // Matches /live/username/password/channelId (e.g. /live/4214c2d3f7/8b3231582d65/1016921.m3u8)
+        const match = parsed.pathname.match(/\/live\/([^/]+)\/([^/]+)\/([^/.]+)/i);
+        if (match) {
+            const clientId = getClientIdentifier(req);
+            return `${clientId}:${parsed.host}:${match[1]}:${match[3]}`;
+        }
+        return null;
+    } catch (_) {
+        return null;
+    }
+}
+
+// Periodic cleanup of inactive live channel pins
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of pinnedLiveCdnMap.entries()) {
+        if (now - entry.timestamp > PINNED_LIVE_CDN_TTL_MS) {
+            pinnedLiveCdnMap.delete(key);
+        }
+    }
+}, 60000).unref?.();
+
 // In-memory index cache for media headers and tail Cues (prevents 458 burst when browser demuxer probes MKV/MP4 files)
 const mediaIndexCache = new Map();
 const MEDIA_INDEX_CACHE_MAX = 60;
@@ -1372,6 +1405,19 @@ router.all('/stream/stop', (req, res) => {
                 } catch (_) {}
                 activeStreamControllersByAccount.delete(key);
                 stopped = true;
+            }
+        }
+    }
+
+    // Clean up any pinned Live TV sessions for this channel or client
+    const liveChannelKey = getLiveChannelKey(url, req);
+    if (liveChannelKey) {
+        pinnedLiveCdnMap.delete(liveChannelKey);
+    } else {
+        const clientId = getClientIdentifier(req);
+        for (const key of pinnedLiveCdnMap.keys()) {
+            if (key.startsWith(`${clientId}:`)) {
+                pinnedLiveCdnMap.delete(key);
             }
         }
     }
@@ -1553,11 +1599,30 @@ router.get('/stream', async (req, res) => {
                 headers['Range'] = rangeHeader;
             }
 
+            // Live TV CDN Pinning:
+            // If we have an active, healthy pinned CDN node for this live channel session, fetch from it directly.
+            // This stops round-robin DNS from jumping between different CDN edge servers on repeated manifest polls.
+            const liveChannelKey = isM3u8Url ? getLiveChannelKey(url, req) : null;
+            let targetFetchUrl = url;
+            if (liveChannelKey && pinnedLiveCdnMap.has(liveChannelKey)) {
+                const pin = pinnedLiveCdnMap.get(liveChannelKey);
+                if (Date.now() - pin.timestamp < PINNED_LIVE_CDN_TTL_MS) {
+                    targetFetchUrl = pin.pinnedUrl;
+                    pin.timestamp = Date.now();
+                } else {
+                    pinnedLiveCdnMap.delete(liveChannelKey);
+                }
+            }
+
             let response;
             try {
-                response = await fetch(url, { headers, signal: abortController.signal });
+                response = await fetch(targetFetchUrl, { headers, signal: abortController.signal });
             } catch (fetchErr) {
                 cleanupListeners();
+                if (liveChannelKey && targetFetchUrl !== url) {
+                    // Pinned CDN failed, unpin so next poll retries the primary URL
+                    pinnedLiveCdnMap.delete(liveChannelKey);
+                }
                 if (fetchErr.name === 'AbortError' || abortController.signal.aborted || currentEntry.isCancelled || req.destroyed || res.destroyed || res.writableEnded) {
                     if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
                         activeStreamControllersByAccount.delete(accountKey);
@@ -1565,6 +1630,22 @@ router.get('/stream', async (req, res) => {
                     return;
                 }
                 throw fetchErr;
+            }
+
+            // If pinned CDN node returned an error, unpin so next attempt falls back to original URL
+            if (liveChannelKey && targetFetchUrl !== url && !response.ok && response.status >= 400) {
+                pinnedLiveCdnMap.delete(liveChannelKey);
+            }
+
+            // If this was an initial live channel request and was redirected to a specific CDN node, pin that node
+            if (liveChannelKey && response.ok) {
+                const finalUrl = response.url || targetFetchUrl;
+                if (finalUrl !== url && (finalUrl.includes('/live/') || finalUrl.includes('/hls/'))) {
+                    pinnedLiveCdnMap.set(liveChannelKey, {
+                        pinnedUrl: finalUrl,
+                        timestamp: Date.now()
+                    });
+                }
             }
             activeResponse = response;
             currentEntry.activeResponse = response;
@@ -1705,7 +1786,7 @@ router.get('/stream', async (req, res) => {
                 }
 
                 const buffer = Buffer.concat(chunks);
-                const finalUrl = response.url || url;
+                const finalUrl = response.url || targetFetchUrl || url;
                 streamProxyDebug(`[Proxy] Processing HLS manifest from: ${finalUrl.substring(0, 80)}...`);
                 res.removeHeader('Content-Length');
                 res.removeHeader('Content-Range');
@@ -1754,7 +1835,10 @@ router.get('/stream', async (req, res) => {
 
                 if (liveManifestCache.has(url)) {
                     const cached = liveManifestCache.get(url);
-                    if (incomingSeq !== null && typeof cached.sequence === 'number' && incomingSeq < cached.sequence) {
+                    const age = Date.now() - (cached.timestamp || 0);
+                    // Only drop minor backward drift (1 to 5 segments) within a recent 12s window.
+                    // If sequence gap is large (> 5) or older than 12s, upstream encoder has reset or started a new session.
+                    if (incomingSeq !== null && typeof cached.sequence === 'number' && incomingSeq < cached.sequence && (cached.sequence - incomingSeq) <= 5 && age < 12000) {
                         console.warn(`[Proxy] Dropped out-of-order CDN manifest for ${url.substring(0, 70)} (incoming seq ${incomingSeq} < cached ${cached.sequence})`);
                         if (onClose) req.off('close', onClose);
                         res.set('X-Velora-Manifest-Monotonic', 'PREVENT_REGRESSION');

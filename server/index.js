@@ -25,7 +25,7 @@ try {
     function isDinoTarget(target) {
         if (!target) return false;
         const lower = String(target).toLowerCase();
-        return lower.includes('playmodx') || lower.includes('103.176.90.');
+        return lower.includes('playmodx') || lower.includes('103.176.90.') || lower.includes('185.245.');
     }
 
     class SelectiveRoutingDispatcher extends Dispatcher {

@@ -140,161 +140,150 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
 }
 
 /* --------------------------------------------------------------------------
-   Adult Portal Hub (TV en Direct & Films VOD Choice Cards)
+   Adult Portal Hub (TV en Direct & Films VOD Choice Cards / Banners)
    -------------------------------------------------------------------------- */
 .vel-adult-portal-hub {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
   width: 100%;
-  max-width: 860px;
+  max-width: 900px;
   margin: 0 auto;
-  padding: 6px 4px 16px;
+  padding: 12px 8px 24px;
   box-sizing: border-box;
 }
 
 @media (min-width: 681px) {
   .vel-adult-portal-hub {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(280px, 380px));
+    grid-template-columns: repeat(2, 1fr);
     gap: 24px;
-    justify-content: center;
-    padding: 24px 16px;
+    padding: 24px 16px 36px;
   }
 }
 
 .vel-adult-hub-card {
   position: relative;
-  border-radius: 18px;
-  padding: 16px 18px;
+  border-radius: 20px;
+  overflow: hidden;
   cursor: pointer;
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
   display: flex;
-  align-items: center;
-  text-align: left;
-  gap: 14px;
+  flex-direction: column;
+  aspect-ratio: 16 / 9;
+  min-height: 180px;
   user-select: none;
   box-sizing: border-box;
+  background: #0d0c18;
+}
+
+.vel-adult-hub-card:focus-visible {
+  outline: 2px solid #a855f7;
+  outline-offset: 3px;
 }
 
 .vel-adult-hub-card--live {
-  background: linear-gradient(145deg, rgba(168, 85, 247, 0.16), rgba(15, 23, 42, 0.7));
-  border: 1px solid rgba(168, 85, 247, 0.35);
+  border: 1.5px solid rgba(168, 85, 247, 0.4);
 }
 
-.vel-adult-hub-card--live:hover {
-  transform: translateY(-3px);
+.vel-adult-hub-card--live:hover,
+.vel-adult-hub-card--live:focus-visible {
+  transform: translateY(-4px) scale(1.015);
   border-color: #a855f7;
-  box-shadow: 0 12px 32px rgba(168, 85, 247, 0.28);
+  box-shadow: 0 16px 40px rgba(168, 85, 247, 0.35);
 }
 
 .vel-adult-hub-card--vod {
-  background: linear-gradient(145deg, rgba(225, 29, 72, 0.18), rgba(15, 23, 42, 0.7));
-  border: 1px solid rgba(225, 29, 72, 0.38);
+  border: 1.5px solid rgba(244, 63, 94, 0.4);
 }
 
-.vel-adult-hub-card--vod:hover {
-  transform: translateY(-3px);
+.vel-adult-hub-card--vod:hover,
+.vel-adult-hub-card--vod:focus-visible {
+  transform: translateY(-4px) scale(1.015);
   border-color: #f43f5e;
-  box-shadow: 0 12px 32px rgba(225, 29, 72, 0.3);
+  box-shadow: 0 16px 40px rgba(244, 63, 94, 0.35);
+}
+
+.vel-adult-hub-card__visual {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 18px;
+  display: flex;
+}
+
+.vel-adult-hub-card__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vel-adult-hub-card:hover .vel-adult-hub-card__img,
+.vel-adult-hub-card:focus-visible .vel-adult-hub-card__img {
+  transform: scale(1.04);
+}
+
+.vel-adult-hub-card__fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px 18px;
+  box-sizing: border-box;
+}
+
+.vel-adult-hub-card--live .vel-adult-hub-card__fallback {
+  background: linear-gradient(145deg, rgba(168, 85, 247, 0.22), rgba(15, 23, 42, 0.85));
+}
+
+.vel-adult-hub-card--vod .vel-adult-hub-card__fallback {
+  background: linear-gradient(145deg, rgba(225, 29, 72, 0.24), rgba(15, 23, 42, 0.85));
 }
 
 .vel-adult-hub-card__icon {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  margin-bottom: 12px;
 }
 
 .vel-adult-hub-card--live .vel-adult-hub-card__icon {
-  background: rgba(168, 85, 247, 0.22);
-  border: 1px solid rgba(168, 85, 247, 0.5);
+  background: rgba(168, 85, 247, 0.25);
+  border: 1px solid rgba(168, 85, 247, 0.55);
   color: #c084fc;
 }
 
 .vel-adult-hub-card--vod .vel-adult-hub-card__icon {
-  background: rgba(225, 29, 72, 0.22);
-  border: 1px solid rgba(244, 63, 94, 0.5);
+  background: rgba(225, 29, 72, 0.25);
+  border: 1px solid rgba(244, 63, 94, 0.55);
   color: #f43f5e;
 }
 
-.vel-adult-hub-card__body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
 .vel-adult-hub-card__title {
-  font-size: 1.15rem;
+  font-size: 1.25rem;
   font-weight: 800;
   color: #fff;
-  margin: 0;
+  margin: 0 0 6px 0;
   line-height: 1.25;
 }
 
 .vel-adult-hub-card__desc {
-  font-size: 0.8rem;
+  font-size: 0.84rem;
   color: #94a3b8;
-  margin: 0 0 8px 0;
+  margin: 0;
   line-height: 1.35;
-}
-
-.vel-adult-hub-card__btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: 10px;
-  border: none;
-  color: #fff;
-  font-weight: 800;
-  font-size: 0.85rem;
-  cursor: pointer;
-  align-self: flex-start;
-  transition: opacity 0.18s;
-}
-
-.vel-adult-hub-card--live .vel-adult-hub-card__btn {
-  background: linear-gradient(135deg, #9333ea, #7e22ce);
-}
-
-.vel-adult-hub-card--vod .vel-adult-hub-card__btn {
-  background: linear-gradient(135deg, #e11d48, #be123c);
-}
-
-@media (min-width: 681px) {
-  .vel-adult-hub-card {
-    flex-direction: column;
-    text-align: center;
-    padding: 30px 24px;
-    gap: 0;
-  }
-  .vel-adult-hub-card__icon {
-    width: 64px;
-    height: 64px;
-    margin: 0 auto 16px;
-  }
-  .vel-adult-hub-card__title {
-    font-size: 1.3rem;
-    margin-bottom: 6px;
-  }
-  .vel-adult-hub-card__desc {
-    font-size: 0.88rem;
-    margin-bottom: 20px;
-  }
-  .vel-adult-hub-card__btn {
-    width: 100%;
-    padding: 12px 20px;
-    font-size: 0.92rem;
-    align-self: stretch;
-  }
+  max-width: 280px;
 }
 
 .vel-adult-header__left {
@@ -804,6 +793,134 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
 .vel-btn-subtle:hover {
   background: rgba(244, 63, 94, 0.28);
   color: #fff;
+}
+
+/* --------------------------------------------------------------------------
+   Admin Adult Hub Images Configuration
+   -------------------------------------------------------------------------- */
+.vel-admin-adult-hub-images-section {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin: 14px 0 18px;
+  box-sizing: border-box;
+}
+
+.vel-admin-adult-images-header h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 1.05rem;
+}
+
+.vel-admin-adult-images-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+@media (min-width: 681px) {
+  .vel-admin-adult-images-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+}
+
+.vel-admin-adult-image-card {
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vel-admin-adult-image-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #f1f5f9;
+  font-size: 0.9rem;
+}
+
+.vel-admin-img-clear-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 6px;
+  color: #94a3b8;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: all 0.15s ease;
+}
+
+.vel-admin-img-clear-btn:hover {
+  background: rgba(244, 63, 94, 0.35);
+  color: #fff;
+}
+
+.vel-admin-adult-image-preview-wrap {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 160px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vel-admin-adult-image-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.vel-admin-adult-image-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #64748b;
+  font-size: 0.76rem;
+  text-align: center;
+  padding: 10px;
+}
+
+.vel-admin-adult-image-placeholder svg {
+  opacity: 0.5;
+}
+
+.vel-admin-adult-image-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.vel-admin-adult-image-controls input[type="text"] {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.82rem;
+}
+
+.vel-admin-adult-images-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .vel-admin-adult-grid {

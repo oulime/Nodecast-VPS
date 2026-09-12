@@ -6607,9 +6607,71 @@
             aria-labelledby="settings-tab-btn-adult" data-settings-tab="adult" hidden>
             <div
               style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-              <h2>🔞 Gestion des Bouquets Adulte +18</h2>
+              <h2>🔞 Gestion de la Section Adulte +18</h2>
               <span id="vel-admin-adult-count-badge" class="vel-admin-adult-badge">0 bouquet(s) activé(s)</span>
             </div>
+
+            <!-- Bannières Images du Portail Adulte -->
+            <div class="vel-admin-adult-hub-images-section">
+              <div class="vel-admin-adult-images-header">
+                <h3>🖼️ Images d'Accueil du Portail Adulte</h3>
+                <p class="countries-admin-intro" style="margin: 4px 0 12px;">
+                  Personnalisez les deux bannières cliquables (TV en Direct & Films/VOD) affichées à l'entrée du portail Adulte.
+                </p>
+              </div>
+              <div class="vel-admin-adult-images-grid">
+                <!-- TV Direct Image Card -->
+                <div class="vel-admin-adult-image-card">
+                  <div class="vel-admin-adult-image-title-row">
+                    <strong>📺 Bannière TV en Direct</strong>
+                    <button type="button" id="vel-admin-adult-live-img-clear" class="vel-admin-img-clear-btn" title="Effacer cette image">✕</button>
+                  </div>
+                  <div class="vel-admin-adult-image-preview-wrap">
+                    <img id="vel-admin-adult-live-img-preview" class="vel-admin-adult-image-preview hidden" alt="Aperçu TV Direct" />
+                    <div id="vel-admin-adult-live-img-placeholder" class="vel-admin-adult-image-placeholder">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
+                      <span>Aucune image configurée (visuel par défaut)</span>
+                    </div>
+                  </div>
+                  <div class="vel-admin-adult-image-controls">
+                    <input type="text" id="vel-admin-adult-live-img-url" class="admin-add-package-dialog__input" placeholder="URL image (https://... ou /uploads/...)" autocomplete="off" />
+                    <input type="file" id="vel-admin-adult-live-img-file" accept="image/*" style="display:none;" />
+                    <button type="button" id="vel-admin-adult-live-img-upload-btn" class="countries-admin-cancel" style="white-space:nowrap;">📁 Importer (PC)</button>
+                  </div>
+                </div>
+
+                <!-- Films & VOD Image Card -->
+                <div class="vel-admin-adult-image-card">
+                  <div class="vel-admin-adult-image-title-row">
+                    <strong>🎬 Bannière Films & VOD</strong>
+                    <button type="button" id="vel-admin-adult-vod-img-clear" class="vel-admin-img-clear-btn" title="Effacer cette image">✕</button>
+                  </div>
+                  <div class="vel-admin-adult-image-preview-wrap">
+                    <img id="vel-admin-adult-vod-img-preview" class="vel-admin-adult-image-preview hidden" alt="Aperçu Films & VOD" />
+                    <div id="vel-admin-adult-vod-img-placeholder" class="vel-admin-adult-image-placeholder">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                      <span>Aucune image configurée (visuel par défaut)</span>
+                    </div>
+                  </div>
+                  <div class="vel-admin-adult-image-controls">
+                    <input type="text" id="vel-admin-adult-vod-img-url" class="admin-add-package-dialog__input" placeholder="URL image (https://... ou /uploads/...)" autocomplete="off" />
+                    <input type="file" id="vel-admin-adult-vod-img-file" accept="image/*" style="display:none;" />
+                    <button type="button" id="vel-admin-adult-vod-img-upload-btn" class="countries-admin-cancel" style="white-space:nowrap;">📁 Importer (PC)</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="vel-admin-adult-images-actions">
+                <button type="button" id="vel-admin-adult-images-save-btn" class="vel-btn-subtle" style="background: rgba(225, 29, 72, 0.25); border: 1px solid rgba(225, 29, 72, 0.55); font-weight: 700; color: #fff; padding: 7px 18px;">
+                  💾 Enregistrer les Images
+                </button>
+                <span id="vel-admin-adult-images-status" class="status" style="margin: 0;"></span>
+              </div>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 20px 0 16px;" />
+
+            <h3 style="margin: 0 0 6px; font-size: 1.05rem;">📦 Bouquets TV & VOD Adulte +18</h3>
             <p class="countries-admin-intro" style="margin-top: 0">
               Sélectionnez les bouquets (TV en direct, Films ou Séries de tous vos fournisseurs) à inclure dans la
               section <strong>Adulte +18</strong>.
@@ -7072,36 +7134,38 @@
 
             <div id="vel-adult-packages-container" class="vel-adult-packages-container">
               <div class="vel-adult-portal-hub">
-                <div id="vel-adult-hub-live" class="vel-adult-hub-card vel-adult-hub-card--live"
+                <div id="vel-adult-hub-live" class="vel-adult-hub-card vel-adult-hub-card--live" role="button" tabindex="0"
+                  aria-label="Accéder à la TV Adulte en Direct"
                   onclick="if(window.veloraOpenAdultLiveDirectly)window.veloraOpenAdultLiveDirectly();">
-                  <div class="vel-adult-hub-card__icon">
-                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
-                      <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
-                      <polyline points="17 2 12 7 7 2"></polyline>
-                    </svg>
-                  </div>
-                  <div class="vel-adult-hub-card__body">
-                    <h2 class="vel-adult-hub-card__title">TV en Direct</h2>
-                    <p class="vel-adult-hub-card__desc">Accéder aux chaînes de télévision adultes en direct.</p>
-                    <button type="button" id="btn-launch-adult-live" class="vel-adult-hub-card__btn">
-                      ▶ Lancer la TV en Direct
-                    </button>
+                  <div class="vel-adult-hub-card__visual">
+                    <img id="vel-adult-hub-live-img" class="vel-adult-hub-card__img hidden" alt="TV en Direct" />
+                    <div id="vel-adult-hub-live-fallback" class="vel-adult-hub-card__fallback">
+                      <div class="vel-adult-hub-card__icon">
+                        <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
+                          <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+                          <polyline points="17 2 12 7 7 2"></polyline>
+                        </svg>
+                      </div>
+                      <h2 class="vel-adult-hub-card__title">TV en Direct</h2>
+                      <p class="vel-adult-hub-card__desc">Accéder aux chaînes de télévision adultes en direct</p>
+                    </div>
                   </div>
                 </div>
 
-                <div id="vel-adult-hub-vod" class="vel-adult-hub-card vel-adult-hub-card--vod"
+                <div id="vel-adult-hub-vod" class="vel-adult-hub-card vel-adult-hub-card--vod" role="button" tabindex="0"
+                  aria-label="Accéder aux Films & VOD Adultes"
                   onclick="if(window.veloraOpenAdultMoviesDirectly)window.veloraOpenAdultMoviesDirectly();">
-                  <div class="vel-adult-hub-card__icon">
-                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
-                      <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                    </svg>
-                  </div>
-                  <div class="vel-adult-hub-card__body">
-                    <h2 class="vel-adult-hub-card__title">Films & VOD</h2>
-                    <p class="vel-adult-hub-card__desc">Accéder au lecteur et au catalogue des films adultes.</p>
-                    <button type="button" id="btn-launch-adult-vod" class="vel-adult-hub-card__btn">
-                      ▶ Lancer les Films (VOD)
-                    </button>
+                  <div class="vel-adult-hub-card__visual">
+                    <img id="vel-adult-hub-vod-img" class="vel-adult-hub-card__img hidden" alt="Films & VOD" />
+                    <div id="vel-adult-hub-vod-fallback" class="vel-adult-hub-card__fallback">
+                      <div class="vel-adult-hub-card__icon">
+                        <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
+                          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                      </div>
+                      <h2 class="vel-adult-hub-card__title">Films & VOD</h2>
+                      <p class="vel-adult-hub-card__desc">Accéder au catalogue et au lecteur de films adultes</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -17367,8 +17431,8 @@
     })();
   </script>
   <script defer src="/assets/velora-nav-controller.js?v=20260909-teardown-v6"></script>
-  <link rel="stylesheet" href="/assets/velora-adult.css?v=20260911-mobile-controls-v1" />
-  <script defer src="/assets/velora-adult.js?v=20260911-landscape-fs-v1"></script>
+  <link rel="stylesheet" href="/assets/velora-adult.css?v=20260912-hub-images-v2" />
+  <script defer src="/assets/velora-adult.js?v=20260912-hub-images-v2"></script>
 </body>
 
 </html>

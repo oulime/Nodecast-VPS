@@ -7,9 +7,14 @@
   const REST_BASE = "/api/velora-db/rest/v1";
   const ADULT_CONFIRMED_KEY = "velora_adult_confirmed_v1";
   const LOCAL_STORAGE_ADULT_KEY = "velora_admin_adult_packages";
+  const LOCAL_STORAGE_ADULT_HUB_IMAGES_KEY = "velora_admin_adult_hub_images";
   const ADULT_KEYWORDS = /(^|\s|[-_\[(])(xxx|xx|adult|adults|adulte|adultes|adulti|erotic|erotique|erotik|porn|porno|sexy|sex|hot|playboy|hustler|dorcel|forno|penthouse|brazzers|redlight|vivid|evilangel|mfc|chaturbate|x-rated|x\s*rated|18\+|18\s*plus|\+18)($|\s|[-_\])])/i;
 
   let assignedAdultPackages = new Map(); // key: package_id -> row
+  let adultHubImages = {
+    liveImage: "",
+    vodImage: ""
+  };
   let allCatalogPackages = [];
   let allSources = [];
   let currentAdultView = null; // null | "vod"
@@ -19,6 +24,16 @@
   let adminSourceFilter = "all";
   let adminSelectedOnly = false;
   let isAdultOpen = false;
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
 
   function makePackageKey(kind, sourceId, categoryId) {
     return `${kind}:${sourceId}:${categoryId}`;
@@ -183,6 +198,80 @@
     window.dispatchEvent(new CustomEvent("velora-adult-packages-changed"));
   }
 
+  let fetchAdultHubImagesPromise = null;
+  async function fetchAdultHubImages(forceRefresh = false) {
+    if (!forceRefresh && (adultHubImages.liveImage || adultHubImages.vodImage)) {
+      return adultHubImages;
+    }
+    if (fetchAdultHubImagesPromise) return fetchAdultHubImagesPromise;
+
+    const cached = localStorage.getItem(LOCAL_STORAGE_ADULT_HUB_IMAGES_KEY);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (parsed && typeof parsed === "object") {
+          if (parsed.liveImage != null) adultHubImages.liveImage = String(parsed.liveImage).trim();
+          if (parsed.vodImage != null) adultHubImages.vodImage = String(parsed.vodImage).trim();
+        }
+      } catch (_) {}
+    }
+
+    fetchAdultHubImagesPromise = (async () => {
+      try {
+        const res = await fetch(`${REST_BASE}/admin_settings?key=eq.adult_hub_images`, {
+          headers: { "Content-Type": "application/json" }
+        });
+        if (res.ok) {
+          const rows = await res.json();
+          if (Array.isArray(rows) && rows[0] && rows[0].value) {
+            try {
+              const val = typeof rows[0].value === "string" ? JSON.parse(rows[0].value) : rows[0].value;
+              if (val && typeof val === "object") {
+                adultHubImages.liveImage = String(val.liveImage || "").trim();
+                adultHubImages.vodImage = String(val.vodImage || "").trim();
+                localStorage.setItem(LOCAL_STORAGE_ADULT_HUB_IMAGES_KEY, JSON.stringify(adultHubImages));
+              }
+            } catch (_) {}
+          }
+        }
+      } catch (err) {
+        console.warn("[Velora Adult] Notice fetching adult_hub_images:", err.message);
+      } finally {
+        fetchAdultHubImagesPromise = null;
+      }
+      return adultHubImages;
+    })();
+
+    return fetchAdultHubImagesPromise;
+  }
+
+  async function saveAdultHubImages(newImages) {
+    adultHubImages.liveImage = String(newImages.liveImage || "").trim();
+    adultHubImages.vodImage = String(newImages.vodImage || "").trim();
+    localStorage.setItem(LOCAL_STORAGE_ADULT_HUB_IMAGES_KEY, JSON.stringify(adultHubImages));
+
+    try {
+      await fetch(`${REST_BASE}/admin_settings?key=eq.adult_hub_images`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Prefer": "resolution=merge-duplicates,return=representation"
+        },
+        body: JSON.stringify({
+          key: "adult_hub_images",
+          value: JSON.stringify(adultHubImages)
+        })
+      });
+    } catch (err) {
+      console.warn("[Velora Adult] Error saving adult_hub_images:", err.message);
+    }
+
+    window.dispatchEvent(new CustomEvent("velora-adult-hub-images-changed"));
+    if (isAdultOpen) {
+      renderAdultPortal();
+    }
+  }
+
   async function fetchAllCatalogPackages() {
     try {
       const pkgMap = new Map();
@@ -344,6 +433,155 @@
     const badge = document.getElementById("vel-admin-adult-count-badge");
     const searchInput = document.getElementById("vel-admin-adult-search");
     const sourceSelect = document.getElementById("vel-admin-adult-source-select");
+
+    // Hub Images Admin Elements
+    const liveImgInput = document.getElementById("vel-admin-adult-live-img-url");
+    const liveImgFile = document.getElementById("vel-admin-adult-live-img-file");
+    const liveImgUploadBtn = document.getElementById("vel-admin-adult-live-img-upload-btn");
+    const liveImgPreview = document.getElementById("vel-admin-adult-live-img-preview");
+    const liveImgPlaceholder = document.getElementById("vel-admin-adult-live-img-placeholder");
+    const liveImgClearBtn = document.getElementById("vel-admin-adult-live-img-clear");
+
+    const vodImgInput = document.getElementById("vel-admin-adult-vod-img-url");
+    const vodImgFile = document.getElementById("vel-admin-adult-vod-img-file");
+    const vodImgUploadBtn = document.getElementById("vel-admin-adult-vod-img-upload-btn");
+    const vodImgPreview = document.getElementById("vel-admin-adult-vod-img-preview");
+    const vodImgPlaceholder = document.getElementById("vel-admin-adult-vod-img-placeholder");
+    const vodImgClearBtn = document.getElementById("vel-admin-adult-vod-img-clear");
+
+    const imagesSaveBtn = document.getElementById("vel-admin-adult-images-save-btn");
+    const imagesStatus = document.getElementById("vel-admin-adult-images-status");
+
+    function setImagesStatus(msg, isError = false) {
+      if (imagesStatus) {
+        imagesStatus.textContent = msg;
+        imagesStatus.style.color = isError ? "#fca5a5" : "#86efac";
+      }
+    }
+
+    function updateImgPreview(imgEl, placeholderEl, url) {
+      const clean = String(url || "").trim();
+      if (clean) {
+        if (imgEl) {
+          imgEl.src = clean;
+          imgEl.classList.remove("hidden");
+        }
+        if (placeholderEl) placeholderEl.classList.add("hidden");
+      } else {
+        if (imgEl) {
+          imgEl.removeAttribute("src");
+          imgEl.classList.add("hidden");
+        }
+        if (placeholderEl) placeholderEl.classList.remove("hidden");
+      }
+    }
+
+    // Populate hub images admin values
+    fetchAdultHubImages().then(imgs => {
+      if (liveImgInput) liveImgInput.value = imgs.liveImage || "";
+      if (vodImgInput) vodImgInput.value = imgs.vodImage || "";
+      updateImgPreview(liveImgPreview, liveImgPlaceholder, imgs.liveImage);
+      updateImgPreview(vodImgPreview, vodImgPlaceholder, imgs.vodImage);
+    });
+
+    if (liveImgInput) {
+      liveImgInput.oninput = () => updateImgPreview(liveImgPreview, liveImgPlaceholder, liveImgInput.value);
+    }
+    if (vodImgInput) {
+      vodImgInput.oninput = () => updateImgPreview(vodImgPreview, vodImgPlaceholder, vodImgInput.value);
+    }
+
+    if (liveImgClearBtn) {
+      liveImgClearBtn.onclick = () => {
+        if (liveImgInput) liveImgInput.value = "";
+        updateImgPreview(liveImgPreview, liveImgPlaceholder, "");
+      };
+    }
+    if (vodImgClearBtn) {
+      vodImgClearBtn.onclick = () => {
+        if (vodImgInput) vodImgInput.value = "";
+        updateImgPreview(vodImgPreview, vodImgPlaceholder, "");
+      };
+    }
+
+    async function handleImageFileUpload(file, inputEl, previewEl, placeholderEl, btnEl) {
+      if (!file) return;
+      if (file.size > 8 * 1024 * 1024) {
+        setImagesStatus("L'image ne doit pas dépasser 8 Mo.", true);
+        return;
+      }
+      if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.textContent = "⏳ Envoi...";
+      }
+      setImagesStatus("Importation de l'image sur le VPS...");
+      try {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          try {
+            const dataBase64 = e.target.result;
+            const res = await fetch("/api/velora-db/upload-section-logo", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ dataBase64, fileName: file.name })
+            });
+            const json = await res.json();
+            if (!res.ok || !json.ok) throw new Error(json.error || "Erreur upload");
+            if (inputEl) inputEl.value = json.url;
+            updateImgPreview(previewEl, placeholderEl, json.url);
+            setImagesStatus("Image importée avec succès ! Pensez à enregistrer.");
+          } catch (err) {
+            setImagesStatus("Erreur d'importation : " + err.message, true);
+          } finally {
+            if (btnEl) {
+              btnEl.disabled = false;
+              btnEl.textContent = "📁 Importer (PC)";
+            }
+          }
+        };
+        reader.readAsDataURL(file);
+      } catch (err) {
+        if (btnEl) {
+          btnEl.disabled = false;
+          btnEl.textContent = "📁 Importer (PC)";
+        }
+        setImagesStatus("Impossible de lire le fichier.", true);
+      }
+    }
+
+    if (liveImgUploadBtn && liveImgFile) {
+      liveImgUploadBtn.onclick = () => liveImgFile.click();
+      liveImgFile.onchange = () => {
+        const file = liveImgFile.files && liveImgFile.files[0];
+        if (file) handleImageFileUpload(file, liveImgInput, liveImgPreview, liveImgPlaceholder, liveImgUploadBtn);
+        liveImgFile.value = "";
+      };
+    }
+
+    if (vodImgUploadBtn && vodImgFile) {
+      vodImgUploadBtn.onclick = () => vodImgFile.click();
+      vodImgFile.onchange = () => {
+        const file = vodImgFile.files && vodImgFile.files[0];
+        if (file) handleImageFileUpload(file, vodImgInput, vodImgPreview, vodImgPlaceholder, vodImgUploadBtn);
+        vodImgFile.value = "";
+      };
+    }
+
+    if (imagesSaveBtn) {
+      imagesSaveBtn.onclick = async () => {
+        imagesSaveBtn.disabled = true;
+        setImagesStatus("Enregistrement des images...");
+        const newImages = {
+          liveImage: liveImgInput ? liveImgInput.value.trim() : "",
+          vodImage: vodImgInput ? vodImgInput.value.trim() : ""
+        };
+        await saveAdultHubImages(newImages);
+        setImagesStatus("✅ Images enregistrées et appliquées avec succès !");
+        imagesSaveBtn.disabled = false;
+        setTimeout(() => setImagesStatus(""), 3500);
+      };
+    }
+
     if (!grid) return;
 
     function setStatus(msg, isError = false) {
@@ -354,7 +592,7 @@
     }
 
     setStatus("Chargement des streams et catalogues de tous les fournisseurs...");
-    await Promise.all([fetchAssignedAdultPackages(), fetchAllCatalogPackages()]);
+    await Promise.all([fetchAssignedAdultPackages(), fetchAllCatalogPackages(), fetchAdultHubImages()]);
     setStatus("");
 
     if (sourceSelect) {
@@ -2345,34 +2583,49 @@
     portal.setAttribute("aria-hidden", "false");
     portal.style.removeProperty("display");
 
+    await fetchAdultHubImages();
+
+    const liveImgSrc = (adultHubImages && adultHubImages.liveImage) ? adultHubImages.liveImage.trim() : "";
+    const vodImgSrc = (adultHubImages && adultHubImages.vodImage) ? adultHubImages.vodImage.trim() : "";
+
+    const liveCardInner = liveImgSrc
+      ? `<div class="vel-adult-hub-card__visual">
+           <img class="vel-adult-hub-card__img" src="${escapeHtml(liveImgSrc)}" alt="TV en Direct" loading="lazy" />
+         </div>`
+      : `<div class="vel-adult-hub-card__visual">
+           <div class="vel-adult-hub-card__fallback">
+             <div class="vel-adult-hub-card__icon">
+               <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
+             </div>
+             <h2 class="vel-adult-hub-card__title">TV en Direct</h2>
+             <p class="vel-adult-hub-card__desc">Accéder aux chaînes de télévision adultes en direct</p>
+           </div>
+         </div>`;
+
+    const vodCardInner = vodImgSrc
+      ? `<div class="vel-adult-hub-card__visual">
+           <img class="vel-adult-hub-card__img" src="${escapeHtml(vodImgSrc)}" alt="Films & VOD" loading="lazy" />
+         </div>`
+      : `<div class="vel-adult-hub-card__visual">
+           <div class="vel-adult-hub-card__fallback">
+             <div class="vel-adult-hub-card__icon">
+               <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+             </div>
+             <h2 class="vel-adult-hub-card__title">Films & VOD</h2>
+             <p class="vel-adult-hub-card__desc">Accéder au catalogue et au lecteur de films adultes</p>
+           </div>
+         </div>`;
+
     container.replaceChildren();
     container.innerHTML = `
       <div class="vel-adult-portal-hub">
         
-        <div id="vel-adult-hub-live" class="vel-adult-hub-card vel-adult-hub-card--live">
-          <div class="vel-adult-hub-card__icon">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
-          </div>
-          <div class="vel-adult-hub-card__body">
-            <h2 class="vel-adult-hub-card__title">TV en Direct</h2>
-            <p class="vel-adult-hub-card__desc">Accéder aux chaînes de télévision adultes en direct.</p>
-            <button type="button" class="vel-adult-hub-card__btn">
-              ▶ Lancer la TV en Direct
-            </button>
-          </div>
+        <div id="vel-adult-hub-live" class="vel-adult-hub-card vel-adult-hub-card--live ${liveImgSrc ? 'has-custom-img' : ''}" role="button" tabindex="0" aria-label="Accéder à la TV Adulte en Direct">
+          ${liveCardInner}
         </div>
 
-        <div id="vel-adult-hub-vod" class="vel-adult-hub-card vel-adult-hub-card--vod">
-          <div class="vel-adult-hub-card__icon">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-          </div>
-          <div class="vel-adult-hub-card__body">
-            <h2 class="vel-adult-hub-card__title">Films & VOD</h2>
-            <p class="vel-adult-hub-card__desc">Accéder au lecteur et au catalogue des films adultes.</p>
-            <button type="button" class="vel-adult-hub-card__btn">
-              ▶ Lancer les Films (VOD)
-            </button>
-          </div>
+        <div id="vel-adult-hub-vod" class="vel-adult-hub-card vel-adult-hub-card--vod ${vodImgSrc ? 'has-custom-img' : ''}" role="button" tabindex="0" aria-label="Accéder aux Films & VOD Adultes">
+          ${vodCardInner}
         </div>
 
       </div>
@@ -2381,11 +2634,23 @@
     const liveCard = document.getElementById("vel-adult-hub-live");
     if (liveCard) {
       liveCard.onclick = () => openAdultLivePlayerDirectly();
+      liveCard.onkeydown = (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openAdultLivePlayerDirectly();
+        }
+      };
     }
 
     const vodCard = document.getElementById("vel-adult-hub-vod");
     if (vodCard) {
       vodCard.onclick = () => openAdultMoviesPlayerDirectly();
+      vodCard.onkeydown = (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openAdultMoviesPlayerDirectly();
+        }
+      };
     }
 
     // Silent background pre-warm
@@ -3367,7 +3632,14 @@
     }
   });
 
+  document.addEventListener("velora-adult-hub-images-changed", () => {
+    if (isAdultOpen) {
+      renderAdultPortal();
+    }
+  });
+
   fetchAssignedAdultPackages();
+  fetchAdultHubImages();
   fetchServerPinRecord();
   fetchServerAdultConfirmed();
 

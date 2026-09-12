@@ -108,6 +108,13 @@
       var resumeBlock = window.veloraRenderResumeSection();
       if (resumeBlock) fragment.appendChild(resumeBlock);
     }
+    var existingFootball = root.querySelector(".vel-home-section--football");
+    if (existingFootball) {
+      fragment.appendChild(existingFootball);
+    } else if (typeof window.veloraRenderFootballSectionDirect === "function") {
+      var footBlock = window.veloraRenderFootballSectionDirect();
+      if (footBlock) fragment.appendChild(footBlock);
+    }
     sections.forEach(function (section) {
       var isHorizontal = section.card_orientation === "horizontal";
       var block = document.createElement("div");
@@ -172,6 +179,7 @@
       fragment.appendChild(block);
     });
     root.replaceChildren(fragment);
+    if (typeof window.veloraInjectFootballSection === "function") window.veloraInjectFootballSection();
     renderedCountry = country;
     document.dispatchEvent(new CustomEvent("velora-home-country-rendered", {
       detail: { countryId: String(document.getElementById("country-select")?.value || country || "") }

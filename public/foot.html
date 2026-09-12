@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Football aujourd'hui - Programme TV</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/css/foot.css?v=20260912-foot-v6" />
+</head>
+
+<body>
+    <div class="foot-container">
+        <!-- Barre de navigation supérieure -->
+        <header class="foot-navbar">
+            <a href="/" class="foot-brand">
+                <div class="foot-brand-logo">⚽</div>
+                <span class="foot-brand-text">VeloraVIP <span style="font-size: 0.85em; color: var(--accent-blue); font-weight: 500;">FOOT</span></span>
+            </a>
+            <div class="foot-nav-actions">
+                <div class="foot-country-select-wrap">
+                    <select id="country-picker" class="foot-country-select" aria-label="Sélectionner le pays de diffusion">
+                        <option value="france">🇫🇷 France (Canal+, beIN, DAZN)</option>
+                        <option value="mena">🌍 Monde Arabe (beIN Sports, SSC, Abu Dhabi)</option>
+                        <option value="uk">🇬🇧 UK (Sky Sports, TNT Sports)</option>
+                        <option value="spain">🇪🇸 Espagne (Movistar+, DAZN)</option>
+                        <option value="usa">🇺🇸 USA (NBC, CBS, Paramount+, ESPN)</option>
+                        <option value="italy">🇮🇹 Italie (Sky Sport, DAZN)</option>
+                        <option value="germany">🇩🇪 Allemagne (Sky Sport, DAZN)</option>
+                        <option value="portugal">🇵🇹 Portugal (Sport TV, DAZN)</option>
+                    </select>
+                </div>
+                <button type="button" class="foot-btn-refresh" id="btn-refresh" title="Actualiser le flux" aria-label="Actualiser">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                    </svg>
+                </button>
+                <a href="/" class="foot-btn-back">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    <span>Accueil</span>
+                </a>
+            </div>
+        </header>
+
+        <!-- En-tête principal -->
+        <section class="foot-header">
+            <div class="foot-title-wrapper">
+                <h1 class="foot-title">Football aujourd'hui</h1>
+                <div class="foot-badge-count" id="badge-count">Chargement...</div>
+            </div>
+            <p class="foot-subtitle">
+                <span class="foot-subtitle-dot"></span>
+                <span id="foot-subtitle-text">Diffusion en direct • Chaînes TV françaises</span>
+            </p>
+        </section>
+
+        <!-- Barre de recherche rapide -->
+        <section class="foot-controls">
+            <div class="foot-search-bar">
+                <div class="foot-search-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                </div>
+                <input type="text" id="search-input" class="foot-search-input" placeholder="Rechercher une équipe, un club, une chaîne TV..." autocomplete="off" />
+            </div>
+        </section>
+
+        <!-- Grille des cartes de match -->
+        <main class="foot-matches-grid" id="matches-grid" aria-live="polite">
+            <!-- Skeletons de chargement -->
+            <div class="foot-skeleton-card">
+                <div class="skeleton-header">
+                    <div class="skeleton-shimmer skeleton-comp"></div>
+                    <div class="skeleton-shimmer skeleton-badge"></div>
+                </div>
+                <div class="skeleton-teams">
+                    <div class="skeleton-team">
+                        <div class="skeleton-shimmer skeleton-logo"></div>
+                        <div class="skeleton-shimmer skeleton-text"></div>
+                    </div>
+                    <div class="skeleton-shimmer skeleton-vs"></div>
+                    <div class="skeleton-team">
+                        <div class="skeleton-shimmer skeleton-logo"></div>
+                        <div class="skeleton-shimmer skeleton-text"></div>
+                    </div>
+                </div>
+                <div class="skeleton-shimmer skeleton-tv"></div>
+            </div>
+            <div class="foot-skeleton-card">
+                <div class="skeleton-header">
+                    <div class="skeleton-shimmer skeleton-comp"></div>
+                    <div class="skeleton-shimmer skeleton-badge"></div>
+                </div>
+                <div class="skeleton-teams">
+                    <div class="skeleton-team">
+                        <div class="skeleton-shimmer skeleton-logo"></div>
+                        <div class="skeleton-shimmer skeleton-text"></div>
+                    </div>
+                    <div class="skeleton-shimmer skeleton-vs"></div>
+                    <div class="skeleton-team">
+                        <div class="skeleton-shimmer skeleton-logo"></div>
+                        <div class="skeleton-shimmer skeleton-text"></div>
+                    </div>
+                </div>
+                <div class="skeleton-shimmer skeleton-tv"></div>
+            </div>
+            <div class="foot-skeleton-card">
+                <div class="skeleton-header">
+                    <div class="skeleton-shimmer skeleton-comp"></div>
+                    <div class="skeleton-shimmer skeleton-badge"></div>
+                </div>
+                <div class="skeleton-teams">
+                    <div class="skeleton-team">
+                        <div class="skeleton-shimmer skeleton-logo"></div>
+                        <div class="skeleton-shimmer skeleton-text"></div>
+                    </div>
+                    <div class="skeleton-shimmer skeleton-vs"></div>
+                    <div class="skeleton-team">
+                        <div class="skeleton-shimmer skeleton-logo"></div>
+                        <div class="skeleton-shimmer skeleton-text"></div>
+                    </div>
+                </div>
+                <div class="skeleton-shimmer skeleton-tv"></div>
+            </div>
+        </main>
+
+        <!-- Pied de page -->
+        <footer class="foot-footer">
+            <p>Programme TV Football actualisé automatiquement • Fuseau horaire Europe/Paris • Logos propulsés par TheSportsDB</p>
+        </footer>
+    </div>
+
+    <!-- Script applicatif -->
+    <script src="/js/foot.js?v=20260912-foot-v6"></script>
+</body>
+
+</html>

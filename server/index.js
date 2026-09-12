@@ -616,6 +616,7 @@ veloraCatalogCache.onSnapshotReady(snapshotStatus => {
     console.log(`[Home cache] Rebuilt after catalogue ${snapshotStatus.snapshotVersion}: ${homeCache.sections.length} sections, ${entryCount} entries`);
 });
 app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/matches', require('./routes/matches'));
 app.use('/api', require('./routes/packageCovers'));
 app.use('/api/country-logos', require('./routes/countryLogos'));
 
@@ -642,11 +643,17 @@ function sendVeloraApp(req, res) {
     res.sendFile(path.join(publicDir, 'index.html'));
 }
 
+function sendFootPage(req, res) {
+    res.sendFile(path.join(publicDir, 'foot.html'));
+}
+
 // The browser owns the JWT in localStorage, so the server cannot determine
 // authentication from a plain page request. Always serve the app at `/`; its
 // early bootstrap redirects browsers without a token to `/login`.
 app.get('/', sendVeloraApp);
 app.get('/login', sendLoginPage);
+app.get('/foot', sendFootPage);
+app.get('/foot.html', sendFootPage);
 
 // Backend admin iframe. express.static has index disabled, so serve it explicitly.
 app.get('/nodecast-admin/', (req, res) => {

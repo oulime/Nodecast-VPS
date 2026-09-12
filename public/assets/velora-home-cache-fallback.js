@@ -555,6 +555,10 @@
       var resumeBlock = window.veloraRenderResumeSection();
       if (resumeBlock) fragment.appendChild(resumeBlock);
     }
+    if (typeof window.veloraRenderFootballSectionDirect === "function") {
+      var footBlock = window.veloraRenderFootballSectionDirect();
+      if (footBlock) fragment.appendChild(footBlock);
+    }
     matching.forEach(function (section) {
       var isHorizontal = section.card_orientation === "horizontal";
       var block = document.createElement("div");
@@ -622,6 +626,7 @@
     });
     if (version !== renderVersion) return false;
     root.replaceChildren(fragment);
+    if (typeof window.veloraInjectFootballSection === "function") window.veloraInjectFootballSection();
     document.dispatchEvent(new CustomEvent("velora-home-country-rendered", {
       detail: { countryId: activeCountryId() }
     }));

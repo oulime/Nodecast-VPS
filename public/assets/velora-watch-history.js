@@ -2437,6 +2437,9 @@
     } else {
       root.prepend(block);
     }
+    if (typeof window.veloraInjectFootballSection === "function") {
+      try { window.veloraInjectFootballSection(); } catch (_) {}
+    }
   }
   window.veloraInjectResumeSection = injectResumeSectionDirectly;
 

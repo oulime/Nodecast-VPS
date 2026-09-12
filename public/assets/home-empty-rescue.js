@@ -6,9 +6,17 @@
   var renderedCountry = null;
 
   function sectionsForCountry(data) {
-    var countrySelect = document.getElementById("country-select");
+    var countrySelect = document.getElementById("country-select") || document.getElementById("home-country-select");
     var country = String(countrySelect?.value || "").toLowerCase().trim();
     var countryName = String(countrySelect?.selectedOptions?.[0]?.textContent || "").toLowerCase().trim();
+    if (!country) {
+      try {
+        var savedId = localStorage.getItem("lumina_selected_country_id") || sessionStorage.getItem("lumina_selected_country_id");
+        if (savedId) country = String(savedId).toLowerCase().trim();
+        var savedName = localStorage.getItem("velora_selected_country_name_v1") || sessionStorage.getItem("velora_selected_country_name_v1");
+        if (savedName) countryName = String(savedName).toLowerCase().trim();
+      } catch (_) {}
+    }
     var normCountry = country.replace(/^country_/, "");
     var normName = countryName.replace(/^country_/, "");
     var sections = Array.isArray(data?.sections) ? data.sections : [];
@@ -81,7 +89,13 @@
 
   function renderIfEmpty() {
     var root = document.getElementById("vel-home-sections");
-    var country = String(document.getElementById("country-select")?.value || "");
+    var countrySelect = document.getElementById("country-select") || document.getElementById("home-country-select");
+    var country = String(countrySelect?.value || "");
+    if (!country) {
+      try {
+        country = String(localStorage.getItem("lumina_selected_country_id") || sessionStorage.getItem("lumina_selected_country_id") || "");
+      } catch (_) {}
+    }
     if (!payload || !root) return;
     if (root.querySelector(".vel-home-section:not(.vel-home-section--resume) .vel-home-section__card") && renderedCountry === country) return;
     var sections = sectionsForCountry(payload);
@@ -160,13 +174,21 @@
     root.replaceChildren(fragment);
     renderedCountry = country;
     document.dispatchEvent(new CustomEvent("velora-home-country-rendered", {
-      detail: { countryId: String(document.getElementById("country-select")?.value || "") }
+      detail: { countryId: String(document.getElementById("country-select")?.value || country || "") }
     }));
   }
 
   async function load() {
     try {
-      var response = await fetch("/api/velora-db/home-cache?t=" + Date.now(), { cache: "no-store" });
+      var countrySelect = document.getElementById("country-select") || document.getElementById("home-country-select");
+      var cId = countrySelect?.value || "";
+      if (!cId) {
+        try {
+          cId = localStorage.getItem("lumina_selected_country_id") || sessionStorage.getItem("lumina_selected_country_id") || "";
+        } catch (_) {}
+      }
+      var url = "/api/velora-db/home-cache?" + (cId ? "country_id=" + encodeURIComponent(cId) + "&" : "") + "t=" + Date.now();
+      var response = await fetch(url, { cache: "no-store" });
       if (!response.ok) return;
       payload = await response.json();
       renderIfEmpty();
@@ -175,12 +197,19 @@
   }
 
   window.addEventListener("load", load, { once: true });
-  document.addEventListener("velora-countries-ready", load);
+  document.addEventListener("velora-countries-ready", function() { renderedCountry = null; load(); });
+  document.addEventListener("velora-country-change", function() { renderedCountry = null; load(); });
+  document.addEventListener("velora-country-changed", function() { renderedCountry = null; load(); });
+  window.addEventListener("velora-countries-ready", function() { renderedCountry = null; load(); });
+  window.addEventListener("velora-country-change", function() { renderedCountry = null; load(); });
   document.addEventListener("velora-home-cache-ready", renderIfEmpty);
   window.setTimeout(load, 1200);
-  window.setTimeout(function () {
-    document.getElementById("country-select")?.addEventListener("change", function () {
-      window.setTimeout(renderIfEmpty, 50);
-    });
-  }, 0);
+  document.addEventListener("change", function (e) {
+    if (e.target && (e.target.id === "country-select" || e.target.id === "home-country-select")) {
+      window.setTimeout(function () {
+        renderedCountry = null;
+        load();
+      }, 50);
+    }
+  }, true);
 })();

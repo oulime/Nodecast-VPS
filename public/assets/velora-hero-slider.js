@@ -34,8 +34,12 @@
       var id = window.veloraGetActiveCountryId();
       if (id) return id;
     }
-    var select = document.getElementById("country-select");
+    var select = document.getElementById("country-select") || document.getElementById("home-country-select");
     if (select && select.value) return select.value;
+    try {
+      var saved = localStorage.getItem("lumina_selected_country_id") || sessionStorage.getItem("lumina_selected_country_id");
+      if (saved) return saved;
+    } catch (_) {}
     return "default";
   }
 
@@ -498,16 +502,31 @@
     updateHeroSliderForCountry();
 
     // Listen for Country changes
-    var countrySelect = document.getElementById("country-select");
-    if (countrySelect) {
-      countrySelect.addEventListener("change", function() {
+    document.addEventListener("change", function(e) {
+      if (e.target && (e.target.id === "country-select" || e.target.id === "home-country-select")) {
         window.setTimeout(function() {
           updateHeroSliderForCountry();
         }, 80);
-      });
-    }
+      }
+    }, true);
 
     document.addEventListener("velora-country-change", function() {
+      updateHeroSliderForCountry();
+    });
+
+    document.addEventListener("velora-country-changed", function() {
+      updateHeroSliderForCountry();
+    });
+
+    document.addEventListener("velora-countries-ready", function() {
+      updateHeroSliderForCountry();
+    });
+
+    window.addEventListener("velora-country-change", function() {
+      updateHeroSliderForCountry();
+    });
+
+    window.addEventListener("velora-countries-ready", function() {
       updateHeroSliderForCountry();
     });
 

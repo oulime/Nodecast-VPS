@@ -25,6 +25,10 @@
     }
     const select = document.getElementById("country-select") || document.getElementById("home-country-select");
     if (select && select.value) return String(select.value);
+    try {
+      const saved = localStorage.getItem("lumina_selected_country_id") || sessionStorage.getItem("lumina_selected_country_id");
+      if (saved) return String(saved);
+    } catch (_) {}
     return "country_france";
   }
 
@@ -1462,18 +1466,27 @@
     render();
   });
 
-  const countrySelect = document.getElementById("country-select");
-  if (countrySelect) {
-    countrySelect.addEventListener("change", () => {
-      lastFeedKey = "";
-      lastHomeCountry = null;
-      homeFeedInitialized = false;
-      feedCache.clear();
-      packageFullItemsCache.clear();
-      syncHeaderForMediaTabs();
-      setTimeout(() => render(true), 30);
-    });
+  function onCountryChanged() {
+    lastFeedKey = "";
+    lastHomeCountry = null;
+    homeFeedInitialized = false;
+    feedCache.clear();
+    packageFullItemsCache.clear();
+    syncHeaderForMediaTabs();
+    setTimeout(() => render(true), 30);
   }
+
+  document.addEventListener("change", (e) => {
+    if (e.target && (e.target.id === "country-select" || e.target.id === "home-country-select")) {
+      onCountryChanged();
+    }
+  }, true);
+
+  document.addEventListener("velora-country-change", onCountryChanged);
+  document.addEventListener("velora-country-changed", onCountryChanged);
+  document.addEventListener("velora-countries-ready", onCountryChanged);
+  window.addEventListener("velora-country-change", onCountryChanged);
+  window.addEventListener("velora-countries-ready", onCountryChanged);
 
   document.addEventListener("velora-return-home", () => {
     setTimeout(() => initHomeMixedFeed(false), 50);

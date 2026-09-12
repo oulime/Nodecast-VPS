@@ -2573,6 +2573,8 @@ function buildMediaFeedCache() {
                     }
                 }
 
+                if (items.length < 3) continue;
+
                 totalCachedItems += items.length;
                 totalCachedPackages += 1;
 
@@ -2868,7 +2870,7 @@ function buildHomeCache() {
             }).filter(item => item?.name).slice(0, HOME_CACHE_ENTRIES_PER_PACKAGE);
         }
         return { ...section, country_ids: Array.isArray(section.country_ids) ? section.country_ids : (section.country_id ? String(section.country_id).split(',').map(s => s.trim()).filter(Boolean) : ['default']), content_type: type, card_orientation: orientation, logo_url: String(section.logo_url || section.badge_logo_url || '').trim(), entries };
-    });
+    }).filter(section => section && Array.isArray(section.entries) && section.entries.length >= 3);
     const payload = { generatedAt: new Date().toISOString(), sections: output };
     writeJsonAtomic(homeCachePath, payload);
     return payload;
@@ -2883,7 +2885,7 @@ router.get('/home-cache', (req, res) => {
         const sectionId = String(req.query.section_id || '').trim();
         const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 10, 1), 100);
         const offset = Math.max(Number.parseInt(req.query.offset, 10) || 0, 0);
-        let sections = Array.isArray(payload.sections) ? payload.sections : [];
+        let sections = Array.isArray(payload.sections) ? payload.sections.filter(s => Array.isArray(s.entries) && s.entries.length >= 3) : [];
         if (countryId) {
             const countrySections = sections.filter(section => {
                 if (section.published === false) return false;

@@ -112,11 +112,14 @@ router.delete('/:itemId', (req, res) => {
     try {
         const db = getDb();
         const userId = req.user.id;
-        const itemId = String(req.params.itemId).trim();
+        const itemId = String(req.params.itemId || '').trim();
+        const seriesId = String(req.query.seriesId || '').trim();
+        const name = String(req.query.name || '').trim();
+        const seriesName = String(req.query.seriesName || '').trim();
 
         const compositeId = `${userId}:${itemId}`;
 
-        const stmt = db.prepare(`
+        let query = `
             DELETE FROM watch_history 
             WHERE user_id = ? AND (
                 id = ? 
@@ -130,9 +133,8 @@ router.delete('/:itemId', (req, res) => {
                 OR json_extract(data, '$.seriesId') = ?
                 OR json_extract(data, '$.episodeStreamId') = ?
                 OR json_extract(data, '$.id') = ?
-            )
-        `);
-        const result = stmt.run(
+        `;
+        const params = [
             userId,
             compositeId,
             itemId,
@@ -145,7 +147,33 @@ router.delete('/:itemId', (req, res) => {
             itemId,
             itemId,
             itemId
-        );
+        ];
+
+        if (seriesId) {
+            query += `
+                OR parent_id = ?
+                OR item_id = ?
+                OR id LIKE ?
+                OR json_extract(data, '$.seriesId') = ?
+                OR json_extract(data, '$.streamId') = ?
+            `;
+            params.push(seriesId, seriesId, `%${seriesId}%`, seriesId, seriesId);
+        }
+
+        if (name || seriesName) {
+            const targetName = (seriesName || name).toLowerCase();
+            query += `
+                OR LOWER(json_extract(data, '$.name')) = ?
+                OR LOWER(json_extract(data, '$.seriesName')) = ?
+                OR LOWER(json_extract(data, '$.title')) = ?
+            `;
+            params.push(targetName, targetName, targetName);
+        }
+
+        query += `)`;
+
+        const stmt = db.prepare(query);
+        const result = stmt.run(...params);
 
         console.log(`[History] Deleted ${result.changes} rows for item ${itemId} (user ${userId})`);
         res.json({ success: true, changes: result.changes });

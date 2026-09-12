@@ -1125,7 +1125,7 @@
             }
           }
           return cloned;
-        }).filter(p => !adultPackageIds.has(String(p.id)) && Array.isArray(p.items) && p.items.length > 0);
+        }).filter(p => !adultPackageIds.has(String(p.id)) && Array.isArray(p.items) && p.items.length >= 3);
       }
 
       const validMovies = processPackages(movieFeed?.packages, "movies");
@@ -1289,8 +1289,8 @@
         }
       }
 
-      // Filter packages that have preview items and are not assigned to adult
-      const validPackages = packages.filter(p => !adultPackageIds.has(String(p.id)) && Array.isArray(p.items) && p.items.length > 0);
+      // Filter packages that have preview items and are not assigned to adult (at least 3 items)
+      const validPackages = packages.filter(p => !adultPackageIds.has(String(p.id)) && Array.isArray(p.items) && p.items.length >= 3);
 
       if (!validPackages.length) {
         container.style.display = "none";

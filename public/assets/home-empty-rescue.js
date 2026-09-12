@@ -8,12 +8,18 @@
   function sectionsForCountry(data) {
     var country = String(document.getElementById("country-select")?.value || "");
     var sections = Array.isArray(data?.sections) ? data.sections : [];
+    function hasEnoughItems(row) {
+      var count = Array.isArray(row.custom_entries) && row.custom_entries.length > 0
+        ? row.custom_entries.length
+        : (Array.isArray(row.entries) ? row.entries.length : 0);
+      return count >= 3;
+    }
     var rows = sections.filter(function (row) {
-      return row.published !== false && String(row.country_id || "") === country;
+      return row.published !== false && String(row.country_id || "") === country && hasEnoughItems(row);
     });
     if (!rows.length) {
       rows = sections.filter(function (row) {
-        return row.published !== false && (!row.country_id || row.country_id === "default");
+        return row.published !== false && (!row.country_id || row.country_id === "default") && hasEnoughItems(row);
       });
     }
     return rows.sort(function (a, b) {
@@ -121,6 +127,7 @@
 
       var entries = Array.isArray(section.entries) ? section.entries : [];
       if (typeof window.veloraApplyHomeChannelRules === "function") entries = window.veloraApplyHomeChannelRules(section, entries);
+      if (entries.length < 3) return;
       entries.forEach(function (entry) {
         rail.appendChild(card(section, entry));
       });

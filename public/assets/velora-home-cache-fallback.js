@@ -419,7 +419,12 @@
   function matchingSections(payload) {
     var sections = payload && Array.isArray(payload.sections) ? payload.sections : [];
     var countryId = activeCountryId();
-    var published = sections.filter(function (section) { return section.published !== false; });
+    var published = sections.filter(function (section) {
+      var count = Array.isArray(section.custom_entries) && section.custom_entries.length > 0
+        ? section.custom_entries.length
+        : (Array.isArray(section.entries) ? section.entries.length : 0);
+      return section.published !== false && count >= 3;
+    });
     var specific = published.filter(function (section) {
       var ids = getSectionCountryIds(section);
       return !ids.includes("default") && (countryId ? ids.includes(countryId) : false);
@@ -587,6 +592,7 @@
       var filteredEntries = entries.filter(function (entry) {
         return !dominantSource || String(entry.sourceId || "") === dominantSource;
       });
+      if (filteredEntries.length < 3) return;
       appendRailPage(rail, section, filteredEntries, 0);
       block.append(headerSec, railWrap);
       fragment.appendChild(block);

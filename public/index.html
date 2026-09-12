@@ -1586,7 +1586,7 @@
   <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-54"></script>
   <link rel="stylesheet" href="/assets/velora-favorites.css?v=white-logo-v20260911-1" />
   <script defer src="/assets/velora-favorites.js?v=20260911-search-fav-name-v5"></script>
-  <script defer src="/assets/velora-watch-history.js?v=20260911-series-rewind-ep-v2"></script>
+  <script defer src="/assets/velora-watch-history.js?v=20260912-permanent-delete-v1"></script>
   <script defer src="/assets/velora-catalog-scroll-memory.js?v=20260902-scroll-memory-v6"></script>
   <script defer src="/assets/velora-cache-inventory.js?v=instant-nav-v20260821-54"></script>
   <script defer src="/assets/manual-pays-visible-memberships.js?v=instant-nav-v20260907-151"></script>
@@ -7178,17 +7178,17 @@
             </button>
             <button type="button" class="vel-global-search__tab" data-tab-filter="movies" role="tab"
               aria-selected="false">
-              <span class="vel-global-search__tab-label">🎬 Films</span>
+              <span class="vel-global-search__tab-label">🎬<span class="vel-tab-text"> Films</span></span>
               <span class="vel-global-search__tab-count" data-count-for="movies">0</span>
             </button>
             <button type="button" class="vel-global-search__tab" data-tab-filter="series" role="tab"
               aria-selected="false">
-              <span class="vel-global-search__tab-label">🍿 Séries</span>
+              <span class="vel-global-search__tab-label">🍿<span class="vel-tab-text"> Séries</span></span>
               <span class="vel-global-search__tab-count" data-count-for="series">0</span>
             </button>
             <button type="button" class="vel-global-search__tab" data-tab-filter="live" role="tab"
               aria-selected="false">
-              <span class="vel-global-search__tab-label">📺 Chaînes</span>
+              <span class="vel-global-search__tab-label">📺<span class="vel-tab-text"> Chaînes</span></span>
               <span class="vel-global-search__tab-count" data-count-for="live">0</span>
             </button>
           </div>
@@ -12287,7 +12287,8 @@
                 var grid = document.createElement("div");
                 grid.className = "vel-global-search__grid vel-global-search__grid--channels";
 
-                var currentLimit = getSectionLimit("live", 10);
+                var defaultLiveLimit = currentFilterTab === "all" ? 5 : 10;
+                var currentLimit = getSectionLimit("live", defaultLiveLimit);
                 var visibleItems = section.items.slice(0, currentLimit);
                 visibleItems.forEach(function (item) {
                   grid.appendChild(createResultButton(item, country, section.key));
@@ -12296,7 +12297,8 @@
 
                 if (section.items.length > currentLimit) {
                   var remaining = section.items.length - currentLimit;
-                  group.appendChild(createLoadMoreButton("live", remaining, 10, "Voir plus de chaînes"));
+                  var step = currentFilterTab === "all" ? 5 : 10;
+                  group.appendChild(createLoadMoreButton("live", remaining, step, "Voir plus de chaînes"));
                 }
               } else if (!isExpanded && currentFilterTab === "all") {
                 // VOD Slider Mode with Touch Swipe, Arrow Controls, and "Tout voir" end card
@@ -12526,6 +12528,18 @@
 
         var suppressTouchSearchCloseUntil = 0;
 
+        function resetFilterToAll() {
+          currentFilterTab = "all";
+          sectionLimits = {};
+          if (filterTabs) {
+            filterTabs.querySelectorAll(".vel-global-search__tab").forEach(function (t) {
+              var isAll = (t.dataset.tabFilter || "all") === "all";
+              t.classList.toggle("is-active", isAll);
+              t.setAttribute("aria-selected", isAll ? "true" : "false");
+            });
+          }
+        }
+
         function openSearch(event) {
           if (event) {
             if (typeof event.preventDefault === "function") event.preventDefault();
@@ -12538,6 +12552,7 @@
             primeSearchBtn.classList.add("is-hidden");
             primeSearchBtn.style.setProperty("display", "none", "important");
           }
+          resetFilterToAll();
           updateSearchPlaceholder();
           dialog.classList.remove("hidden");
           dialog.setAttribute("aria-hidden", "false");
@@ -12545,6 +12560,8 @@
           syncClearButton();
           if (!input.value.trim() && (!lastSearchPayload || !lastSearchPayload.sections)) {
             renderSuggestions();
+          } else if (lastSearchPayload && lastSearchQuery) {
+            renderResults(lastSearchPayload, lastSearchQuery);
           }
           window.setTimeout(function () {
             input.focus();
@@ -12555,6 +12572,7 @@
           if (Date.now() < suppressTouchSearchCloseUntil) return;
           runId += 1;
           deferredSearchUpdate = null;
+          resetFilterToAll();
           document.body.classList.remove("vel-search-open");
           var primeSearchBtn = document.getElementById("vel-prime-search-btn");
           if (primeSearchBtn) {
@@ -12615,6 +12633,7 @@
             input.value = "";
             syncClearButton();
             handleSearchInput();
+            resetFilterToAll();
             input.focus();
           });
         }
@@ -12625,6 +12644,7 @@
             if (!tabBtn || tabBtn.classList.contains("is-disabled")) return;
             var filter = tabBtn.dataset.tabFilter || "all";
             currentFilterTab = filter;
+            sectionLimits = {};
             filterTabs.querySelectorAll(".vel-global-search__tab").forEach(function (t) {
               var isActive = t === tabBtn;
               t.classList.toggle("is-active", isActive);
@@ -12640,16 +12660,19 @@
         input.addEventListener("keydown", function (event) {
           if (event.key !== "Enter") return;
           event.preventDefault();
+          resetFilterToAll();
           runSearch();
         });
         form.addEventListener("submit", function (event) {
           event.preventDefault();
+          resetFilterToAll();
           runSearch();
         });
         var submitBtn = form.querySelector(".vel-global-search__submit");
         if (submitBtn) {
           submitBtn.addEventListener("click", function (event) {
             event.preventDefault();
+            resetFilterToAll();
             runSearch();
           });
         }
@@ -12676,7 +12699,8 @@
             var secKey = loadMoreBtn.dataset.loadMoreSection;
             var step = parseInt(loadMoreBtn.dataset.loadMoreStep, 10) || 12;
             if (secKey) {
-              var current = sectionLimits[secKey] || (secKey === "live" ? 10 : (secKey === "general" ? 24 : 18));
+              var defaultSecLimit = secKey === "live" ? (currentFilterTab === "all" ? 5 : 10) : (secKey === "general" ? 24 : 18);
+              var current = sectionLimits[secKey] || defaultSecLimit;
               sectionLimits[secKey] = current + step;
               if (lastSearchPayload && lastSearchQuery) {
                 renderResults(lastSearchPayload, lastSearchQuery);
@@ -16060,6 +16084,21 @@
       .vel-global-search__header {
         padding: 0.65rem 0.75rem 0.2rem;
         gap: 0.45rem;
+      }
+
+      .vel-global-search__filter-tabs {
+        gap: 0.35rem;
+        padding: 0.15rem 0 0.4rem;
+      }
+
+      .vel-global-search__tab {
+        padding: 0.35rem 0.65rem;
+        gap: 0.3rem;
+        font-size: 0.8rem;
+      }
+
+      .vel-global-search__tab .vel-tab-text {
+        display: none !important;
       }
 
       .vel-global-search__bar {

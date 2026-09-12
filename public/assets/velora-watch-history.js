@@ -399,9 +399,105 @@
     }
   }
 
+  function cleanCoverUrl(url) {
+    if (!url || typeof url !== "string") return "";
+    var s = url.trim();
+    if (s.startsWith("//")) return location.protocol + s;
+    return s;
+  }
+
+  function normalizeTitle(t) {
+    return String(t || "").toLowerCase()
+      .replace(/\[[^\]]*\]/g, "")
+      .replace(/\([^)]*\)/g, "")
+      .replace(/\b(4k|8k|fhd|hd|hevc|vf|vostfr|multi)\b/gi, "")
+      .replace(/[^a-z0-9]/g, "")
+      .trim();
+  }
+
+  // --- Tombstones (Deleted History Registry) ---
+  function getTombstones() {
+    try {
+      var raw = localStorage.getItem("velora_deleted_history_tombstones");
+      if (raw) {
+        var list = JSON.parse(raw);
+        if (Array.isArray(list)) return list;
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function addTombstone(item) {
+    if (!item) return;
+    try {
+      var list = getTombstones();
+      var norm = normalizeTitle(item.seriesName || item.name || "");
+      var entry = {
+        id: item.id ? String(item.id) : null,
+        streamId: item.streamId ? String(item.streamId) : null,
+        episodeStreamId: item.episodeStreamId ? String(item.episodeStreamId) : null,
+        seriesId: item.seriesId ? String(item.seriesId) : null,
+        name: item.name ? String(item.name).trim() : null,
+        seriesName: item.seriesName ? String(item.seriesName).trim() : null,
+        normTitle: norm || null,
+        type: item.type || "movie",
+        timestamp: Date.now()
+      };
+      list.push(entry);
+      var cutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
+      list = list.filter(function (t) { return t && t.timestamp > cutoff; }).slice(-200);
+      localStorage.setItem("velora_deleted_history_tombstones", JSON.stringify(list));
+    } catch (_) {}
+  }
+
+  function removeTombstoneForMedia(media) {
+    if (!media) return;
+    try {
+      var list = getTombstones();
+      if (!list.length) return;
+      var norm = normalizeTitle(media.seriesName || media.name || "");
+      var mId = String(media.id || "");
+      var sId = String(media.seriesId || media.streamId || "");
+      var filtered = list.filter(function (t) {
+        if (mId && t.id && t.id === mId) return false;
+        if (sId && (t.seriesId === sId || t.streamId === sId)) return false;
+        if (norm && t.normTitle && t.normTitle === norm) return false;
+        return true;
+      });
+      localStorage.setItem("velora_deleted_history_tombstones", JSON.stringify(filtered));
+    } catch (_) {}
+  }
+
+  function isItemTombstoned(item) {
+    if (!item) return false;
+    var list = getTombstones();
+    if (!list.length) return false;
+    var itId = String(item.id || "");
+    var itStreamId = item.streamId ? String(item.streamId) : "";
+    var itEpId = item.episodeStreamId ? String(item.episodeStreamId) : "";
+    var itSeriesId = item.seriesId ? String(item.seriesId) : "";
+    var itNorm = normalizeTitle(item.seriesName || item.name || "");
+
+    return list.some(function (t) {
+      if (itId && t.id && t.id === itId) return true;
+      if (t.type === "series" || item.type === "series") {
+        if (itSeriesId && t.seriesId && itSeriesId === t.seriesId) return true;
+        if (itSeriesId && t.streamId && itSeriesId === t.streamId) return true;
+        if (itStreamId && t.seriesId && itStreamId === t.seriesId) return true;
+        if (itNorm && t.normTitle && itNorm === t.normTitle) return true;
+      }
+      if (itStreamId && t.streamId && itStreamId === t.streamId) return true;
+      if (itEpId && t.episodeStreamId && itEpId === t.episodeStreamId) return true;
+      if (itNorm && itNorm.length >= 2 && t.normTitle && itNorm === t.normTitle) return true;
+      return false;
+    });
+  }
+
   function getLocalHistory() {
     if (state.cachedHistory && Array.isArray(state.cachedHistory)) {
-      return state.cachedHistory;
+      return state.cachedHistory.filter(function (it) { return !isItemTombstoned(it); });
     }
     try {
       var activeKey = getActiveUserKey();
@@ -409,7 +505,7 @@
       if (raw) {
         var items = JSON.parse(raw);
         if (Array.isArray(items) && items.length > 0) {
-          var validOnly = items.filter(isValidMediaEntry);
+          var validOnly = items.filter(isValidMediaEntry).filter(function (it) { return !isItemTombstoned(it); });
           state.cachedHistory = validOnly;
           return validOnly;
         }
@@ -424,7 +520,7 @@
             if (legacyRaw) {
               var legItems = JSON.parse(legacyRaw);
               if (Array.isArray(legItems) && legItems.length > 0) {
-                var validLeg = legItems.filter(isValidMediaEntry);
+                var validLeg = legItems.filter(isValidMediaEntry).filter(function (it) { return !isItemTombstoned(it); });
                 if (validLeg.length > 0) {
                   localStorage.setItem(activeKey, JSON.stringify(validLeg));
                   return validLeg;
@@ -442,7 +538,7 @@
 
   function saveLocalHistory(items, skipDomRebuild) {
     try {
-      var valid = items.filter(isValidMediaEntry);
+      var valid = items.filter(isValidMediaEntry).filter(function (it) { return !isItemTombstoned(it); });
       var key = getActiveUserKey();
       localStorage.setItem(key, JSON.stringify(valid.slice(0, MAX_ITEMS)));
       document.dispatchEvent(new CustomEvent("velora-watch-history-updated"));
@@ -459,13 +555,31 @@
     var sId = item.streamId ? String(item.streamId) : "";
     var epId = item.episodeStreamId ? String(item.episodeStreamId) : "";
     var seriesId = item.seriesId ? String(item.seriesId) : "";
+    var normTitle = normalizeTitle(item.seriesName || item.name || "");
+    var isSeries = item.type === "series";
 
     return list.filter(function (it) {
       if (!it) return false;
+      if (isItemTombstoned(it)) return false;
       if (targetId && String(it.id) === targetId) return false;
-      if (item.type === "series" && seriesId && (String(it.seriesId) === seriesId || String(it.streamId) === seriesId)) return false;
-      if (sId && (String(it.streamId) === sId || String(it.episodeStreamId) === sId)) return false;
-      if (epId && (String(it.episodeStreamId) === epId || String(it.streamId) === epId)) return false;
+
+      var itSeriesId = it.seriesId ? String(it.seriesId) : "";
+      var itStreamId = it.streamId ? String(it.streamId) : "";
+      var itEpId = it.episodeStreamId ? String(it.episodeStreamId) : "";
+      var itNormTitle = normalizeTitle(it.seriesName || it.name || "");
+      var itIsSeries = it.type === "series";
+
+      // If item is a series, completely wipe ALL episodes of this series from history
+      if (isSeries || itIsSeries) {
+        if (seriesId && (itSeriesId === seriesId || itStreamId === seriesId)) return false;
+        if (itSeriesId && (itSeriesId === sId || itSeriesId === targetId)) return false;
+        if (normTitle && normTitle.length >= 2 && itNormTitle && normTitle === itNormTitle) return false;
+      }
+
+      if (sId && (itStreamId === sId || itEpId === sId)) return false;
+      if (epId && (itEpId === epId || itStreamId === epId)) return false;
+      if (normTitle && normTitle.length >= 2 && itNormTitle && normTitle === itNormTitle) return false;
+
       return isValidMediaEntry(it);
     });
   }
@@ -473,7 +587,38 @@
   function removeHistoryItem(item, cardEl) {
     if (!item) return;
 
-    // 1. Clean from ALL localStorage keys immediately so it is never resurrected on reload
+    // 1. Add to tombstones immediately so it can never resurrect
+    addTombstone(item);
+
+    // 2. Clear any active playback / session state for this item
+    if (state.currentPlaying) {
+      var curNorm = normalizeTitle(state.currentPlaying.seriesName || state.currentPlaying.name || "");
+      var itemNorm = normalizeTitle(item.seriesName || item.name || "");
+      var curSId = String(state.currentPlaying.seriesId || state.currentPlaying.streamId || "");
+      var itemSId = String(item.seriesId || item.streamId || "");
+      if (
+        String(state.currentPlaying.id) === String(item.id) ||
+        (curSId && curSId === itemSId) ||
+        (curNorm && itemNorm && curNorm === itemNorm)
+      ) {
+        state.currentPlaying = null;
+        sessionTracker.mediaId = null;
+        sessionTracker.continuousSeconds = 0;
+        sessionTracker.qualified = false;
+        sessionTracker.rewindActive = false;
+      }
+    }
+
+    // 3. Clear series episode cache if series
+    if (item.type === "series") {
+      var sId = item.seriesId || item.streamId;
+      if (sId) {
+        delete window.__veloraSeriesEpisodesCache[String(sId)];
+        try { localStorage.removeItem("velora_series_eps_" + String(sId)); } catch (_) {}
+      }
+    }
+
+    // 4. Clean from ALL localStorage keys immediately so it is never resurrected on reload
     try {
       for (var i = 0; i < localStorage.length; i++) {
         var k = localStorage.key(i);
@@ -492,10 +637,11 @@
       }
     } catch (_) {}
 
+    state.cachedHistory = null;
     var activeItems = filterHistoryList(getLocalHistory(), item);
     saveLocalHistory(activeItems, !!cardEl);
 
-    // 2. Sync removal to backend database for all IDs
+    // 5. Sync removal to backend database for all IDs and series metadata
     var token = authToken();
     if (token) {
       var idsToDelete = new Set();
@@ -504,29 +650,22 @@
       if (item.episodeStreamId) idsToDelete.add(String(item.episodeStreamId));
       if (item.seriesId) idsToDelete.add(String(item.seriesId));
 
+      var qParams = new URLSearchParams();
+      if (item.seriesId) qParams.set("seriesId", String(item.seriesId));
+      if (item.name) qParams.set("name", String(item.name));
+      if (item.seriesName) qParams.set("seriesName", String(item.seriesName));
+      var queryString = qParams.toString() ? ("?" + qParams.toString()) : "";
+
       idsToDelete.forEach(function (id) {
-        fetch("/api/history/" + encodeURIComponent(String(id)), {
+        fetch("/api/history/" + encodeURIComponent(String(id)) + queryString, {
           method: "DELETE",
           headers: { Authorization: "Bearer " + token }
         }).catch(function () {});
       });
     }
-  }
 
-  function cleanCoverUrl(url) {
-    if (!url || typeof url !== "string") return "";
-    var s = url.trim();
-    if (s.startsWith("//")) return location.protocol + s;
-    return s;
-  }
-
-  function normalizeTitle(t) {
-    return String(t || "").toLowerCase()
-      .replace(/\[[^\]]*\]/g, "")
-      .replace(/\([^)]*\)/g, "")
-      .replace(/\b(4k|8k|fhd|hd|hevc|vf|vostfr|multi)\b/gi, "")
-      .replace(/[^a-z0-9]/g, "")
-      .trim();
+    // 6. Refresh episode row decorations in detail page (clears "✓ Vu" and progress bar)
+    requestDecorateEpisodes();
   }
 
   function parseSeasonEpisode(badgeText, titleText) {
@@ -757,7 +896,9 @@
               isFinished: percent >= FINISHED_WATCH_PERCENT,
               updatedAt: r.updated_at ? Number(r.updated_at) : (d.updatedAt || Date.now())
             });
-          }).filter(isValidMediaEntry);
+          }).filter(isValidMediaEntry).filter(function (it) {
+            return !isItemTombstoned(it);
+          });
 
           var local = getLocalHistory();
           var mergedMap = new Map();
@@ -795,6 +936,7 @@
 
   function updateSessionTrackerMedia(mediaId, mediaObj) {
     if (!mediaId) return;
+    if (mediaObj) removeTombstoneForMedia(mediaObj);
     if (sessionTracker.mediaId === mediaId) return;
     var history = getLocalHistory();
     var alreadySaved = history.some(function (it) {
@@ -904,7 +1046,7 @@
       }
     }
 
-    if (!media || !isValidMediaEntry(media)) return;
+    if (!media || !isValidMediaEntry(media) || isItemTombstoned(media)) return;
 
     var id = media.id;
     var existingEntry = getLocalHistory().find(function (item) { return String(item.id) === String(id); });

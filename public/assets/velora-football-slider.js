@@ -320,6 +320,76 @@
     return sortedEntries.map(function (e) { return e.stream; });
   }
 
+  function removeMatchBanner() {
+    var ex = document.getElementById('vel-live-match-banner');
+    if (ex) ex.remove();
+  }
+
+  function renderMatchBanner(match) {
+    removeMatchBanner();
+    if (!match) return;
+
+    var contentView = document.getElementById('content-view');
+    var dynamicList = document.getElementById('dynamic-list');
+    if (!contentView) return;
+
+    var homeName = match.homeTeam?.name || 'Équipe 1';
+    var awayName = match.awayTeam?.name || 'Équipe 2';
+    var homeInitial = homeName.charAt(0).toUpperCase();
+    var awayInitial = awayName.charAt(0).toUpperCase();
+    var timeInfo = getMatchTimeDetails(match.time);
+
+    var timeBadgeHtml = '';
+    if (timeInfo.status === 'live') {
+      timeBadgeHtml = '<span class="vel-football-card__time-badge vel-football-card__time-badge--live">' +
+        '<span class="vel-football-card__live-dot"></span>' +
+        '<span>EN DIRECT</span>' +
+      '</span>';
+    } else if (timeInfo.status === 'starting_soon') {
+      timeBadgeHtml = '<span class="vel-football-card__time-badge vel-football-card__time-badge--starting-soon">' +
+        '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>' +
+        '<span>' + escapeHtml(match.time || '--:--') + '</span>' +
+      '</span>';
+    } else {
+      timeBadgeHtml = '<span class="vel-football-card__time-badge">' +
+        '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>' +
+        '<span>' + escapeHtml(match.time || '--:--') + '</span>' +
+      '</span>';
+    }
+
+    var banner = document.createElement('div');
+    banner.id = 'vel-live-match-banner';
+    banner.className = 'vel-live-match-banner';
+    banner.innerHTML =
+      '<div class="vel-match-banner-comp-wrap">' +
+        '<span class="vel-match-banner-comp">' + escapeHtml(match.competition || 'Football') + '</span>' +
+        timeBadgeHtml +
+      '</div>' +
+      '<div class="vel-match-banner-teams">' +
+        '<div class="vel-match-banner-team vel-match-banner-team--home">' +
+          '<div class="vel-match-banner-logo-wrap">' +
+            '<img class="vel-match-banner-logo" src="' + escapeHtml(match.homeTeam?.logoUrl || '') + '" alt="' + escapeHtml(homeName) + '" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML=\'<span class=\\\'vel-match-banner-fallback-logo\\\'>' + homeInitial + '</span>\'">' +
+          '</div>' +
+          '<span class="vel-match-banner-team-name">' + escapeHtml(homeName) + '</span>' +
+        '</div>' +
+        '<div class="vel-match-banner-vs-wrap">' +
+          '<span class="vel-match-banner-vs">VS</span>' +
+        '</div>' +
+        '<div class="vel-match-banner-team vel-match-banner-team--away">' +
+          '<div class="vel-match-banner-logo-wrap">' +
+            '<img class="vel-match-banner-logo" src="' + escapeHtml(match.awayTeam?.logoUrl || '') + '" alt="' + escapeHtml(awayName) + '" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML=\'<span class=\\\'vel-match-banner-fallback-logo\\\'>' + awayInitial + '</span>\'">' +
+          '</div>' +
+          '<span class="vel-match-banner-team-name">' + escapeHtml(awayName) + '</span>' +
+        '</div>' +
+      '</div>';
+
+    if (dynamicList && dynamicList.parentNode === contentView) {
+      contentView.insertBefore(banner, dynamicList);
+    } else {
+      contentView.prepend(banner);
+    }
+  }
+
   window.veloraOpenMatchChannels = async function (match, priorityChannel) {
     if (!match) return;
     var homeName = match.homeTeam?.name || '';
@@ -346,10 +416,14 @@
         hideFootballToast();
         if (typeof window.veloraOpenSearchChannelItem === 'function') {
           var ok = await window.veloraOpenSearchChannelItem(matchingChannels[0], matchingChannels, displayTitle);
-          if (ok) return;
+          if (ok) {
+            renderMatchBanner(match);
+            return;
+          }
         }
         if (typeof window.veloraPlayLiveChannel === 'function') {
           window.veloraPlayLiveChannel(matchingChannels[0]);
+          renderMatchBanner(match);
           return;
         }
       } else {
@@ -364,12 +438,103 @@
     }
   };
 
+  function getMatchTimeDetails(matchTimeStr) {
+    if (!matchTimeStr) return { diffMinutes: 9999, status: 'upcoming', formattedTime: '--:--' };
+
+    var cleaned = String(matchTimeStr).trim().replace(/[hH.]/, ':');
+    var parts = cleaned.match(/(\d{1,2})\s*:\s*(\d{2})/);
+    if (!parts) return { diffMinutes: 9999, status: 'upcoming', formattedTime: matchTimeStr };
+
+    var hours = parseInt(parts[1], 10);
+    var minutes = parseInt(parts[2], 10);
+
+    var now = new Date();
+    var matchDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+
+    var diffMs = matchDate.getTime() - now.getTime();
+    var diffMinutes = Math.round(diffMs / 60000);
+
+    // Live: started within last 115 minutes (diffMinutes between -115 and 0)
+    // Starting soon: starts in <= 30 mins and not started yet (diffMinutes between 0 and 30)
+    // Finished: started > 115 minutes ago (diffMinutes < -115)
+    // Upcoming: starts in > 30 minutes
+    if (diffMinutes < -115) {
+      return { diffMinutes: diffMinutes, status: 'finished', formattedTime: matchTimeStr };
+    } else if (diffMinutes <= 0) {
+      return { diffMinutes: diffMinutes, status: 'live', formattedTime: matchTimeStr };
+    } else if (diffMinutes <= 30) {
+      return { diffMinutes: diffMinutes, status: 'starting_soon', formattedTime: matchTimeStr };
+    } else {
+      return { diffMinutes: diffMinutes, status: 'upcoming', formattedTime: matchTimeStr };
+    }
+  }
+
+  function sortFootballMatches(matches) {
+    if (!Array.isArray(matches)) return [];
+
+    var mapped = matches.map(function (m, idx) {
+      return {
+        match: m,
+        originalIndex: idx,
+        timeInfo: getMatchTimeDetails(m.time)
+      };
+    });
+
+    mapped.sort(function (a, b) {
+      var rankMap = { live: 0, starting_soon: 1, upcoming: 2, finished: 3 };
+      var aRank = rankMap[a.timeInfo.status] != null ? rankMap[a.timeInfo.status] : 2;
+      var bRank = rankMap[b.timeInfo.status] != null ? rankMap[b.timeInfo.status] : 2;
+
+      if (aRank !== bRank) {
+        return aRank - bRank;
+      }
+
+      // Within each status group (especially upcoming >30min), strictly preserve our ranking system order
+      return a.originalIndex - b.originalIndex;
+    });
+
+    return mapped.map(function (item) {
+      return item.match;
+    });
+  }
+
   function createFootballMatchCard(match) {
     var card = document.createElement('div');
     card.className = 'vel-football-card';
     card.setAttribute('tabindex', '0');
     card.setAttribute('role', 'button');
-    card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + ' à ' + (match.time || ''));
+
+    var timeInfo = getMatchTimeDetails(match.time);
+    var timeBadgeHtml = '';
+
+    if (timeInfo.status === 'live') {
+      card.classList.add('is-live');
+      card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + ' - EN DIRECT (' + (match.time || '') + ')');
+      timeBadgeHtml = '<span class="vel-football-card__time-badge vel-football-card__time-badge--live">' +
+        '<span class="vel-football-card__live-dot"></span>' +
+        '<span>EN DIRECT</span>' +
+      '</span>';
+    } else if (timeInfo.status === 'starting_soon') {
+      card.classList.add('is-starting-soon');
+      card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + ' à ' + (match.time || '') + ' (Bientôt)');
+      timeBadgeHtml = '<span class="vel-football-card__time-badge vel-football-card__time-badge--starting-soon">' +
+        '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>' +
+        '<span>' + escapeHtml(match.time || '--:--') + '</span>' +
+      '</span>';
+    } else if (timeInfo.status === 'finished') {
+      card.classList.add('is-finished');
+      card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + ' (Terminé)');
+      timeBadgeHtml = '<span class="vel-football-card__time-badge vel-football-card__time-badge--finished">' +
+        '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>' +
+        '<span>' + escapeHtml(match.time || '--:--') + '</span>' +
+      '</span>';
+    } else {
+      card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + ' à ' + (match.time || ''));
+      timeBadgeHtml = '<span class="vel-football-card__time-badge">' +
+        '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>' +
+        '<span>' + escapeHtml(match.time || '--:--') + '</span>' +
+      '</span>';
+    }
 
     var homeInitial = (match.homeTeam?.name || 'H').charAt(0).toUpperCase();
     var awayInitial = (match.awayTeam?.name || 'A').charAt(0).toUpperCase();
@@ -377,10 +542,7 @@
     card.innerHTML =
       '<div class="vel-football-card__top">' +
         '<span class="vel-football-card__comp">' + escapeHtml(match.competition || 'Football') + '</span>' +
-        '<span class="vel-football-card__time-badge">' +
-          '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>' +
-          '<span>' + escapeHtml(match.time || '--:--') + '</span>' +
-        '</span>' +
+        timeBadgeHtml +
       '</div>' +
       '<div class="vel-football-card__match">' +
         '<div class="vel-football-card__team">' +
@@ -398,15 +560,116 @@
         '</div>' +
       '</div>';
 
+    function showMatchNoticeModal(matchObj, timeStatusInfo) {
+      var existing = document.getElementById('vel-football-notice-modal');
+      if (existing) existing.remove();
+
+      if (!matchObj) return;
+      timeStatusInfo = timeStatusInfo || getMatchTimeDetails(matchObj.time);
+
+      var homeName = matchObj.homeTeam?.name || 'Équipe 1';
+      var awayName = matchObj.awayTeam?.name || 'Équipe 2';
+      var homeInitial = homeName.charAt(0).toUpperCase();
+      var awayInitial = awayName.charAt(0).toUpperCase();
+
+      var isFinished = timeStatusInfo.status === 'finished';
+      var diffMinutes = Math.max(0, timeStatusInfo.diffMinutes);
+      var hours = Math.floor(diffMinutes / 60);
+      var mins = diffMinutes % 60;
+      var timeRemainingStr = hours > 0
+        ? (hours + 'h' + (mins > 0 ? (mins < 10 ? '0' : '') + mins : ''))
+        : (mins + ' min');
+
+      var channels = Array.isArray(matchObj.tvChannels) && matchObj.tvChannels.length > 0
+        ? matchObj.tvChannels
+        : ['Chaîne à confirmer'];
+
+      var channelsHtml = channels.map(function (ch) {
+        return '<span class="vel-match-modal-ch-pill">' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
+          '<span>' + escapeHtml(ch) + '</span>' +
+        '</span>';
+      }).join('');
+
+      var modal = document.createElement('div');
+      modal.id = 'vel-football-notice-modal';
+      modal.className = 'vel-football-notice-modal';
+      modal.setAttribute('role', 'dialog');
+      modal.setAttribute('aria-modal', 'true');
+
+      var noticeText = isFinished
+        ? 'Ce match est <strong>déjà terminé</strong> (coup d\'envoi était à ' + escapeHtml(matchObj.time || '') + ').'
+        : 'Ce match <strong>n\'a pas encore commencé</strong>.<br>Coup d\'envoi prévu à <strong>' + escapeHtml(matchObj.time || '--:--') + '</strong> (dans <strong>' + timeRemainingStr + '</strong>).';
+
+      var noticeIcon = isFinished ? '🏁' : '⏳';
+
+      modal.innerHTML =
+        '<div class="vel-football-modal-backdrop"></div>' +
+        '<div class="vel-football-modal-box">' +
+          '<button type="button" class="vel-football-modal-close" aria-label="Fermer">✕</button>' +
+          '<div class="vel-football-modal-header">' +
+            '<span class="vel-football-modal-comp">' + escapeHtml(matchObj.competition || 'Football') + '</span>' +
+            '<span class="vel-football-modal-time">' + escapeHtml(matchObj.time || '--:--') + '</span>' +
+          '</div>' +
+          '<div class="vel-football-modal-teams">' +
+            '<div class="vel-football-modal-team">' +
+              '<div class="vel-football-modal-logo-wrap">' +
+                '<img class="vel-football-modal-logo" src="' + escapeHtml(matchObj.homeTeam?.logoUrl || '') + '" alt="' + escapeHtml(homeName) + '" onerror="this.onerror=null; this.parentElement.innerHTML=\'<span class=\\\'vel-football-modal-fallback-logo\\\'>' + homeInitial + '</span>\'">' +
+              '</div>' +
+              '<span class="vel-football-modal-team-name">' + escapeHtml(homeName) + '</span>' +
+            '</div>' +
+            '<span class="vel-football-modal-vs">VS</span>' +
+            '<div class="vel-football-modal-team">' +
+              '<div class="vel-football-modal-logo-wrap">' +
+                '<img class="vel-football-modal-logo" src="' + escapeHtml(matchObj.awayTeam?.logoUrl || '') + '" alt="' + escapeHtml(awayName) + '" onerror="this.onerror=null; this.parentElement.innerHTML=\'<span class=\\\'vel-football-modal-fallback-logo\\\'>' + awayInitial + '</span>\'">' +
+              '</div>' +
+              '<span class="vel-football-modal-team-name">' + escapeHtml(awayName) + '</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="vel-football-modal-notice ' + (isFinished ? 'is-finished' : '') + '">' +
+            '<span class="vel-football-modal-notice-icon">' + noticeIcon + '</span>' +
+            '<div class="vel-football-modal-notice-text">' + noticeText + '</div>' +
+          '</div>' +
+          '<div class="vel-football-modal-channels-section">' +
+            '<div class="vel-football-modal-channels-title">' +
+              '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>' +
+              '<span>Diffusion TV prévue :</span>' +
+            '</div>' +
+            '<div class="vel-football-modal-channels-grid">' +
+              channelsHtml +
+            '</div>' +
+          '</div>' +
+        '</div>';
+
+      function closeModal() {
+        modal.classList.add('is-closing');
+        setTimeout(function () {
+          modal.remove();
+        }, 200);
+      }
+
+      var closeBtn = modal.querySelector('.vel-football-modal-close');
+      if (closeBtn) closeBtn.addEventListener('click', closeModal);
+      var backdrop = modal.querySelector('.vel-football-modal-backdrop');
+      if (backdrop) backdrop.addEventListener('click', closeModal);
+
+      document.body.appendChild(modal);
+    }
+
     function handleCardAction(e) {
       if (e) {
         e.preventDefault();
         e.stopPropagation();
       }
-      if (typeof window.veloraOpenMatchChannels === 'function') {
-        window.veloraOpenMatchChannels(match);
+      var tInfo = getMatchTimeDetails(match.time);
+      if (tInfo.status === 'upcoming' || tInfo.status === 'finished') {
+        showMatchNoticeModal(match, tInfo);
       } else {
-        window.location.href = '/foot';
+        if (typeof window.veloraOpenMatchChannels === 'function') {
+          window.veloraOpenMatchChannels(match);
+        } else {
+          window.location.href = '/foot';
+        }
       }
     }
 
@@ -422,6 +685,8 @@
 
   function renderFootballSection(matches, country) {
     if (!Array.isArray(matches) || matches.length === 0) return null;
+
+    var sortedMatches = sortFootballMatches(matches);
 
     var block = document.createElement('div');
     block.className = 'UI3iHJ vel-home-section vel-home-section--football vel-home-section--horizontal vel-home-section--compact';
@@ -452,7 +717,7 @@
       isUserTouching = false;
     }, { passive: true });
 
-    matches.forEach(function (m) {
+    sortedMatches.forEach(function (m) {
       var card = createFootballMatchCard(m);
       rail.appendChild(card);
     });
@@ -634,6 +899,415 @@
       '}',
       '@keyframes velFootSpin {',
       '  to { transform: rotate(360deg); }',
+      '}',
+      '/* Live & Starting Soon Badges */',
+      '.vel-football-card__time-badge--starting-soon {',
+      '  color: #4ade80 !important;',
+      '  background: rgba(34, 197, 94, 0.18) !important;',
+      '  border: 1px solid rgba(34, 197, 94, 0.48) !important;',
+      '  box-shadow: 0 0 10px rgba(34, 197, 94, 0.28), 0 2px 6px rgba(0, 0, 0, 0.3) !important;',
+      '}',
+      '.vel-football-card__time-badge--starting-soon svg {',
+      '  stroke: #4ade80 !important;',
+      '}',
+      '.vel-football-card__time-badge--live {',
+      '  color: #ffffff !important;',
+      '  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;',
+      '  border: 1px solid rgba(255, 120, 120, 0.6) !important;',
+      '  box-shadow: 0 0 14px rgba(239, 68, 68, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4) !important;',
+      '  font-weight: 800 !important;',
+      '  letter-spacing: 0.05em !important;',
+      '}',
+      '.vel-football-card__live-dot {',
+      '  width: 6px;',
+      '  height: 6px;',
+      '  border-radius: 50%;',
+      '  background: #ffffff;',
+      '  box-shadow: 0 0 6px #ffffff;',
+      '  display: inline-block;',
+      '  animation: velFootLivePulse 1.1s ease-in-out infinite alternate;',
+      '}',
+      '@keyframes velFootLivePulse {',
+      '  0% { opacity: 0.45; transform: scale(0.85); }',
+      '  100% { opacity: 1; transform: scale(1.25); box-shadow: 0 0 10px #ffffff; }',
+      '}',
+      '.vel-football-card.is-live {',
+      '  border-color: rgba(239, 68, 68, 0.45) !important;',
+      '  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5), 0 0 15px rgba(239, 68, 68, 0.18) !important;',
+      '}',
+      '.vel-football-card.is-starting-soon {',
+      '  border-color: rgba(34, 197, 94, 0.35) !important;',
+      '  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5), 0 0 12px rgba(34, 197, 94, 0.12) !important;',
+      '}',
+      '.vel-football-card__time-badge--finished {',
+      '  color: #94a3b8 !important;',
+      '  background: rgba(148, 163, 184, 0.1) !important;',
+      '  border: 1px solid rgba(148, 163, 184, 0.2) !important;',
+      '  box-shadow: none !important;',
+      '  opacity: 0.8;',
+      '}',
+      '/* Live Match Header Banner Under Player */',
+      '.vel-live-match-banner {',
+      '  width: 100%;',
+      '  max-width: 640px;',
+      '  margin: 0.65rem auto 1rem auto;',
+      '  padding: 0.85rem 1.4rem;',
+      '  border-radius: 16px;',
+      '  background: linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(13, 12, 20, 0.96) 100%);',
+      '  border: 1px solid rgba(255, 255, 255, 0.12);',
+      '  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);',
+      '  backdrop-filter: blur(16px);',
+      '  -webkit-backdrop-filter: blur(16px);',
+      '  display: flex;',
+      '  flex-direction: column;',
+      '  align-items: center;',
+      '  gap: 0.6rem;',
+      '  box-sizing: border-box;',
+      '  animation: velMatchBannerFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);',
+      '}',
+      '@keyframes velMatchBannerFadeIn {',
+      '  from { opacity: 0; transform: translateY(-8px) scale(0.98); }',
+      '  to { opacity: 1; transform: translateY(0) scale(1); }',
+      '}',
+      '.vel-match-banner-comp-wrap {',
+      '  display: flex;',
+      '  align-items: center;',
+      '  justify-content: center;',
+      '  gap: 0.65rem;',
+      '  width: 100%;',
+      '}',
+      '.vel-match-banner-comp {',
+      '  font-size: 0.74rem;',
+      '  font-weight: 800;',
+      '  text-transform: uppercase;',
+      '  letter-spacing: 0.06em;',
+      '  color: #93c5fd;',
+      '  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);',
+      '}',
+      '.vel-match-banner-teams {',
+      '  display: flex;',
+      '  align-items: center;',
+      '  justify-content: space-between;',
+      '  width: 100%;',
+      '  gap: 0.8rem;',
+      '}',
+      '.vel-match-banner-team {',
+      '  display: flex;',
+      '  flex-direction: column;',
+      '  align-items: center;',
+      '  flex: 1;',
+      '  min-width: 0;',
+      '  gap: 0.35rem;',
+      '  text-align: center;',
+      '}',
+      '.vel-match-banner-logo-wrap {',
+      '  width: 58px;',
+      '  height: 58px;',
+      '  display: flex;',
+      '  align-items: center;',
+      '  justify-content: center;',
+      '}',
+      '.vel-match-banner-logo {',
+      '  max-width: 100%;',
+      '  max-height: 100%;',
+      '  width: auto;',
+      '  height: 54px;',
+      '  object-fit: contain;',
+      '  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.85));',
+      '}',
+      '.vel-match-banner-fallback-logo {',
+      '  width: 46px;',
+      '  height: 46px;',
+      '  border-radius: 12px;',
+      '  background: rgba(59, 130, 246, 0.18);',
+      '  border: 1px solid rgba(59, 130, 246, 0.4);',
+      '  display: flex;',
+      '  align-items: center;',
+      '  justify-content: center;',
+      '  font-size: 1.3rem;',
+      '  font-weight: 800;',
+      '  color: #60a5fa;',
+      '}',
+      '.vel-match-banner-team-name {',
+      '  font-size: 0.88rem;',
+      '  font-weight: 700;',
+      '  color: #ffffff;',
+      '  white-space: nowrap;',
+      '  overflow: hidden;',
+      '  text-overflow: ellipsis;',
+      '  width: 100%;',
+      '  line-height: 1.2;',
+      '  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);',
+      '}',
+      '.vel-match-banner-vs-wrap {',
+      '  display: flex;',
+      '  flex-direction: column;',
+      '  align-items: center;',
+      '  justify-content: center;',
+      '  flex-shrink: 0;',
+      '}',
+      '.vel-match-banner-vs {',
+      '  font-size: 0.8rem;',
+      '  font-weight: 900;',
+      '  color: #94a3b8;',
+      '  padding: 0.25rem 0.6rem;',
+      '  border-radius: 7px;',
+      '  background: rgba(255, 255, 255, 0.08);',
+      '  border: 1px solid rgba(255, 255, 255, 0.14);',
+      '  line-height: 1;',
+      '  letter-spacing: 0.08em;',
+      '  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);',
+      '}',
+      '@media (max-width: 600px) {',
+      '  .vel-live-match-banner { padding: 0.6rem 0.75rem; margin: 0.4rem auto 0.65rem auto; }',
+      '  .vel-match-banner-logo-wrap { width: 44px; height: 44px; }',
+      '  .vel-match-banner-logo { height: 40px; }',
+      '  .vel-match-banner-team-name { font-size: 0.76rem; }',
+      '}',
+      '/* Football Upcoming Notice Modal */',
+      '.vel-football-notice-modal {',
+      '  position: fixed;',
+      '  inset: 0;',
+      '  z-index: 2147483647;',
+      '  display: flex;',
+      '  align-items: center;',
+      '  justify-content: center;',
+      '  padding: 1.2rem;',
+      '  box-sizing: border-box;',
+      '}',
+      '.vel-football-modal-backdrop {',
+      '  position: absolute;',
+      '  inset: 0;',
+      '  background: rgba(0, 0, 0, 0.78);',
+      '  backdrop-filter: blur(12px);',
+      '  -webkit-backdrop-filter: blur(12px);',
+      '  animation: velFootFadeIn 0.25s ease-out;',
+      '}',
+      '.vel-football-modal-box {',
+      '  position: relative;',
+      '  width: 100%;',
+      '  max-width: 460px;',
+      '  background: linear-gradient(145deg, #131722 0%, #0d0f17 100%);',
+      '  border: 1px solid rgba(255, 255, 255, 0.15);',
+      '  border-radius: 20px;',
+      '  padding: 1.5rem 1.5rem 1.3rem 1.5rem;',
+      '  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.85), 0 0 30px rgba(59, 130, 246, 0.15);',
+      '  display: flex;',
+      '  flex-direction: column;',
+      '  gap: 1.1rem;',
+      '  z-index: 1;',
+      '  box-sizing: border-box;',
+      '  animation: velFootZoomIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);',
+      '}',
+      '.vel-football-notice-modal.is-closing .vel-football-modal-box {',
+      '  animation: velFootZoomOut 0.2s ease-in forwards;',
+      '}',
+      '.vel-football-notice-modal.is-closing .vel-football-modal-backdrop {',
+      '  animation: velFootFadeOut 0.2s ease-in forwards;',
+      '}',
+      '@keyframes velFootFadeIn { from { opacity: 0; } to { opacity: 1; } }',
+      '@keyframes velFootFadeOut { from { opacity: 1; } to { opacity: 0; } }',
+      '@keyframes velFootZoomIn { from { opacity: 0; transform: scale(0.92) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }',
+      '@keyframes velFootZoomOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.92) translateY(12px); } }',
+      '.vel-football-modal-close {',
+      '  position: absolute;',
+      '  top: 1rem;',
+      '  right: 1rem;',
+      '  width: 32px;',
+      '  height: 32px;',
+      '  border-radius: 50%;',
+      '  border: 1px solid rgba(255, 255, 255, 0.12);',
+      '  background: rgba(255, 255, 255, 0.06);',
+      '  color: #94a3b8;',
+      '  display: flex;',
+      '  align-items: center;',
+      '  justify-content: center;',
+      '  cursor: pointer;',
+      '  font-size: 0.95rem;',
+      '  transition: all 0.2s ease;',
+      '}',
+      '.vel-football-modal-close:hover {',
+      '  background: rgba(239, 68, 68, 0.2);',
+      '  border-color: rgba(239, 68, 68, 0.5);',
+      '  color: #ffffff;',
+      '  transform: scale(1.08);',
+      '}',
+      '.vel-football-modal-header {',
+      '  display: flex;',
+      '  align-items: center;',
+      '  justify-content: space-between;',
+      '  padding-right: 2.2rem;',
+      '}',
+      '.vel-football-modal-comp {',
+      '  font-size: 0.85rem;',
+      '  font-weight: 800;',
+      '  text-transform: uppercase;',
+      '  letter-spacing: 0.05em;',
+      '  color: #60a5fa;',
+      '}',
+      '.vel-football-modal-time {',
+      '  font-size: 0.85rem;',
+      '  font-weight: 700;',
+      '  color: #38bdf8;',
+      '  background: rgba(56, 189, 248, 0.14);',
+      '  border: 1px solid rgba(56, 189, 248, 0.35);',
+      '  padding: 0.2rem 0.6rem;',
+      '  border-radius: 9999px;',
+      '}',
+      '.vel-football-modal-teams {',
+      '  display: flex;',
+      '  align-items: center;',
+      '  justify-content: space-between;',
+      '  gap: 0.8rem;',
+      '  padding: 0.2rem 0;',
+      '}',
+      '.vel-football-modal-team {',
+      '  display: flex;',
+      '  flex-direction: column;',
+      '  align-items: center;',
+      '  text-align: center;',
+      '  flex: 1;',
+      '  min-width: 0;',
+      '  gap: 0.45rem;',
+      '}',
+      '.vel-football-modal-logo-wrap {',
+      '  width: 64px;',
+      '  height: 64px;',
+      '  display: flex;',
+      '  align-items: center;',
+      '  justify-content: center;',
+      '}',
+      '.vel-football-modal-logo {',
+      '  max-width: 100%;',
+      '  max-height: 100%;',
+      '  width: auto;',
+      '  height: 60px;',
+      '  object-fit: contain;',
+      '  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.8));',
+      '}',
+      '.vel-football-modal-fallback-logo {',
+      '  width: 50px;',
+      '  height: 50px;',
+      '  border-radius: 14px;',
+      '  background: rgba(59, 130, 246, 0.16);',
+      '  border: 1px solid rgba(59, 130, 246, 0.35);',
+      '  display: flex;',
+      '  align-items: center;',
+      '  justify-content: center;',
+      '  font-size: 1.35rem;',
+      '  font-weight: 800;',
+      '  color: #60a5fa;',
+      '}',
+      '.vel-football-modal-team-name {',
+      '  font-size: 0.92rem;',
+      '  font-weight: 700;',
+      '  color: #ffffff;',
+      '  white-space: nowrap;',
+      '  overflow: hidden;',
+      '  text-overflow: ellipsis;',
+      '  max-width: 100%;',
+      '}',
+      '.vel-football-modal-vs {',
+      '  font-size: 0.78rem;',
+      '  font-weight: 900;',
+      '  color: #94a3b8;',
+      '  padding: 0.22rem 0.52rem;',
+      '  border-radius: 6px;',
+      '  background: rgba(255, 255, 255, 0.08);',
+      '  border: 1px solid rgba(255, 255, 255, 0.12);',
+      '}',
+      '.vel-football-modal-notice {',
+      '  display: flex;',
+      '  align-items: center;',
+      '  gap: 0.8rem;',
+      '  padding: 0.8rem 1rem;',
+      '  border-radius: 12px;',
+      '  background: rgba(56, 189, 248, 0.1);',
+      '  border: 1px solid rgba(56, 189, 248, 0.28);',
+      '  color: #e2e8f0;',
+      '  font-size: 0.86rem;',
+      '  line-height: 1.45;',
+      '}',
+      '.vel-football-modal-notice.is-finished {',
+      '  background: rgba(148, 163, 184, 0.1);',
+      '  border-color: rgba(148, 163, 184, 0.25);',
+      '}',
+      '.vel-football-modal-notice strong {',
+      '  color: #38bdf8;',
+      '}',
+      '.vel-football-modal-notice.is-finished strong {',
+      '  color: #e2e8f0;',
+      '}',
+      '.vel-football-modal-notice-icon {',
+      '  font-size: 1.35rem;',
+      '  flex-shrink: 0;',
+      '}',
+      '.vel-football-modal-channels-section {',
+      '  display: flex;',
+      '  flex-direction: column;',
+      '  gap: 0.5rem;',
+      '}',
+      '.vel-football-modal-channels-title {',
+      '  display: flex;',
+      '  align-items: center;',
+      '  gap: 0.4rem;',
+      '  font-size: 0.78rem;',
+      '  font-weight: 700;',
+      '  color: #94a3b8;',
+      '  text-transform: uppercase;',
+      '  letter-spacing: 0.04em;',
+      '}',
+      '.vel-football-modal-channels-grid {',
+      '  display: flex;',
+      '  flex-wrap: wrap;',
+      '  gap: 0.45rem;',
+      '}',
+      '.vel-match-modal-ch-pill {',
+      '  display: inline-flex;',
+      '  align-items: center;',
+      '  gap: 0.35rem;',
+      '  font-size: 0.78rem;',
+      '  font-weight: 700;',
+      '  color: #cbd5e1;',
+      '  background: rgba(255, 255, 255, 0.06);',
+      '  border: 1px solid rgba(255, 255, 255, 0.12);',
+      '  padding: 0.28rem 0.65rem;',
+      '  border-radius: 8px;',
+      '}',
+      '.vel-football-modal-actions {',
+      '  display: flex;',
+      '  align-items: center;',
+      '  gap: 0.75rem;',
+      '  margin-top: 0.2rem;',
+      '}',
+      '.vel-football-modal-btn {',
+      '  flex: 1;',
+      '  padding: 0.75rem 1rem;',
+      '  border-radius: 12px;',
+      '  font-size: 0.9rem;',
+      '  font-weight: 700;',
+      '  cursor: pointer;',
+      '  transition: all 0.2s ease;',
+      '  text-align: center;',
+      '  border: none;',
+      '}',
+      '.vel-football-modal-btn--primary {',
+      '  background: #3b82f6;',
+      '  color: #ffffff;',
+      '  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.35);',
+      '}',
+      '.vel-football-modal-btn--primary:hover {',
+      '  background: #2563eb;',
+      '  transform: translateY(-2px);',
+      '}',
+      '.vel-football-modal-btn--secondary {',
+      '  background: rgba(255, 255, 255, 0.08);',
+      '  color: #cbd5e1;',
+      '  border: 1px solid rgba(255, 255, 255, 0.15);',
+      '}',
+      '.vel-football-modal-btn--secondary:hover {',
+      '  background: rgba(255, 255, 255, 0.14);',
+      '  color: #ffffff;',
       '}'
     ].join('\n');
     document.head.appendChild(st);
@@ -668,7 +1342,14 @@
     checkPendingMatchFromSession();
   }
 
-  // Écouteurs de changement de pays
+  // Actualisation périodique toutes les minutes pour basculer automatiquement en DIRECT / Bientôt
+  setInterval(function () {
+    if (document.visibilityState === 'visible') {
+      scheduleInjection(50);
+    }
+  }, 60000);
+
+  // Écouteurs de changement de pays et navigation
   document.addEventListener('velora-country-switch-start', handleCountrySwitchEvent);
   document.addEventListener('velora-country-change', handleCountrySwitchEvent);
   document.addEventListener('velora-country-changed', handleCountrySwitchEvent);
@@ -679,6 +1360,16 @@
     checkPendingMatchFromSession();
   });
   document.addEventListener('velora-app-ready', checkPendingMatchFromSession);
+  document.addEventListener('velora-countries-ready', handleCountrySwitchEvent);
+  document.addEventListener('velora-return-home', function () {
+    removeMatchBanner();
+    scheduleInjection(100);
+  });
+  document.addEventListener('velora-show-home', function () {
+    removeMatchBanner();
+    scheduleInjection(100);
+  });
+  document.addEventListener('velora-home-tab', removeMatchBanner);
   document.addEventListener('velora-countries-ready', handleCountrySwitchEvent);
   document.addEventListener('velora-return-home', function () { scheduleInjection(100); });
   document.addEventListener('velora-show-home', function () { scheduleInjection(100); });

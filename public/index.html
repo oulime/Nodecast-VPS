@@ -1586,7 +1586,7 @@
   <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-54"></script>
   <link rel="stylesheet" href="/assets/velora-favorites.css?v=white-logo-v20260911-1" />
   <script defer src="/assets/velora-favorites.js?v=20260911-search-fav-name-v5"></script>
-  <script defer src="/assets/velora-watch-history.js?v=20260912-resume-margin-v4"></script>
+  <script defer src="/assets/velora-watch-history.js?v=20260912-resume-first-time-v5"></script>
   <script defer src="/assets/velora-catalog-scroll-memory.js?v=20260902-scroll-memory-v6"></script>
   <script defer src="/assets/velora-cache-inventory.js?v=instant-nav-v20260821-54"></script>
   <script defer src="/assets/manual-pays-visible-memberships.js?v=instant-nav-v20260907-151"></script>
@@ -2114,30 +2114,28 @@
       display: none !important;
     }
 
-    /* Subtle ambient purple background radiating from the logo with a soft touch at bottom */
+    /* Solid dark base background everywhere */
     html,
     body {
       background-color: #07060b !important;
-      background-image:
-        radial-gradient(ellipse 850px 550px at 12% 0%, rgba(147, 51, 234, 0.22) 0%, rgba(124, 58, 237, 0.10) 30%, rgba(88, 28, 135, 0.03) 55%, transparent 70%),
-        radial-gradient(ellipse 550px 380px at 0% 0%, rgba(168, 85, 247, 0.15) 0%, rgba(139, 92, 246, 0.06) 35%, transparent 65%),
-        radial-gradient(ellipse 900px 400px at 50% 100%, rgba(124, 58, 237, 0.08) 0%, rgba(88, 28, 135, 0.03) 40%, transparent 70%) !important;
-      background-attachment: fixed !important;
-      background-repeat: no-repeat !important;
-      background-size: cover !important;
+      background-image: none !important;
     }
 
     body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-      pointer-events: none;
-      background:
+      display: none !important;
+      content: none !important;
+    }
+
+    /* Ambient purple glow placed at the top of content ONLY for Accueil (choice portal & home page) — scrolls away into solid black */
+    .vel-home-choice,
+    .vel-home-empty-page {
+      background-image:
         radial-gradient(ellipse 850px 550px at 12% 0%, rgba(147, 51, 234, 0.22) 0%, rgba(124, 58, 237, 0.10) 30%, rgba(88, 28, 135, 0.03) 55%, transparent 70%),
-        radial-gradient(ellipse 550px 380px at 0% 0%, rgba(168, 85, 247, 0.15) 0%, rgba(139, 92, 246, 0.06) 35%, transparent 65%),
-        radial-gradient(ellipse 900px 400px at 50% 100%, rgba(124, 58, 237, 0.08) 0%, rgba(88, 28, 135, 0.03) 40%, transparent 70%);
-      background-color: #07060b;
+        radial-gradient(ellipse 550px 380px at 0% 0%, rgba(168, 85, 247, 0.15) 0%, rgba(139, 92, 246, 0.06) 35%, transparent 65%) !important;
+      background-attachment: local !important;
+      background-repeat: no-repeat !important;
+      background-position: top center !important;
+      background-size: 100% 550px !important;
     }
 
     .main--velora,
@@ -2152,8 +2150,6 @@
     body[data-vel-active-tab="home"] .main--velora,
     body[data-vel-top-level="home"] .main--velora,
     body.vel-home-empty-active .main--velora,
-    .vel-home-empty-page,
-    #vel-home-empty-page,
     body.velora-tv-mode .main--velora {
       background-color: transparent !important;
       background-image: none !important;
@@ -5677,8 +5673,7 @@
               </h3>
               <p class="hint"
                 style="margin-top:0; margin-bottom:0.75rem; font-size:0.8rem; color:var(--text-secondary,#cbd5e1);">
-                Définit le temps de visionnage minimum requis avant qu'un film ou épisode n'apparaisse dans le rail «
-                Continuer de regarder » (par défaut : 3 minutes).
+                Définit le temps de visionnage minimum requis lors du <strong>premier visionnage</strong> avant qu'un film ou une série n'apparaisse dans le rail « Continuer de regarder » (par défaut : 3 minutes). Si le contenu est déjà présent dans le rail, les mises à jour de progression sont immédiates.
               </p>
               <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
                 <div style="display:flex; align-items:center; gap:0.5rem;">

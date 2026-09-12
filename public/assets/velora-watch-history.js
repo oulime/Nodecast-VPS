@@ -941,14 +941,76 @@
     rewindContinuousSeconds: 0
   };
 
+  // Helper to check if a movie or series is ALREADY present in the "Continuer de regarder" (Reprendre) rail
+  function isMediaAlreadyInResume(mediaObj, mediaId) {
+    if (!mediaObj && !mediaId) return false;
+    if (mediaObj && mediaObj.isResumeCard) return true;
+    var history = getLocalHistory();
+    if (!history || !history.length) return false;
+
+    var targetId = String(mediaId || (mediaObj ? mediaObj.id : "") || "").trim();
+    var isSeries = mediaObj ? (mediaObj.type === "series" || String(mediaObj.contentType) === "series" || targetId.startsWith("series:")) : targetId.startsWith("series:");
+
+    // 1. Direct ID match in active history
+    if (targetId && history.some(function (it) { return it && !isItemTombstoned(it) && String(it.id) === targetId; })) {
+      return true;
+    }
+
+    // 2. Series match: if ANY episode/card of this series is already tracked in history
+    if (isSeries && mediaObj) {
+      var sId = String(mediaObj.seriesId || mediaObj.streamId || "").trim();
+      var epStreamId = String(mediaObj.episodeStreamId || "").trim();
+      var sNorm = normalizeTitle(mediaObj.seriesName || mediaObj.name || "");
+
+      var hasSeries = history.some(function (it) {
+        if (!it || it.type !== "series" || isItemTombstoned(it)) return false;
+        var itSId = String(it.seriesId || it.streamId || "").trim();
+        var itEpId = String(it.episodeStreamId || "").trim();
+        if (sId && itSId && (itSId === sId || String(it.id).startsWith("series:" + sId + ":"))) return true;
+        if (epStreamId && itEpId && itEpId === epStreamId) return true;
+        if (sNorm && sNorm.length >= 2 && it.name) {
+          var itNorm = normalizeTitle(it.seriesName || it.name);
+          if (itNorm && itNorm === sNorm) return true;
+        }
+        return false;
+      });
+
+      if (hasSeries) return true;
+    }
+
+    // 3. Movie match: if this movie is already tracked in active history
+    if (!isSeries && mediaObj) {
+      var mStreamId = String(mediaObj.streamId || "").trim();
+      var mNorm = normalizeTitle(mediaObj.name || "");
+
+      var hasMovie = history.some(function (it) {
+        if (!it || it.type === "series" || isItemTombstoned(it)) return false;
+        if (mStreamId && String(it.streamId || "") === mStreamId) return true;
+        if (mNorm && mNorm.length >= 2 && it.name) {
+          var itNorm = normalizeTitle(it.name);
+          if (itNorm && itNorm === mNorm) return true;
+        }
+        return false;
+      });
+
+      if (hasMovie) return true;
+    }
+
+    return false;
+  }
+
   function updateSessionTrackerMedia(mediaId, mediaObj) {
     if (!mediaId) return;
     if (mediaObj) removeTombstoneForMedia(mediaObj);
-    if (sessionTracker.mediaId === mediaId) return;
+    if (sessionTracker.mediaId === mediaId) {
+      if (mediaObj && isMediaAlreadyInResume(mediaObj, mediaId)) {
+        sessionTracker.qualified = true;
+      }
+      return;
+    }
+
+    var alreadyInResume = isMediaAlreadyInResume(mediaObj, mediaId);
     var history = getLocalHistory();
-    var alreadySaved = history.some(function (it) {
-      return String(it.id) === String(mediaId);
-    });
 
     var isRewindEpisode = false;
     if (mediaObj && mediaObj.type === "series") {
@@ -977,7 +1039,7 @@
     sessionTracker.mediaId = mediaId;
     sessionTracker.continuousSeconds = 0;
     sessionTracker.lastTick = null;
-    sessionTracker.qualified = alreadySaved;
+    sessionTracker.qualified = alreadyInResume;
     sessionTracker.seekFromTime = 0;
     sessionTracker.rewindActive = isRewindEpisode;
     sessionTracker.rewindStartTime = 0;
@@ -1056,6 +1118,11 @@
     if (!media || !isValidMediaEntry(media) || isItemTombstoned(media)) return;
 
     var id = media.id;
+    var alreadyInResume = isMediaAlreadyInResume(media, id);
+    if (alreadyInResume) {
+      sessionTracker.qualified = true;
+    }
+
     var existingEntry = getLocalHistory().find(function (item) { return String(item.id) === String(id); });
 
     var realCurrent = Number.isFinite(video.currentTime) ? video.currentTime : 0;
@@ -1066,8 +1133,8 @@
     var percent = isEnd ? 100 : (duration > 0 ? Math.round((currentPos / duration) * 100) : 5);
     var isFinished = isEnd || (duration > 0 && percent >= FINISHED_WATCH_PERCENT);
 
-    if (!isFinished && !sessionTracker.qualified && !existingEntry && !isRewindCommit) {
-      // User has not watched continuously for the required minimum time yet and video is not finished
+    if (!isFinished && !sessionTracker.qualified && !alreadyInResume && !existingEntry && !isRewindCommit) {
+      // User has not watched continuously for the required minimum time yet (first time watching this content) and video is not finished
       return;
     }
 

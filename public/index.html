@@ -2114,9 +2114,32 @@
       display: none !important;
     }
 
-    /* Ultra-light unified solid dark background everywhere (0% CPU/GPU overhead) */
+    /* Subtle ambient purple background radiating from the logo with a soft touch at bottom */
     html,
-    body,
+    body {
+      background-color: #07060b !important;
+      background-image:
+        radial-gradient(ellipse 850px 550px at 12% 0%, rgba(147, 51, 234, 0.22) 0%, rgba(124, 58, 237, 0.10) 30%, rgba(88, 28, 135, 0.03) 55%, transparent 70%),
+        radial-gradient(ellipse 550px 380px at 0% 0%, rgba(168, 85, 247, 0.15) 0%, rgba(139, 92, 246, 0.06) 35%, transparent 65%),
+        radial-gradient(ellipse 900px 400px at 50% 100%, rgba(124, 58, 237, 0.08) 0%, rgba(88, 28, 135, 0.03) 40%, transparent 70%) !important;
+      background-attachment: fixed !important;
+      background-repeat: no-repeat !important;
+      background-size: cover !important;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 850px 550px at 12% 0%, rgba(147, 51, 234, 0.22) 0%, rgba(124, 58, 237, 0.10) 30%, rgba(88, 28, 135, 0.03) 55%, transparent 70%),
+        radial-gradient(ellipse 550px 380px at 0% 0%, rgba(168, 85, 247, 0.15) 0%, rgba(139, 92, 246, 0.06) 35%, transparent 65%),
+        radial-gradient(ellipse 900px 400px at 50% 100%, rgba(124, 58, 237, 0.08) 0%, rgba(88, 28, 135, 0.03) 40%, transparent 70%);
+      background-color: #07060b;
+    }
+
     .main--velora,
     body .main--velora,
     body[data-vel-active-tab="live"] .main--velora,
@@ -2132,7 +2155,7 @@
     .vel-home-empty-page,
     #vel-home-empty-page,
     body.velora-tv-mode .main--velora {
-      background-color: #06050a !important;
+      background-color: transparent !important;
       background-image: none !important;
     }
 

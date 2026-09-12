@@ -171,7 +171,7 @@
     // 3. Strip bracketed / parenthesized language suffixes and tags
     clean = clean
       .replace(/\s*([\[\(][A-Z0-9\+\-\s]{1,12}[\]\)]|\b(HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|AR|EN|UK|US|ES|DE|IT|PT|TR|NL|RU|PL|RO|MULTI|TRUEFRENCH|FRENCH|ARABIC)\b)$/i, "")
-      .replace(/\s*[-:|•]\s*$/g, "")
+      .replace(/\s*[-:|•\s]*$/g, "")
       .trim();
 
     // 4. Strip bracketed or delimiter-separated prefix tags (e.g. [FR] -, FR -, AR :)
@@ -181,7 +181,13 @@
       .replace(/^[A-Z0-9]{1,6}-[A-Z0-9]{1,6}\s*[-:|•]\s*/i, "")
       .trim();
 
-    // 5. Apply sentence casing (only first letter capital)
+    // 5. Clean unicode noise, subscripts, superscripts (⁴ᴷ ³⁸⁴⁰ᴾ etc.) & resolution noise
+    clean = clean
+      .replace(/[\u00B2\u00B3\u00B9\u2070-\u207F\u2080-\u208F\u1D2C-\u1D6A\u1DA0-\u1DCF]+/g, " ")
+      .replace(/\b(3840p|2160p|1080p|720p|480p|4k|8k|uhd|fhd|hd|hevc|h265|x265|h264|x264)\b/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
     return toSentenceCase(clean || title || "Catalogue");
   }
 
@@ -189,9 +195,8 @@
     if (!str) return "";
     const s = String(str).trim();
     if (!s) return "";
-    const lower = s.toLowerCase();
     let capitalized = false;
-    return lower.replace(/[a-zA-ZÀ-ÿ]/, (char) => {
+    return s.toLowerCase().replace(/\p{L}/u, (char) => {
       if (!capitalized) {
         capitalized = true;
         return char.toUpperCase();
@@ -940,12 +945,7 @@
 
     const h2 = document.createElement("h2");
     h2.className = "qwttco";
-    const typeBadge = isHome
-      ? (tab === "movies"
-          ? '<span class="vel-home-row-badge vel-home-row-badge--movies" aria-hidden="true">🎬</span>'
-          : '<span class="vel-home-row-badge vel-home-row-badge--series" aria-hidden="true">🍿</span>')
-      : "";
-    h2.innerHTML = `<span data-testid="carousel-title" class="">${typeBadge}<span>${pkgTitle}</span></span>`;
+    h2.innerHTML = `<span data-testid="carousel-title" class=""><span>${pkgTitle}</span></span>`;
     h2.style.cursor = "pointer";
 
     const seeMore = document.createElement("a");

@@ -6,7 +6,11 @@
   var renderedCountry = null;
 
   function sectionsForCountry(data) {
-    var country = String(document.getElementById("country-select")?.value || "");
+    var countrySelect = document.getElementById("country-select");
+    var country = String(countrySelect?.value || "").toLowerCase().trim();
+    var countryName = String(countrySelect?.selectedOptions?.[0]?.textContent || "").toLowerCase().trim();
+    var normCountry = country.replace(/^country_/, "");
+    var normName = countryName.replace(/^country_/, "");
     var sections = Array.isArray(data?.sections) ? data.sections : [];
     function hasEnoughItems(row) {
       if (Array.isArray(row.custom_entries) && row.custom_entries.length > 0) {
@@ -18,11 +22,20 @@
       return true;
     }
     var rows = sections.filter(function (row) {
-      return row.published !== false && String(row.country_id || "") === country && hasEnoughItems(row);
+      if (row.published === false || !hasEnoughItems(row)) return false;
+      var ids = Array.isArray(row.country_ids) && row.country_ids.length ? row.country_ids : String(row.country_id || "").split(",").map(function(s){return s.trim()}).filter(Boolean);
+      if (ids.includes("default") || ids.includes("all") || (!country && !countryName)) return true;
+      if (ids.includes(country)) return true;
+      return ids.some(function(id) {
+        var n = String(id).toLowerCase().replace(/^country_/, "");
+        if (normCountry && (n === normCountry || normCountry.includes(n) || n.includes(normCountry))) return true;
+        if (normName && (n === normName || normName.includes(n) || n.includes(normName))) return true;
+        return false;
+      });
     });
     if (!rows.length) {
       rows = sections.filter(function (row) {
-        return row.published !== false && (!row.country_id || row.country_id === "default") && hasEnoughItems(row);
+        return row.published !== false && hasEnoughItems(row);
       });
     }
     return rows.sort(function (a, b) {

@@ -554,8 +554,8 @@ body.vel-home-empty-active {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: clamp(8px, 1.2vw, 14px) !important;
-  margin-top: clamp(8px, 1.2vw, 14px) !important;
+  gap: clamp(14px, 1.8vw, 22px) !important;
+  margin-top: clamp(14px, 1.8vw, 22px) !important;
   padding-top: 0 !important;
   padding-bottom: clamp(60px, 8vw, 120px);
 }
@@ -568,16 +568,13 @@ body.vel-home-empty-active {
 }
 
 .vel-home-row-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.95em;
-  line-height: 1;
+  display: inline;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  margin-left: 0.35rem;
   margin-right: 0;
-  position: relative;
-  top: -0.1em;
-  vertical-align: middle;
-  flex-shrink: 0;
+  color: inherit;
   background: transparent;
   box-shadow: none;
   padding: 0;
@@ -587,6 +584,7 @@ body.vel-home-empty-active {
 .vel-home-row-badge--series {
   background: transparent;
   box-shadow: none;
+  color: inherit;
 }
 
 .vel-home-feed-sentinel {

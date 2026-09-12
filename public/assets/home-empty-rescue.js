@@ -9,10 +9,13 @@
     var country = String(document.getElementById("country-select")?.value || "");
     var sections = Array.isArray(data?.sections) ? data.sections : [];
     function hasEnoughItems(row) {
-      var count = Array.isArray(row.custom_entries) && row.custom_entries.length > 0
-        ? row.custom_entries.length
-        : (Array.isArray(row.entries) ? row.entries.length : 0);
-      return count >= 3;
+      if (Array.isArray(row.custom_entries) && row.custom_entries.length > 0) {
+        return row.custom_entries.length >= 3;
+      }
+      if (Array.isArray(row.entries) && row.entries.length > 0) {
+        return row.entries.length >= 3;
+      }
+      return true;
     }
     var rows = sections.filter(function (row) {
       return row.published !== false && String(row.country_id || "") === country && hasEnoughItems(row);
@@ -67,10 +70,17 @@
     var root = document.getElementById("vel-home-sections");
     var country = String(document.getElementById("country-select")?.value || "");
     if (!payload || !root) return;
-    if (root.querySelector(".vel-home-section__card") && renderedCountry === country) return;
+    if (root.querySelector(".vel-home-section:not(.vel-home-section--resume) .vel-home-section__card") && renderedCountry === country) return;
     var sections = sectionsForCountry(payload);
     if (!sections.length) return;
-    root.replaceChildren();
+    var fragment = document.createDocumentFragment();
+    var existingResume = root.querySelector(".vel-home-section--resume");
+    if (existingResume) {
+      fragment.appendChild(existingResume);
+    } else if (typeof window.veloraRenderResumeSection === "function") {
+      var resumeBlock = window.veloraRenderResumeSection();
+      if (resumeBlock) fragment.appendChild(resumeBlock);
+    }
     sections.forEach(function (section) {
       var isHorizontal = section.card_orientation === "horizontal";
       var block = document.createElement("div");
@@ -132,8 +142,9 @@
         rail.appendChild(card(section, entry));
       });
       block.append(headerSec, railWrap);
-      root.appendChild(block);
+      fragment.appendChild(block);
     });
+    root.replaceChildren(fragment);
     renderedCountry = country;
     document.dispatchEvent(new CustomEvent("velora-home-country-rendered", {
       detail: { countryId: String(document.getElementById("country-select")?.value || "") }

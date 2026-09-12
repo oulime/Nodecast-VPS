@@ -33,8 +33,15 @@
         --vel-home-heading-b: #ff5252;
         --vel-home-heading-glow: rgba(229, 9, 20, 0.45);
         order: -1;
-        margin-bottom: 0.65rem;
+        margin: 0 !important;
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
         transition: opacity 0.3s ease, transform 0.3s ease, margin 0.3s ease;
+      }
+      .vel-home-section--resume .vel-home-section__rail {
+        padding-bottom: 2px !important;
       }
       .vel-home-section--resume.is-hiding {
         opacity: 0 !important;

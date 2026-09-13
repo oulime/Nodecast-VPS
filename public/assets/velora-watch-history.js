@@ -548,7 +548,9 @@
       var valid = items.filter(isValidMediaEntry).filter(function (it) { return !isItemTombstoned(it); });
       var key = getActiveUserKey();
       localStorage.setItem(key, JSON.stringify(valid.slice(0, MAX_ITEMS)));
-      document.dispatchEvent(new CustomEvent("velora-watch-history-updated"));
+      state.cachedHistory = valid;
+      state.needsResumeRailRefresh = true;
+      document.dispatchEvent(new CustomEvent("velora-watch-history-updated", { detail: { items: valid } }));
       if (!skipDomRebuild) {
         injectResumeSectionDirectly();
       }
@@ -1101,7 +1103,6 @@
   function recordProgress(video, isEnd, isThrottled, isRewindCommit) {
     if (!video || video.id === "video" || video.id === "vel-adult-video" || isNaN(video.currentTime) || (video.currentTime < MIN_WATCH_SECONDS && !isEnd)) return;
     if (document.body.dataset.velActiveTab === "live" || document.body.dataset.velActiveTab === "adult" || document.body.dataset.veloraReturnAdult === "true" || document.body.classList.contains("vel-adult-active")) return;
-    if (!isVodPlayerVisible()) return;
 
     var media = state.currentPlaying;
     if (!media) {
@@ -1134,7 +1135,7 @@
 
     var id = media.id;
     var alreadyInResume = isMediaAlreadyInResume(media, id);
-    if (alreadyInResume) {
+    if (alreadyInResume || isRewindCommit || isEnd || !isThrottled || (video.currentTime >= MIN_WATCH_SECONDS)) {
       sessionTracker.qualified = true;
     }
 
@@ -1148,8 +1149,7 @@
     var percent = isEnd ? 100 : (duration > 0 ? Math.round((currentPos / duration) * 100) : 5);
     var isFinished = isEnd || (duration > 0 && percent >= FINISHED_WATCH_PERCENT);
 
-    if (!isFinished && !sessionTracker.qualified && !alreadyInResume && !existingEntry && !isRewindCommit) {
-      // User has not watched continuously for the required minimum time yet (first time watching this content) and video is not finished
+    if (!isFinished && !sessionTracker.qualified && !alreadyInResume && !existingEntry && !isRewindCommit && video.currentTime < MIN_WATCH_SECONDS) {
       return;
     }
 
@@ -1287,7 +1287,8 @@
       }
     }
 
-    saveLocalHistory(items, !isRewindCommit && (isThrottled || isVodPlayerVisible()));
+    state.lastDiskSaveTimestamp = Date.now();
+    saveLocalHistory(items, !isRewindCommit && !isEnd && isThrottled && isVodPlayerVisible());
 
     var now = Date.now();
     if (isEnd || isRewindCommit || !isThrottled || (now - state.lastDbSyncTimestamp >= 30000)) {
@@ -1711,8 +1712,9 @@
           sessionTracker.qualified = true;
           recordProgress(vodVideo, false, false, true);
         } else {
-          recordProgress(vodVideo, false, false, false);
+          recordProgress(vodVideo, false, false, true);
         }
+        injectResumeSectionDirectly();
       }, { passive: true });
 
       vodVideo.addEventListener("ended", function () {
@@ -1720,7 +1722,8 @@
         sessionTracker.lastTick = null;
         sessionTracker.qualified = true;
         updateActiveEpisodeLiveProgress();
-        recordProgress(vodVideo, true, false, false);
+        recordProgress(vodVideo, true, false, true);
+        injectResumeSectionDirectly();
         setTimeout(function () {
           triggerAutoPlayNextEpisode();
         }, 800);
@@ -2476,11 +2479,49 @@
     } catch (_) {}
   }
 
+  var vodContainerObserver = null;
+  function setupVodContainerObserver() {
+    if (vodContainerObserver) return;
+    var vodContainer = document.getElementById("vod-player-container");
+    if (!vodContainer || typeof MutationObserver === "undefined") return;
+    try {
+      vodContainerObserver = new MutationObserver(function () {
+        var isHiddenNow = vodContainer.classList.contains("hidden") || vodContainer.style.display === "none";
+        if (isHiddenNow) {
+          var video = document.getElementById("video-vod");
+          if (video && Number.isFinite(video.currentTime) && video.currentTime >= MIN_WATCH_SECONDS) {
+            recordProgress(video, false, false, true);
+          }
+          injectResumeSectionDirectly();
+        }
+      });
+      vodContainerObserver.observe(vodContainer, { attributes: true, attributeFilter: ["class", "style"] });
+    } catch (_) {}
+  }
+
+  var homeSectionsObserver = null;
+  function setupHomeSectionsObserver() {
+    if (homeSectionsObserver) return;
+    var root = document.getElementById("vel-home-sections");
+    if (!root || typeof MutationObserver === "undefined") return;
+    try {
+      homeSectionsObserver = new MutationObserver(function () {
+        if (state.needsResumeRailRefresh) {
+          state.needsResumeRailRefresh = false;
+          injectResumeSectionDirectly();
+        }
+      });
+      homeSectionsObserver.observe(root, { childList: true });
+    } catch (_) {}
+  }
+
   // Lifecycle boot
   function init() {
     injectStyles();
     bindVideoTrackers();
     setupEpisodeObserver();
+    setupVodContainerObserver();
+    setupHomeSectionsObserver();
 
     loadHistoryFromDatabase();
     syncResumeMinWatchSetting();
@@ -2493,36 +2534,64 @@
 
     document.addEventListener("velora-resume-settings-changed", injectResumeSectionDirectly);
 
-    // Refresh resume section only when returning home or viewing home
-    document.addEventListener("velora-home-tab", function () {
-      if (state.needsResumeRailRefresh) {
+    // Refresh resume section upon returning to home or viewing home
+    var homeEvents = [
+      "velora-home-tab",
+      "velora-show-home",
+      "velora-return-home",
+      "velora-home-country-rendered",
+      "velora-country-changed",
+      "velora-nav-home"
+    ];
+    homeEvents.forEach(function (evName) {
+      document.addEventListener(evName, function () {
         state.needsResumeRailRefresh = false;
         injectResumeSectionDirectly();
-      }
-      requestDecorateEpisodes();
+        requestDecorateEpisodes();
+      });
     });
 
-    document.addEventListener("velora-show-home", function () {
-      if (state.needsResumeRailRefresh) {
-        state.needsResumeRailRefresh = false;
-        injectResumeSectionDirectly();
+    // Capture clicks on navigation buttons leading to Home or closing player
+    document.addEventListener("click", function (e) {
+      if (!e.target) return;
+      var targetEl = e.target.closest("#btn-close-vod-player, .btn-close-vod, #btn-go-home, #btn-logo-home, #btn-back-home, [data-tab='home'], [data-nav-target='home'], .vel-nav-item[data-tab='home']");
+      if (targetEl) {
+        var video = document.getElementById("video-vod");
+        if (video && Number.isFinite(video.currentTime) && video.currentTime >= MIN_WATCH_SECONDS) {
+          recordProgress(video, false, false, true);
+        }
+        setTimeout(injectResumeSectionDirectly, 40);
+        setTimeout(injectResumeSectionDirectly, 200);
       }
-    });
+    }, true);
 
     document.addEventListener("velora-home-media-open", function () {
       bindVideoTrackers();
       requestDecorateEpisodes();
     });
 
+    window.addEventListener("popstate", function () {
+      injectResumeSectionDirectly();
+    });
+
+    window.addEventListener("hashchange", function () {
+      injectResumeSectionDirectly();
+    });
+
     window.addEventListener("pagehide", function () {
       var video = document.getElementById("video-vod");
-      if (video) recordProgress(video, false, false);
+      if (video) recordProgress(video, false, false, true);
     });
 
     document.addEventListener("visibilitychange", function () {
       if (document.visibilityState === "hidden") {
         var video = document.getElementById("video-vod");
-        if (video) recordProgress(video, false, false);
+        if (video) recordProgress(video, false, false, true);
+      } else if (document.visibilityState === "visible") {
+        if (state.needsResumeRailRefresh) {
+          state.needsResumeRailRefresh = false;
+          injectResumeSectionDirectly();
+        }
       }
     });
 

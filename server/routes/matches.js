@@ -15,13 +15,15 @@ router.get('/today', async (req, res) => {
     try {
         const forceRefresh = req.query.refresh === 'true' || req.query.refresh === '1';
         const country = req.query.country || req.headers['x-velora-country'] || 'france';
-        const result = await footballService.getTodayMatches(country, forceRefresh);
+        const allMatches = req.query.all === 'true' || req.query.all === '1' || req.query.scope === 'all';
+        const result = await footballService.getTodayMatches(country, forceRefresh, allMatches);
 
         res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=7200');
         res.setHeader('X-Cache-Hit', result.cached ? 'HIT' : 'MISS');
         res.setHeader('X-Country', String(result.country?.id || 'france'));
         res.setHeader('X-Country-Name', encodeURIComponent(String(result.country?.name || 'France')));
         res.setHeader('X-Total-Matches', String(result.matches.length));
+        res.setHeader('X-Matches-Scope', allMatches ? 'all' : 'big');
 
         // Format attendu : tableau direct d'objets match (100% rétrocompatible)
         return res.json(result.matches);

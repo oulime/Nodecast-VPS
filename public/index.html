@@ -7105,7 +7105,7 @@
             <div class="vel-adult-header">
               <div class="vel-adult-header__left">
                 <button type="button" id="btn-adult-back-home" class="vel-adult-back-btn" title="Retour à l'accueil"
-                  onclick="if(window.veloraCloseAdultPortal){window.veloraCloseAdultPortal();}else if(window.veloraCloseAdultView){window.veloraCloseAdultView();}else{document.getElementById('adult-view').classList.add('hidden');document.body.classList.remove('vel-adult-active');var h=document.getElementById('vel-home-empty-page');if(h){h.classList.remove('hidden');h.style.removeProperty('display');}document.body.classList.add('vel-home-empty-active');document.dispatchEvent(new CustomEvent('velora-return-home'));}">
+                  onclick="if(typeof window.veloraCloseAdultPortal==='function'){window.veloraCloseAdultPortal(true);}else if(typeof window.veloraCloseAdultView==='function'){window.veloraCloseAdultView(true);}else if(typeof window.veloraShowHome==='function'){window.veloraShowHome();}else{var h=document.getElementById('btn-logo-home');if(h){h.click();}else{document.dispatchEvent(new CustomEvent('velora-return-home'));}}">
                   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2">
                     <path d="M19 12H5M12 19l-7-7 7-7" />
                   </svg>
@@ -17394,19 +17394,25 @@
           e.preventDefault();
           e.stopPropagation();
           if (typeof window.veloraCloseAdultPortal === "function") {
-            window.veloraCloseAdultPortal();
+            window.veloraCloseAdultPortal(true);
           } else if (typeof window.veloraCloseAdultView === "function") {
-            window.veloraCloseAdultView();
+            window.veloraCloseAdultView(true);
+          } else if (typeof window.veloraShowHome === "function") {
+            window.veloraShowHome();
           } else {
             var adultView = document.getElementById("adult-view");
             if (adultView) adultView.classList.add("hidden");
-            document.body.classList.remove("vel-adult-active");
+            document.body.classList.remove("vel-adult-active", "vel-adult-player-active");
             var home = document.getElementById("vel-home-empty-page");
             if (home) {
               home.classList.remove("hidden");
               home.style.removeProperty("display");
             }
-            document.body.classList.add("vel-home-empty-active");
+            document.body.classList.add("vel-home-empty-active", "vel-home-choice-picked");
+            document.body.dataset.velActiveTab = "home";
+            var logoH = document.getElementById("btn-logo-home");
+            if (logoH) logoH.click();
+            document.dispatchEvent(new CustomEvent("velora-show-home"));
             document.dispatchEvent(new CustomEvent("velora-return-home"));
           }
           return;
@@ -17431,8 +17437,8 @@
     })();
   </script>
   <script defer src="/assets/velora-nav-controller.js?v=20260909-teardown-v6"></script>
-  <link rel="stylesheet" href="/assets/velora-adult.css?v=20260912-hub-images-v2" />
-  <script defer src="/assets/velora-adult.js?v=20260912-hub-images-v2"></script>
+  <link rel="stylesheet" href="/assets/velora-adult.css?v=20260912-hub-images-v3" />
+  <script defer src="/assets/velora-adult.js?v=20260912-hub-images-v3"></script>
 </body>
 
 </html>

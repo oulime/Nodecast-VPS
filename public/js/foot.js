@@ -1,5 +1,5 @@
 /**
- * Contrôleur Frontend pour la page /foot (Matchs de football télévisés aujourd'hui)
+ * Contrôleur Frontend pour la page /foot (Tous les matchs de football télévisés aujourd'hui)
  */
 
 (function () {
@@ -9,6 +9,7 @@
         constructor() {
             this.matches = [];
             this.filteredMatches = [];
+            this.selectedCompetition = 'all';
             this.searchQuery = '';
             this.isLoading = true;
             this.hasError = false;
@@ -18,6 +19,7 @@
             // Éléments DOM
             this.matchesGrid = document.getElementById('matches-grid');
             this.searchInput = document.getElementById('search-input');
+            this.chipsContainer = document.getElementById('chips-container');
             this.refreshBtn = document.getElementById('btn-refresh');
             this.badgeCount = document.getElementById('badge-count');
             this.countryPicker = document.getElementById('country-picker');
@@ -54,46 +56,15 @@
             if (!c) return 'france';
             const s = String(c).toLowerCase().replace(/^country_/, '').replace(/[_\-\s]+/g, ' ').trim();
 
-            // 1. Pays Arabes / Monde Arabe (MENA)
-            if (/(arabe|arabic|arab|mena|oriental|maghreb|maroc|morocco|algerie|algeria|tunisie|tunisia|egypt|egypte|saudi|saoudite|qatar|emirats|uae|kuwait|koweit|bahrain|oman|iraq|irak|jordan|jordanie|lebanon|liban|libya|libye|sudan|soudan|yemen|syria|syrie|palestine|\b(ar|dz|ma|tn|eg|sa|ae|qa|kw|om|bh|iq|jo|lb|ly|sd|ye|sy)\b)/i.test(s)) {
+            if (/[\u0600-\u06FF]/.test(s) || /(arabe|arabic|arab|mena|oriental|maghreb|maroc|morocco|algerie|algeria|tunisie|tunisia|egypt|egypte|saudi|saoudite|qatar|emirats|uae|kuwait|koweit|bahrain|oman|iraq|irak|jordan|jordanie|lebanon|liban|libya|libye|sudan|soudan|yemen|syria|syrie|palestine|\b(ar|dz|ma|tn|eg|sa|ae|qa|kw|om|bh|iq|jo|lb|ly|sd|ye|sy)\b)/i.test(s)) {
                 return 'mena';
             }
-
-            // 2. Royaume-Uni / UK
-            if (/(uk|gb|gbr|england|angleterre|united kingdom|great britain|royaume uni|royaume-uni|\b(uk|gb)\b)/i.test(s)) {
-                return 'uk';
-            }
-
-            // 3. Espagne
-            if (/(spain|espagne|espana|spanish|\b(es|esp)\b)/i.test(s)) {
-                return 'spain';
-            }
-
-            // 4. États-Unis / USA
-            if (/(usa|us|united states|etats unis|etats-unis|america|amerique|\b(us|usa)\b)/i.test(s)) {
-                return 'usa';
-            }
-
-            // 5. Italie
-            if (/(italy|italie|italia|italian|\b(it|ita)\b)/i.test(s)) {
-                return 'italy';
-            }
-
-            // 6. Allemagne
-            if (/(germany|allemagne|deutschland|german|\b(de|deu|ger)\b)/i.test(s)) {
-                return 'germany';
-            }
-
-            // 7. Portugal
-            if (/(portugal|portugais|portuguese|\b(pt|prt)\b)/i.test(s)) {
-                return 'portugal';
-            }
-
-            // 8. France
-            if (/(france|francais|french|\b(fr|fra)\b)/i.test(s)) {
-                return 'france';
-            }
-
+            if (/(uk|gb|gbr|england|angleterre|united kingdom|great britain|royaume uni|royaume-uni|\b(uk|gb)\b)/i.test(s)) return 'uk';
+            if (/(spain|espagne|espana|españa|spanish|\b(es|esp)\b)/i.test(s)) return 'spain';
+            if (/(usa|us|united states|etats unis|etats-unis|états-unis|america|amerique|amérique|\b(us|usa)\b)/i.test(s)) return 'usa';
+            if (/(italy|italie|italia|italian|\b(it|ita)\b)/i.test(s)) return 'italy';
+            if (/(germany|allemagne|deutschland|german|\b(de|deu|ger)\b)/i.test(s)) return 'germany';
+            if (/(portugal|portugais|portuguese|\b(pt|prt)\b)/i.test(s)) return 'portugal';
             return 'france';
         }
 
@@ -104,6 +75,13 @@
             this.updateHeaderLabels(this.country);
             this.setupEventListeners();
             this.loadMatches();
+
+            // Actualisation automatique des statuts horaires toutes les minutes
+            setInterval(() => {
+                if (!this.isLoading && !this.hasError && this.matches.length > 0) {
+                    this.filterAndRender();
+                }
+            }, 60000);
         }
 
         setupEventListeners() {
@@ -137,14 +115,14 @@
 
         updateHeaderLabels(country) {
             const labels = {
-                france: { name: 'France', flag: '🇫🇷', subtitle: 'Diffusion en direct • Chaînes TV françaises 🇫🇷', tv: 'Diffusion TV' },
-                uk: { name: 'UK', flag: '🇬🇧', subtitle: 'Diffusion en direct • Chaînes TV UK 🇬🇧 (Sky, TNT Sports)', tv: 'Diffusion TV (UK)' },
-                spain: { name: 'Espagne', flag: '🇪🇸', subtitle: 'Diffusion en direct • Chaînes TV 🇪🇸 (Movistar+, DAZN)', tv: 'Diffusion TV (Espagne)' },
-                usa: { name: 'USA', flag: '🇺🇸', subtitle: 'Diffusion en direct • Chaînes TV 🇺🇸 (NBC, Paramount+, ESPN)', tv: 'Diffusion TV (USA)' },
-                italy: { name: 'Italie', flag: '🇮🇹', subtitle: 'Diffusion en direct • Chaînes TV 🇮🇹 (Sky Sport, DAZN)', tv: 'Diffusion TV (Italie)' },
-                germany: { name: 'Allemagne', flag: '🇩🇪', subtitle: 'Diffusion en direct • Chaînes TV 🇩🇪 (Sky Sport, DAZN)', tv: 'Diffusion TV (Allemagne)' },
-                mena: { name: 'Monde Arabe', flag: '🌍', subtitle: 'بث مباشر • القنوات العربية (beIN Sports, SSC, Abu Dhabi Sports) 🌍', tv: 'القنوات الناقلة (Diffusion TV)' },
-                portugal: { name: 'Portugal', flag: '🇵🇹', subtitle: 'Diffusion en direct • Chaînes TV 🇵🇹 (Sport TV, DAZN)', tv: 'Diffusion TV (Portugal)' }
+                france: { name: 'France', flag: '🇫🇷', subtitle: 'Diffusion en direct • Chaînes TV françaises 🇫🇷' },
+                uk: { name: 'UK', flag: '🇬🇧', subtitle: 'Diffusion en direct • Chaînes TV UK 🇬🇧 (Sky, TNT Sports)' },
+                spain: { name: 'Espagne', flag: '🇪🇸', subtitle: 'Diffusion en direct • Chaînes TV 🇪🇸 (Movistar+, DAZN)' },
+                usa: { name: 'USA', flag: '🇺🇸', subtitle: 'Diffusion en direct • Chaînes TV 🇺🇸 (NBC, Paramount+, ESPN)' },
+                italy: { name: 'Italie', flag: '🇮🇹', subtitle: 'Diffusion en direct • Chaînes TV 🇮🇹 (Sky Sport, DAZN)' },
+                germany: { name: 'Allemagne', flag: '🇩🇪', subtitle: 'Diffusion en direct • Chaînes TV 🇩🇪 (Sky Sport, DAZN)' },
+                mena: { name: 'Monde Arabe', flag: '🌍', subtitle: 'بث مباشر • القنوات العربية (beIN Sports, SSC, Abu Dhabi Sports) 🌍' },
+                portugal: { name: 'Portugal', flag: '🇵🇹', subtitle: 'Diffusion en direct • Chaînes TV 🇵🇹 (Sport TV, DAZN)' }
             };
 
             const info = labels[country] || labels.france;
@@ -158,16 +136,43 @@
             }
         }
 
+        getMatchTimeDetails(matchTimeStr) {
+            if (!matchTimeStr) return { diffMinutes: 9999, status: 'upcoming', formattedTime: '--:--' };
+
+            const cleaned = String(matchTimeStr).trim().replace(/[hH.]/, ':');
+            const parts = cleaned.match(/(\d{1,2})\s*:\s*(\d{2})/);
+            if (!parts) return { diffMinutes: 9999, status: 'upcoming', formattedTime: matchTimeStr };
+
+            const hours = parseInt(parts[1], 10);
+            const minutes = parseInt(parts[2], 10);
+
+            const now = new Date();
+            const matchDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+
+            const diffMs = matchDate.getTime() - now.getTime();
+            const diffMinutes = Math.round(diffMs / 60000);
+
+            if (diffMinutes < -115) {
+                return { diffMinutes, status: 'finished', formattedTime: matchTimeStr };
+            } else if (diffMinutes <= 0) {
+                return { diffMinutes, status: 'live', formattedTime: matchTimeStr };
+            } else if (diffMinutes <= 30) {
+                return { diffMinutes, status: 'starting_soon', formattedTime: matchTimeStr };
+            } else {
+                return { diffMinutes, status: 'upcoming', formattedTime: matchTimeStr };
+            }
+        }
+
         async loadMatches(forceRefresh = false) {
             this.isLoading = true;
             this.hasError = false;
             this.renderLoadingSkeletons();
 
             try {
-                const queryParts = [];
+                const queryParts = ['all=true'];
                 if (forceRefresh) queryParts.push('refresh=true');
                 if (this.country) queryParts.push(`country=${encodeURIComponent(this.country)}`);
-                const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+                const queryString = `?${queryParts.join('&')}`;
 
                 const url = `/api/matches/today${queryString}`;
                 const response = await fetch(url, {
@@ -189,34 +194,111 @@
                 this.errorMessage = err.message || 'Impossible de récupérer les matchs';
             }
 
+            this.renderChips();
             this.updateBadgeCount();
             this.filterAndRender();
         }
 
+        renderChips() {
+            if (!this.chipsContainer) return;
+            if (!this.matches || this.matches.length === 0) {
+                this.chipsContainer.innerHTML = '';
+                return;
+            }
+
+            // Calcul des compétitions uniques et de leur nombre
+            const compCounts = new Map();
+            this.matches.forEach(m => {
+                const comp = m.competition || 'Autre';
+                compCounts.set(comp, (compCounts.get(comp) || 0) + 1);
+            });
+
+            // Tri par nombre de matchs décroissant
+            const sortedComps = Array.from(compCounts.entries()).sort((a, b) => b[1] - a[1]);
+
+            let html = `
+                <button type="button" class="foot-chip ${this.selectedCompetition === 'all' ? 'active' : ''}" data-comp="all">
+                    <span>Tous</span>
+                    <span class="foot-chip-count">${this.matches.length}</span>
+                </button>
+            `;
+
+            sortedComps.forEach(([comp, count]) => {
+                const isActive = this.selectedCompetition === comp;
+                html += `
+                    <button type="button" class="foot-chip ${isActive ? 'active' : ''}" data-comp="${this.escapeHtml(comp)}">
+                        <span>${this.escapeHtml(comp)}</span>
+                        <span class="foot-chip-count">${count}</span>
+                    </button>
+                `;
+            });
+
+            this.chipsContainer.innerHTML = html;
+
+            this.chipsContainer.querySelectorAll('.foot-chip').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    this.selectedCompetition = btn.getAttribute('data-comp') || 'all';
+                    this.chipsContainer.querySelectorAll('.foot-chip').forEach(c => c.classList.remove('active'));
+                    btn.classList.add('active');
+                    this.filterAndRender();
+                });
+            });
+        }
+
         updateBadgeCount() {
             if (!this.badgeCount) return;
-            const count = this.matches.length;
-            this.badgeCount.textContent = count > 1
-                ? `${count} matchs diffusés`
-                : count === 1
-                    ? `1 match diffusé`
-                    : `0 match`;
+            const total = this.matches.length;
+            const liveCount = this.matches.filter(m => this.getMatchTimeDetails(m.time).status === 'live').length;
+
+            if (liveCount > 0) {
+                this.badgeCount.innerHTML = `<span>${total} matchs</span> • <strong style="color: #ef4444;">🔴 ${liveCount} en direct</strong>`;
+            } else {
+                this.badgeCount.textContent = total > 1
+                    ? `${total} matchs programmés`
+                    : total === 1
+                        ? `1 match programmé`
+                        : `0 match`;
+            }
         }
 
         filterAndRender() {
+            let list = [...this.matches];
+
+            // 1. Filtrage par compétition
+            if (this.selectedCompetition && this.selectedCompetition !== 'all') {
+                list = list.filter(m => (m.competition || '') === this.selectedCompetition);
+            }
+
+            // 2. Filtrage par terme de recherche
             if (this.searchQuery) {
                 const q = this.searchQuery;
-                this.filteredMatches = this.matches.filter(m => {
+                list = list.filter(m => {
                     const home = (m.homeTeam?.name || '').toLowerCase();
                     const away = (m.awayTeam?.name || '').toLowerCase();
                     const comp = (m.competition || '').toLowerCase();
                     const channels = (m.tvChannels || []).join(' ').toLowerCase();
                     return home.includes(q) || away.includes(q) || comp.includes(q) || channels.includes(q);
                 });
-            } else {
-                this.filteredMatches = [...this.matches];
             }
 
+            // 3. Tri moderne et intuitif : EN DIRECT d'abord -> Bientôt -> À venir (par heure) -> Terminés
+            const rankOrder = { live: 0, starting_soon: 1, upcoming: 2, finished: 3 };
+
+            list.sort((a, b) => {
+                const infoA = this.getMatchTimeDetails(a.time);
+                const infoB = this.getMatchTimeDetails(b.time);
+
+                const rankA = rankOrder[infoA.status] ?? 2;
+                const rankB = rankOrder[infoB.status] ?? 2;
+
+                if (rankA !== rankB) {
+                    return rankA - rankB;
+                }
+
+                return String(a.time || '').localeCompare(String(b.time || ''));
+            });
+
+            this.filteredMatches = list;
             this.render();
         }
 
@@ -250,6 +332,45 @@
             const card = document.createElement('div');
             card.className = 'foot-card';
 
+            const timeInfo = this.getMatchTimeDetails(match.time);
+            let timeBadgeHtml = '';
+
+            if (timeInfo.status === 'live') {
+                card.classList.add('is-live');
+                timeBadgeHtml = `
+                    <span class="foot-status-badge status-live">
+                        <span class="foot-live-dot"></span>
+                        <span>EN DIRECT • ${this.escapeHtml(match.time || '')}</span>
+                    </span>
+                `;
+            } else if (timeInfo.status === 'starting_soon') {
+                timeBadgeHtml = `
+                    <span class="foot-status-badge status-ns" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border-color: rgba(245, 158, 11, 0.3);">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <span>Bientôt (${this.escapeHtml(match.time || '--:--')})</span>
+                    </span>
+                `;
+            } else if (timeInfo.status === 'finished') {
+                timeBadgeHtml = `
+                    <span class="foot-status-badge status-ft">
+                        <span>Terminé (${this.escapeHtml(match.time || '')})</span>
+                    </span>
+                `;
+            } else {
+                timeBadgeHtml = `
+                    <span class="foot-status-badge status-ns">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <span>${this.escapeHtml(match.time || '--:--')}</span>
+                    </span>
+                `;
+            }
+
             const homeInitial = (match.homeTeam?.name || 'H').charAt(0).toUpperCase();
             const awayInitial = (match.awayTeam?.name || 'A').charAt(0).toUpperCase();
 
@@ -275,16 +396,10 @@
                 <!-- Header: Competition name and Kickoff Time -->
                 <div class="foot-card-header">
                     <span class="foot-card-comp-name">${this.escapeHtml(match.competition || 'Football')}</span>
-                    <span class="foot-status-badge status-ns">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <polyline points="12 6 12 12 16 14"></polyline>
-                        </svg>
-                        <span>${this.escapeHtml(match.time || '--:--')}</span>
-                    </span>
+                    ${timeBadgeHtml}
                 </div>
 
-                <!-- Body: Home Team VS Away Team (Centered & Balanced) -->
+                <!-- Body: Home Team VS Away Team -->
                 <div class="foot-card-body">
                     <div class="foot-team foot-team-home">
                         <div class="foot-team-logo-wrap">
@@ -386,9 +501,9 @@
                             <path d="M2 12h20"></path>
                         </svg>
                     </div>
-                    <h3 class="foot-state-title">Aucun match télévisé trouvé pour le moment</h3>
+                    <h3 class="foot-state-title">Aucun match trouvé</h3>
                     <p class="foot-state-desc">
-                        Aucune diffusion de grand match n'est programmée pour l'instant ou les diffusions du jour sont terminées.
+                        Aucun match ne correspond à vos critères de recherche pour le moment.
                     </p>
                 </div>
             `;
@@ -440,3 +555,4 @@
         window.footPageApp = new FootPageApp();
     });
 })();
+

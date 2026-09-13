@@ -1,11 +1,10 @@
 /**
- * Service Football - Scraping automatisé des VRAIS GRANDS MATCHS (Big Stages & Big Clubs)
- * Système de Rang basé sur la Hype et l'Audience Réelle Actuelle :
- * - Tier S (200 pts) : Real Madrid, Barça, Arsenal, Man City, Liverpool, PSG, Bayern
- * - Tier A (130 pts) : Chelsea, Man United, Tottenham, Atlético, Leverkusen
- * - Tier B (80 pts) : Inter, Juventus, Milan, Napoli, Dortmund, OM, Monaco, Aston Villa, Newcastle
- * - Tier C (40 pts) : Lyon, Lille, Atalanta, Roma, Lazio, Bilbao, Sociedad, Benfica, etc.
- * Logos HD officiels garantis + TheSportsDB et cache 1 heure.
+ * Service Football - Scraping et diffusion de TOUS LES MATCHS DU JOUR
+ * - Scrape l'intégralité du programme TV de football du jour (sans filtrage restrictif)
+ * - Normalisation des compétitions (Ligue 1, Premier League, LaLiga, Serie A, Bundesliga, Coupes, etc.)
+ * - Normalisation des équipes et logos HD garantis + fallback TheSportsDB
+ * - Adaptation automatique des diffuseurs officiels selon le pays sélectionné
+ * - Cache mémoire 1 heure avec rafraîchissement manuel possible
  */
 
 const cheerio = require('cheerio');
@@ -26,13 +25,27 @@ const COUNTRY_CONFIGS = {
             'europa league': ['Canal+', 'Canal+ Foot', 'RMC Sport 1'],
             'conference league': ['Canal+ Live', 'RMC Sport Live'],
             'premier league': ['Canal+', 'Canal+ Foot', 'Canal+ Premier League'],
-            'liga': ['beIN Sports 1', 'beIN Sports 2'],
-            'ligue 1': ['DAZN 1', 'beIN Sports 1'],
+            'championship': ['beIN Sports 2', 'beIN Sports MAX 4'],
+            'liga': ['beIN Sports 1', 'beIN Sports 2', 'DAZN'],
+            'ligue 1': ['DAZN 1', 'beIN Sports 1', 'Ligue 1+'],
+            'ligue 2': ['beIN Sports 1', 'beIN Sports 2'],
             'serie a': ['DAZN', 'beIN Sports'],
+            'serie b': ['DAZN'],
             'bundesliga': ['beIN Sports 1', 'beIN Sports 2'],
+            '2. bundesliga': ['beIN Sports MAX 5'],
+            'portugal': ['beIN Sports 2', 'beIN Sports MAX 7'],
+            'pays-bas': ['DAZN'],
+            'belgique': ['DAZN'],
+            'turquie': ['beIN Sports MAX 6'],
+            'coupe de france': ['France 3', 'beIN Sports 1', 'YouTube'],
+            'fa cup': ['beIN Sports 1', 'beIN Sports 2'],
+            'copa del rey': ['L\'Équipe'],
+            'coppa italia': ['L\'Équipe'],
+            'dfb-pokal': ['L\'Équipe'],
             'world cup': ['TF1', 'beIN Sports 1'],
             'euro': ['TF1', 'M6', 'beIN Sports 1'],
-            'nations league': ['TF1', 'L\'Équipe']
+            'nations league': ['TF1', 'L\'Équipe'],
+            'saudi': ['Canal+ Sport 360', 'Canal+ Foot']
         }
     },
     uk: {
@@ -45,13 +58,22 @@ const COUNTRY_CONFIGS = {
             'europa league': ['TNT Sports 2', 'discovery+'],
             'conference league': ['TNT Sports', 'discovery+'],
             'premier league': ['Sky Sports Main Event', 'Sky Sports Premier League', 'TNT Sports 1'],
+            'championship': ['Sky Sports Football', 'Sky Sports+'],
             'liga': ['Premier Sports 1', 'LaLigaTV', 'ITV4'],
             'ligue 1': ['TNT Sports 1', 'discovery+'],
             'serie a': ['TNT Sports 1', 'OneFootball'],
             'bundesliga': ['Sky Sports Football', 'Sky Sports Mix'],
+            'portugal': ['TrillerTV+'],
+            'pays-bas': ['TrillerTV+'],
+            'belgique': ['TrillerTV+'],
+            'turquie': ['TrillerTV+'],
+            'super league': ['BBC Two', 'Sky Sports Football', 'YouTube'],
+            'd1 fem': ['BBC Two', 'Sky Sports Football', 'YouTube'],
             'world cup': ['BBC One', 'ITV1', 'STV'],
             'euro': ['BBC One', 'ITV1'],
-            'nations league': ['ITV1', 'Viaplay']
+            'nations league': ['ITV1', 'Viaplay'],
+            'fa cup': ['BBC One', 'ITV1'],
+            'carabao': ['Sky Sports Football']
         }
     },
     spain: {
@@ -64,13 +86,16 @@ const COUNTRY_CONFIGS = {
             'europa league': ['Movistar Liga de Campeones 2', 'Cuatro'],
             'conference league': ['Movistar Liga de Campeones'],
             'premier league': ['DAZN 1', 'DAZN Premier League'],
+            'championship': ['DAZN 2'],
             'liga': ['DAZN LaLiga', 'M+ LaLiga TV', 'Gol Play'],
             'ligue 1': ['Eurosport 1', 'DAZN'],
             'serie a': ['DAZN 1', 'Movistar+'],
             'bundesliga': ['DAZN 2', 'Movistar+'],
+            'portugal': ['RTP Internacional'],
             'world cup': ['RTVE La 1', 'Gol Mundial', 'Movistar Plus+'],
             'euro': ['RTVE La 1', 'La 2', 'Teledeporte'],
-            'nations league': ['RTVE La 1']
+            'nations league': ['RTVE La 1'],
+            'copa del rey': ['RTVE La 1', 'Movistar Plus+']
         }
     },
     usa: {
@@ -83,13 +108,22 @@ const COUNTRY_CONFIGS = {
             'europa league': ['Paramount+', 'ViX'],
             'conference league': ['Paramount+', 'ViX'],
             'premier league': ['NBC', 'Peacock', 'USA Network', 'Telemundo'],
+            'championship': ['ESPN+'],
             'liga': ['ESPN+', 'ESPN Deportes', 'ABC'],
             'ligue 1': ['beIN Sports USA', 'beIN Sports en Español', 'Fubo'],
             'serie a': ['Paramount+', 'CBS Sports Golazo Network'],
             'bundesliga': ['ESPN+', 'ESPN App'],
+            'portugal': ['GOLTV'],
+            'pays-bas': ['ESPN+'],
+            'belgique': ['ESPN+'],
+            'super league': ['CBS Sports Network', 'Paramount+'],
+            'd1 fem': ['CBS Sports Network', 'NWSL+'],
             'world cup': ['FOX', 'FS1', 'Telemundo', 'Peacock'],
             'euro': ['FOX', 'FS1', 'Fubo Sports'],
-            'nations league': ['FOX Sports', 'ViX']
+            'nations league': ['FOX Sports', 'ViX'],
+            'mls': ['Apple TV MLS Season Pass', 'FOX'],
+            'fa cup': ['ESPN+'],
+            'copa del rey': ['ESPN+']
         }
     },
     italy: {
@@ -105,10 +139,12 @@ const COUNTRY_CONFIGS = {
             'liga': ['DAZN Italia'],
             'ligue 1': ['Sky Sport', 'Now TV'],
             'serie a': ['DAZN Italia', 'Sky Sport Calcio', 'Sky Sport Uno'],
+            'serie b': ['DAZN Italia', 'Sky Sport Calcio'],
             'bundesliga': ['Sky Sport Uno', 'Sky Sport Calcio'],
             'world cup': ['Rai 1', 'Rai Sport', 'RaiPlay'],
             'euro': ['Rai 1', 'Sky Sport Uno'],
-            'nations league': ['Rai 1', 'RaiPlay']
+            'nations league': ['Rai 1', 'RaiPlay'],
+            'coppa italia': ['Canale 5', 'Italia 1']
         }
     },
     germany: {
@@ -125,6 +161,8 @@ const COUNTRY_CONFIGS = {
             'ligue 1': ['DAZN Deutschland'],
             'serie a': ['DAZN Deutschland', 'DAZN 2'],
             'bundesliga': ['Sky Sport Bundesliga 1', 'DAZN 1', 'Sat.1'],
+            '2. bundesliga': ['Sky Sport Bundesliga 2'],
+            'dfb-pokal': ['Sky Sport', 'ARD', 'ZDF'],
             'world cup': ['ARD Das Erste', 'ZDF', 'MagentaTV'],
             'euro': ['ARD', 'ZDF', 'RTL', 'MagentaTV'],
             'nations league': ['ZDF', 'ARD', 'RTL']
@@ -142,10 +180,17 @@ const COUNTRY_CONFIGS = {
             'ligue europa': ['beIN Sports 2 HD (عربي)', 'beIN Sports 3 HD (عربي)', 'TOD'],
             'conference': ['beIN Sports 4 HD (عربي)', 'TOD'],
             'premier league': ['beIN Sports 1 HD Premium', 'beIN Sports 2 HD (عربي)', 'beIN 4K'],
+            'championship': ['beIN Sports 3 HD (عربي)'],
             'liga': ['beIN Sports 1 HD (عربي)', 'beIN Sports 3 HD (عربي)', 'TOD'],
             'ligue 1': ['beIN Sports 4 HD (عربي)', 'beIN Sports 1 HD (عربي)'],
+            'ligue 2': ['beIN Sports 4 HD (عربي)'],
             'serie a': ['Abu Dhabi Sports Premium 1 (أبوظبي)', 'STARZPLAY', 'AD Sports 2 HD'],
             'bundesliga': ['beIN Sports 5 HD (عربي)', 'beIN Sports HD', 'TOD'],
+            '2. bundesliga': ['beIN Sports 5 HD (عربي)'],
+            'portugal': ['SSC 1 HD (السعودية)', 'beIN Sports HD'],
+            'turquie': ['beIN Sports HD (عربي)'],
+            'pays-bas': ['Abu Dhabi Sports HD'],
+            'belgique': ['Abu Dhabi Sports HD'],
             'world cup': ['beIN Sports MAX 1/2 HD', 'Alkass Extra 1 HD (الكاس)', 'beIN 4K'],
             'coupe du monde': ['beIN Sports MAX 1/2 HD', 'Alkass Extra 1 HD (الكاس)', 'beIN 4K'],
             'euro': ['beIN Sports MAX 1/2/3 HD', 'TOD (عربي)'],
@@ -165,10 +210,13 @@ const COUNTRY_CONFIGS = {
             'europa league': ['Sport TV 2', 'SIC'],
             'conference league': ['Sport TV 3', 'DAZN Portugal'],
             'premier league': ['DAZN Eleven Sports 1', 'DAZN 2'],
+            'championship': ['Sport TV 3'],
             'liga': ['DAZN Eleven Sports 2', 'DAZN 3'],
+            'portugal': ['Sport TV 1', 'Sport TV 2', 'BTV'],
             'ligue 1': ['Sport TV 4'],
             'serie a': ['Sport TV 2', 'Sport TV 3'],
             'bundesliga': ['DAZN Eleven Sports 3'],
+            'pays-bas': ['Sport TV 5'],
             'world cup': ['RTP 1', 'SIC', 'TVI', 'Sport TV 1'],
             'euro': ['RTP 1', 'SIC', 'TVI', 'Sport TV'],
             'nations league': ['RTP 1', 'Sport TV 1']
@@ -183,47 +231,16 @@ function normalizeCountryCode(countryInput) {
     if (!countryInput) return 'france';
     const s = String(countryInput).toLowerCase().replace(/^country_/, '').replace(/[_\-\s]+/g, ' ').trim();
 
-    // 1. Pays Arabes / Monde Arabe (MENA) : supporte tous les pays et termes
-    if (/(arabe|arabic|arab|mena|oriental|maghreb|maroc|morocco|algerie|algeria|tunisie|tunisia|egypt|egypte|saudi|saoudite|qatar|emirats|uae|kuwait|koweit|bahrain|oman|iraq|irak|jordan|jordanie|lebanon|liban|libya|libye|sudan|soudan|yemen|syria|syrie|palestine|\b(ar|dz|ma|tn|eg|sa|ae|qa|kw|om|bh|iq|jo|lb|ly|sd|ye|sy)\b)/i.test(s)) {
+    if (/[\u0600-\u06FF]/.test(s) || /(arabe|arabic|arab|mena|oriental|maghreb|maroc|morocco|algerie|algeria|tunisie|tunisia|egypt|egypte|saudi|saoudite|qatar|emirats|uae|kuwait|koweit|bahrain|oman|iraq|irak|jordan|jordanie|lebanon|liban|libya|libye|sudan|soudan|yemen|syria|syrie|palestine|\b(ar|dz|ma|tn|eg|sa|ae|qa|kw|om|bh|iq|jo|lb|ly|sd|ye|sy)\b)/i.test(s)) {
         return 'mena';
     }
-
-    // 2. Royaume-Uni / UK
-    if (/(uk|gb|gbr|england|angleterre|united kingdom|great britain|royaume uni|royaume-uni|\b(uk|gb)\b)/i.test(s)) {
-        return 'uk';
-    }
-
-    // 3. Espagne
-    if (/(spain|espagne|espana|spanish|\b(es|esp)\b)/i.test(s)) {
-        return 'spain';
-    }
-
-    // 4. États-Unis / USA
-    if (/(usa|us|united states|etats unis|etats-unis|america|amerique|\b(us|usa)\b)/i.test(s)) {
-        return 'usa';
-    }
-
-    // 5. Italie
-    if (/(italy|italie|italia|italian|\b(it|ita)\b)/i.test(s)) {
-        return 'italy';
-    }
-
-    // 6. Allemagne
-    if (/(germany|allemagne|deutschland|german|\b(de|deu|ger)\b)/i.test(s)) {
-        return 'germany';
-    }
-
-    // 7. Portugal
-    if (/(portugal|portugais|portuguese|\b(pt|prt)\b)/i.test(s)) {
-        return 'portugal';
-    }
-
-    // 8. France
-    if (/(france|francais|french|\b(fr|fra)\b)/i.test(s)) {
-        return 'france';
-    }
-
-    return 'france'; // Par défaut France
+    if (/(uk|gb|gbr|england|angleterre|united kingdom|great britain|royaume uni|royaume-uni|\b(uk|gb)\b)/i.test(s)) return 'uk';
+    if (/(spain|espagne|espana|españa|spanish|\b(es|esp)\b)/i.test(s)) return 'spain';
+    if (/(usa|us|united states|etats unis|etats-unis|états-unis|america|amerique|amérique|\b(us|usa)\b)/i.test(s)) return 'usa';
+    if (/(italy|italie|italia|italian|\b(it|ita)\b)/i.test(s)) return 'italy';
+    if (/(germany|allemagne|deutschland|german|\b(de|deu|ger)\b)/i.test(s)) return 'germany';
+    if (/(portugal|portugais|portuguese|\b(pt|prt)\b)/i.test(s)) return 'portugal';
+    return 'france';
 }
 
 /**
@@ -248,6 +265,7 @@ const MAJOR_TEAM_LOGOS = {
     'man city': 'https://media.api-sports.io/football/teams/50.png',
     'manchester united': 'https://media.api-sports.io/football/teams/33.png',
     'man united': 'https://media.api-sports.io/football/teams/33.png',
+    'man u': 'https://media.api-sports.io/football/teams/33.png',
     'liverpool': 'https://media.api-sports.io/football/teams/40.png',
     'chelsea': 'https://media.api-sports.io/football/teams/49.png',
     'tottenham': 'https://media.api-sports.io/football/teams/47.png',
@@ -264,11 +282,20 @@ const MAJOR_TEAM_LOGOS = {
     'brentford': 'https://media.api-sports.io/football/teams/55.png',
     'crystal palace': 'https://media.api-sports.io/football/teams/52.png',
     'nottingham': 'https://media.api-sports.io/football/teams/65.png',
+    'sheffield united': 'https://media.api-sports.io/football/teams/62.png',
+    'coventry': 'https://media.api-sports.io/football/teams/1359.png',
+    'leicester': 'https://media.api-sports.io/football/teams/46.png',
+    'leeds': 'https://media.api-sports.io/football/teams/63.png',
+    'southampton': 'https://media.api-sports.io/football/teams/41.png',
+    'ipswich': 'https://media.api-sports.io/football/teams/57.png',
+    'birmingham': 'https://media.api-sports.io/football/teams/58.png',
+    'charlton': 'https://media.api-sports.io/football/teams/59.png',
 
     // Espagne
     'real madrid': 'https://media.api-sports.io/football/teams/541.png',
     'barcelone': 'https://media.api-sports.io/football/teams/529.png',
     'barcelona': 'https://media.api-sports.io/football/teams/529.png',
+    'barca': 'https://media.api-sports.io/football/teams/529.png',
     'barça': 'https://media.api-sports.io/football/teams/529.png',
     'atletico': 'https://media.api-sports.io/football/teams/530.png',
     'atlético': 'https://media.api-sports.io/football/teams/530.png',
@@ -289,8 +316,15 @@ const MAJOR_TEAM_LOGOS = {
     'elche': 'https://media.api-sports.io/football/teams/797.png',
     'osasuna': 'https://media.api-sports.io/football/teams/727.png',
     'celta vigo': 'https://media.api-sports.io/football/teams/538.png',
+    'celta': 'https://media.api-sports.io/football/teams/538.png',
     'mallorca': 'https://media.api-sports.io/football/teams/798.png',
     'getafe': 'https://media.api-sports.io/football/teams/546.png',
+    'levante': 'https://media.api-sports.io/football/teams/539.png',
+    'malaga': 'https://media.api-sports.io/football/teams/534.png',
+    'la corogne': 'https://media.api-sports.io/football/teams/542.png',
+    'deportivo': 'https://media.api-sports.io/football/teams/542.png',
+    'espanyol': 'https://media.api-sports.io/football/teams/540.png',
+    'girona': 'https://media.api-sports.io/football/teams/547.png',
 
     // France
     'paris': 'https://media.api-sports.io/football/teams/85.png',
@@ -301,7 +335,6 @@ const MAJOR_TEAM_LOGOS = {
     'om': 'https://media.api-sports.io/football/teams/81.png',
     'lyon': 'https://media.api-sports.io/football/teams/80.png',
     'ol': 'https://media.api-sports.io/football/teams/80.png',
-    'lyon ol': 'https://media.api-sports.io/football/teams/80.png',
     'monaco': 'https://media.api-sports.io/football/teams/91.png',
     'as monaco': 'https://media.api-sports.io/football/teams/91.png',
     'lille': 'https://media.api-sports.io/football/teams/79.png',
@@ -317,7 +350,11 @@ const MAJOR_TEAM_LOGOS = {
     'montpellier': 'https://media.api-sports.io/football/teams/82.png',
     'auxerre': 'https://media.api-sports.io/football/teams/108.png',
     'saint-etienne': 'https://media.api-sports.io/football/teams/1063.png',
-    'asse': 'https://media.api-sports.io/football/teams/1063.png',
+    'le mans': 'https://media.api-sports.io/football/teams/112.png',
+    'troyes': 'https://media.api-sports.io/football/teams/110.png',
+    'metz': 'https://media.api-sports.io/football/teams/111.png',
+    'angers': 'https://media.api-sports.io/football/teams/77.png',
+    'havre': 'https://media.api-sports.io/football/teams/115.png',
 
     // Italie
     'juventus': 'https://media.api-sports.io/football/teams/496.png',
@@ -334,11 +371,16 @@ const MAJOR_TEAM_LOGOS = {
     'atalanta': 'https://media.api-sports.io/football/teams/499.png',
     'fiorentina': 'https://media.api-sports.io/football/teams/502.png',
     'bologna': 'https://media.api-sports.io/football/teams/500.png',
+    'bologne': 'https://media.api-sports.io/football/teams/500.png',
     'torino': 'https://media.api-sports.io/football/teams/503.png',
     'sassuolo': 'https://media.api-sports.io/football/teams/488.png',
     'cagliari': 'https://media.api-sports.io/football/teams/490.png',
     'genoa': 'https://media.api-sports.io/football/teams/495.png',
     'verona': 'https://media.api-sports.io/football/teams/504.png',
+    'lecce': 'https://media.api-sports.io/football/teams/867.png',
+    'monza': 'https://media.api-sports.io/football/teams/1579.png',
+    'parma': 'https://media.api-sports.io/football/teams/523.png',
+    'como': 'https://media.api-sports.io/football/teams/895.png',
 
     // Allemagne
     'bayern': 'https://media.api-sports.io/football/teams/157.png',
@@ -357,216 +399,209 @@ const MAJOR_TEAM_LOGOS = {
     'werder': 'https://media.api-sports.io/football/teams/162.png',
     'bremen': 'https://media.api-sports.io/football/teams/162.png',
     'wolfsburg': 'https://media.api-sports.io/football/teams/161.png',
+    'wolfsbourg': 'https://media.api-sports.io/football/teams/161.png',
     'monchengladbach': 'https://media.api-sports.io/football/teams/163.png',
+    'hambourg': 'https://media.api-sports.io/football/teams/176.png',
+    'heidenheim': 'https://media.api-sports.io/football/teams/180.png',
+    'holstein': 'https://media.api-sports.io/football/teams/191.png',
+    'elversberg': 'https://media.api-sports.io/football/teams/185.png',
+    'st. pauli': 'https://media.api-sports.io/football/teams/186.png',
 
-    // Autres grands d'Europe
+    // Portugal
     'benfica': 'https://media.api-sports.io/football/teams/211.png',
     'porto': 'https://media.api-sports.io/football/teams/212.png',
     'sporting': 'https://media.api-sports.io/football/teams/228.png',
+    'sporting cp': 'https://media.api-sports.io/football/teams/228.png',
+    'braga': 'https://media.api-sports.io/football/teams/217.png',
+    'famalicao': 'https://media.api-sports.io/football/teams/223.png',
+    'gil vicente': 'https://media.api-sports.io/football/teams/225.png',
+    'vitoria guimaraes': 'https://media.api-sports.io/football/teams/224.png',
+
+    // Pays-Bas
     'ajax': 'https://media.api-sports.io/football/teams/194.png',
     'psv': 'https://media.api-sports.io/football/teams/197.png',
     'feyenoord': 'https://media.api-sports.io/football/teams/209.png',
+    'zwolle': 'https://media.api-sports.io/football/teams/204.png',
+    'sparta rotterdam': 'https://media.api-sports.io/football/teams/208.png',
+    'az alkmaar': 'https://media.api-sports.io/football/teams/201.png',
+
+    // Belgique
+    'club bruges': 'https://media.api-sports.io/football/teams/569.png',
+    'anderlecht': 'https://media.api-sports.io/football/teams/582.png',
+    'anvers': 'https://media.api-sports.io/football/teams/740.png',
+    'antwerp': 'https://media.api-sports.io/football/teams/740.png',
+    'genk': 'https://media.api-sports.io/football/teams/739.png',
+    'gent': 'https://media.api-sports.io/football/teams/742.png',
+    'la gantoise': 'https://media.api-sports.io/football/teams/742.png',
+    'union sg': 'https://media.api-sports.io/football/teams/741.png',
+
+    // Turquie
+    'galatasaray': 'https://media.api-sports.io/football/teams/645.png',
+    'fenerbahce': 'https://media.api-sports.io/football/teams/611.png',
+    'besiktas': 'https://media.api-sports.io/football/teams/553.png',
+    'trabzonspor': 'https://media.api-sports.io/football/teams/607.png',
+    'kocaeli': 'https://media.api-sports.io/football/teams/608.png',
+
+    // Écosse
     'celtic': 'https://media.api-sports.io/football/teams/247.png',
-    'rangers': 'https://media.api-sports.io/football/teams/257.png'
+    'rangers': 'https://media.api-sports.io/football/teams/257.png',
+
+    // Arabie Saoudite
+    'al hilal': 'https://media.api-sports.io/football/teams/2524.png',
+    'al nassr': 'https://media.api-sports.io/football/teams/2522.png',
+    'al ittihad': 'https://media.api-sports.io/football/teams/2523.png',
+    'al ahli': 'https://media.api-sports.io/football/teams/2521.png',
+
+    // International / Sélections
+    'france': 'https://media.api-sports.io/football/teams/2.png',
+    'espagne': 'https://media.api-sports.io/football/teams/9.png',
+    'angleterre': 'https://media.api-sports.io/football/teams/10.png',
+    'allemagne': 'https://media.api-sports.io/football/teams/25.png',
+    'italie': 'https://media.api-sports.io/football/teams/768.png',
+    'portugal': 'https://media.api-sports.io/football/teams/27.png',
+    'bresil': 'https://media.api-sports.io/football/teams/6.png',
+    'argentine': 'https://media.api-sports.io/football/teams/26.png',
+    'maroc': 'https://media.api-sports.io/football/teams/31.png',
+    'algerie': 'https://media.api-sports.io/football/teams/32.png',
+    'tunisie': 'https://media.api-sports.io/football/teams/28.png',
+    'egypte': 'https://media.api-sports.io/football/teams/30.png'
 };
 
-// SYSTÈME DE TIERS & POIDS DES CLUBS BASÉ SUR L'AUDIENCE ET LA HYPE ACTUELLE
-const CONTEMPORARY_CLUB_TIERS = [
-    // TIER S (200 pts) : Les méga-stars du foot mondial (audience maximale en France et Europe)
-    { weight: 200, keywords: ['real madrid', 'barcelon', 'barca', 'arsenal', 'manchester city', 'man city', 'liverpool', 'paris', 'psg', 'bayern'] },
-
-    // TIER A (130 pts) : Poids lourds Premier League & gros calibres européens
-    { weight: 130, keywords: ['chelsea', 'manchester united', 'man united', 'tottenham', 'spurs', 'atletico', 'atlético', 'leverkusen'] },
-
-    // TIER B (80 pts) : Grands clubs historiques & Cadors nationaux
-    { weight: 80, keywords: ['inter', 'juventus', 'juve', 'milan', 'ac milan', 'napoli', 'naples', 'dortmund', 'marseille', 'om', 'monaco', 'aston villa', 'newcastle'] },
-
-    // TIER C (40 pts) : Clubs européens réguliers & haut de tableau
-    { weight: 40, keywords: ['lyon', 'ol', 'lille', 'losc', 'atalanta', 'roma', 'lazio', 'bilbao', 'athletic', 'sociedad', 'seville', 'sevilla', 'leipzig', 'benfica', 'sporting', 'porto', 'ajax', 'rennes', 'lens', 'nice'] }
-];
-
-// BONUS PAR COMPÉTITION (Pondéré selon l'intérêt des téléspectateurs français)
-const LEAGUE_BONUSES = [
-    { key: 'champions league', bonus: 150 },
-    { key: 'ligue des champions', bonus: 150 },
-    { key: 'world cup', bonus: 200 },
-    { key: 'coupe du monde', bonus: 200 },
-    { key: 'euro', bonus: 180 },
-    { key: 'premier league', bonus: 60 },
-    { key: 'liga', bonus: 40 },
-    { key: 'ligue 1', bonus: 35 },
-    { key: 'serie a', bonus: 20 },
-    { key: 'bundesliga', bonus: 20 },
-    { key: 'europa league', bonus: 40 },
-    { key: 'nations league', bonus: 35 },
-    { key: 'conference', bonus: 15 }
-];
-
 /**
- * Calcule le rang/poids actuel d'un club
- */
-function getClubWeight(teamName) {
-    if (!teamName) return 15;
-    const lower = String(teamName).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    for (const tier of CONTEMPORARY_CLUB_TIERS) {
-        if (tier.keywords.some(k => lower.includes(k))) {
-            return tier.weight;
-        }
-    }
-    return 15; // Club standard
-}
-
-/**
- * Calcule le bonus de la compétition
- */
-function getLeagueBonus(compName) {
-    if (!compName) return 10;
-    const lower = String(compName).toLowerCase();
-    for (const item of LEAGUE_BONUSES) {
-        if (lower.includes(item.key)) {
-            return item.bonus;
-        }
-    }
-    return 10;
-}
-
-/**
- * Calcule le score d'importance (Hype Score)
- * Le club phare pèse très lourd, et si les deux sont du top tier, le match passe immédiatement au sommet.
- */
-function calculateMatchHypeScore(homeTeam, awayTeam, competition) {
-    const w1 = getClubWeight(homeTeam);
-    const w2 = getClubWeight(awayTeam);
-    const maxW = Math.max(w1, w2);
-    const minW = Math.min(w1, w2);
-    const leagueBonus = getLeagueBonus(competition);
-
-    return (maxW * 100) + (minW * 25) + (w1 * w2 * 0.5) + leagueBonus;
-}
-
-/**
- * Vérifie si une équipe est un grand club reconnu
- */
-function isBigClub(teamName) {
-    return getClubWeight(teamName) >= 40;
-}
-
-// COMPÉTITIONS MAJEURES D'ÉLITE
-const TOP_TIER_COMPETITIONS = [
-    { key: 'champions league', name: 'UEFA Champions League', allMatches: true },
-    { key: 'ligue des champions', name: 'UEFA Champions League', allMatches: true },
-    { key: 'europa league', name: 'UEFA Europa League', allMatches: false },
-    { key: 'ligue europa', name: 'UEFA Europa League', allMatches: false },
-    { key: 'conference league', name: 'UEFA Conference League', allMatches: false },
-    { key: 'conference', name: 'UEFA Conference League', allMatches: false },
-    { key: 'ligue 1', name: 'Ligue 1 McDonald\'s', allMatches: false },
-    { key: 'premier league', name: 'Premier League', allMatches: false },
-    { key: 'liga', name: 'LaLiga EA Sports', allMatches: false },
-    { key: 'serie a', name: 'Serie A', allMatches: false },
-    { key: 'bundesliga', name: 'Bundesliga', allMatches: false },
-    { key: 'world cup', name: 'Coupe du Monde FIFA', allMatches: true },
-    { key: 'coupe du monde', name: 'Coupe du Monde FIFA', allMatches: true },
-    { key: 'euro', name: 'UEFA Euro', allMatches: true },
-    { key: 'nations league', name: 'Ligue des Nations UEFA', allMatches: true },
-    { key: 'ligue des nations', name: 'Ligue des Nations UEFA', allMatches: true },
-    { key: 'copa america', name: 'Copa América', allMatches: true }
-];
-
-// DIVISIONS & LIGUES STRICTEMENT REJETÉES
-const EXCLUDED_KEYWORDS = [
-    'championship', 'ligue 2', 'ligue 3', 'national', 'serie b', 'segunda',
-    '2. bundesliga', 'd2', 'd3', 'u19', 'u21', 'u20', 'u23', 'd1 fem', 'féminine', 'fem.',
-    'japon', 'turquie', 'suisse', 'belgique', 'ecosse', 'danemark', 'grece',
-    'autriche', 'croatie', 'roumanie', 'arabie', 'mls'
-];
-
-/**
- * Valide et identifie si la compétition est une grande scène
- */
-function identifyTopStageCompetition(rawComp) {
-    if (!rawComp) return null;
-    const lower = String(rawComp).toLowerCase();
-
-    for (const ex of EXCLUDED_KEYWORDS) {
-        if (lower.includes(ex)) return null;
-    }
-
-    for (const comp of TOP_TIER_COMPETITIONS) {
-        if (lower.includes(comp.key)) {
-            return comp;
-        }
-    }
-
-    return null;
-}
-
-/**
- * Nettoie le nom du club
+ * Nettoie le nom d'un club et étend les abréviations courantes
  */
 function cleanTeamName(raw) {
     if (!raw) return '';
-    return String(raw)
-        .replace(/\s*Fém\..*$/i, '')
-        .replace(/\s*Féminin.*$/i, '')
-        .replace(/\s*U\d+.*$/i, '')
-        .replace(/\s*OL$/i, '')
-        .replace(/\s*B\.$/i, '')
+    let name = String(raw)
         .replace(/·/g, '')
         .replace(/\s+/g, ' ')
         .trim();
+
+    const replacements = [
+        { regex: /^Manchester U\.?$/i, replace: 'Manchester United' },
+        { regex: /^Manchester C\.?$/i, replace: 'Manchester City' },
+        { regex: /^Man United$/i, replace: 'Manchester United' },
+        { regex: /^Man City$/i, replace: 'Manchester City' },
+        { regex: /^Sheffield U\.?$/i, replace: 'Sheffield United' },
+        { regex: /^Crystal P\.?$/i, replace: 'Crystal Palace' },
+        { regex: /^R\.?\s*Sociedad$/i, replace: 'Real Sociedad' },
+        { regex: /^R\.?\s*Madrid$/i, replace: 'Real Madrid' },
+        { regex: /^R\.?\s*Betis$/i, replace: 'Real Betis' },
+        { regex: /^Sporting C\.?\s*P\.?$/i, replace: 'Sporting CP' },
+        { regex: /^Gil V\.?$/i, replace: 'Gil Vicente' },
+        { regex: /^Rotterdam S\.?$/i, replace: 'Sparta Rotterdam' },
+        { regex: /^Paris PSG$/i, replace: 'Paris SG' },
+        { regex: /^Lyon OL$/i, replace: 'Lyon' },
+        { regex: /^Levante UD$/i, replace: 'Levante' },
+        { regex: /^Celta$/i, replace: 'Celta Vigo' }
+    ];
+
+    for (const item of replacements) {
+        if (item.regex.test(name)) {
+            return item.replace;
+        }
+    }
+
+    return name;
+}
+
+/**
+ * Nettoie et normalise le nom d'une compétition
+ */
+function formatCompetitionName(rawComp) {
+    if (!rawComp) return 'Football';
+    let str = String(rawComp).trim();
+    
+    // Dé-duplication des chaînes doublées (ex: "LigaLiga", "Premier LeaguePremier League")
+    const halfLen = Math.floor(str.length / 2);
+    if (halfLen > 2 && str.slice(0, halfLen) === str.slice(halfLen)) {
+        str = str.slice(0, halfLen).trim();
+    }
+
+    const lower = str.toLowerCase();
+    if (lower.includes('champions league') || lower.includes('ligue des champions')) return 'UEFA Champions League';
+    if (lower.includes('europa league') || lower.includes('ligue europa')) return 'UEFA Europa League';
+    if (lower.includes('conference league') || lower.includes('conference')) return 'UEFA Conference League';
+    if (lower.includes('premier league')) return 'Premier League';
+    if (lower.includes('championship')) return 'Championship';
+    if (lower.includes('2. bundesliga') || lower.includes('d2 allemagne')) return '2. Bundesliga';
+    if (lower.includes('bundesliga')) return 'Bundesliga';
+    if (lower.includes('d1 portugal') || lower.includes('liga portugal')) return 'Liga Portugal';
+    if (lower.includes('d1 pays-bas') || lower.includes('eredivisie')) return 'Eredivisie';
+    if (lower.includes('d1 belgique') || lower.includes('pro league')) return 'Jupiler Pro League';
+    if (lower.includes('d1 turquie') || lower.includes('super lig') || lower.includes('süper lig')) return 'Süper Lig';
+    if (lower.includes('d1 fem. angleterre') || lower.includes('wsl')) return 'Super League Féminine (ANG)';
+    if (lower.includes('d1 fem. allemagne')) return 'Frauen-Bundesliga (ALL)';
+    if (lower.includes('d1 fem') || lower.includes('féminine') || lower.includes('fem.')) return 'D1 Féminine';
+    if (lower.includes('ligue 1')) return 'Ligue 1';
+    if (lower.includes('ligue 2')) return 'Ligue 2';
+    if (lower.includes('serie a')) return 'Serie A';
+    if (lower.includes('serie b')) return 'Serie B';
+    if (lower.includes('liga') || lower.includes('laliga')) return 'LaLiga';
+    if (lower.includes('coupe de france')) return 'Coupe de France';
+    if (lower.includes('fa cup')) return 'FA Cup';
+    if (lower.includes('copa del rey')) return 'Copa del Rey';
+    if (lower.includes('coppa italia')) return 'Coppa Italia';
+    if (lower.includes('dfb-pokal') || lower.includes('dfb pokal')) return 'DFB-Pokal';
+    if (lower.includes('world cup') || lower.includes('coupe du monde')) return 'Coupe du Monde FIFA';
+    if (lower.includes('euro') && !lower.includes('europa')) return 'UEFA Euro';
+    if (lower.includes('nations league') || lower.includes('ligue des nations')) return 'Ligue des Nations';
+    if (lower.includes('saudi') || lower.includes('arabie saoudite')) return 'Saudi Pro League';
+    if (lower.includes('mls')) return 'MLS';
+
+    return str;
 }
 
 /**
  * Étape B : Récupère le logo d'une équipe (Table HD ou TheSportsDB avec User-Agent)
  */
 async function fetchTeamLogo(teamName) {
-    const clean = cleanTeamName(teamName);
+    if (!teamName) return DEFAULT_FOOTBALL_SHIELD_SVG;
+    const clean = String(teamName).toLowerCase().replace(/\s+/g, ' ').trim();
     if (!clean) return DEFAULT_FOOTBALL_SHIELD_SVG;
 
-    const cacheKey = clean.toLowerCase();
-
     // 1. Vérifier le cache mémoire
-    if (teamLogoCache.has(cacheKey)) {
-        return teamLogoCache.get(cacheKey);
+    if (teamLogoCache.has(clean)) {
+        return teamLogoCache.get(clean);
     }
 
     // 2. Recherche directe dans la table des logos HD officiels
-    if (MAJOR_TEAM_LOGOS[cacheKey]) {
-        const logo = MAJOR_TEAM_LOGOS[cacheKey];
-        teamLogoCache.set(cacheKey, logo);
+    if (MAJOR_TEAM_LOGOS[clean]) {
+        const logo = MAJOR_TEAM_LOGOS[clean];
+        teamLogoCache.set(clean, logo);
         return logo;
     }
 
     for (const [key, logoUrl] of Object.entries(MAJOR_TEAM_LOGOS)) {
-        if (cacheKey.includes(key) || key.includes(cacheKey)) {
-            teamLogoCache.set(cacheKey, logoUrl);
+        if (clean === key || clean.includes(key) || key.includes(clean)) {
+            teamLogoCache.set(clean, logoUrl);
             return logoUrl;
         }
     }
 
-    // 3. Appel API TheSportsDB avec User-Agent navigateur (évite le blocage Cloudflare)
+    // 3. Appel API TheSportsDB avec User-Agent navigateur
     try {
-        const query = encodeURIComponent(clean);
+        const query = encodeURIComponent(clean.replace(/\s*fém.*$/i, '').replace(/\s*u\d+.*$/i, '').trim());
         const url = `https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${query}`;
         const res = await fetch(url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
                 'Accept': 'application/json, text/plain, */*'
             },
-            signal: AbortSignal.timeout(3500)
+            signal: AbortSignal.timeout(3000)
         });
 
         if (res.ok) {
             const data = await res.json();
             const badge = data?.teams?.[0]?.strBadge || data?.teams?.[0]?.strTeamBadge || data?.teams?.[0]?.strLogo;
             if (badge) {
-                teamLogoCache.set(cacheKey, badge);
+                teamLogoCache.set(clean, badge);
                 return badge;
             }
         }
     } catch (_) {}
 
-    teamLogoCache.set(cacheKey, DEFAULT_FOOTBALL_SHIELD_SVG);
+    teamLogoCache.set(clean, DEFAULT_FOOTBALL_SHIELD_SVG);
     return DEFAULT_FOOTBALL_SHIELD_SVG;
 }
 
@@ -577,11 +612,88 @@ function cleanChannelName(rawAlt) {
     if (!rawAlt) return '';
     return String(rawAlt)
         .replace(/^match\s+/i, '')
-        .replace(/\s+foot.*$/i, '')
+        .replace(/\s+(?:foot\s+)?programme\s+(?:tv|soir|direct|rediffusion).*$/i, '')
         .replace(/\s+programme.*$/i, '')
         .replace(/\s+soir.*$/i, '')
         .replace(/\s+direct.*$/i, '')
         .trim();
+}
+
+// SYSTÈME DE TIERS & POIDS DES CLUBS
+const CONTEMPORARY_CLUB_TIERS = [
+    { weight: 200, keywords: ['real madrid', 'barcelon', 'barca', 'arsenal', 'manchester city', 'man city', 'liverpool', 'paris', 'psg', 'bayern'] },
+    { weight: 130, keywords: ['chelsea', 'manchester united', 'man united', 'man u', 'tottenham', 'spurs', 'atletico', 'atlético', 'leverkusen'] },
+    { weight: 80, keywords: ['inter', 'juventus', 'juve', 'milan', 'ac milan', 'napoli', 'naples', 'dortmund', 'marseille', 'om', 'monaco', 'aston villa', 'newcastle'] },
+    { weight: 40, keywords: ['lyon', 'ol', 'lille', 'losc', 'atalanta', 'roma', 'lazio', 'bilbao', 'athletic', 'sociedad', 'seville', 'sevilla', 'leipzig', 'benfica', 'sporting', 'porto', 'ajax', 'psv', 'feyenoord', 'galatasaray', 'fenerbahce', 'rennes', 'lens', 'nice'] }
+];
+
+function getClubWeight(teamName) {
+    if (!teamName) return 15;
+    const lower = String(teamName).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    for (const tier of CONTEMPORARY_CLUB_TIERS) {
+        if (tier.keywords.some(k => lower.includes(k))) {
+            return tier.weight;
+        }
+    }
+    return 15;
+}
+
+function calculateMatchHypeScore(homeTeam, awayTeam, competition) {
+    const w1 = getClubWeight(homeTeam);
+    const w2 = getClubWeight(awayTeam);
+    const maxW = Math.max(w1, w2);
+    const minW = Math.min(w1, w2);
+    let leagueBonus = 10;
+    const lowerComp = String(competition || '').toLowerCase();
+    if (lowerComp.includes('champions league')) leagueBonus = 150;
+    else if (lowerComp.includes('premier league')) leagueBonus = 60;
+    else if (lowerComp.includes('liga')) leagueBonus = 40;
+    else if (lowerComp.includes('ligue 1')) leagueBonus = 35;
+    else if (lowerComp.includes('serie a')) leagueBonus = 30;
+    else if (lowerComp.includes('bundesliga')) leagueBonus = 30;
+    else if (lowerComp.includes('europa league')) leagueBonus = 40;
+
+    return (maxW * 100) + (minW * 25) + (w1 * w2 * 0.5) + leagueBonus;
+}
+
+function isBigClub(teamName) {
+    return getClubWeight(teamName) >= 40;
+}
+
+// DIVISIONS & LIGUES REJETÉES POUR LE SLIDER D'ACCUEIL (Seuls les chocs majeurs y figurent)
+const EXCLUDED_HOME_KEYWORDS = [
+    'championship', 'ligue 2', 'ligue 3', 'national', 'serie b', 'segunda',
+    '2. bundesliga', 'd2', 'd3', 'u19', 'u21', 'u20', 'u23', 'd1 fem', 'féminine', 'fem.',
+    'japon', 'turquie', 'suisse', 'belgique', 'ecosse', 'danemark', 'grece',
+    'autriche', 'croatie', 'roumanie', 'arabie', 'mls'
+];
+
+/**
+ * Valide si la compétition est éligible pour le slider d'accueil (Top Scènes)
+ */
+function identifyTopStageCompetition(rawComp) {
+    if (!rawComp) return null;
+    const lower = String(rawComp).toLowerCase();
+
+    for (const ex of EXCLUDED_HOME_KEYWORDS) {
+        if (lower.includes(ex)) return null;
+    }
+
+    if (lower.includes('2. bundesliga') || lower.includes('d2 allemagne')) return null;
+    if (lower.includes('bundesliga')) return { key: 'bundesliga', name: 'Bundesliga', allMatches: false };
+    if (lower.includes('champions league') || lower.includes('ligue des champions')) return { key: 'champions league', name: 'UEFA Champions League', allMatches: true };
+    if (lower.includes('europa league') || lower.includes('ligue europa')) return { key: 'europa league', name: 'UEFA Europa League', allMatches: false };
+    if (lower.includes('conference')) return { key: 'conference', name: 'UEFA Conference League', allMatches: false };
+    if (lower.includes('premier league')) return { key: 'premier league', name: 'Premier League', allMatches: false };
+    if (lower.includes('liga') || lower.includes('laliga')) return { key: 'liga', name: 'LaLiga', allMatches: false };
+    if (lower.includes('serie a')) return { key: 'serie a', name: 'Serie A', allMatches: false };
+    if (lower.includes('ligue 1')) return { key: 'ligue 1', name: 'Ligue 1', allMatches: false };
+    if (lower.includes('world cup') || lower.includes('coupe du monde')) return { key: 'world cup', name: 'Coupe du Monde FIFA', allMatches: true };
+    if (lower.includes('euro') && !lower.includes('europa')) return { key: 'euro', name: 'UEFA Euro', allMatches: true };
+    if (lower.includes('nations league') || lower.includes('ligue des nations')) return { key: 'nations league', name: 'Ligue des Nations UEFA', allMatches: true };
+    if (lower.includes('copa america')) return { key: 'copa america', name: 'Copa América', allMatches: true };
+
+    return null;
 }
 
 let globalRawScrapedMatches = null;
@@ -589,7 +701,7 @@ let globalRawScrapedExpiresAt = 0;
 const RAW_SCRAPE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
 /**
- * Étape A : Scrape les matchs du jour et chaînes de diffusion
+ * Scrape tous les matchs du jour sur footao.tv
  */
 async function scrapeTodayMatches() {
     const now = Date.now();
@@ -617,40 +729,42 @@ async function scrapeTodayMatches() {
 
         const todaySection = $('section').first();
         const rawMatches = [];
+        let lastComp = 'Football';
 
         todaySection.find('div[itemscope]').each((i, el) => {
             const time = $(el).find('time').text().trim() || '20:00';
             const matchTitle = $(el).find('[itemprop="name"]').text().trim();
-            const rawComp = $(el).find('.ap a, .ap').text().trim();
+            let rawComp = $(el).find('.ap a, .ap').text().trim();
 
-            // 1. Filtrage grande compétition
-            const compConfig = identifyTopStageCompetition(rawComp);
-            if (!compConfig) return;
+            if (rawComp === '»' || !rawComp) {
+                rawComp = lastComp;
+            } else {
+                lastComp = rawComp;
+            }
 
-            let homeTeam = '';
-            let awayTeam = '';
+            const compName = formatCompetitionName(rawComp);
+
+            let homeRaw = '';
+            let awayRaw = '';
 
             if (matchTitle.includes('·')) {
                 const parts = matchTitle.split('·').map(s => s.trim());
-                homeTeam = parts[0];
-                awayTeam = parts[1];
+                homeRaw = parts[0];
+                awayRaw = parts[1];
             } else if (matchTitle.includes(' - ')) {
                 const parts = matchTitle.split(' - ').map(s => s.trim());
-                homeTeam = parts[0];
-                awayTeam = parts[1];
+                homeRaw = parts[0];
+                awayRaw = parts[1];
             } else if (matchTitle.includes(' vs ')) {
                 const parts = matchTitle.split(' vs ').map(s => s.trim());
-                homeTeam = parts[0];
-                awayTeam = parts[1];
+                homeRaw = parts[0];
+                awayRaw = parts[1];
             }
 
-            if (!homeTeam || !awayTeam) return;
+            if (!homeRaw || !awayRaw) return;
 
-            // 2. Filtrage "GRANDS CLUBS / TOP AFFICHE"
-            const hasBigClub = isBigClub(homeTeam) || isBigClub(awayTeam);
-            if (!compConfig.allMatches && !hasBigClub) {
-                return;
-            }
+            const homeTeam = cleanTeamName(homeRaw);
+            const awayTeam = cleanTeamName(awayRaw);
 
             const tvChannels = [];
             $(el).find('img.im').each((_, img) => {
@@ -665,12 +779,11 @@ async function scrapeTodayMatches() {
                 tvChannels.push('Chaîne à confirmer');
             }
 
-            // 3. Calcul du score de prestige adapté aux audiences actuelles
-            const hypeScore = calculateMatchHypeScore(homeTeam, awayTeam, compConfig.name);
+            const hypeScore = calculateMatchHypeScore(homeTeam, awayTeam, compName);
 
             rawMatches.push({
                 id: `match_${i + 1}`,
-                competition: compConfig.name,
+                competition: compName,
                 time,
                 homeTeamName: homeTeam,
                 awayTeamName: awayTeam,
@@ -705,7 +818,6 @@ function getBroadcastersForCountry(compName, scrapedChannels, countryConfig) {
         return ['Canal+', 'beIN Sports', 'DAZN'];
     }
 
-    // Recherche dans les diffuseurs officiels configurés pour ce pays
     const compLower = String(compName || '').toLowerCase();
     for (const [key, channels] of Object.entries(countryConfig.broadcasters || {})) {
         if (compLower.includes(key)) {
@@ -713,43 +825,30 @@ function getBroadcastersForCountry(compName, scrapedChannels, countryConfig) {
         }
     }
 
-    // Fallbacks stricts par région (JAMAIS de chaînes françaises pour l'Arabe/MENA/UK/USA/etc.)
-    if (countryConfig.id === 'mena') {
-        return ['beIN Sports 1 HD (عربي)', 'TOD'];
-    }
-    if (countryConfig.id === 'uk') {
-        return ['Sky Sports Premier League', 'TNT Sports 1'];
-    }
-    if (countryConfig.id === 'spain') {
-        return ['Movistar Plus+', 'DAZN LaLiga'];
-    }
-    if (countryConfig.id === 'usa') {
-        return ['Paramount+', 'NBC Sports', 'ESPN+'];
-    }
-    if (countryConfig.id === 'italy') {
-        return ['Sky Sport Uno', 'DAZN Italia'];
-    }
-    if (countryConfig.id === 'germany') {
-        return ['Sky Sport Bundesliga', 'DAZN Deutschland'];
-    }
-    if (countryConfig.id === 'portugal') {
-        return ['Sport TV 1', 'DAZN Eleven Sports'];
-    }
+    if (countryConfig.id === 'mena') return ['beIN Sports 1 HD (عربي)', 'TOD'];
+    if (countryConfig.id === 'uk') return ['Sky Sports Premier League', 'TNT Sports 1'];
+    if (countryConfig.id === 'spain') return ['Movistar Plus+', 'DAZN LaLiga'];
+    if (countryConfig.id === 'usa') return ['Paramount+', 'NBC Sports', 'ESPN+'];
+    if (countryConfig.id === 'italy') return ['Sky Sport Uno', 'DAZN Italia'];
+    if (countryConfig.id === 'germany') return ['Sky Sport Bundesliga', 'DAZN Deutschland'];
+    if (countryConfig.id === 'portugal') return ['Sport TV 1', 'DAZN Eleven Sports'];
 
     return ['Chaîne à confirmer'];
 }
 
 /**
- * Point d'entrée principal : Récupère les chocs majeurs, trie par prestige décroissant et met en cache par pays
+ * Point d'entrée principal :
+ * - allMatches = false (défaut) : Filtre uniquement les GRANDS MATCHS pour le slider d'accueil (triés par hype)
+ * - allMatches = true : Renvoie TOUS les matchs du jour pour la page /foot
  */
-async function getTodayMatches(countryInput = 'france', forceRefresh = false) {
+async function getTodayMatches(countryInput = 'france', forceRefresh = false, allMatches = false) {
     const countryConfig = getCountryConfig(countryInput);
     const countryKey = countryConfig.id;
+    const cacheScopeKey = `${countryKey}_${allMatches ? 'all' : 'big'}`;
     const now = Date.now();
 
-    const cachedEntry = countryCaches.get(countryKey);
+    const cachedEntry = countryCaches.get(cacheScopeKey);
 
-    // Vérification du cache 1 heure pour ce pays
     if (!forceRefresh && cachedEntry && cachedEntry.expiresAt > now) {
         return {
             cached: true,
@@ -759,19 +858,29 @@ async function getTodayMatches(countryInput = 'france', forceRefresh = false) {
     }
 
     try {
-        // Étape A & C : Scraping des matchs du jour filtrés sur les grands clubs
-        const filtered = await scrapeTodayMatches();
+        const rawList = await scrapeTodayMatches();
 
-        // Étape D : Tri intelligent (LES PLUS GRANDS CHOCS ET DUELS DE GÉANTS EN PREMIER)
-        filtered.sort((a, b) => {
-            if (b.hypeScore !== a.hypeScore) {
-                return b.hypeScore - a.hypeScore; // Plus grand score en premier
-            }
-            return a.time.localeCompare(b.time); // En cas d'égalité, tri par heure
-        });
+        // Mode Slider Accueil : Filtrage strict sur les grands chocs & top tiers
+        let targetMatches = rawList;
+        if (!allMatches) {
+            targetMatches = rawList.filter(m => {
+                const compConfig = identifyTopStageCompetition(m.competition);
+                if (!compConfig) return false;
+                if (compConfig.allMatches) return true;
+                return isBigClub(m.homeTeamName) || isBigClub(m.awayTeamName);
+            });
 
-        // Étape B : Récupération des logos HD et diffuseurs TV adaptés au pays
-        const matches = await Promise.all(filtered.map(async (m) => {
+            // Tri par Hype Score décroissant pour l'accueil
+            targetMatches.sort((a, b) => {
+                if (b.hypeScore !== a.hypeScore) {
+                    return b.hypeScore - a.hypeScore;
+                }
+                return a.time.localeCompare(b.time);
+            });
+        }
+
+        // Récupération des logos HD et diffuseurs TV adaptés au pays
+        const matches = await Promise.all(targetMatches.map(async (m) => {
             const [homeLogo, awayLogo] = await Promise.all([
                 fetchTeamLogo(m.homeTeamName),
                 fetchTeamLogo(m.awayTeamName)
@@ -791,12 +900,12 @@ async function getTodayMatches(countryInput = 'france', forceRefresh = false) {
                     name: m.awayTeamName,
                     logoUrl: awayLogo
                 },
-                tvChannels
+                tvChannels,
+                hypeScore: m.hypeScore
             };
         }));
 
-        // Mise en cache 1 heure pour ce pays
-        countryCaches.set(countryKey, {
+        countryCaches.set(cacheScopeKey, {
             data: matches,
             expiresAt: now + CACHE_TTL_MS
         });
@@ -809,7 +918,6 @@ async function getTodayMatches(countryInput = 'france', forceRefresh = false) {
     } catch (err) {
         console.error(`[Football Service] Erreur (${countryKey}):`, err.message);
 
-        // Si le cache précédent existe pour ce pays, on le renvoie en secours
         if (cachedEntry) {
             return {
                 cached: true,
@@ -828,7 +936,8 @@ async function getTodayMatches(countryInput = 'france', forceRefresh = false) {
 function clearCache(countryInput = null) {
     if (countryInput) {
         const countryConfig = getCountryConfig(countryInput);
-        countryCaches.delete(countryConfig.id);
+        countryCaches.delete(`${countryConfig.id}_all`);
+        countryCaches.delete(`${countryConfig.id}_big`);
     } else {
         countryCaches.clear();
     }
@@ -841,9 +950,12 @@ module.exports = {
     isBigClub,
     calculateMatchHypeScore,
     getClubWeight,
+    formatCompetitionName,
+    cleanTeamName,
     identifyTopStageCompetition,
     getCountryConfig,
     normalizeCountryCode,
     COUNTRY_CONFIGS,
     DEFAULT_FOOTBALL_SHIELD_SVG
 };
+

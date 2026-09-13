@@ -3400,8 +3400,7 @@
   }
   window.veloraStopAllStreams = stopAllActiveStreams;
 
-  function closeAdultView(navigateToHome = false) {
-    const wasAdultActive = isAdultOpen || document.body.classList.contains("vel-adult-active") || (document.body.dataset && document.body.dataset.velActiveTab === "adult");
+  function closeAdultView(navigateToHome = true) {
     isAdultOpen = false;
     currentAdultView = null;
     if (activeVodSentinelObserver) {
@@ -3449,28 +3448,37 @@
     const stickyTop = document.querySelector(".vel-sticky-top");
     if (stickyTop) stickyTop.style.removeProperty("display");
 
-    // Only force return to home if explicitly requested (e.g. clicking the adult back button) and adult was active
-    if (navigateToHome && wasAdultActive) {
+    if (navigateToHome) {
+      if (typeof window.veloraShowHome === "function") {
+        try { window.veloraShowHome(); } catch (_) {}
+      } else {
+        const homeLogo = document.getElementById("btn-logo-home");
+        if (homeLogo) {
+          try { homeLogo.click(); } catch (_) {}
+        }
+      }
+
       const homePage = document.getElementById("vel-home-empty-page");
       if (homePage) {
         homePage.classList.remove("hidden");
         homePage.setAttribute("aria-hidden", "false");
         homePage.style.removeProperty("display");
       }
-      document.body.classList.add("vel-home-empty-active");
+      document.body.classList.add("vel-home-empty-active", "vel-home-choice-picked");
       document.body.dataset.velActiveTab = "home";
-      document.body.dataset.velTopLevel = "home";
+      delete document.body.dataset.velTopLevel;
 
       if (typeof window.veloraSetBottomNavActive === "function") {
         window.veloraSetBottomNavActive("home");
       }
 
-      document.dispatchEvent(new CustomEvent("velora-show-home"));
-      document.dispatchEvent(new CustomEvent("velora-return-home"));
+      try { document.dispatchEvent(new CustomEvent("velora-show-home")); } catch (_) {}
+      try { document.dispatchEvent(new CustomEvent("velora-return-home")); } catch (_) {}
     }
   }
 
   window.veloraCloseAdultView = closeAdultView;
+  window.veloraCloseAdultPortal = closeAdultView;
 
   // ---------------------------------------------------------------------------
   // Global Lifecycle & Triggers

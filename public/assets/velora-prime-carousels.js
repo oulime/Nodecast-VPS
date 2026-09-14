@@ -1313,8 +1313,11 @@
       lastFeedKey = feedKey;
       container.innerHTML = "";
 
-      // 1. Create top Hero Spotlight Banner (randomized across packages on each visit)
-      const candidatePackages = validPackages.filter(p => Array.isArray(p.items) && p.items.length > 0);
+      // 1. Randomize package order on each visit across Movies & Series pages
+      const shuffledPackages = shuffleArray(validPackages);
+
+      // 2. Create top Hero Spotlight Banner (randomized across packages on each visit)
+      const candidatePackages = shuffledPackages.filter(p => Array.isArray(p.items) && p.items.length > 0);
       if (candidatePackages.length > 0) {
         const samplePool = candidatePackages.slice(0, Math.min(candidatePackages.length, 12));
         const randPkg = samplePool[Math.floor(Math.random() * samplePool.length)];
@@ -1329,8 +1332,8 @@
         }
       }
 
-      // 2. Render horizontal carousel rows (vertical cards)
-      validPackages.forEach(pkg => {
+      // 3. Render horizontal carousel rows in randomized package order
+      shuffledPackages.forEach(pkg => {
         const rowEl = buildRow(tab, pkg);
         container.appendChild(rowEl);
       });
@@ -1501,6 +1504,14 @@
     setTimeout(() => initHomeMixedFeed(false), 50);
   });
 
+  document.addEventListener("click", (e) => {
+    const tabBtn = e.target && e.target.closest("[data-tab='movies'], [data-tab='series'], [data-tab='vod'], #tab-movies, #tab-series, [data-tab-filter='movies'], [data-tab-filter='series']");
+    if (tabBtn) {
+      lastFeedKey = "";
+      setTimeout(() => render(true), 40);
+    }
+  });
+
   let prevObservedTab = "";
   new MutationObserver(() => {
     const tab = activeTab();
@@ -1510,7 +1521,7 @@
       lastFeedKey = "";
       syncHeaderForMediaTabs();
       if (MEDIA_TABS.has(tab)) {
-        render();
+        render(true);
       } else if (tab === "home") {
         const c = document.getElementById("vel-prime-carousels-container");
         if (c) c.style.display = "none";

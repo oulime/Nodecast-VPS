@@ -164,224 +164,18 @@
     }
   }
 
-  // Règles recommandées par défaut par pays / région
-  var DEFAULT_RECOMMENDED_BY_COUNTRY = {
-    "_default": {
-      "Canal+": ["Canal+ Sport", "Canal+ Foot", "Canal+ Sport 360", "Canal+ Live"],
-      "Canal Plus": ["Canal+ Sport", "Canal+ Foot", "Canal+ Sport 360", "Canal+ Live"],
-      "beIN Sports": ["beIN Sports 1", "beIN Sports 2", "beIN Sports 3", "beIN Sports Max"],
-      "DAZN": ["DAZN 1", "DAZN 2"],
-      "Sky Sports": ["Sky Sports Main Event", "Sky Sports Premier League", "Sky Sports Football"],
-      "TNT Sports": ["TNT Sports 1", "TNT Sports 2", "TNT Sports 3", "TNT Sports 4"],
-      "Movistar": ["Movistar LaLiga", "Movistar Liga de Campeones"],
-      "TF1": ["TF1", "TF1 HD"],
-      "M6": ["M6", "M6 HD"]
-    },
-    "france": {
-      "Canal+": ["Canal+ Sport", "Canal+ Foot", "Canal+ Sport 360", "Canal+ Live"],
-      "Canal Plus": ["Canal+ Sport", "Canal+ Foot", "Canal+ Sport 360", "Canal+ Live"],
-      "Canal+ Sport": ["Canal+ Sport", "Canal+ Foot", "Canal+ Sport 360"],
-      "Canal+ Foot": ["Canal+ Foot", "Canal+ Sport", "Canal+ Live"],
-      "Canal+ Live": ["Canal+ Live", "Canal+ Foot", "Canal+ Sport 360"],
-      "beIN Sports": ["beIN Sports 1", "beIN Sports 2", "beIN Sports 3", "beIN Sports Max"],
-      "beIN Sports 1": ["beIN Sports 1", "beIN Sports 1 HD", "beIN Sports 1 FHD"],
-      "beIN Sports 2": ["beIN Sports 2", "beIN Sports 2 HD", "beIN Sports 2 FHD"],
-      "beIN Sports 3": ["beIN Sports 3", "beIN Sports 3 HD", "beIN Sports 3 FHD"],
-      "DAZN": ["DAZN 1", "DAZN 2", "DAZN 1 France", "DAZN 1 FR"],
-      "DAZN 1": ["DAZN 1", "DAZN 1 France", "DAZN 1 FR"],
-      "DAZN 2": ["DAZN 2", "DAZN 2 France", "DAZN 2 FR"],
-      "RMC Sport": ["RMC Sport 1", "RMC Sport 2", "RMC Sport Live"],
-      "RMC Sport 1": ["RMC Sport 1", "RMC Sport 1 HD", "RMC Sport 1 FHD"],
-      "RMC Sport 2": ["RMC Sport 2", "RMC Sport 2 HD"],
-      "Amazon Prime": ["Prime Video", "Pass Ligue 1", "Amazon Prime"],
-      "Prime Video": ["Prime Video", "Pass Ligue 1", "Amazon Prime"],
-      "Eurosport": ["Eurosport 1", "Eurosport 2", "Eurosport 1 FR", "Eurosport 2 FR"],
-      "TF1": ["TF1", "TF1 HD", "TF1 4K"],
-      "M6": ["M6", "M6 HD", "M6 4K"],
-      "France 2": ["France 2", "France 2 HD", "France 2 4K"],
-      "France 3": ["France 3", "France 3 HD"],
-      "La Chaîne L'Équipe": ["La Chaîne L'Équipe", "L'Équipe", "L'Equipe 21"]
-    },
-    "arabe": {
-      "beIN Sports": ["beIN Sports 1 HD", "beIN Sports 2 HD", "beIN Sports 3 HD", "beIN Sports 4 HD", "beIN Sports AFC", "beIN Sports Premium 1"],
-      "beIN Sports 1": ["beIN Sports 1 HD", "beIN Sports 1", "beIN Sports AFC 1", "beIN Sports Premium 1"],
-      "beIN Sports 2": ["beIN Sports 2 HD", "beIN Sports 2", "beIN Sports AFC 2"],
-      "beIN Sports 3": ["beIN Sports 3 HD", "beIN Sports 3", "beIN Sports AFC 3"],
-      "beIN Sports 4": ["beIN Sports 4 HD", "beIN Sports 4"],
-      "SSC": ["SSC 1 HD", "SSC 2 HD", "SSC 3 HD", "SSC 4 HD", "SSC 5 HD", "SSC Extra 1"],
-      "Abu Dhabi": ["Abu Dhabi Sports 1", "Abu Dhabi Sports 2", "AD Sports 1 HD", "AD Sports Premium 1"],
-      "Alkass": ["Alkass 1 HD", "Alkass 2 HD", "Alkass 3 HD", "Alkass 4 HD", "Alkass Extra 1"],
-      "Dubai Sports": ["Dubai Sports 1", "Dubai Sports 2", "Dubai Sports 3"],
-      "Arryadia": ["Arryadia", "Arryadia HD", "Arryadia TNT"],
-      "On Time Sports": ["On Time Sports 1", "On Time Sports 2", "ON Sport"],
-      "Canal+": ["Canal+ Sport", "Canal+ Foot"]
-    },
-    "mena": {
-      "beIN Sports": ["beIN Sports 1 HD", "beIN Sports 2 HD", "beIN Sports 3 HD", "beIN Sports 4 HD", "beIN Sports AFC", "beIN Sports Premium 1"],
-      "beIN Sports 1": ["beIN Sports 1 HD", "beIN Sports 1", "beIN Sports AFC 1", "beIN Sports Premium 1"],
-      "beIN Sports 2": ["beIN Sports 2 HD", "beIN Sports 2", "beIN Sports AFC 2"],
-      "beIN Sports 3": ["beIN Sports 3 HD", "beIN Sports 3", "beIN Sports AFC 3"],
-      "beIN Sports 4": ["beIN Sports 4 HD", "beIN Sports 4"],
-      "SSC": ["SSC 1 HD", "SSC 2 HD", "SSC 3 HD", "SSC 4 HD", "SSC 5 HD", "SSC Extra 1"],
-      "Abu Dhabi": ["Abu Dhabi Sports 1", "Abu Dhabi Sports 2", "AD Sports 1 HD", "AD Sports Premium 1"],
-      "Alkass": ["Alkass 1 HD", "Alkass 2 HD", "Alkass 3 HD", "Alkass 4 HD", "Alkass Extra 1"],
-      "Dubai Sports": ["Dubai Sports 1", "Dubai Sports 2", "Dubai Sports 3"],
-      "Arryadia": ["Arryadia", "Arryadia HD", "Arryadia TNT"],
-      "On Time Sports": ["On Time Sports 1", "On Time Sports 2", "ON Sport"],
-      "Canal+": ["Canal+ Sport", "Canal+ Foot"]
-    },
-    "maroc": {
-      "Arryadia": ["Arryadia", "Arryadia HD", "Arryadia TNT", "SNRT Arryadia"],
-      "beIN Sports": ["beIN Sports 1 HD", "beIN Sports 2 HD", "beIN Sports 3 HD", "beIN Sports 4 HD", "beIN Sports Premium 1"],
-      "SSC": ["SSC 1 HD", "SSC 2 HD", "SSC 3 HD", "SSC 4 HD", "SSC 5 HD"],
-      "Canal+": ["Canal+ Sport", "Canal+ Foot"]
-    },
-    "algerie": {
-      "ENTV": ["Programme National", "TV6 Algerie", "ENTV HD", "Canal Algerie"],
-      "beIN Sports": ["beIN Sports 1 HD", "beIN Sports 2 HD", "beIN Sports 3 HD", "beIN Sports 4 HD"],
-      "SSC": ["SSC 1 HD", "SSC 2 HD", "SSC 3 HD"]
-    },
-    "tunisie": {
-      "El Watania": ["El Watania 1", "El Watania 2", "Tele Tunisie 1", "Tele Tunisie 2"],
-      "beIN Sports": ["beIN Sports 1 HD", "beIN Sports 2 HD", "beIN Sports 3 HD"],
-      "SSC": ["SSC 1 HD", "SSC 2 HD"]
-    },
-    "egypte": {
-      "On Time Sports": ["On Time Sports 1", "On Time Sports 2", "ON Sport HD"],
-      "beIN Sports": ["beIN Sports 1 HD", "beIN Sports 2 HD", "beIN Sports 3 HD"],
-      "SSC": ["SSC 1 HD", "SSC 2 HD"]
-    },
-    "angleterre": {
-      "Sky Sports": ["Sky Sports Main Event", "Sky Sports Premier League", "Sky Sports Football", "Sky Sports Arena", "Sky Sports Action"],
-      "Sky Sports Main Event": ["Sky Sports Main Event", "Sky Sports Premier League"],
-      "Sky Sports Premier League": ["Sky Sports Premier League", "Sky Sports Main Event"],
-      "TNT Sports": ["TNT Sports 1", "TNT Sports 2", "TNT Sports 3", "TNT Sports 4", "TNT Sports Ultimate"],
-      "TNT Sports 1": ["TNT Sports 1", "TNT Sports Ultimate"],
-      "TNT Sports 2": ["TNT Sports 2"],
-      "BBC": ["BBC One", "BBC Two", "BBC iPlayer", "BBC Red Button"],
-      "ITV": ["ITV 1", "ITV 4", "ITVX"],
-      "Premier Sports": ["Premier Sports 1", "Premier Sports 2"],
-      "Amazon Prime": ["Prime Video UK", "Prime Video"],
-      "DAZN": ["DAZN 1 UK", "DAZN"]
-    },
-    "uk": {
-      "Sky Sports": ["Sky Sports Main Event", "Sky Sports Premier League", "Sky Sports Football", "Sky Sports Arena", "Sky Sports Action"],
-      "Sky Sports Main Event": ["Sky Sports Main Event", "Sky Sports Premier League"],
-      "Sky Sports Premier League": ["Sky Sports Premier League", "Sky Sports Main Event"],
-      "TNT Sports": ["TNT Sports 1", "TNT Sports 2", "TNT Sports 3", "TNT Sports 4", "TNT Sports Ultimate"],
-      "TNT Sports 1": ["TNT Sports 1", "TNT Sports Ultimate"],
-      "TNT Sports 2": ["TNT Sports 2"],
-      "BBC": ["BBC One", "BBC Two", "BBC iPlayer", "BBC Red Button"],
-      "ITV": ["ITV 1", "ITV 4", "ITVX"],
-      "Premier Sports": ["Premier Sports 1", "Premier Sports 2"],
-      "Amazon Prime": ["Prime Video UK", "Prime Video"],
-      "DAZN": ["DAZN 1 UK", "DAZN"]
-    },
-    "espagne": {
-      "Movistar": ["Movistar LaLiga", "Movistar LaLiga 1", "Movistar Liga de Campeones", "Movistar Plus+"],
-      "Movistar LaLiga": ["Movistar LaLiga", "Movistar LaLiga 1", "Movistar Plus+"],
-      "Movistar Liga de Campeones": ["Movistar Liga de Campeones", "Movistar Liga de Campeones 1"],
-      "DAZN": ["DAZN LaLiga", "DAZN LaLiga 2", "DAZN 1 ES", "DAZN 2 ES", "DAZN 1"],
-      "DAZN LaLiga": ["DAZN LaLiga", "DAZN LaLiga 2"],
-      "Gol Play": ["Gol Play", "GOL", "GOL TV"],
-      "RTVE": ["La 1", "Teledeporte", "RTVE Play"]
-    },
-    "spain": {
-      "Movistar": ["Movistar LaLiga", "Movistar LaLiga 1", "Movistar Liga de Campeones", "Movistar Plus+"],
-      "Movistar LaLiga": ["Movistar LaLiga", "Movistar LaLiga 1", "Movistar Plus+"],
-      "Movistar Liga de Campeones": ["Movistar Liga de Campeones", "Movistar Liga de Campeones 1"],
-      "DAZN": ["DAZN LaLiga", "DAZN LaLiga 2", "DAZN 1 ES", "DAZN 2 ES", "DAZN 1"],
-      "DAZN LaLiga": ["DAZN LaLiga", "DAZN LaLiga 2"],
-      "Gol Play": ["Gol Play", "GOL", "GOL TV"],
-      "RTVE": ["La 1", "Teledeporte", "RTVE Play"]
-    },
-    "italie": {
-      "Sky Sport": ["Sky Sport Uno", "Sky Sport Calcio", "Sky Sport Serie A", "Sky Sport Football", "Sky Sport 251", "Sky Sport 252"],
-      "Sky Sport Calcio": ["Sky Sport Calcio", "Sky Sport Uno"],
-      "Sky Sport Uno": ["Sky Sport Uno", "Sky Sport Calcio"],
-      "DAZN": ["DAZN 1", "DAZN 2", "DAZN 1 IT", "DAZN IT", "Zona DAZN"],
-      "Rai": ["Rai 1", "Rai 2", "Rai Sport", "Rai Sport+ HD"],
-      "Mediaset": ["Canale 5", "Italia 1", "Mediaset Infinity", "20 Mediaset"]
-    },
-    "italy": {
-      "Sky Sport": ["Sky Sport Uno", "Sky Sport Calcio", "Sky Sport Serie A", "Sky Sport Football", "Sky Sport 251", "Sky Sport 252"],
-      "Sky Sport Calcio": ["Sky Sport Calcio", "Sky Sport Uno"],
-      "Sky Sport Uno": ["Sky Sport Uno", "Sky Sport Calcio"],
-      "DAZN": ["DAZN 1", "DAZN 2", "DAZN 1 IT", "DAZN IT", "Zona DAZN"],
-      "Rai": ["Rai 1", "Rai 2", "Rai Sport", "Rai Sport+ HD"],
-      "Mediaset": ["Canale 5", "Italia 1", "Mediaset Infinity", "20 Mediaset"]
-    },
-    "allemagne": {
-      "Sky Sport": ["Sky Sport Bundesliga 1", "Sky Sport Bundesliga 2", "Sky Sport Premier League", "Sky Sport Top Event", "Sky Sport Mix"],
-      "Sky Sport Bundesliga": ["Sky Sport Bundesliga 1", "Sky Sport Bundesliga 2"],
-      "DAZN": ["DAZN 1 DE", "DAZN 2 DE", "DAZN 1", "DAZN 2"],
-      "RTL": ["RTL", "RTL Nitro", "RTL+"],
-      "ZDF": ["ZDF", "ZDF HD", "ZDFinfo"],
-      "ARD": ["Das Erste", "ARD HD", "Sportschau"]
-    },
-    "germany": {
-      "Sky Sport": ["Sky Sport Bundesliga 1", "Sky Sport Bundesliga 2", "Sky Sport Premier League", "Sky Sport Top Event", "Sky Sport Mix"],
-      "Sky Sport Bundesliga": ["Sky Sport Bundesliga 1", "Sky Sport Bundesliga 2"],
-      "DAZN": ["DAZN 1 DE", "DAZN 2 DE", "DAZN 1", "DAZN 2"],
-      "RTL": ["RTL", "RTL Nitro", "RTL+"],
-      "ZDF": ["ZDF", "ZDF HD", "ZDFinfo"],
-      "ARD": ["Das Erste", "ARD HD", "Sportschau"]
-    },
-    "portugal": {
-      "Sport TV": ["Sport TV 1", "Sport TV 2", "Sport TV 3", "Sport TV 4", "Sport TV 5", "Sport TV 6", "Sport TV +"],
-      "Sport TV 1": ["Sport TV 1", "Sport TV +"],
-      "DAZN": ["DAZN 1 PT", "DAZN 2 PT", "DAZN 3 PT", "Eleven Sports 1", "Eleven Sports 2"],
-      "RTP": ["RTP 1", "RTP 2", "RTP Internacional"],
-      "SIC": ["SIC", "SIC Notícias"],
-      "TVI": ["TVI", "TVI Ficção"]
-    },
-    "etats_unis": {
-      "NBC": ["NBC", "USA Network", "Peacock", "Telemundo", "Universo"],
-      "CBS": ["CBS", "Paramount+", "CBS Sports Network", "Golazo Network"],
-      "ESPN": ["ESPN", "ESPN2", "ESPN+", "ESPN Deportes", "ABC"],
-      "Fox Sports": ["FOX", "FS1", "FS2", "Fox Deportes"],
-      "beIN Sports": ["beIN Sports USA", "beIN Sports en Español", "beIN Sports Connect"]
-    },
-    "usa": {
-      "NBC": ["NBC", "USA Network", "Peacock", "Telemundo", "Universo"],
-      "CBS": ["CBS", "Paramount+", "CBS Sports Network", "Golazo Network"],
-      "ESPN": ["ESPN", "ESPN2", "ESPN+", "ESPN Deportes", "ABC"],
-      "Fox Sports": ["FOX", "FS1", "FS2", "Fox Deportes"],
-      "beIN Sports": ["beIN Sports USA", "beIN Sports en Español", "beIN Sports Connect"]
-    },
-    "belgique": {
-      "DAZN": ["DAZN 1 BE", "DAZN 2 BE", "DAZN 3 BE", "Eleven Sports 1", "Eleven Sports 2"],
-      "Play Sports": ["Play Sports 1", "Play Sports 2", "Play Sports 3"],
-      "RTBF": ["Tipik", "La Une", "RTBF Auvio"],
-      "VTM": ["VTM 2", "VTM 3", "VTM 4"]
-    },
-    "suisse": {
-      "blue Sport": ["blue Sport 1", "blue Sport 2", "blue Sport 3", "blue Zoom"],
-      "RTS": ["RTS 1", "RTS 2", "RTS Deux"],
-      "SRF": ["SRF zwei", "SRF info", "SRF 1"],
-      "RSI": ["RSI La 2", "RSI La 1"]
-    },
-    "pays_bas": {
-      "Ziggo Sport": ["Ziggo Sport Select", "Ziggo Sport Voetbal", "Ziggo Sport Racing", "Ziggo Sport Docu"],
-      "ESPN": ["ESPN 1", "ESPN 2", "ESPN 3", "ESPN 4"],
-      "Viaplay": ["Viaplay", "Viaplay Xtra"],
-      "NOS": ["NPO 1", "NPO 2", "NPO 3"]
-    },
-    "turquie": {
-      "beIN Sports": ["beIN Sports 1 TR", "beIN Sports 2 TR", "beIN Sports 3 TR", "beIN Sports Haber"],
-      "S Sport": ["S Sport", "S Sport 2", "S Sport Plus"],
-      "TRT": ["TRT Spor", "TRT Spor Yildiz", "TRT 1"],
-      "TV8": ["TV8", "TV8.5", "EXXEN"]
-    }
-  };
+  // Aucune règle codée en dur : l'administrateur a le contrôle total
+  var DEFAULT_RECOMMENDED_BY_COUNTRY = {};
 
   var state = {
-    // Structure multi-pays: { "_default": { ... }, "france": { ... }, ... }
+    // Structure multi-pays: { "_default": [ { id, channel, competition, packages, aliases } ], ... }
     store: {},
     visibleCountriesList: [],
+    allLivePackages: [],
     selectedCountry: "france",
     isEditing: false,
-    editingKey: ""
+    editingRuleId: "",
+    selectedFormPackages: []
   };
 
   function esc(v) {
@@ -457,28 +251,108 @@
       id: cid,
       name: displayName,
       flag: flag,
-      code: iso || cid.slice(0, 2)
+      code: iso || cid.slice(0, 2),
+      dbId: foundInVis ? foundInVis.dbId : null
     };
   }
 
-  function findMappingKey(mappings, rawKey) {
-    if (!mappings || !rawKey) return null;
-    if (mappings[rawKey] !== undefined) return rawKey;
-    var normTarget = String(rawKey).trim().toLowerCase();
-    for (var k in mappings) {
-      if (k.trim().toLowerCase() === normTarget) return k;
+  /**
+   * Normalise une règle unitaire.
+   */
+  function normalizeRule(rawItem, idx) {
+    if (!rawItem) return null;
+    var count = (idx || 0) + 1;
+    if (typeof rawItem === "string") {
+      return {
+        id: "r_" + count + "_" + Math.random().toString(36).slice(2, 7),
+        channel: rawItem.trim(),
+        competition: "_all",
+        packages: [],
+        aliases: [rawItem.trim()]
+      };
     }
-    var unescaped = String(rawKey)
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .trim().toLowerCase();
-    for (var k2 in mappings) {
-      if (k2.trim().toLowerCase() === unescaped) return k2;
+    var channel = String(rawItem.channel || rawItem.key || rawItem.name || "").trim();
+    if (!channel) return null;
+
+    var comp = String(rawItem.competition || "_all").trim();
+    if (!comp || comp === "all" || comp === "global" || comp.toLowerCase() === "toutes les compétitions (par défaut)") comp = "_all";
+
+    var pkgs = Array.isArray(rawItem.packages)
+      ? rawItem.packages.map(String).map(function (s) { return s.trim(); }).filter(Boolean)
+      : (rawItem.packages ? [String(rawItem.packages).trim()] : []);
+
+    var aliases = Array.isArray(rawItem.aliases)
+      ? rawItem.aliases.map(String).map(function (s) { return s.trim(); }).filter(Boolean)
+      : (rawItem.aliases ? [String(rawItem.aliases).trim()] : []);
+
+    return {
+      id: String(rawItem.id || ("r_" + count + "_" + Math.random().toString(36).slice(2, 7))),
+      channel: channel,
+      competition: comp,
+      packages: pkgs,
+      aliases: aliases
+    };
+  }
+
+  /**
+   * Normalise le tableau ou dictionnaire de règles d'un pays.
+   */
+  function normalizeCountryRules(rawRules) {
+    if (!rawRules) return [];
+    if (Array.isArray(rawRules)) {
+      return rawRules.map(normalizeRule).filter(Boolean);
     }
-    return null;
+    if (typeof rawRules === "object") {
+      var list = [];
+      var idx = 0;
+      for (var k in rawRules) {
+        var val = rawRules[k];
+        if (Array.isArray(val)) {
+          list.push({
+            id: "r_" + (++idx) + "_" + Math.random().toString(36).slice(2, 7),
+            channel: String(k).trim(),
+            competition: "_all",
+            packages: [],
+            aliases: val.map(String).map(function (s) { return s.trim(); }).filter(Boolean)
+          });
+        } else if (val && typeof val === "object") {
+          var norm = normalizeRule(Object.assign({ channel: k }, val), ++idx);
+          if (norm) list.push(norm);
+        }
+      }
+      return list;
+    }
+    return [];
+  }
+
+  /**
+   * Normalise l'objet complet multi-pays.
+   */
+  function normalizeStore(raw) {
+    var normalized = {};
+    if (!raw || typeof raw !== "object") {
+      return normalized;
+    }
+
+    if (Array.isArray(raw)) {
+      normalized._default = normalizeCountryRules(raw);
+      return normalized;
+    }
+
+    for (var c in raw) {
+      var slug = countrySlug(c);
+      normalized[slug] = normalizeCountryRules(raw[c]);
+    }
+
+    return normalized;
+  }
+
+  function getCountryMappings(countryId) {
+    var cid = countrySlug(countryId);
+    if (!state.store[cid]) {
+      state.store[cid] = [];
+    }
+    return state.store[cid];
   }
 
   /**
@@ -515,7 +389,6 @@
         return !NON_COUNTRIES.has(vk) && visibleSet.has(vk);
       });
 
-      // Si la table canonical n'a pas encore de flag __visible__, on filtre les non-pays
       var list = (filtered.length > 0) ? filtered : adminList.filter(function (c) {
         return c && c.name && !NON_COUNTRIES.has(visibilityKey(c.name));
       });
@@ -534,41 +407,34 @@
 
       return state.visibleCountriesList;
     } catch (e) {
-      console.warn("[Velora Football Admin] Erreur lors du chargement des pays visibles:", e.message);
+      console.warn("[Velora Football Admin] Erreur chargement pays visibles:", e.message);
       return state.visibleCountriesList || [];
     }
   }
 
   /**
-   * Normalise l'objet de stockage multi-pays.
+   * Récupère les packages Live disponibles.
    */
-  function normalizeStore(raw) {
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-      return {
-        "_default": Object.assign({}, DEFAULT_RECOMMENDED_BY_COUNTRY._default),
-        "france": Object.assign({}, DEFAULT_RECOMMENDED_BY_COUNTRY.france)
-      };
+  async function fetchLivePackages() {
+    if (state.allLivePackages && state.allLivePackages.length > 0) {
+      return state.allLivePackages;
     }
+    try {
+      var t = localStorage.getItem("authToken");
+      var headers = { "apikey": KEY, "Authorization": "Bearer " + KEY };
+      if (t) headers.Authorization = "Bearer " + t;
 
-    // Est-ce déjà un store multi-pays ?
-    var hasCountryKeys = raw._default || raw.france || raw.arabe || raw.mena || raw.uk || raw.angleterre || raw.espagne || raw.spain || raw.italie || raw.italy || raw.allemagne || raw.germany || raw.usa || raw.etats_unis || raw.maroc || raw.algerie;
-    if (hasCountryKeys) {
-      return Object.assign({}, raw);
-    }
-
-    // Ancien format plat : on place les règles existantes dans _default et france
-    return {
-      "_default": Object.assign({}, raw),
-      "france": Object.assign({}, raw)
-    };
-  }
-
-  function getCountryMappings(countryId) {
-    var cid = countrySlug(countryId);
-    if (!state.store[cid]) {
-      state.store[cid] = {};
-    }
-    return state.store[cid];
+      var res = await fetch(SURL + "/rest/v1/admin_packages?kind=eq.live&order=name.asc", { headers: headers });
+      if (res.ok) {
+        var rows = await res.json();
+        if (Array.isArray(rows)) {
+          state.allLivePackages = rows;
+          renderPackagesDatalist();
+          return rows;
+        }
+      }
+    } catch (_) {}
+    return state.allLivePackages || [];
   }
 
   function injectStyles() {
@@ -793,6 +659,87 @@
         margin-top: 0.25rem;
         flex-wrap: wrap;
       }
+      .vel-foot-pkg-picker-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+      .vel-foot-selected-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        min-height: 24px;
+      }
+      .vel-foot-pkg-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.25rem 0.6rem;
+        border-radius: 6px;
+        background: rgba(168, 85, 247, 0.2);
+        border: 1px solid rgba(168, 85, 247, 0.45);
+        color: #e9d5ff;
+        font-size: 0.78rem;
+        font-weight: 700;
+      }
+      .vel-foot-pkg-tag-del {
+        background: transparent;
+        border: none;
+        color: #fca5a5;
+        cursor: pointer;
+        padding: 0 0.15rem;
+        font-weight: 900;
+        font-size: 0.85rem;
+        line-height: 1;
+      }
+      .vel-foot-pkg-tag-del:hover {
+        color: #ef4444;
+      }
+      .vel-foot-badge-comp {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.2rem 0.55rem;
+        border-radius: 6px;
+        background: rgba(234, 179, 8, 0.15);
+        border: 1px solid rgba(234, 179, 8, 0.4);
+        color: #fde047;
+        font-size: 0.76rem;
+        font-weight: 700;
+      }
+      .vel-foot-badge-comp--all {
+        background: rgba(148, 163, 184, 0.12);
+        border-color: rgba(148, 163, 184, 0.25);
+        color: #cbd5e1;
+      }
+      .vel-foot-badge-pkg {
+        display: inline-block;
+        padding: 0.2rem 0.55rem;
+        margin: 0.15rem 0.2rem;
+        border-radius: 6px;
+        background: rgba(168, 85, 247, 0.15);
+        border: 1px solid rgba(168, 85, 247, 0.4);
+        color: #e9d5ff;
+        font-size: 0.76rem;
+        font-weight: 700;
+      }
+      .vel-foot-alias-badge {
+        display: inline-block;
+        padding: 0.2rem 0.55rem;
+        margin: 0.15rem 0.2rem;
+        border-radius: 6px;
+        background: rgba(56, 189, 248, 0.12);
+        border: 1px solid rgba(56, 189, 248, 0.3);
+        color: #7dd3fc;
+        font-size: 0.76rem;
+        font-weight: 700;
+      }
+      .vel-foot-alias-badge--highlight {
+        background: rgba(16, 185, 129, 0.2);
+        border-color: rgba(16, 185, 129, 0.5);
+        color: #6ee7b7;
+        font-size: 0.82rem;
+      }
       .vel-foot-test-box {
         background: rgba(0, 0, 0, 0.35);
         border: 1px dashed rgba(255, 255, 255, 0.18);
@@ -812,12 +759,6 @@
       .vel-foot-test-header {
         font-size: 0.85rem;
         color: #f1f5f9;
-        margin-bottom: 0.4rem;
-      }
-      .vel-foot-test-tags {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.35rem;
         margin-bottom: 0.4rem;
       }
       .vel-foot-test-subtext {
@@ -869,35 +810,13 @@
         background: rgba(255, 255, 255, 0.03);
       }
       .vel-foot-cell-key {
-        width: 25%;
         color: #38bdf8;
         font-weight: 800;
         font-size: 0.92rem;
       }
-      .vel-foot-cell-aliases {
-        width: 55%;
-      }
       .vel-foot-cell-actions {
-        width: 20%;
         text-align: right;
         white-space: nowrap;
-      }
-      .vel-foot-alias-badge {
-        display: inline-block;
-        padding: 0.2rem 0.55rem;
-        margin: 0.15rem 0.2rem;
-        border-radius: 6px;
-        background: rgba(56, 189, 248, 0.12);
-        border: 1px solid rgba(56, 189, 248, 0.3);
-        color: #7dd3fc;
-        font-size: 0.76rem;
-        font-weight: 700;
-      }
-      .vel-foot-alias-badge--highlight {
-        background: rgba(16, 185, 129, 0.2);
-        border-color: rgba(16, 185, 129, 0.5);
-        color: #6ee7b7;
-        font-size: 0.82rem;
       }
       .vel-foot-btn-action {
         padding: 0.4rem 0.75rem;
@@ -1068,6 +987,71 @@
     return "france";
   }
 
+  function renderPackagesDatalist() {
+    var dl = getEl("foot-packages-datalist");
+    if (!dl) return;
+
+    var packages = state.allLivePackages || [];
+    var names = new Set();
+    packages.forEach(function (pkg) {
+      if (pkg && pkg.name && pkg.name.trim()) {
+        names.add(pkg.name.trim());
+      }
+    });
+
+    // Also include packages from current state.store
+    Object.keys(state.store).forEach(function (c) {
+      var rules = state.store[c] || [];
+      rules.forEach(function (r) {
+        (r.packages || []).forEach(function (p) {
+          if (p && p.trim()) names.add(p.trim());
+        });
+      });
+    });
+
+    var sorted = Array.from(names).sort(function (a, b) { return a.localeCompare(b, "fr"); });
+    dl.innerHTML = sorted.map(function (name) {
+      return '<option value="' + esc(name) + '">' + esc(name) + '</option>';
+    }).join("");
+  }
+
+  function addPackageTag(pkgName) {
+    var input = getEl("foot-map-pkg-input");
+    var val = (pkgName || (input ? input.value : "")).trim();
+    if (!val) return;
+
+    if (!state.selectedFormPackages.includes(val)) {
+      state.selectedFormPackages.push(val);
+      renderSelectedPackagesTags();
+    }
+    if (input) input.value = "";
+    if (input) input.focus();
+  }
+
+  function removePackageTag(pkgName) {
+    state.selectedFormPackages = state.selectedFormPackages.filter(function (p) {
+      return p !== pkgName;
+    });
+    renderSelectedPackagesTags();
+  }
+
+  function renderSelectedPackagesTags() {
+    var container = getEl("foot-map-selected-packages");
+    if (!container) return;
+
+    if (state.selectedFormPackages.length === 0) {
+      container.innerHTML = '<span style="font-size:0.78rem; color:#64748b; font-style:italic;">Aucun package sélectionné.</span>';
+      return;
+    }
+
+    container.innerHTML = state.selectedFormPackages.map(function (pkg) {
+      return '<span class="vel-foot-pkg-tag">' +
+        '<span>📦 ' + esc(pkg) + '</span>' +
+        '<button type="button" class="vel-foot-pkg-tag-del" data-pkg="' + esc(pkg) + '" onclick="window.veloraFootballAdmin.removePackageTag(this.getAttribute(\'data-pkg\'))" title="Retirer ce package">×</button>' +
+      '</span>';
+    }).join(" ");
+  }
+
   function renderCountrySelector() {
     var pillsContainer = getEl("foot-country-pills");
     var formSelect = getEl("foot-form-country-select");
@@ -1109,18 +1093,17 @@
       return a.name.localeCompare(b.name, "fr");
     });
 
-    // S'assurer que le pays sélectionné est valide
     if (!countriesMap.has(state.selectedCountry)) {
       state.selectedCountry = countriesMap.has("france") ? "france" : (sortedList[1] ? sortedList[1].id : "_default");
     }
 
     var activeMeta = getCountryMeta(state.selectedCountry);
 
-    // 1. Rendu des pilules de la barre horizontale
+    // 1. Rendu des pilules
     if (pillsContainer) {
       pillsContainer.innerHTML = sortedList.map(function (c) {
-        var rulesMap = state.store[c.id] || {};
-        var count = Object.keys(rulesMap).length;
+        var rulesList = state.store[c.id] || [];
+        var count = rulesList.length;
         var isActive = state.selectedCountry === c.id;
 
         return '<button type="button" class="vel-foot-country-pill ' + (isActive ? "is-active" : "") + '" data-country-id="' + esc(c.id) + '">' +
@@ -1131,27 +1114,29 @@
       }).join("");
     }
 
-    // 2. Rendu du menu déroulant dans la carte du formulaire
+    // 2. Menu déroulant formulaire
     if (formSelect) {
       formSelect.innerHTML = sortedList.map(function (c) {
         return '<option value="' + esc(c.id) + '" ' + (c.id === state.selectedCountry ? "selected" : "") + '>' + c.flag + " " + esc(c.name) + '</option>';
       }).join("");
     }
 
-    // 3. Rendu du sélecteur du testeur
+    // 3. Sélecteur testeur
     if (testCountrySelect) {
       testCountrySelect.innerHTML = sortedList.map(function (c) {
         return '<option value="' + esc(c.id) + '" ' + (c.id === state.selectedCountry ? "selected" : "") + '>' + c.flag + " " + esc(c.name) + '</option>';
       }).join("");
     }
 
-    // 4. Mise à jour du libellé du bouton d'ajout
+    // 4. Bouton submit
     var btnSubmit = getEl("foot-map-submit-btn");
     if (btnSubmit) {
       btnSubmit.textContent = state.isEditing
         ? "💾 Mettre à jour (" + activeMeta.name + ")"
         : "➕ Ajouter la règle (" + activeMeta.name + ")";
     }
+
+    renderPackagesDatalist();
   }
 
   function renderMappingsTable() {
@@ -1159,48 +1144,61 @@
     var countEl = getEl("foot-mappings-count");
     if (!tbody) return;
 
-    var currentMappings = getCountryMappings(state.selectedCountry);
+    var currentRules = getCountryMappings(state.selectedCountry);
     var filterQuery = (getEl("foot-mappings-search") ? getEl("foot-mappings-search").value : "").trim().toLowerCase();
-    var keys = Object.keys(currentMappings).sort(function (a, b) { return a.localeCompare(b, "fr"); });
+    var rules = currentRules.slice().sort(function (a, b) {
+      if (a.channel !== b.channel) return a.channel.localeCompare(b.channel, "fr");
+      return (a.competition || "").localeCompare(b.competition || "", "fr");
+    });
 
     if (filterQuery) {
-      keys = keys.filter(function (k) {
-        var aliases = currentMappings[k] || [];
-        var joined = (k + " " + (Array.isArray(aliases) ? aliases.join(" ") : String(aliases))).toLowerCase();
-        return joined.includes(filterQuery);
+      rules = rules.filter(function (r) {
+        var pkgs = (r.packages || []).join(" ");
+        var aliases = (r.aliases || []).join(" ");
+        var comp = r.competition === "_all" ? "toutes" : (r.competition || "");
+        var full = (r.channel + " " + comp + " " + pkgs + " " + aliases).toLowerCase();
+        return full.includes(filterQuery);
       });
     }
 
     var activeMeta = getCountryMeta(state.selectedCountry);
 
     if (countEl) {
-      var total = Object.keys(currentMappings).length;
+      var total = currentRules.length;
       countEl.textContent = total + (total > 1 ? " règles configurées pour " : " règle configurée pour ") + activeMeta.name;
     }
 
-    if (keys.length === 0) {
-      var hasRec = DEFAULT_RECOMMENDED_BY_COUNTRY[state.selectedCountry] || DEFAULT_RECOMMENDED_BY_COUNTRY._default;
-      tbody.innerHTML = '<tr><td colspan="3" class="vel-foot-empty">' +
-        '<div>Aucune règle spécifique pour <strong>' + esc(activeMeta.name) + '</strong>. ' + (state.selectedCountry !== "_default" ? '(Les règles générales par défaut seront appliquées en repli).' : '') + '</div>' +
-        (hasRec ? '<div class="vel-foot-empty-action"><button type="button" class="vel-foot-btn vel-foot-btn-primary vel-foot-btn-sm" onclick="window.veloraFootballAdmin.loadRecommendedDefaults()">✨ Charger règles recommandées (' + esc(activeMeta.name) + ')</button><button type="button" class="vel-foot-btn vel-foot-btn-secondary vel-foot-btn-sm" onclick="window.veloraFootballAdmin.copyFromCountry(\'_default\')">📋 Copier depuis Par Défaut</button></div>' : '') +
+    if (rules.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="vel-foot-empty">' +
+        '<div>Aucune règle pour <strong>' + esc(activeMeta.name) + '</strong>. ' + (state.selectedCountry !== "_default" ? '(Les règles générales par défaut seront appliquées en repli si définies).' : '') + '</div>' +
+        '<div class="vel-foot-empty-action"><button type="button" class="vel-foot-btn vel-foot-btn-secondary vel-foot-btn-sm" onclick="window.veloraFootballAdmin.copyFromCountry(\'_default\')">📋 Copier depuis Par Défaut</button></div>' +
       '</td></tr>';
       return;
     }
 
-    tbody.innerHTML = keys.map(function (k) {
-      var aliases = currentMappings[k];
-      var list = Array.isArray(aliases) ? aliases : [String(aliases)];
-      var badgesHtml = list.map(function (al) {
-        return '<span class="vel-foot-alias-badge">' + esc(al) + "</span>";
-      }).join(" ");
+    tbody.innerHTML = rules.map(function (r) {
+      var isAllComp = !r.competition || r.competition === "_all";
+      var compBadgeHtml = isAllComp
+        ? '<span class="vel-foot-badge-comp vel-foot-badge-comp--all">🌐 Toutes</span>'
+        : '<span class="vel-foot-badge-comp">🏆 ' + esc(r.competition) + '</span>';
 
-      var kEsc = esc(k);
-      return '<tr data-map-key="' + kEsc + '">' +
-        '<td class="vel-foot-cell-key"><strong>' + kEsc + '</strong></td>' +
-        '<td class="vel-foot-cell-aliases">' + badgesHtml + '</td>' +
+      var pkgsHtml = (r.packages && r.packages.length > 0)
+        ? r.packages.map(function (pkg) { return '<span class="vel-foot-badge-pkg">📦 ' + esc(pkg) + '</span>'; }).join(" ")
+        : '<span style="color:#64748b; font-style:italic; font-size:0.76rem;">—</span>';
+
+      var aliasesHtml = (r.aliases && r.aliases.length > 0)
+        ? r.aliases.map(function (al) { return '<span class="vel-foot-alias-badge">' + esc(al) + '</span>'; }).join(" ")
+        : '<span style="color:#64748b; font-style:italic; font-size:0.76rem;">—</span>';
+
+      var rIdEsc = esc(r.id);
+      return '<tr data-rule-id="' + rIdEsc + '">' +
+        '<td class="vel-foot-cell-key"><strong>' + esc(r.channel) + '</strong></td>' +
+        '<td>' + compBadgeHtml + '</td>' +
+        '<td>' + pkgsHtml + '</td>' +
+        '<td>' + aliasesHtml + '</td>' +
         '<td class="vel-foot-cell-actions">' +
-          '<button type="button" class="vel-foot-btn-action vel-foot-btn-edit" data-action="edit-mapping" data-key="' + kEsc + '" onclick="window.veloraFootballAdmin.editMapping(this.getAttribute(\'data-key\'))" title="Modifier cette règle">✏️ Modifier</button>' +
-          '<button type="button" class="vel-foot-btn-action vel-foot-btn-delete" data-action="delete-mapping" data-key="' + kEsc + '" onclick="window.veloraFootballAdmin.deleteMapping(this.getAttribute(\'data-key\'))" title="Supprimer cette règle">🗑️ Supprimer</button>' +
+          '<button type="button" class="vel-foot-btn-action vel-foot-btn-edit" data-action="edit-rule" data-id="' + rIdEsc + '" onclick="window.veloraFootballAdmin.editRule(this.getAttribute(\'data-id\'))" title="Modifier cette règle">✏️ Modifier</button>' +
+          '<button type="button" class="vel-foot-btn-action vel-foot-btn-delete" data-action="delete-rule" data-id="' + rIdEsc + '" onclick="window.veloraFootballAdmin.deleteRule(this.getAttribute(\'data-id\'))" title="Supprimer cette règle">🗑️ Supprimer</button>' +
         '</td>' +
       '</tr>';
     }).join("");
@@ -1214,7 +1212,7 @@
     renderMappingsTable();
     var testInput = getEl("foot-test-input");
     if (testInput && testInput.value) {
-      runLiveTest(testInput.value);
+      runLiveTest();
     }
   }
 
@@ -1254,73 +1252,90 @@
   async function loadAndRenderMappings() {
     await Promise.all([
       syncFromDatabase(),
-      fetchVisibleCountries(false)
+      fetchVisibleCountries(false),
+      fetchLivePackages()
     ]);
     if (!state.selectedCountry) {
       state.selectedCountry = detectCurrentAppCountry();
     }
     renderCountrySelector();
     renderMappingsTable();
+    renderSelectedPackagesTags();
   }
 
   function resetForm() {
     state.isEditing = false;
-    state.editingKey = "";
+    state.editingRuleId = "";
+    state.selectedFormPackages = [];
+
     var inputKey = getEl("foot-map-key");
+    var inputComp = getEl("foot-map-competition");
     var inputAliases = getEl("foot-map-aliases");
+    var inputPkg = getEl("foot-map-pkg-input");
     var btnSubmit = getEl("foot-map-submit-btn");
     var activeMeta = getCountryMeta(state.selectedCountry);
+
     if (inputKey) { inputKey.value = ""; inputKey.disabled = false; }
+    if (inputComp) inputComp.value = "";
     if (inputAliases) inputAliases.value = "";
+    if (inputPkg) inputPkg.value = "";
     if (btnSubmit) btnSubmit.textContent = "➕ Ajouter la règle (" + activeMeta.name + ")";
+    renderSelectedPackagesTags();
     setStatus("");
   }
 
-  function editMapping(rawKey) {
-    if (!rawKey) return;
-    var currentMappings = getCountryMappings(state.selectedCountry);
-    var realKey = findMappingKey(currentMappings, rawKey) || rawKey;
-    var aliases = currentMappings[realKey];
-    if (!aliases) return;
+  function editRule(ruleId) {
+    if (!ruleId) return;
+    var currentRules = getCountryMappings(state.selectedCountry);
+    var rule = currentRules.find(function (r) { return r.id === ruleId; });
+    if (!rule) {
+      rule = currentRules.find(function (r) { return r.channel.toLowerCase() === String(ruleId).toLowerCase(); });
+    }
+    if (!rule) return;
 
     state.isEditing = true;
-    state.editingKey = realKey;
+    state.editingRuleId = rule.id;
+    state.selectedFormPackages = Array.isArray(rule.packages) ? rule.packages.slice() : [];
 
     var inputKey = getEl("foot-map-key");
+    var inputComp = getEl("foot-map-competition");
     var inputAliases = getEl("foot-map-aliases");
     var btnSubmit = getEl("foot-map-submit-btn");
-    var list = Array.isArray(aliases) ? aliases : [String(aliases)];
 
-    if (inputKey) {
-      inputKey.value = realKey;
-    }
-    if (inputAliases) {
-      inputAliases.value = list.join(", ");
-    }
+    if (inputKey) inputKey.value = rule.channel;
+    if (inputComp) inputComp.value = (!rule.competition || rule.competition === "_all") ? "" : rule.competition;
+    if (inputAliases) inputAliases.value = Array.isArray(rule.aliases) ? rule.aliases.join(", ") : String(rule.aliases || "");
+    renderSelectedPackagesTags();
+
     if (btnSubmit) {
       btnSubmit.textContent = "💾 Mettre à jour (" + getCountryMeta(state.selectedCountry).name + ")";
     }
 
     var formEl = getEl("foot-map-form");
     if (formEl) formEl.scrollIntoView({ behavior: "smooth", block: "center" });
-    if (inputAliases) inputAliases.focus();
-    setStatus("✏️ Modification de la règle « " + realKey + " » pour " + getCountryMeta(state.selectedCountry).name + "...");
+    if (inputKey) inputKey.focus();
+    setStatus("✏️ Modification de la règle « " + rule.channel + " »...");
   }
 
-  async function deleteMapping(rawKey) {
-    if (!rawKey) return;
-    var currentMappings = getCountryMappings(state.selectedCountry);
-    var realKey = findMappingKey(currentMappings, rawKey) || rawKey;
+  async function deleteRule(ruleId) {
+    if (!ruleId) return;
+    var currentRules = getCountryMappings(state.selectedCountry);
+    var targetIdx = currentRules.findIndex(function (r) { return r.id === ruleId; });
+    if (targetIdx < 0) {
+      targetIdx = currentRules.findIndex(function (r) { return r.channel.toLowerCase() === String(ruleId).toLowerCase(); });
+    }
+    if (targetIdx < 0) return;
 
-    var activeMeta = getCountryMeta(state.selectedCountry);
-    delete currentMappings[realKey];
-    state.store[state.selectedCountry] = currentMappings;
+    var deleted = currentRules.splice(targetIdx, 1)[0];
+    state.store[state.selectedCountry] = currentRules;
 
     await persistToDatabase(state.store);
     renderCountrySelector();
     renderMappingsTable();
-    if (state.isEditing && state.editingKey === realKey) resetForm();
-    setStatus("🗑️ Règle pour « " + realKey + " » supprimée de " + activeMeta.name + ".");
+    if (state.isEditing && state.editingRuleId === ruleId) resetForm();
+
+    var activeMeta = getCountryMeta(state.selectedCountry);
+    setStatus("🗑️ Règle pour « " + deleted.channel + " » supprimée de " + activeMeta.name + ".");
   }
 
   async function handleFormSubmit(e) {
@@ -1328,70 +1343,101 @@
     if (e && typeof e.stopPropagation === "function") e.stopPropagation();
 
     var inputKey = getEl("foot-map-key");
+    var inputComp = getEl("foot-map-competition");
     var inputAliases = getEl("foot-map-aliases");
-    if (!inputKey || !inputAliases) return;
+    if (!inputKey) return;
 
-    var key = inputKey.value.trim();
-    var aliasesStr = inputAliases.value.trim();
+    var channel = inputKey.value.trim();
+    var rawComp = inputComp ? inputComp.value.trim() : "";
+    var competition = (!rawComp || rawComp === "_all" || rawComp.toLowerCase() === "toutes les compétitions (par défaut)") ? "_all" : rawComp;
 
-    if (!key) {
+    var aliasesStr = inputAliases ? inputAliases.value.trim() : "";
+    var aliasesList = aliasesStr ? aliasesStr.split(/[,\n]+/).map(function (s) { return s.trim(); }).filter(Boolean) : [];
+    var packagesList = state.selectedFormPackages.slice();
+
+    if (!channel) {
       setStatus("Veuillez entrer le nom de la chaîne du match (ex: Canal+ ou beIN Sports 1).", true);
       inputKey.focus();
       return;
     }
 
-    if (!aliasesStr) {
-      setStatus("Veuillez entrer au moins un mot-clé ou alias de recherche (ex: Canal+ Sport, Canal+ Foot).", true);
-      inputAliases.focus();
+    if (packagesList.length === 0 && aliasesList.length === 0) {
+      setStatus("Veuillez spécifier au moins un package prioritaire OU des mots-clés de recherche.", true);
+      if (inputAliases) inputAliases.focus();
       return;
     }
 
-    var aliasesList = aliasesStr.split(/[,\n]+/).map(function (s) { return s.trim(); }).filter(Boolean);
-    if (aliasesList.length === 0) {
-      setStatus("Aucun alias valide spécifié.", true);
-      return;
-    }
+    var currentRules = getCountryMappings(state.selectedCountry);
 
-    var currentMappings = getCountryMappings(state.selectedCountry);
+    if (state.isEditing && state.editingRuleId) {
+      var editIdx = currentRules.findIndex(function (r) { return r.id === state.editingRuleId; });
+      if (editIdx >= 0) {
+        currentRules[editIdx] = {
+          id: state.editingRuleId,
+          channel: channel,
+          competition: competition,
+          packages: packagesList,
+          aliases: aliasesList
+        };
+      } else {
+        currentRules.push({
+          id: state.editingRuleId,
+          channel: channel,
+          competition: competition,
+          packages: packagesList,
+          aliases: aliasesList
+        });
+      }
+    } else {
+      var normComp = competition.toLowerCase();
+      var normChan = channel.toLowerCase();
+      var existingIdx = currentRules.findIndex(function (r) {
+        return r.channel.toLowerCase() === normChan && (r.competition || "_all").toLowerCase() === normComp;
+      });
 
-    // Si on était en train de modifier et que la clé a changé, supprimer l'ancienne clé
-    if (state.isEditing && state.editingKey) {
-      var oldRealKey = findMappingKey(currentMappings, state.editingKey);
-      if (oldRealKey && oldRealKey !== key) {
-        delete currentMappings[oldRealKey];
+      if (existingIdx >= 0) {
+        currentRules[existingIdx].packages = packagesList;
+        currentRules[existingIdx].aliases = aliasesList;
+      } else {
+        currentRules.push({
+          id: "r_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+          channel: channel,
+          competition: competition,
+          packages: packagesList,
+          aliases: aliasesList
+        });
       }
     }
 
-    currentMappings[key] = aliasesList;
-    state.store[state.selectedCountry] = currentMappings;
-
+    state.store[state.selectedCountry] = currentRules;
     await persistToDatabase(state.store);
     renderCountrySelector();
     renderMappingsTable();
     resetForm();
 
     var activeMeta = getCountryMeta(state.selectedCountry);
-    setStatus("✨ Règle enregistrée avec succès pour « " + key + " » dans " + activeMeta.name + " (" + aliasesList.length + " alias).");
+    var compLabel = competition === "_all" ? "Toutes compétitions" : competition;
+    setStatus("✨ Règle enregistrée pour « " + channel + " » [" + compLabel + "] dans " + activeMeta.name + " (" + packagesList.length + " package(s), " + aliasesList.length + " alias).");
   }
 
-  async function loadRecommendedDefaults() {
+  async function clearCountryRules() {
     var activeMeta = getCountryMeta(state.selectedCountry);
-    var recommended = DEFAULT_RECOMMENDED_BY_COUNTRY[state.selectedCountry] || DEFAULT_RECOMMENDED_BY_COUNTRY._default;
-
-    var currentMappings = getCountryMappings(state.selectedCountry);
-    var merged = Object.assign({}, recommended, currentMappings);
-    state.store[state.selectedCountry] = merged;
+    if (!confirm("Voulez-vous vraiment supprimer TOUTES les règles pour " + activeMeta.name + " ?")) {
+      return;
+    }
+    state.store[state.selectedCountry] = [];
     await persistToDatabase(state.store);
     renderCountrySelector();
     renderMappingsTable();
-    setStatus("✨ Règles recommandées chargées avec succès pour " + activeMeta.name + " (" + Object.keys(merged).length + " règles actives).");
+    resetForm();
+    setStatus("🗑️ Toutes les règles ont été supprimées pour " + activeMeta.name + ".");
   }
 
   async function copyFromCountry(sourceCountryId) {
     var sourceId = sourceCountryId;
     if (!sourceId) {
       var sourceList = Object.keys(state.store).filter(function (c) {
-        return c !== state.selectedCountry && Object.keys(state.store[c] || {}).length > 0;
+        return c !== state.selectedCountry && (state.store[c] || []).length > 0;
       });
       if (sourceList.length === 0) {
         alert("Aucun autre pays n'a de règles configurées pour le moment.");
@@ -1403,121 +1449,139 @@
       sourceId = countrySlug(chosen);
     }
 
-    var sourceRules = state.store[sourceId] || DEFAULT_RECOMMENDED_BY_COUNTRY[sourceId] || {};
-    if (Object.keys(sourceRules).length === 0) {
+    var sourceRules = state.store[sourceId] || [];
+    if (sourceRules.length === 0) {
       alert("Aucune règle trouvée dans le pays source " + sourceId);
       return;
     }
 
-    var currentMappings = getCountryMappings(state.selectedCountry);
-    var merged = Object.assign({}, sourceRules, currentMappings);
-    state.store[state.selectedCountry] = merged;
+    var currentRules = getCountryMappings(state.selectedCountry);
+    var existingKeys = new Set(currentRules.map(function (r) { return (r.channel + "__" + (r.competition || "_all")).toLowerCase(); }));
+
+    sourceRules.forEach(function (sr) {
+      var k = (sr.channel + "__" + (sr.competition || "_all")).toLowerCase();
+      if (!existingKeys.has(k)) {
+        currentRules.push(Object.assign({}, sr, { id: "r_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6) }));
+        existingKeys.add(k);
+      }
+    });
+
+    state.store[state.selectedCountry] = currentRules;
     await persistToDatabase(state.store);
     renderCountrySelector();
     renderMappingsTable();
-    setStatus("📋 " + Object.keys(sourceRules).length + " règle(s) copiée(s) depuis " + getCountryMeta(sourceId).name + " vers " + getCountryMeta(state.selectedCountry).name + ".");
+    setStatus("📋 Règles copiées depuis " + getCountryMeta(sourceId).name + " vers " + getCountryMeta(state.selectedCountry).name + ".");
   }
 
-  function runLiveTest(query, overrideCountry) {
+  function runLiveTest(channelQuery, compQuery, countryQuery) {
     var resBox = getEl("foot-test-results");
     if (!resBox) return;
-    var q = (query || "").trim();
-    var testCid = countrySlug(overrideCountry || (getEl("foot-test-country-select") ? getEl("foot-test-country-select").value : state.selectedCountry));
+
+    var q = (channelQuery || (getEl("foot-test-input") ? getEl("foot-test-input").value : "")).trim();
+    var compQ = (compQuery !== undefined ? compQuery : (getEl("foot-test-comp") ? getEl("foot-test-comp").value : "")).trim();
+    var testCid = countrySlug(countryQuery || (getEl("foot-test-country-select") ? getEl("foot-test-country-select").value : state.selectedCountry));
 
     if (!q) {
-      resBox.innerHTML = '<span class="vel-foot-test-hint">Entrez le nom d\'un diffuseur (ex: Canal+, beIN 1, Sky Sports...) pour voir les mots-clés qui seront recherchés.</span>';
+      resBox.innerHTML = '<span class="vel-foot-test-hint">Entrez le nom d\'un diffuseur pour tester le résultat.</span>';
       return;
     }
 
-    var countryRules = state.store[testCid] || {};
-    var defaultRules = state.store._default || {};
+    var countryRules = state.store[testCid] || [];
+    var defaultRules = state.store._default || [];
 
     var normQ = q.toLowerCase();
-    var matchedKey = null;
-    var matchedAliases = null;
-    var matchedFromCountry = null;
+    var normComp = compQ.toLowerCase();
 
-    // 1. Recherche dans le pays sélectionné
-    for (var k in countryRules) {
-      if (k.toLowerCase() === normQ || k.trim().toLowerCase() === q.toLowerCase()) {
-        matchedKey = k;
-        matchedAliases = countryRules[k];
-        matchedFromCountry = testCid;
-        break;
-      }
-    }
+    function matchInRules(rules) {
+      if (!Array.isArray(rules)) return null;
+      var exactCompMatch = null;
+      var allCompMatch = null;
 
-    if (!matchedAliases) {
-      for (var k2 in countryRules) {
-        if (normQ.includes(k2.toLowerCase()) || k2.toLowerCase().includes(normQ)) {
-          matchedKey = k2;
-          matchedAliases = countryRules[k2];
-          matchedFromCountry = testCid;
-          break;
-        }
-      }
-    }
+      for (var i = 0; i < rules.length; i++) {
+        var r = rules[i];
+        var rChan = (r.channel || "").toLowerCase();
+        var rComp = (r.competition || "_all").toLowerCase();
 
-    // 2. Repli sur _default si non trouvé dans le pays
-    if (!matchedAliases && testCid !== "_default") {
-      for (var dk in defaultRules) {
-        if (dk.toLowerCase() === normQ || dk.trim().toLowerCase() === q.toLowerCase()) {
-          matchedKey = dk;
-          matchedAliases = defaultRules[dk];
-          matchedFromCountry = "_default";
-          break;
-        }
-      }
-      if (!matchedAliases) {
-        for (var dk2 in defaultRules) {
-          if (normQ.includes(dk2.toLowerCase()) || dk2.toLowerCase().includes(normQ)) {
-            matchedKey = dk2;
-            matchedAliases = defaultRules[dk2];
-            matchedFromCountry = "_default";
-            break;
+        var chanMatches = rChan === normQ || normQ.includes(rChan) || rChan.includes(normQ);
+        if (chanMatches) {
+          if (normComp && rComp !== "_all" && (normComp.includes(rComp) || rComp.includes(normComp))) {
+            return { rule: r, type: "comp_exact" };
+          }
+          if (rComp === "_all" && !allCompMatch) {
+            allCompMatch = { rule: r, type: "comp_all" };
           }
         }
       }
+      return exactCompMatch || allCompMatch;
+    }
+
+    var matchRes = matchInRules(countryRules);
+    var matchedFromCountry = testCid;
+
+    if (!matchRes && testCid !== "_default") {
+      matchRes = matchInRules(defaultRules);
+      matchedFromCountry = "_default";
     }
 
     var targetMeta = getCountryMeta(testCid);
 
-    if (matchedAliases && matchedAliases.length > 0) {
-      var badges = matchedAliases.map(function (a) {
-        return '<span class="vel-foot-alias-badge vel-foot-alias-badge--highlight">' + esc(a) + "</span>";
+    if (matchRes && matchRes.rule) {
+      var r = matchRes.rule;
+      var pkgs = r.packages || [];
+      var aliases = r.aliases || [];
+
+      var compLabel = (!r.competition || r.competition === "_all") ? "Toutes compétitions" : r.competition;
+      var sourceLabel = matchedFromCountry === testCid
+        ? 'Règle spécifique ' + targetMeta.flag + ' ' + targetMeta.name
+        : 'Règle de repli 🌐 Par défaut';
+
+      var pkgsHtml = pkgs.map(function (p) {
+        return '<span class="vel-foot-badge-pkg">📦 ' + esc(p) + '</span>';
       }).join(" ");
 
-      var sourceLabel = matchedFromCountry === testCid
-        ? 'Règle spécifique du pays (' + targetMeta.flag + ' ' + targetMeta.name + ')'
-        : 'Règle générale de repli (🌐 Par défaut)';
+      var aliasesHtml = aliases.map(function (a) {
+        return '<span class="vel-foot-alias-badge vel-foot-alias-badge--highlight">' + esc(a) + '</span>';
+      }).join(" ");
+
+      var actionText = "";
+      if (pkgs.length > 0 && aliases.length > 0) {
+        actionText = "➡️ <strong>Priorité Packages :</strong> Au clic sur le match, le tiroir affichera toutes les chaînes des packages <code>" + esc(pkgs.join(", ")) + "</code>, et démarrera directement la chaîne <code>" + esc(aliases[0]) + "</code>.";
+      } else if (pkgs.length > 0) {
+        actionText = "➡️ <strong>Mode Packages :</strong> Au clic sur le match, le tiroir TV affichera directement l'intégralité des chaînes des packages <code>" + esc(pkgs.join(", ")) + "</code>.";
+      } else {
+        actionText = "➡️ <strong>Mode Recherche :</strong> Le système recherchera les chaînes cibles : <code>" + esc(aliases.join(", ")) + "</code>.";
+      }
 
       resBox.innerHTML = '<div class="vel-foot-test-match-found">' +
-        '<div class="vel-foot-test-header">✅ Correspondance trouvée pour <strong>« ' + esc(matchedKey) + ' »</strong> [' + sourceLabel + '] :</div>' +
-        '<div class="vel-foot-test-tags">' + badges + '</div>' +
-        '<div class="vel-foot-test-subtext">➡️ Lors du clic sur le match dans le bouquet <strong>' + targetMeta.name + '</strong>, la recherche ciblera ces ' + matchedAliases.length + ' chaînes au lieu de « ' + esc(q) + ' ».</div>' +
+        '<div class="vel-foot-test-header">✅ Règle appliquée pour <strong>« ' + esc(r.channel) + ' »</strong> [' + esc(compLabel) + '] <small style="color:#94a3b8;">(' + sourceLabel + ')</small> :</div>' +
+        (pkgs.length > 0 ? '<div style="margin: 0.3rem 0;"><strong>Packages :</strong> ' + pkgsHtml + '</div>' : '') +
+        (aliases.length > 0 ? '<div style="margin: 0.3rem 0;"><strong>Mots-clés :</strong> ' + aliasesHtml + '</div>' : '') +
+        '<div class="vel-foot-test-subtext" style="margin-top: 0.4rem;">' + actionText + '</div>' +
       '</div>';
     } else {
       resBox.innerHTML = '<div class="vel-foot-test-no-match">' +
-        '<div class="vel-foot-test-header">ℹ️ Aucun mappage spécifique pour <strong>« ' + esc(q) + ' »</strong> dans ' + targetMeta.name + '.</div>' +
-        '<div class="vel-foot-test-subtext">➡️ Le système recherchera directement le terme original : <code>' + esc(q) + '</code>.</div>' +
-        '<button type="button" class="vel-foot-btn-action" style="margin-top:0.4rem;" onclick="window.veloraFootballAdmin &amp;&amp; window.veloraFootballAdmin.quickCreateMapping(\'' + esc(q).replace(/'/g, "\\'") + '\')">➕ Créer une règle pour « ' + esc(q) + ' » dans ' + targetMeta.name + '</button>' +
+        '<div class="vel-foot-test-header">ℹ️ Aucune règle configurée pour <strong>« ' + esc(q) + ' »</strong> ' + (compQ ? 'en [' + esc(compQ) + '] ' : '') + 'dans ' + targetMeta.name + '.</div>' +
+        '<div class="vel-foot-test-subtext">➡️ Recherche standard par nom direct : <code>' + esc(q) + '</code>.</div>' +
+        '<button type="button" class="vel-foot-btn-action" style="margin-top:0.4rem;" onclick="window.veloraFootballAdmin &amp;&amp; window.veloraFootballAdmin.quickCreateMapping(\'' + esc(q).replace(/'/g, "\\'") + '\', \'' + esc(compQ).replace(/'/g, "\\'") + '\')">➕ Créer une règle pour « ' + esc(q) + ' » dans ' + targetMeta.name + '</button>' +
       '</div>';
     }
   }
 
-  function quickCreateMapping(channelName) {
+  function quickCreateMapping(channelName, competition) {
     if (!channelName) return;
     resetForm();
     var inputKey = getEl("foot-map-key");
+    var inputComp = getEl("foot-map-competition");
     var inputAliases = getEl("foot-map-aliases");
     if (inputKey) inputKey.value = channelName;
+    if (inputComp && competition) inputComp.value = competition;
     if (inputAliases) inputAliases.value = channelName + " 1, " + channelName + " 2";
     var formEl = getEl("foot-map-form");
     if (formEl) formEl.scrollIntoView({ behavior: "smooth", block: "center" });
     if (inputAliases) inputAliases.focus();
   }
 
-  var jsonDialogMode = "country"; // "country" ou "all"
+  var jsonDialogMode = "country";
 
   function openJsonEditor(mode) {
     var dialog = getEl("foot-json-dialog");
@@ -1550,12 +1614,12 @@
     if (!textarea) return;
     try {
       var parsed = JSON.parse(textarea.value);
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        throw new Error('Le format doit être un objet JSON valide { "Chaîne": ["Alias1", "Alias2"] }');
+      if (!parsed || typeof parsed !== "object") {
+        throw new Error('Format JSON invalide');
       }
 
       if (jsonDialogMode === "country") {
-        state.store[state.selectedCountry] = parsed;
+        state.store[state.selectedCountry] = normalizeCountryRules(parsed);
       } else {
         state.store = normalizeStore(parsed);
       }
@@ -1575,11 +1639,15 @@
     showFootballTab: showFootballTab,
     selectCountry: selectCountry,
     copyFromCountry: copyFromCountry,
-    editMapping: editMapping,
-    deleteMapping: deleteMapping,
+    editRule: editRule,
+    deleteRule: deleteRule,
+    editMapping: editRule,
+    deleteMapping: deleteRule,
     resetForm: resetForm,
     handleSubmit: handleFormSubmit,
-    loadRecommendedDefaults: loadRecommendedDefaults,
+    addPackageTag: addPackageTag,
+    removePackageTag: removePackageTag,
+    clearCountryRules: clearCountryRules,
     quickCreateMapping: quickCreateMapping,
     openJsonEditor: openJsonEditor,
     saveJsonEditor: saveJsonEditor,
@@ -1588,7 +1656,7 @@
     getMappings: function (countryId) {
       if (!countryId) return state.store;
       var cid = countrySlug(countryId);
-      return state.store[cid] || state.store._default || {};
+      return state.store[cid] || state.store._default || [];
     }
   };
 
@@ -1603,7 +1671,7 @@
   document.addEventListener("click", function (e) {
     if (!e || !e.target) return;
 
-    // Intercepter UNIQUEMENT le clic sur le bouton d'onglet dans l'en-tête (et JAMAIS à l'intérieur du panneau football)
+    // Intercepter UNIQUEMENT le bouton d'onglet dans l'en-tête (et JAMAIS à l'intérieur du panneau football)
     var isTabBtn = e.target.closest('#settings-tab-btn-football, #settings-tabs [role="tab"][data-settings-tab="football"], #settings-tabs button[data-settings-tab="football"]');
     if (isTabBtn && !e.target.closest('#settings-tab-football')) {
       showFootballTab();
@@ -1667,20 +1735,20 @@
     }
 
     // Modifier une règle
-    var editBtn = e.target.closest('[data-action="edit-mapping"], .vel-foot-btn-edit');
+    var editBtn = e.target.closest('[data-action="edit-rule"], [data-action="edit-mapping"], .vel-foot-btn-edit');
     if (editBtn) {
       e.preventDefault();
-      var editKey = editBtn.getAttribute("data-key") || editBtn.dataset.key;
-      editMapping(editKey);
+      var editId = editBtn.getAttribute("data-id") || editBtn.getAttribute("data-key") || editBtn.dataset.id || editBtn.dataset.key;
+      editRule(editId);
       return;
     }
 
     // Supprimer une règle
-    var delBtn = e.target.closest('[data-action="delete-mapping"], .vel-foot-btn-delete');
+    var delBtn = e.target.closest('[data-action="delete-rule"], [data-action="delete-mapping"], .vel-foot-btn-delete');
     if (delBtn) {
       e.preventDefault();
-      var delKey = delBtn.getAttribute("data-key") || delBtn.dataset.key;
-      deleteMapping(delKey);
+      var delId = delBtn.getAttribute("data-id") || delBtn.getAttribute("data-key") || delBtn.dataset.id || delBtn.dataset.key;
+      deleteRule(delId);
       return;
     }
   });
@@ -1689,10 +1757,16 @@
     if (e.target && e.target.id === "foot-mappings-search") {
       renderMappingsTable();
     }
-    if (e.target && e.target.id === "foot-test-input") {
-      var val = e.target.value;
+    if (e.target && (e.target.id === "foot-test-input" || e.target.id === "foot-test-comp")) {
       clearTimeout(window.__veloraFootTestTimer);
-      window.__veloraFootTestTimer = setTimeout(function () { runLiveTest(val); }, 200);
+      window.__veloraFootTestTimer = setTimeout(function () { runLiveTest(); }, 200);
+    }
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.target && e.target.id === "foot-map-pkg-input" && e.key === "Enter") {
+      e.preventDefault();
+      addPackageTag();
     }
   });
 
@@ -1702,10 +1776,7 @@
       return;
     }
     if (e.target && e.target.id === "foot-test-country-select") {
-      var testInput = getEl("foot-test-input");
-      if (testInput && testInput.value) {
-        runLiveTest(testInput.value, e.target.value);
-      }
+      runLiveTest();
     }
   });
 

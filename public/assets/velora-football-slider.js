@@ -260,76 +260,199 @@
     return {};
   }
 
-  function getFootballChannelMappings(countryContext) {
+  function normalizeRule(rawItem, idx) {
+    if (!rawItem) return null;
+    var count = (idx || 0) + 1;
+    if (typeof rawItem === 'string') {
+      return {
+        id: 'r_' + count,
+        channel: rawItem.trim(),
+        competition: '_all',
+        packages: [],
+        aliases: [rawItem.trim()]
+      };
+    }
+    var channel = String(rawItem.channel || rawItem.key || rawItem.name || '').trim();
+    if (!channel) return null;
+
+    var comp = String(rawItem.competition || '_all').trim();
+    if (!comp || comp === 'all' || comp === 'global' || comp.toLowerCase() === 'toutes les compétitions (par défaut)') comp = '_all';
+
+    var pkgs = Array.isArray(rawItem.packages)
+      ? rawItem.packages.map(String).map(function (s) { return s.trim(); }).filter(Boolean)
+      : (rawItem.packages ? [String(rawItem.packages).trim()] : []);
+
+    var aliases = Array.isArray(rawItem.aliases)
+      ? rawItem.aliases.map(String).map(function (s) { return s.trim(); }).filter(Boolean)
+      : (rawItem.aliases ? [String(rawItem.aliases).trim()] : []);
+
+    return {
+      id: String(rawItem.id || ('r_' + count)),
+      channel: channel,
+      competition: comp,
+      packages: pkgs,
+      aliases: aliases
+    };
+  }
+
+  function normalizeCountryRules(rawRules) {
+    if (!rawRules) return [];
+    if (Array.isArray(rawRules)) {
+      return rawRules.map(normalizeRule).filter(Boolean);
+    }
+    if (typeof rawRules === 'object') {
+      var list = [];
+      var idx = 0;
+      for (var k in rawRules) {
+        var val = rawRules[k];
+        if (Array.isArray(val)) {
+          list.push({
+            id: 'r_' + (++idx),
+            channel: String(k).trim(),
+            competition: '_all',
+            packages: [],
+            aliases: val.map(String).map(function (s) { return s.trim(); }).filter(Boolean)
+          });
+        } else if (val && typeof val === 'object') {
+          var norm = normalizeRule(Object.assign({ channel: k }, val), ++idx);
+          if (norm) list.push(norm);
+        }
+      }
+      return list;
+    }
+    return [];
+  }
+
+  function getCountryRulesList(countryContext) {
     var rawStore = getRawFootballMappingsStore();
     var cKey = countrySlug(countryContext);
 
-    // Vérifier si le store est au format multi-pays ou ancien format plat
     var hasCountryKeys = rawStore._default || rawStore.france || rawStore.arabe || rawStore.mena || rawStore.maroc || rawStore.algerie || rawStore.uk || rawStore.espagne;
-
-    if (!hasCountryKeys) {
-      // Ancien format plat : renvoyer directement le dictionnaire
-      return rawStore || {};
+    if (!hasCountryKeys && Object.keys(rawStore).length > 0) {
+      return {
+        countryRules: normalizeCountryRules(rawStore),
+        defaultRules: []
+      };
     }
 
-    var countryRules = (cKey && rawStore[cKey]) ? rawStore[cKey] : {};
-    var defaultRules = rawStore._default || {};
-
-    // Fusion : règles du pays prioritaire avec repli sur les règles par défaut
-    return Object.assign({}, defaultRules, countryRules);
+    var countryRules = (cKey && rawStore[cKey]) ? normalizeCountryRules(rawStore[cKey]) : [];
+    var defaultRules = rawStore._default ? normalizeCountryRules(rawStore._default) : [];
+    return {
+      countryRules: countryRules,
+      defaultRules: defaultRules
+    };
   }
 
-  function expandChannelMappings(rawChannels, countryContext) {
-    if (!Array.isArray(rawChannels) || rawChannels.length === 0) return [];
-    var mappings = getFootballChannelMappings(countryContext);
-    var result = [];
+  function matchRuleForChannel(broadcasterName, matchCompetition, rulesList) {
+    if (!broadcasterName || !Array.isArray(rulesList) || rulesList.length === 0) return null;
+    var normB = normalizeChannelText(broadcasterName);
+    var normComp = normalizeChannelText(matchCompetition || '');
 
-    rawChannels.forEach(function (ch) {
-      if (!ch || typeof ch !== 'string') return;
-      var trimmed = ch.trim();
-      if (!trimmed || trimmed === 'Chaîne à confirmer') return;
-
-      var normTarget = normalizeChannelText(trimmed);
-      var matchedAliases = null;
-
-      // 1. Exact or normalized key lookup
-      for (var k in mappings) {
-        if (normalizeChannelText(k) === normTarget || k.trim().toLowerCase() === trimmed.toLowerCase()) {
-          matchedAliases = mappings[k];
-          break;
-        }
-      }
-
-      // 2. Fallback substring match if key is contained in channel
-      if (!matchedAliases) {
-        for (var k2 in mappings) {
-          var normK2 = normalizeChannelText(k2);
-          if (normK2 && (normTarget.includes(normK2) || normK2.includes(normTarget))) {
-            matchedAliases = mappings[k2];
-            break;
+    // 1. Exact / inclusion match on channel AND matching competition
+    if (normComp) {
+      for (var i = 0; i < rulesList.length; i++) {
+        var r = rulesList[i];
+        if (r.competition && r.competition !== '_all') {
+          var rCompNorm = normalizeChannelText(r.competition);
+          if (rCompNorm && (normComp.includes(rCompNorm) || rCompNorm.includes(normComp))) {
+            var rChNorm = normalizeChannelText(r.channel);
+            if (rChNorm === normB || (normB && (rChNorm.includes(normB) || normB.includes(rChNorm)))) {
+              return r;
+            }
           }
         }
       }
+    }
 
-      if (matchedAliases && Array.isArray(matchedAliases) && matchedAliases.length > 0) {
-        matchedAliases.forEach(function (alias) {
-          if (alias && typeof alias === 'string' && alias.trim()) {
-            result.push(alias.trim());
-          }
+    // 2. Exact match on channel with competition === '_all'
+    for (var j = 0; j < rulesList.length; j++) {
+      var r2 = rulesList[j];
+      if (!r2.competition || r2.competition === '_all') {
+        if (normalizeChannelText(r2.channel) === normB || r2.channel.trim().toLowerCase() === broadcasterName.trim().toLowerCase()) {
+          return r2;
+        }
+      }
+    }
+
+    // 3. Substring match on channel with competition === '_all'
+    for (var k = 0; k < rulesList.length; k++) {
+      var r3 = rulesList[k];
+      if (!r3.competition || r3.competition === '_all') {
+        var rNorm = normalizeChannelText(r3.channel);
+        if (rNorm && (normB.includes(rNorm) || rNorm.includes(normB))) {
+          return r3;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  function getStreamsForPackages(packageIdentifiers, state, countryId) {
+    if (!Array.isArray(packageIdentifiers) || packageIdentifiers.length === 0) return [];
+    var matchedStreams = [];
+    var seenStreamIds = new Set();
+    var pkgIdSet = new Set();
+
+    var allPkgs = (window.Pe && Array.isArray(window.Pe.packages)) ? window.Pe.packages : [];
+
+    packageIdentifiers.forEach(function (pkgIdent) {
+      if (!pkgIdent) return;
+      var identStr = String(pkgIdent).trim();
+      var normIdent = normalizeChannelText(identStr);
+
+      pkgIdSet.add(identStr);
+
+      allPkgs.forEach(function (p) {
+        if (!p) return;
+        var pid = String(p.id);
+        var pName = String(p.name || '').trim();
+        var pNorm = normalizeChannelText(pName);
+
+        if (pid === identStr || pName === identStr || pName.toLowerCase() === identStr.toLowerCase()) {
+          pkgIdSet.add(pid);
+        } else if (normIdent && (pNorm === normIdent || pNorm.includes(normIdent) || normIdent.includes(pNorm))) {
+          pkgIdSet.add(pid);
+        }
+      });
+    });
+
+    if (state && state.streamsByCatAll) {
+      pkgIdSet.forEach(function (pkgId) {
+        var streams = state.streamsByCatAll.get(String(pkgId));
+        if (Array.isArray(streams)) {
+          streams.forEach(function (st) {
+            var sid = String(st.stream_id || st.id);
+            if (!seenStreamIds.has(sid)) {
+              seenStreamIds.add(sid);
+              matchedStreams.push(st);
+            }
+          });
+        }
+      });
+
+      if (matchedStreams.length === 0) {
+        state.streamsByCatAll.forEach(function (streams, catKey) {
+          var catNorm = normalizeChannelText(catKey);
+          packageIdentifiers.forEach(function (pkgIdent) {
+            var normIdent = normalizeChannelText(pkgIdent);
+            if (catNorm && normIdent && (catNorm.includes(normIdent) || normIdent.includes(catNorm))) {
+              if (Array.isArray(streams)) {
+                streams.forEach(function (st) {
+                  var sid = String(st.stream_id || st.id);
+                  if (!seenStreamIds.has(sid)) {
+                    seenStreamIds.add(sid);
+                    matchedStreams.push(st);
+                  }
+                });
+              }
+            }
+          });
         });
-      } else {
-        result.push(trimmed);
       }
-    });
+    }
 
-    // Deduplicate preserving order
-    var seen = new Set();
-    return result.filter(function (c) {
-      var k = c.toLowerCase();
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    });
+    return matchedStreams;
   }
 
   document.addEventListener('velora-football-mappings-changed', function (e) {
@@ -346,21 +469,73 @@
       } catch (_) {}
     }
 
+    var state = (typeof window.veloraGetState === 'function') ? window.veloraGetState() : null;
+    var countryId = (typeof window.veloraGetActiveCountryId === 'function') ? window.veloraGetActiveCountryId() : null;
+
     var rawChannels = Array.isArray(match.tvChannels) ? match.tvChannels.slice() : [];
     if (priorityChannel) {
       rawChannels = [priorityChannel].concat(rawChannels.filter(function (c) { return c !== priorityChannel; }));
     }
 
-    var targetChannels = expandChannelMappings(rawChannels, rawCountry);
-    if (targetChannels.length === 0) {
-      targetChannels = rawChannels.slice();
+    var rules = getCountryRulesList(rawCountry);
+    var targetKeywords = [];
+    var matchedPackages = [];
+    var matchedAliasesForPackageScoring = [];
+
+    rawChannels.forEach(function (bc) {
+      if (!bc || typeof bc !== 'string' || bc === 'Chaîne à confirmer') return;
+      var trimmed = bc.trim();
+      var r = matchRuleForChannel(trimmed, match.competition, rules.countryRules) ||
+              matchRuleForChannel(trimmed, match.competition, rules.defaultRules);
+
+      if (r) {
+        if (Array.isArray(r.packages) && r.packages.length > 0) {
+          r.packages.forEach(function (pkg) {
+            if (pkg && !matchedPackages.includes(pkg)) matchedPackages.push(pkg);
+          });
+        }
+        if (Array.isArray(r.aliases) && r.aliases.length > 0) {
+          r.aliases.forEach(function (alias) {
+            if (alias && !targetKeywords.includes(alias)) targetKeywords.push(alias);
+            if (alias && !matchedAliasesForPackageScoring.includes(alias)) matchedAliasesForPackageScoring.push(alias);
+          });
+        } else {
+          if (!targetKeywords.includes(r.channel)) targetKeywords.push(r.channel);
+          if (!matchedAliasesForPackageScoring.includes(r.channel)) matchedAliasesForPackageScoring.push(r.channel);
+        }
+      } else {
+        if (!targetKeywords.includes(trimmed)) targetKeywords.push(trimmed);
+        if (!matchedAliasesForPackageScoring.includes(trimmed)) matchedAliasesForPackageScoring.push(trimmed);
+      }
+    });
+
+    // 1. Priorité aux Packages IPTV configurés par l'administrateur
+    if (matchedPackages.length > 0) {
+      var pkgStreams = getStreamsForPackages(matchedPackages, state, countryId);
+      if (pkgStreams.length > 0) {
+        var scoringKeywords = matchedAliasesForPackageScoring.length > 0 ? matchedAliasesForPackageScoring : (targetKeywords.length > 0 ? targetKeywords : rawChannels);
+        
+        var scoredList = pkgStreams.map(function (st) {
+          var maxScore = 10; // score de base pour toute chaîne du package
+          scoringKeywords.forEach(function (kw) {
+            var sc = scoreChannelMatch(st, kw);
+            if (sc > maxScore) maxScore = sc;
+          });
+          return { stream: st, score: maxScore };
+        });
+
+        // Les meilleures correspondances d'alias/chaînes en premier, suivies de tout le reste du package
+        scoredList.sort(function (a, b) {
+          return b.score - a.score;
+        });
+
+        return scoredList.map(function (e) { return e.stream; });
+      }
     }
 
+    // 2. Recherche standard par mots-clés / alias
     var foundStreamsMap = new Map();
-    var state = (typeof window.veloraGetState === 'function') ? window.veloraGetState() : null;
-    var countryId = (typeof window.veloraGetActiveCountryId === 'function') ? window.veloraGetActiveCountryId() : null;
 
-    // 1. Recherche dans les chaînes déjà chargées du pays actif
     if (state && state.streamsByCatAll) {
       var candidatePackages = [];
       if (window.Pe && Array.isArray(window.Pe.packages)) {
@@ -387,7 +562,8 @@
         });
       }
 
-      targetChannels.forEach(function (tvCh) {
+      var searchKwList = targetKeywords.length > 0 ? targetKeywords : rawChannels;
+      searchKwList.forEach(function (tvCh) {
         localStreams.forEach(function (st) {
           var score = scoreChannelMatch(st, tvCh);
           if (score >= 60) {
@@ -401,10 +577,11 @@
       });
     }
 
-    // 2. Recherche via l'API de recherche du pays (VPS / Nodecast)
+    // 3. Recherche via l'API de recherche du pays (VPS / Nodecast)
     if (typeof window.veloraSearchCountryContent === 'function') {
-      for (var i = 0; i < targetChannels.length; i++) {
-        var chQuery = targetChannels[i];
+      var searchKwList2 = targetKeywords.length > 0 ? targetKeywords : rawChannels;
+      for (var i = 0; i < searchKwList2.length; i++) {
+        var chQuery = searchKwList2[i];
         if (!chQuery || chQuery.length < 2 || chQuery === 'Chaîne à confirmer') continue;
         try {
           var searchRes = await window.veloraSearchCountryContent(chQuery);
@@ -426,7 +603,7 @@
       }
     }
 
-    // 3. Si aucune chaîne spécifique n'est trouvée, recherche par équipes du match (ex: chaînes EVENT)
+    // 4. Si aucune chaîne spécifique n'est trouvée, recherche par équipes du match (ex: chaînes EVENT)
     if (foundStreamsMap.size === 0 && (match.homeTeam?.name || match.awayTeam?.name)) {
       var queryTeams = [match.homeTeam?.name, match.awayTeam?.name].filter(Boolean);
       for (var k = 0; k < queryTeams.length; k++) {

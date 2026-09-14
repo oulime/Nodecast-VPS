@@ -6656,16 +6656,59 @@
                     </select>
                   </div>
                 </div>
-                <p class="desc">Sélectionnez le pays pour lequel vous souhaitez créer ou modifier la règle, puis définissez la chaîne du match et ses mots-clés de recherche.</p>
+                <p class="desc">Associez un diffuseur et/ou une compétition à des packages IPTV prioritaires et/ou des mots-clés de chaînes.</p>
                 <form id="foot-map-form" onsubmit="window.veloraFootballAdmin && window.veloraFootballAdmin.handleSubmit(event); return false;">
                   <div class="vel-foot-form-group">
+                    <label for="foot-map-competition">Compétition (Optionnel)</label>
+                    <input type="text" id="foot-map-competition" list="foot-competition-datalist" class="vel-foot-input" placeholder="🌐 Toutes les compétitions (Par défaut) ou ex: Ligue 1" autocomplete="off" />
+                    <datalist id="foot-competition-datalist">
+                      <option value="_all">🌐 Toutes les compétitions (Par défaut)</option>
+                      <option value="Ligue 1">🇫🇷 Ligue 1</option>
+                      <option value="Premier League">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option>
+                      <option value="UEFA Champions League">🏆 UEFA Champions League</option>
+                      <option value="UEFA Europa League">🏆 UEFA Europa League</option>
+                      <option value="UEFA Europa Conference League">🏆 UEFA Europa Conference League</option>
+                      <option value="La Liga">🇪🇸 La Liga</option>
+                      <option value="Serie A">🇮🇹 Serie A</option>
+                      <option value="Bundesliga">🇩🇪 Bundesliga</option>
+                      <option value="Ligue 2">🇫🇷 Ligue 2</option>
+                      <option value="Coupe de France">🇫🇷 Coupe de France</option>
+                      <option value="FA Cup">🏴󠁧󠁢󠁥󠁮󠁧󠁿 FA Cup</option>
+                      <option value="Copa del Rey">🇪🇸 Copa del Rey</option>
+                      <option value="Coppa Italia">🇮🇹 Coppa Italia</option>
+                      <option value="DFB-Pokal">🇩🇪 DFB-Pokal</option>
+                      <option value="Botola Pro">🇲🇦 Botola Pro</option>
+                      <option value="Saudi Pro League">🇸🇦 Saudi Pro League</option>
+                      <option value="CAN">🌍 Coupe d'Afrique des Nations (CAN)</option>
+                    </datalist>
+                  </div>
+
+                  <div class="vel-foot-form-group" style="margin-top: 0.5rem;">
                     <label for="foot-map-key">Nom chaîne du match (diffuseur)</label>
                     <input type="text" id="foot-map-key" class="vel-foot-input" placeholder="ex: Canal+ ou beIN Sports 1" required autocomplete="off" />
                   </div>
+
                   <div class="vel-foot-form-group" style="margin-top: 0.5rem;">
-                    <label for="foot-map-aliases">Mots-clés de recherche / Alias (séparés par des virgules)</label>
-                    <input type="text" id="foot-map-aliases" class="vel-foot-input" placeholder="ex: Canal+ Sport, Canal+ Foot, Canal+ 360" required autocomplete="off" />
+                    <label for="foot-map-pkg-input">Package(s) de chaînes IPTV prioritaires (Optionnel)</label>
+                    <div class="vel-foot-pkg-picker-wrap">
+                      <div id="foot-map-selected-packages" class="vel-foot-selected-tags"></div>
+                      <div style="display:flex; gap:0.4rem; margin-top:0.35rem;">
+                        <input type="text" id="foot-map-pkg-input" list="foot-packages-datalist" class="vel-foot-input" style="flex:1;" placeholder="Choisir ou taper un package (ex: FR | CANAL+, FR | SPORTS)..." autocomplete="off" />
+                        <button type="button" id="foot-map-pkg-add-btn" class="vel-foot-btn vel-foot-btn-secondary vel-foot-btn-sm" onclick="window.veloraFootballAdmin &amp;&amp; window.veloraFootballAdmin.addPackageTag()">➕ Ajouter package</button>
+                      </div>
+                      <datalist id="foot-packages-datalist">
+                        <!-- Rempli dynamiquement avec les packages Live du pays -->
+                      </datalist>
+                    </div>
+                    <span style="font-size:0.75rem; color:#94a3b8; margin-top:0.2rem;">💡 Si configuré, toutes les chaînes de ces packages seront listées dans le tiroir TV au clic sur le match (avec priorité aux chaînes des packages).</span>
                   </div>
+
+                  <div class="vel-foot-form-group" style="margin-top: 0.5rem;">
+                    <label for="foot-map-aliases">Mots-clés de recherche / Alias de chaînes (séparés par des virgules)</label>
+                    <input type="text" id="foot-map-aliases" class="vel-foot-input" placeholder="ex: Canal+ Sport, Canal+ Foot, Canal+ 360" autocomplete="off" />
+                    <span style="font-size:0.75rem; color:#94a3b8; margin-top:0.2rem;">Permet de cibler la chaîne précise qui démarrera automatiquement.</span>
+                  </div>
+
                   <div class="vel-foot-form-actions">
                     <button type="button" id="foot-map-submit-btn" class="vel-foot-btn vel-foot-btn-primary" onclick="window.veloraFootballAdmin && window.veloraFootballAdmin.handleSubmit(event)">➕ Ajouter la règle</button>
                     <button type="button" id="foot-map-reset-btn" class="vel-foot-btn vel-foot-btn-secondary" onclick="window.veloraFootballAdmin && window.veloraFootballAdmin.resetForm()">Réinitialiser</button>
@@ -6681,12 +6724,19 @@
                     <!-- Rempli dynamiquement -->
                   </select>
                 </div>
-                <p class="desc">Tapez un nom de diffuseur pour simuler instantanément les mots-clés recherchés dans le pays sélectionné.</p>
+                <p class="desc">Testez la résolution d'une chaîne et d'une compétition pour voir les packages et mots-clés qui seront déclenchés.</p>
+                
                 <div class="vel-foot-form-group">
-                  <label for="foot-test-input">Chaîne à tester</label>
+                  <label for="foot-test-comp">Compétition du test (Optionnel)</label>
+                  <input type="text" id="foot-test-comp" list="foot-competition-datalist" class="vel-foot-input" placeholder="ex: Ligue 1, Premier League ou laisser vide" autocomplete="off" />
+                </div>
+
+                <div class="vel-foot-form-group" style="margin-top: 0.4rem;">
+                  <label for="foot-test-input">Chaîne diffuseur à tester</label>
                   <input type="text" id="foot-test-input" class="vel-foot-input" placeholder="Tapez ex: Canal+, beIN 1, Sky Sports, DAZN..." autocomplete="off" />
                 </div>
-                <div id="foot-test-results" class="vel-foot-test-box">
+
+                <div id="foot-test-results" class="vel-foot-test-box" style="margin-top: 0.5rem;">
                   <span class="vel-foot-test-hint">Entrez le nom d'un diffuseur pour tester le résultat.</span>
                 </div>
               </div>
@@ -6705,13 +6755,15 @@
                 <table class="vel-foot-table">
                   <thead>
                     <tr>
-                      <th>Chaîne du Match</th>
-                      <th>Mots-clés de Recherche (Alias)</th>
-                      <th style="text-align: right;">Actions</th>
+                      <th style="width: 20%;">Chaîne Match</th>
+                      <th style="width: 18%;">Compétition</th>
+                      <th style="width: 25%;">Packages Prioritaires</th>
+                      <th style="width: 25%;">Mots-clés / Alias</th>
+                      <th style="width: 12%; text-align: right;">Actions</th>
                     </tr>
                   </thead>
                   <tbody id="foot-mappings-tbody">
-                    <tr><td colspan="3" class="vel-foot-empty">Chargement des règles...</td></tr>
+                    <tr><td colspan="5" class="vel-foot-empty">Chargement des règles...</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -6725,7 +6777,7 @@
                 <button type="button" id="foot-json-tab-all" class="vel-foot-json-tab-btn">🌐 Tous les pays (Multi-pays complet)</button>
               </div>
               <p style="font-size:0.82rem; color:#94a3b8; margin-bottom:0.75rem;">
-                Modifiez l'objet JSON ci-dessous directement pour importer ou exporter en masse. Format : <code>{ "Chaîne": ["Alias1", "Alias2"] }</code>.
+                Format étendu : <code>[ { "channel": "Canal+", "competition": "_all", "packages": ["FR | CANAL+"], "aliases": ["Canal+ Sport"] } ]</code>.
               </p>
               <textarea id="foot-json-textarea" class="vel-foot-textarea" rows="14" style="width:100%; box-sizing:border-box; font-family:monospace; font-size:0.85rem;"></textarea>
               <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1rem;">
@@ -17536,7 +17588,7 @@
   <script defer src="/assets/velora-live-wheel.js?v=20260911-fav-name-v11"></script>
   <link rel="stylesheet" href="/assets/velora-prime-carousel.css?v=20260912-clean-title-v9" />
   <script defer src="/assets/velora-prime-carousels.js?v=20260912-clean-title-v9"></script>
-  <script defer src="/assets/velora-football-slider.js?v=20260914-foot-slider-v12"></script>
+  <script defer src="/assets/velora-football-slider.js?v=20260914-foot-slider-v15-comp-pkg"></script>
   <script>
     (() => {
       document.addEventListener("click", function (e) {
@@ -17589,7 +17641,7 @@
   <script defer src="/assets/velora-nav-controller.js?v=20260914-teardown-v7"></script>
   <link rel="stylesheet" href="/assets/velora-adult.css?v=20260912-hub-images-v3" />
   <script defer src="/assets/velora-adult.js?v=20260912-hub-images-v3"></script>
-  <script defer src="/assets/velora-football-admin.js?v=20260914-foot-admin-v2-cachebust"></script>
+  <script defer src="/assets/velora-football-admin.js?v=20260914-foot-admin-v7-clean-persistence"></script>
 </body>
 
 </html>

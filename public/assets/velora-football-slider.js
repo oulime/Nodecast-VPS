@@ -948,7 +948,7 @@
 
       var noticeText = isFinished
         ? 'Ce match est <strong>déjà terminé</strong> (coup d\'envoi était à ' + escapeHtml(matchObj.time || '') + ').'
-        : 'Ce match <strong>n\'a pas encore commencé</strong>.<br>Coup d\'envoi prévu à <strong>' + escapeHtml(matchObj.time || '--:--') + '</strong> (dans <strong>' + timeRemainingStr + '</strong>).';
+        : 'Ce match <strong>n\'a pas encore commencé</strong>.<br>Coup d\'envoi dans <strong>' + timeRemainingStr + '</strong>.';
 
       var noticeIcon = isFinished ? '🏁' : '⏳';
 

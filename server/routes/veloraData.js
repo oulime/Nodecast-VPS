@@ -2708,7 +2708,7 @@ function buildHomeCache() {
         const orientation = String(section.card_orientation || 'vertical').toLowerCase() === 'horizontal' ? 'horizontal' : 'vertical';
         const isHorizontal = orientation === 'horizontal';
         let entries = [];
-        if (Array.isArray(section.custom_entries) && section.custom_entries.length > 0) {
+        if (!section.package_id && Array.isArray(section.custom_entries) && section.custom_entries.length > 0) {
             entries = section.custom_entries.map((item, a) => {
                 const rawName = String(item.name || item.title || '').trim();
                 const rawId = item.streamId ?? item.stream_id ?? item.raw_stream_id ?? a;
@@ -2763,6 +2763,15 @@ function buildHomeCache() {
                 };
             }).filter(item => item?.name).slice(0, HOME_CACHE_ENTRIES_PER_PACKAGE);
         } else {
+            const customVisuals = new Map();
+            if (Array.isArray(section.custom_entries)) {
+                for (const c of section.custom_entries) {
+                    const sId = String(c.streamId ?? c.stream_id ?? c.id ?? '').trim();
+                    const sName = normalizedPosterTitle(c.name || c.title || '');
+                    if (sId) customVisuals.set(`id:${sId}`, c);
+                    if (sName) customVisuals.set(`name:${sName}`, c);
+                }
+            }
             const curationList = curationsByPkg.get(String(section.package_id)) || [];
             const seen = new Set();
             const rawItems = [];
@@ -2820,8 +2829,9 @@ function buildHomeCache() {
                 const rawName = String(item.name || item.title || item.series_name || '').trim();
                 if (type === 'live' && isHomeChannelHidden(rawName, channelRules.hiddenFilters)) return null;
                 const sourceId = String(item.source_id ?? '').trim();
+                const customItem = customVisuals.get(`id:${rawId}`) || customVisuals.get(`name:${normalizedPosterTitle(rawName)}`) || {};
 
-                let backdropCandidate = item.backdrop_path ?? item.backdrop ?? item.backdrop_url ?? '';
+                let backdropCandidate = customItem.backdropUrl || customItem.backdrop || item.backdrop_path || item.backdrop || item.backdrop_url || '';
                 if (Array.isArray(backdropCandidate) && backdropCandidate.length > 0) backdropCandidate = backdropCandidate[0];
                 let backdropUrl = '';
                 if (typeof backdropCandidate === 'string' && backdropCandidate.trim()) {
@@ -2831,16 +2841,16 @@ function buildHomeCache() {
                 }
                 const sectionPkgCover = String(packageRow.cover_url || section.logo_url || section.badge_logo_url || '').trim();
                 const standardThumb = type === 'live'
-                    ? sanitizeChannelIcon(rawName, item.stream_icon || item.cover || '', sectionPkgCover, {
+                    ? sanitizeChannelIcon(rawName, customItem.thumbUrl || item.stream_icon || item.cover || '', sectionPkgCover, {
                         package_id: section.package_id,
                         category_id: item.raw_category_id ?? item.category_id,
                         source_id: item.source_id,
                         item_id: rawId
                     })
-                    : String(item.stream_icon || item.cover || '');
-                let horizontalThumb = '';
-                let titleLogo = item.title_logo || item.titleLogo || item.logo || '';
-                let hasIntegratedTitle = false;
+                    : String(customItem.thumbUrl || item.stream_icon || item.cover || '');
+                let horizontalThumb = customItem.horizontal_thumb || '';
+                let titleLogo = customItem.title_logo || customItem.titleLogo || customItem.logo || item.title_logo || item.titleLogo || item.logo || '';
+                let hasIntegratedTitle = Boolean(customItem.has_integrated_title);
                 if (isHorizontal && (type === 'movies' || type === 'series')) {
                     const clean = cleanMediaTitleForSearch(rawName);
                     const k1 = `${type === 'movies' ? 'movie' : 'tv'}:${(clean.title || rawName).toLowerCase().trim()}`;

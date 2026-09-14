@@ -1136,10 +1136,6 @@
 
     var id = media.id;
     var alreadyInResume = isMediaAlreadyInResume(media, id);
-    if (alreadyInResume || isRewindCommit || isEnd || !isThrottled || (video.currentTime >= MIN_WATCH_SECONDS)) {
-      sessionTracker.qualified = true;
-    }
-
     var existingEntry = getLocalHistory().find(function (item) { return String(item.id) === String(id); });
 
     var realCurrent = Number.isFinite(video.currentTime) ? video.currentTime : 0;
@@ -1150,9 +1146,22 @@
     var percent = isEnd ? 100 : (duration > 0 ? Math.round((currentPos / duration) * 100) : 5);
     var isFinished = isEnd || (duration > 0 && percent >= FINISHED_WATCH_PERCENT);
 
-    if (!isFinished && !sessionTracker.qualified && !alreadyInResume && !existingEntry && !isRewindCommit && video.currentTime < MIN_WATCH_SECONDS) {
+    var minSec = getResumeMinWatchSeconds();
+    var continuousSecs = sessionTracker.continuousSeconds || 0;
+
+    // Strict qualification check:
+    // 1. Content already in Reprendre / History -> always qualified (immediate seek/position updates)
+    // 2. Video completed/ended -> qualified
+    // 3. User watched continuously for >= minSec (default 3 mins) -> qualified
+    // 4. User sought or played to a position >= minSec -> qualified
+    // 5. Already marked qualified during this active session -> qualified
+    var isQualified = isFinished || alreadyInResume || !!existingEntry || sessionTracker.qualified || (isRewindCommit && sessionTracker.qualified) || (realCurrent >= minSec) || (continuousSecs >= minSec);
+
+    if (!isQualified) {
       return;
     }
+
+    sessionTracker.qualified = true;
 
     var items = getLocalHistory().filter(function (item) {
       return String(item.id) !== String(id);
@@ -2438,8 +2447,7 @@
   window.veloraInjectResumeSection = injectResumeSectionDirectly;
   window.veloraSaveCurrentProgress = function () {
     var video = document.getElementById("video-vod");
-    if (video && Number.isFinite(video.currentTime) && video.currentTime >= MIN_WATCH_SECONDS) {
-      sessionTracker.qualified = true;
+    if (video && Number.isFinite(video.currentTime)) {
       recordProgress(video, false, false, true);
       injectResumeSectionDirectly();
     }
@@ -2488,7 +2496,7 @@
         var isHiddenNow = vodContainer.classList.contains("hidden") || vodContainer.style.display === "none";
         if (isHiddenNow) {
           var video = document.getElementById("video-vod");
-          if (video && Number.isFinite(video.currentTime) && video.currentTime >= MIN_WATCH_SECONDS) {
+          if (video && Number.isFinite(video.currentTime)) {
             recordProgress(video, false, false, true);
           }
           injectResumeSectionDirectly();
@@ -2547,7 +2555,7 @@
     homeEvents.forEach(function (evName) {
       document.addEventListener(evName, function () {
         var video = document.getElementById("video-vod");
-        if (video && Number.isFinite(video.currentTime) && video.currentTime >= MIN_WATCH_SECONDS) {
+        if (video && Number.isFinite(video.currentTime)) {
           recordProgress(video, false, false, true);
         }
         state.needsResumeRailRefresh = false;
@@ -2558,7 +2566,7 @@
 
     window.addEventListener("velora-home-media-stop", function () {
       var video = document.getElementById("video-vod");
-      if (video && Number.isFinite(video.currentTime) && video.currentTime >= MIN_WATCH_SECONDS) {
+      if (video && Number.isFinite(video.currentTime)) {
         recordProgress(video, false, false, true);
       }
       state.needsResumeRailRefresh = false;
@@ -2572,7 +2580,7 @@
       var targetEl = e.target.closest("#btn-close-vod-player, .btn-close-vod, #btn-go-home, #btn-logo-home, #btn-back-home, [data-tab='home'], [data-nav-target='home'], .vel-nav-item[data-tab='home'], [data-bottom-nav], .vel-bottom-nav__button, .vel-vod-back-btn, .vod-back-btn, .player-back-btn, #btn-adult-back-home, #vel-home-search-trigger, #vel-home-profile-trigger, [data-tab]");
       if (targetEl) {
         var video = document.getElementById("video-vod");
-        if (video && Number.isFinite(video.currentTime) && video.currentTime >= MIN_WATCH_SECONDS) {
+        if (video && Number.isFinite(video.currentTime)) {
           recordProgress(video, false, false, true);
         }
         setTimeout(injectResumeSectionDirectly, 40);

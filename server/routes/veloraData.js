@@ -2636,22 +2636,32 @@ router.post('/admin/rebuild-media-feed', (req, res) => {
     }
 });
 
-// Nightly automatic feed cache rebuild (every 24 hours) & on snapshot ready
+// Nightly automatic feed & home cache rebuild (every 24 hours) & on snapshot ready
 try {
-    veloraCatalogCache.onSnapshotReady(() => {
+    veloraCatalogCache.onSnapshotReady(async () => {
         try {
             buildMediaFeedCache();
-            console.log('[Velora cache] Media feed cache auto-refreshed on snapshot update.');
+            const homePayload = buildHomeCache();
+            await enrichHomeCacheMoviePosters(homePayload);
+            await enrichHomeCacheBackdrops(homePayload);
+            await enrichHomeCacheTitleLogos(homePayload);
+            writeJsonAtomic(homeCachePath, homePayload);
+            console.log('[Velora cache] Media feed and Home cache auto-refreshed on snapshot update.');
         } catch (e) {
-            console.warn('[Velora cache] Media feed post-build hook error:', e.message);
+            console.warn('[Velora cache] Post-build hook error:', e.message);
         }
     });
 } catch (_) {}
 
-setInterval(() => {
+setInterval(async () => {
     try {
         buildMediaFeedCache();
-        console.log('[Velora cache] Nightly media feed cache rebuild completed.');
+        const homePayload = buildHomeCache();
+        await enrichHomeCacheMoviePosters(homePayload);
+        await enrichHomeCacheBackdrops(homePayload);
+        await enrichHomeCacheTitleLogos(homePayload);
+        writeJsonAtomic(homeCachePath, homePayload);
+        console.log('[Velora cache] Nightly media feed and Home cache rebuild completed.');
     } catch (e) {
         console.warn('[Velora cache] Nightly rebuild failed:', e.message);
     }
@@ -2666,44 +2676,35 @@ function buildHomeCache() {
         .filter(row => sectionPackageIds.has(String(row.target_package_id || '')));
     const resolvedPackages = countryPackageCache.packages;
     const packages = new Map(resolvedPackages.map(row => [String(row.id), row]));
-    const packageStreams = new Map();
+    const curationsByPkg = new Map();
     for (const row of curations) {
         const packageId = String(row.target_package_id || '').trim();
         const streamId = String(row.stream_id || '').trim();
         if (!packageId || !streamId) continue;
-        const packageRow = packages.get(packageId) || {};
-        const sourceId = String(row.source_id ?? packageRow.source_id ?? '').trim();
-        const kind = String(row.kind ?? packageRow.kind ?? '').trim();
-        if (!packageStreams.has(packageId)) {
-            packageStreams.set(packageId, { keys: new Set(), sourceAware: false });
+        if (!curationsByPkg.has(packageId)) {
+            curationsByPkg.set(packageId, []);
         }
-        const membership = packageStreams.get(packageId);
-        if ((kind === 'vod' || kind === 'series') && sourceId) {
-            membership.sourceAware = true;
-            membership.keys.add(`${sourceId}:${streamId}`);
-        } else {
-            membership.keys.add(streamId);
-        }
+        curationsByPkg.get(packageId).push(row);
     }
-    const snapshots = {
-        live: veloraCatalogCache.getSnapshot('live_streams') || [],
-        movies: veloraCatalogCache.getSnapshot('vod_streams') || [],
-        series: veloraCatalogCache.getSnapshot('series') || []
-    };
+
+    const db = getDb();
+    const enabledSourceIds = getEnabledSourceIdSet();
+    const findItem = db.prepare(`
+        SELECT source_id, item_id, name, stream_icon, container_extension, provider_order, rating, year, added_at, data
+        FROM playlist_items
+        WHERE source_id = ? AND type = ? AND item_id = ? AND is_hidden = 0
+    `);
+
     let backdropCache = {};
     try { backdropCache = JSON.parse(fs.readFileSync(vodBackdropCachePath, 'utf8')) || {}; } catch (_) {}
 
-    const enabledSourceIds = getEnabledSourceIdSet();
     const output = sections.map(section => {
         const type = ['live', 'movies', 'series'].includes(section.content_type)
             ? section.content_type : 'live';
+        const itemType = type === 'movies' ? 'movie' : type;
         const packageRow = packages.get(String(section.package_id)) || {};
-        const providerSourceId = String(packageRow.source_id ?? '').trim();
+        const providerSourceId = Number.parseInt(packageRow.source_id, 10);
         const providerCategoryId = String(packageRow.category_id ?? '').trim();
-        const providerKind = String(packageRow.kind ?? '').trim();
-        const expectedKind = type === 'movies' ? 'vod' : type;
-        const providerBacked = Boolean(providerSourceId && providerCategoryId && (!providerKind || providerKind === expectedKind));
-        const membership = packageStreams.get(String(section.package_id)) || { keys: new Set(), sourceAware: false };
         const orientation = String(section.card_orientation || 'vertical').toLowerCase() === 'horizontal' ? 'horizontal' : 'vertical';
         const isHorizontal = orientation === 'horizontal';
         let entries = [];
@@ -2762,27 +2763,63 @@ function buildHomeCache() {
                 };
             }).filter(item => item?.name).slice(0, HOME_CACHE_ENTRIES_PER_PACKAGE);
         } else {
-            entries = snapshots[type].filter(item => {
-                const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
-                const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
-                if (sourceId && !enabledSourceIds.has(sourceId)) return false;
-                if (membership.keys.size) {
-                    return membership.sourceAware
-                        ? membership.keys.has(`${sourceId}:${String(rawId)}`)
-                        : membership.keys.has(String(rawId));
+            const curationList = curationsByPkg.get(String(section.package_id)) || [];
+            const seen = new Set();
+            const rawItems = [];
+
+            for (const curation of curationList) {
+                const sourceId = Number.parseInt(curation.source_id, 10);
+                const streamId = String(curation.stream_id || '').trim();
+                const key = `${sourceId}:${streamId}`;
+                if (!Number.isInteger(sourceId) || !streamId || !enabledSourceIds.has(String(sourceId)) || seen.has(key)) continue;
+                const item = findItem.get(sourceId, itemType, streamId);
+                if (!item) continue;
+                seen.add(key);
+                let data = {};
+                try { data = JSON.parse(item.data || '{}'); } catch (_) {}
+                rawItems.push({
+                    ...data,
+                    ...item,
+                    raw_stream_id: item.item_id,
+                    raw_series_id: item.item_id,
+                    stream_id: item.item_id,
+                    series_id: item.item_id
+                });
+            }
+
+            if (!rawItems.length && Number.isInteger(providerSourceId) && providerCategoryId && enabledSourceIds.has(String(providerSourceId))) {
+                const catItems = db.prepare(`
+                    SELECT source_id, item_id, name, stream_icon, container_extension, provider_order, rating, year, added_at, data
+                    FROM playlist_items
+                    WHERE source_id = ? AND type = ? AND category_id = ? AND is_hidden = 0
+                    ORDER BY provider_order ASC, rowid ASC
+                `).all(providerSourceId, itemType, providerCategoryId);
+                for (const item of catItems) {
+                    let data = {};
+                    try { data = JSON.parse(item.data || '{}'); } catch (_) {}
+                    rawItems.push({
+                        ...data,
+                        ...item,
+                        raw_stream_id: item.item_id,
+                        raw_series_id: item.item_id,
+                        stream_id: item.item_id,
+                        series_id: item.item_id
+                    });
                 }
-                if (providerBacked) {
-                    return sourceId === providerSourceId
-                        && String(item.raw_category_id ?? '') === providerCategoryId;
-                }
-                return false;
-            }).map(item => {
-                const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
+            }
+
+            // Sort in exact provider order
+            rawItems.sort((left, right) => {
+                const a = Number.isFinite(left.provider_order) ? left.provider_order : Number.MAX_SAFE_INTEGER;
+                const b = Number.isFinite(right.provider_order) ? right.provider_order : Number.MAX_SAFE_INTEGER;
+                return a - b || String(left.name).localeCompare(String(right.name), 'fr');
+            });
+
+            entries = rawItems.map(item => {
+                const rawId = item.item_id ?? item.raw_stream_id ?? item.stream_id;
                 const rawName = String(item.name || item.title || item.series_name || '').trim();
                 if (type === 'live' && isHomeChannelHidden(rawName, channelRules.hiddenFilters)) return null;
-                const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
-                const key = `${sourceId}:${String(rawId)}`;
-                const titleKey = normalizedPosterTitle(rawName);
+                const sourceId = String(item.source_id ?? '').trim();
 
                 let backdropCandidate = item.backdrop_path ?? item.backdrop ?? item.backdrop_url ?? '';
                 if (Array.isArray(backdropCandidate) && backdropCandidate.length > 0) backdropCandidate = backdropCandidate[0];
@@ -2809,8 +2846,10 @@ function buildHomeCache() {
                     const k1 = `${type === 'movies' ? 'movie' : 'tv'}:${(clean.title || rawName).toLowerCase().trim()}`;
                     const k2 = `${type === 'movies' ? 'movie' : 'tv'}:${rawName.toLowerCase().trim()}`;
                     const hCache = getHorizontalThumbCache();
-                    if (hCache[k1] && hCache[k1] !== 'NONE') horizontalThumb = hCache[k1];
-                    else if (hCache[k2] && hCache[k2] !== 'NONE') horizontalThumb = hCache[k2];
+                    if (!horizontalThumb) {
+                        if (hCache[k1] && hCache[k1] !== 'NONE') horizontalThumb = hCache[k1];
+                        else if (hCache[k2] && hCache[k2] !== 'NONE') horizontalThumb = hCache[k2];
+                    }
                     if (horizontalThumb) {
                         hasIntegratedTitle = true;
                         titleLogo = '';

@@ -461,10 +461,34 @@
     };
   }
 
+  function findMappingKey(mappings, rawKey) {
+    if (!mappings || !rawKey) return null;
+    if (mappings[rawKey] !== undefined) return rawKey;
+    var normTarget = String(rawKey).trim().toLowerCase();
+    for (var k in mappings) {
+      if (k.trim().toLowerCase() === normTarget) return k;
+    }
+    var unescaped = String(rawKey)
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .trim().toLowerCase();
+    for (var k2 in mappings) {
+      if (k2.trim().toLowerCase() === unescaped) return k2;
+    }
+    return null;
+  }
+
   /**
    * Récupère la liste exacte des pays visibles créés par l'admin dans l'onglet Pays.
    */
-  async function fetchVisibleCountries() {
+  async function fetchVisibleCountries(force) {
+    if (!force && state.visibleCountriesList && state.visibleCountriesList.length > 0) {
+      return state.visibleCountriesList;
+    }
+
     try {
       var t = localStorage.getItem("authToken");
       var headers = { "apikey": KEY, "Authorization": "Bearer " + KEY };
@@ -511,7 +535,7 @@
       return state.visibleCountriesList;
     } catch (e) {
       console.warn("[Velora Football Admin] Erreur lors du chargement des pays visibles:", e.message);
-      return [];
+      return state.visibleCountriesList || [];
     }
   }
 
@@ -876,9 +900,9 @@
         font-size: 0.82rem;
       }
       .vel-foot-btn-action {
-        padding: 0.35rem 0.65rem;
+        padding: 0.4rem 0.75rem;
         border-radius: 6px;
-        font-size: 0.75rem;
+        font-size: 0.78rem;
         font-weight: 700;
         cursor: pointer;
         border: 1px solid transparent;
@@ -886,18 +910,18 @@
         transition: all 0.15s ease;
       }
       .vel-foot-btn-edit {
-        background: rgba(59, 130, 246, 0.15);
+        background: rgba(59, 130, 246, 0.2);
         color: #93c5fd;
-        border-color: rgba(59, 130, 246, 0.35);
+        border-color: rgba(59, 130, 246, 0.45);
       }
       .vel-foot-btn-edit:hover {
         background: #2563eb;
         color: #fff;
       }
       .vel-foot-btn-delete {
-        background: rgba(239, 68, 68, 0.15);
+        background: rgba(239, 68, 68, 0.2);
         color: #fca5a5;
-        border-color: rgba(239, 68, 68, 0.35);
+        border-color: rgba(239, 68, 68, 0.45);
       }
       .vel-foot-btn-delete:hover {
         background: #dc2626;
@@ -1175,8 +1199,8 @@
         '<td class="vel-foot-cell-key"><strong>' + kEsc + '</strong></td>' +
         '<td class="vel-foot-cell-aliases">' + badgesHtml + '</td>' +
         '<td class="vel-foot-cell-actions">' +
-          '<button type="button" class="vel-foot-btn-action vel-foot-btn-edit" data-action="edit-mapping" data-key="' + kEsc + '" title="Modifier cette règle">✏️ Modifier</button>' +
-          '<button type="button" class="vel-foot-btn-action vel-foot-btn-delete" data-action="delete-mapping" data-key="' + kEsc + '" title="Supprimer cette règle">🗑️ Supprimer</button>' +
+          '<button type="button" class="vel-foot-btn-action vel-foot-btn-edit" data-action="edit-mapping" data-key="' + kEsc + '" onclick="window.veloraFootballAdmin.editMapping(this.getAttribute(\'data-key\'))" title="Modifier cette règle">✏️ Modifier</button>' +
+          '<button type="button" class="vel-foot-btn-action vel-foot-btn-delete" data-action="delete-mapping" data-key="' + kEsc + '" onclick="window.veloraFootballAdmin.deleteMapping(this.getAttribute(\'data-key\'))" title="Supprimer cette règle">🗑️ Supprimer</button>' +
         '</td>' +
       '</tr>';
     }).join("");
@@ -1230,7 +1254,7 @@
   async function loadAndRenderMappings() {
     await Promise.all([
       syncFromDatabase(),
-      fetchVisibleCountries()
+      fetchVisibleCountries(false)
     ]);
     if (!state.selectedCountry) {
       state.selectedCountry = detectCurrentAppCountry();
@@ -1252,45 +1276,57 @@
     setStatus("");
   }
 
-  function editMapping(key) {
+  function editMapping(rawKey) {
+    if (!rawKey) return;
     var currentMappings = getCountryMappings(state.selectedCountry);
-    if (!key || !currentMappings[key]) return;
+    var realKey = findMappingKey(currentMappings, rawKey) || rawKey;
+    var aliases = currentMappings[realKey];
+    if (!aliases) return;
+
     state.isEditing = true;
-    state.editingKey = key;
+    state.editingKey = realKey;
+
     var inputKey = getEl("foot-map-key");
     var inputAliases = getEl("foot-map-aliases");
     var btnSubmit = getEl("foot-map-submit-btn");
-    var aliases = currentMappings[key];
     var list = Array.isArray(aliases) ? aliases : [String(aliases)];
 
-    if (inputKey) { inputKey.value = key; }
-    if (inputAliases) { inputAliases.value = list.join(", "); }
-    if (btnSubmit) { btnSubmit.textContent = "💾 Mettre à jour (" + getCountryMeta(state.selectedCountry).name + ")"; }
+    if (inputKey) {
+      inputKey.value = realKey;
+    }
+    if (inputAliases) {
+      inputAliases.value = list.join(", ");
+    }
+    if (btnSubmit) {
+      btnSubmit.textContent = "💾 Mettre à jour (" + getCountryMeta(state.selectedCountry).name + ")";
+    }
 
     var formEl = getEl("foot-map-form");
     if (formEl) formEl.scrollIntoView({ behavior: "smooth", block: "center" });
     if (inputAliases) inputAliases.focus();
-    setStatus("Modification de la règle « " + key + " » pour " + getCountryMeta(state.selectedCountry).name + "...");
+    setStatus("✏️ Modification de la règle « " + realKey + " » pour " + getCountryMeta(state.selectedCountry).name + "...");
   }
 
-  async function deleteMapping(key) {
-    if (!key) return;
-    var activeMeta = getCountryMeta(state.selectedCountry);
-    if (!confirm("Supprimer le mappage pour « " + key + " » dans le bouquet " + activeMeta.name + " ?")) return;
-
+  async function deleteMapping(rawKey) {
+    if (!rawKey) return;
     var currentMappings = getCountryMappings(state.selectedCountry);
-    delete currentMappings[key];
+    var realKey = findMappingKey(currentMappings, rawKey) || rawKey;
+
+    var activeMeta = getCountryMeta(state.selectedCountry);
+    delete currentMappings[realKey];
     state.store[state.selectedCountry] = currentMappings;
 
     await persistToDatabase(state.store);
     renderCountrySelector();
     renderMappingsTable();
-    if (state.isEditing && state.editingKey === key) resetForm();
-    setStatus("Règle pour « " + key + " » supprimée de " + activeMeta.name + ".");
+    if (state.isEditing && state.editingKey === realKey) resetForm();
+    setStatus("🗑️ Règle pour « " + realKey + " » supprimée de " + activeMeta.name + ".");
   }
 
   async function handleFormSubmit(e) {
-    if (e) e.preventDefault();
+    if (e && typeof e.preventDefault === "function") e.preventDefault();
+    if (e && typeof e.stopPropagation === "function") e.stopPropagation();
+
     var inputKey = getEl("foot-map-key");
     var inputAliases = getEl("foot-map-aliases");
     if (!inputKey || !inputAliases) return;
@@ -1318,8 +1354,12 @@
 
     var currentMappings = getCountryMappings(state.selectedCountry);
 
-    if (state.isEditing && state.editingKey && state.editingKey !== key) {
-      delete currentMappings[state.editingKey];
+    // Si on était en train de modifier et que la clé a changé, supprimer l'ancienne clé
+    if (state.isEditing && state.editingKey) {
+      var oldRealKey = findMappingKey(currentMappings, state.editingKey);
+      if (oldRealKey && oldRealKey !== key) {
+        delete currentMappings[oldRealKey];
+      }
     }
 
     currentMappings[key] = aliasesList;
@@ -1339,12 +1379,6 @@
     var recommended = DEFAULT_RECOMMENDED_BY_COUNTRY[state.selectedCountry] || DEFAULT_RECOMMENDED_BY_COUNTRY._default;
 
     var currentMappings = getCountryMappings(state.selectedCountry);
-    if (Object.keys(currentMappings).length > 0) {
-      if (!confirm("Voulez-vous fusionner les règles recommandées pour " + activeMeta.name + " avec vos règles actuelles ?")) {
-        return;
-      }
-    }
-
     var merged = Object.assign({}, recommended, currentMappings);
     state.store[state.selectedCountry] = merged;
     await persistToDatabase(state.store);
@@ -1560,65 +1594,93 @@
 
   // Écoute de l'événement de modification de la visibilité des pays dans l'onglet Pays
   window.addEventListener("velora-country-visibility-changed", async function () {
-    await fetchVisibleCountries();
+    await fetchVisibleCountries(true);
     renderCountrySelector();
     renderMappingsTable();
   });
 
   // Écouteurs globaux
   document.addEventListener("click", function (e) {
-    if (e.target && e.target.closest('#settings-tab-btn-football, [data-settings-tab="football"]')) {
+    if (!e || !e.target) return;
+
+    // Intercepter UNIQUEMENT le clic sur le bouton d'onglet dans l'en-tête (et JAMAIS à l'intérieur du panneau football)
+    var isTabBtn = e.target.closest('#settings-tab-btn-football, #settings-tabs [role="tab"][data-settings-tab="football"], #settings-tabs button[data-settings-tab="football"]');
+    if (isTabBtn && !e.target.closest('#settings-tab-football')) {
       showFootballTab();
       return;
     }
-    var countryPill = e.target && e.target.closest(".vel-foot-country-pill");
+
+    // Pilules de pays
+    var countryPill = e.target.closest(".vel-foot-country-pill");
     if (countryPill && countryPill.dataset.countryId) {
+      e.preventDefault();
       selectCountry(countryPill.dataset.countryId);
       return;
     }
-    if (e.target && e.target.closest("#foot-btn-copy-rules")) {
+
+    // Actions d'en-tête
+    if (e.target.closest("#foot-btn-copy-rules")) {
+      e.preventDefault();
       copyFromCountry();
       return;
     }
-    if (e.target && e.target.closest("#foot-btn-load-defaults")) {
+    if (e.target.closest("#foot-btn-load-defaults")) {
+      e.preventDefault();
       loadRecommendedDefaults();
       return;
     }
-    if (e.target && e.target.closest("#foot-btn-open-json")) {
+    if (e.target.closest("#foot-btn-open-json")) {
+      e.preventDefault();
       openJsonEditor("country");
       return;
     }
-    if (e.target && e.target.closest("#foot-json-tab-country")) {
+    if (e.target.closest("#foot-json-tab-country")) {
+      e.preventDefault();
       openJsonEditor("country");
       return;
     }
-    if (e.target && e.target.closest("#foot-json-tab-all")) {
+    if (e.target.closest("#foot-json-tab-all")) {
+      e.preventDefault();
       openJsonEditor("all");
       return;
     }
-    if (e.target && (e.target.closest("#foot-json-close") || e.target.closest("#foot-json-cancel"))) {
+    if (e.target.closest("#foot-json-close") || e.target.closest("#foot-json-cancel")) {
+      e.preventDefault();
       var d = getEl("foot-json-dialog");
       if (d) d.close();
       return;
     }
-    if (e.target && e.target.closest("#foot-json-save")) {
+    if (e.target.closest("#foot-json-save")) {
+      e.preventDefault();
       saveJsonEditor();
       return;
     }
-    if (e.target && e.target.closest("#foot-map-reset-btn")) {
+    if (e.target.closest("#foot-map-reset-btn")) {
+      e.preventDefault();
       resetForm();
       return;
     }
-
-    var editBtn = e.target && e.target.closest('[data-action="edit-mapping"]');
-    if (editBtn) {
-      editMapping(editBtn.dataset.key);
+    if (e.target.closest("#foot-map-submit-btn")) {
+      e.preventDefault();
+      handleFormSubmit(e);
       return;
     }
 
-    var delBtn = e.target && e.target.closest('[data-action="delete-mapping"]');
+    // Modifier une règle
+    var editBtn = e.target.closest('[data-action="edit-mapping"], .vel-foot-btn-edit');
+    if (editBtn) {
+      e.preventDefault();
+      var editKey = editBtn.getAttribute("data-key") || editBtn.dataset.key;
+      editMapping(editKey);
+      return;
+    }
+
+    // Supprimer une règle
+    var delBtn = e.target.closest('[data-action="delete-mapping"], .vel-foot-btn-delete');
     if (delBtn) {
-      deleteMapping(delBtn.dataset.key);
+      e.preventDefault();
+      var delKey = delBtn.getAttribute("data-key") || delBtn.dataset.key;
+      deleteMapping(delKey);
       return;
     }
   });

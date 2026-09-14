@@ -6657,7 +6657,7 @@
                   </div>
                 </div>
                 <p class="desc">Sélectionnez le pays pour lequel vous souhaitez créer ou modifier la règle, puis définissez la chaîne du match et ses mots-clés de recherche.</p>
-                <form id="foot-map-form" onsubmit="return false;">
+                <form id="foot-map-form" onsubmit="window.veloraFootballAdmin && window.veloraFootballAdmin.handleSubmit(event); return false;">
                   <div class="vel-foot-form-group">
                     <label for="foot-map-key">Nom chaîne du match (diffuseur)</label>
                     <input type="text" id="foot-map-key" class="vel-foot-input" placeholder="ex: Canal+ ou beIN Sports 1" required autocomplete="off" />
@@ -6667,8 +6667,8 @@
                     <input type="text" id="foot-map-aliases" class="vel-foot-input" placeholder="ex: Canal+ Sport, Canal+ Foot, Canal+ 360" required autocomplete="off" />
                   </div>
                   <div class="vel-foot-form-actions">
-                    <button type="submit" id="foot-map-submit-btn" class="vel-foot-btn vel-foot-btn-primary">➕ Ajouter la règle</button>
-                    <button type="button" id="foot-map-reset-btn" class="vel-foot-btn vel-foot-btn-secondary">Réinitialiser</button>
+                    <button type="button" id="foot-map-submit-btn" class="vel-foot-btn vel-foot-btn-primary" onclick="window.veloraFootballAdmin && window.veloraFootballAdmin.handleSubmit(event)">➕ Ajouter la règle</button>
+                    <button type="button" id="foot-map-reset-btn" class="vel-foot-btn vel-foot-btn-secondary" onclick="window.veloraFootballAdmin && window.veloraFootballAdmin.resetForm()">Réinitialiser</button>
                   </div>
                 </form>
               </div>
@@ -17536,7 +17536,7 @@
   <script defer src="/assets/velora-live-wheel.js?v=20260911-fav-name-v11"></script>
   <link rel="stylesheet" href="/assets/velora-prime-carousel.css?v=20260912-clean-title-v9" />
   <script defer src="/assets/velora-prime-carousels.js?v=20260912-clean-title-v9"></script>
-  <script defer src="/assets/velora-football-slider.js?v=20260912-foot-premium-v11"></script>
+  <script defer src="/assets/velora-football-slider.js?v=20260914-foot-slider-v12"></script>
   <script>
     (() => {
       document.addEventListener("click", function (e) {
@@ -17586,10 +17586,10 @@
       }, true);
     })();
   </script>
-  <script defer src="/assets/velora-nav-controller.js?v=20260909-teardown-v6"></script>
+  <script defer src="/assets/velora-nav-controller.js?v=20260914-teardown-v7"></script>
   <link rel="stylesheet" href="/assets/velora-adult.css?v=20260912-hub-images-v3" />
   <script defer src="/assets/velora-adult.js?v=20260912-hub-images-v3"></script>
-  <script defer src="/assets/velora-football-admin.js?v=20260914-foot-admin-v1"></script>
+  <script defer src="/assets/velora-football-admin.js?v=20260914-foot-admin-v2-cachebust"></script>
 </body>
 
 </html>

@@ -1586,7 +1586,7 @@
   <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-54"></script>
   <link rel="stylesheet" href="/assets/velora-favorites.css?v=white-logo-v20260911-1" />
   <script defer src="/assets/velora-favorites.js?v=20260911-search-fav-name-v5"></script>
-  <script defer src="/assets/velora-watch-history.js?v=20260912-resume-live-sync-v7"></script>
+  <script defer src="/assets/velora-watch-history.js?v=20260914-resume-instant-fix-v8"></script>
   <script defer src="/assets/velora-catalog-scroll-memory.js?v=20260902-scroll-memory-v6"></script>
   <script defer src="/assets/velora-cache-inventory.js?v=instant-nav-v20260821-54"></script>
   <script defer src="/assets/manual-pays-visible-memberships.js?v=instant-nav-v20260907-151"></script>
@@ -16755,6 +16755,9 @@
         if (primeContainer) {
           primeContainer.style.removeProperty("display");
         }
+        if (typeof window.veloraSaveCurrentProgress === "function") {
+          try { window.veloraSaveCurrentProgress(); } catch (_) { }
+        }
         stopHomeMedia();
         ["content-view", "packages-view", "adult-view"].forEach(function (id) {
           var view = document.getElementById(id);
@@ -16778,6 +16781,9 @@
         document.documentElement.scrollTop = 0;
         document.body.scrollTop = 0;
         setActive("home");
+        if (typeof window.veloraInjectResumeSection === "function") {
+          try { window.veloraInjectResumeSection(); } catch (_) { }
+        }
       }
 
       document.addEventListener("velora-return-home", showHome);

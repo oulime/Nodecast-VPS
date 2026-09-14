@@ -8,7 +8,26 @@
 
   function cleanupAllActiveMediaAndSessions() {
     try {
-      // 1. Native app bundle teardown
+      var hasActiveMedia = false;
+
+      // 1. Forcefully abort all HTML5 <video> and <audio> elements in the document
+      document.querySelectorAll("video, audio").forEach(function (v) {
+        try {
+          if (v && (!v.paused || v.src || v.currentSrc)) {
+            hasActiveMedia = true;
+            v.pause();
+            if (v.hls && typeof v.hls.destroy === "function") {
+              try { v.hls.stopLoad(); } catch (_) {}
+              try { v.hls.destroy(); } catch (_) {}
+              v.hls = null;
+            }
+            v.removeAttribute("src");
+            try { v.load(); } catch (_) {}
+          }
+        } catch (_) {}
+      });
+
+      // 2. Native app bundle teardown
       if (typeof window.veloraStopAllPlayback === "function") {
         try { window.veloraStopAllPlayback(); } catch (_) {}
       }
@@ -22,43 +41,28 @@
         try { window.veloraStopAllStreams(); } catch (_) {}
       }
 
-      // 2. Adult player teardown
+      // 3. Adult player teardown
       const isAdultActive = document.body.classList.contains("vel-adult-active") || (document.body.dataset && document.body.dataset.velActiveTab === "adult");
       if (isAdultActive && typeof window.veloraCloseAdultView === "function") {
         try { window.veloraCloseAdultView(false); } catch (_) {}
       }
 
-      // 3. Close active server-side transcode sessions
+      // 4. Close active server-side transcode sessions
       if (typeof window.veloraCloseActiveTranscodeSession === "function") {
         try { window.veloraCloseActiveTranscodeSession(); } catch (_) {}
       }
 
-      // 4. Forcefully abort all HTML5 <video> and <audio> elements in the document
-      // Removing src and calling .load() immediately causes the browser to send a TCP FIN/RST
-      document.querySelectorAll("video, audio").forEach(function (v) {
+      // 5. Fire instant stream stop beacon only if media was active
+      if (hasActiveMedia || isAdultActive || (typeof window.__veloraActiveTranscodeSession !== "undefined" && window.__veloraActiveTranscodeSession)) {
         try {
-          if (v && !v.paused) {
-            v.pause();
+          const stopUrl = "/api/proxy/stream/stop";
+          if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+            navigator.sendBeacon(stopUrl);
+          } else {
+            fetch(stopUrl, { method: "POST", keepalive: true }).catch(function () {});
           }
-          if (v && v.hls && typeof v.hls.destroy === "function") {
-            try { v.hls.stopLoad(); } catch (_) {}
-            try { v.hls.destroy(); } catch (_) {}
-            v.hls = null;
-          }
-          v.removeAttribute("src");
-          try { v.load(); } catch (_) {}
         } catch (_) {}
-      });
-
-      // 5. Fire instant stream stop beacon to backend proxy
-      try {
-        const stopUrl = "/api/proxy/stream/stop";
-        if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
-          navigator.sendBeacon(stopUrl);
-        } else {
-          fetch(stopUrl, { method: "POST", keepalive: true }).catch(function () {});
-        }
-      } catch (_) {}
+      }
     } catch (_) {}
   }
 
@@ -74,17 +78,17 @@
   document.addEventListener("click", function (e) {
     if (!e.target) return;
 
-    // Ignore country picker, profile menu, search triggers, or popups
+    // Ignore settings/admin panels, country picker, profile menu, search triggers, or popups
     if (
       e.target.closest(
-        "#vel-bottom-country-menu, #vel-bottom-profile-menu, #country-select, .country-select, .country-select-trigger, .velora-country-select-menu, [data-bottom-nav='country'], [data-bottom-nav='profile'], #vel-home-profile-trigger, #vel-floating-search, [data-bottom-nav='search']"
+        "#settings-dialog, .settings-dialog, #settings-tab-football, .vel-foot-admin-panel, #vel-bottom-country-menu, #vel-bottom-profile-menu, #country-select, .country-select, .country-select-trigger, .velora-country-select-menu, [data-bottom-nav='country'], [data-bottom-nav='profile'], #vel-home-profile-trigger, #vel-floating-search, [data-bottom-nav='search']"
       )
     ) {
       return;
     }
 
     const navEl = e.target.closest(
-      ".nav-item, .nav-link, .sidebar-link, .vel-bottom-nav-item, [data-bottom-nav], [data-nav], [data-tab], [data-settings-tab], .vel-nav-btn, .navbar, .header-nav, #btn-home, #btn-live, #btn-movies, #btn-series, #btn-favorites, #btn-adult, .vod-back-btn, .player-back-btn, [data-action='back'], [data-action='close-player']"
+      ".nav-item, .nav-link, .sidebar-link, .vel-bottom-nav-item, [data-bottom-nav], [data-nav], .vel-nav-btn, .navbar, .header-nav, #btn-home, #btn-live, #btn-movies, #btn-series, #btn-favorites, #btn-adult, .vod-back-btn, .player-back-btn, [data-action='back'], [data-action='close-player']"
     );
 
     if (navEl) {
@@ -136,4 +140,3 @@
     observer.observe(document.body, { attributes: true, attributeFilter: ["class", "data-vel-active-tab", "data-vel-top-level"] });
   } catch (_) {}
 })();
-

@@ -219,10 +219,141 @@
     return 0;
   }
 
+  function countrySlug(raw) {
+    if (!raw) return '_default';
+    var s = String(raw).trim();
+    if (s === '_default' || s === 'default' || s === 'global' || s === 'all') return '_default';
+    return String(s)
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/^country_/, '')
+      .replace(/[^\p{L}\p{N}]+/gu, '_')
+      .replace(/^_+|_+$/g, '') || '_default';
+  }
+
+  function normalizeCountryCode(c) {
+    return countrySlug(c);
+  }
+
+  function getRawFootballMappingsStore() {
+    if (window.__veloraFootballMappingsCache && typeof window.__veloraFootballMappingsCache === 'object') {
+      return window.__veloraFootballMappingsCache;
+    }
+    if (window.veloraFootballAdmin && typeof window.veloraFootballAdmin.getStore === 'function') {
+      var s = window.veloraFootballAdmin.getStore();
+      if (s && typeof s === 'object' && Object.keys(s).length > 0) {
+        window.__veloraFootballMappingsCache = s;
+        return s;
+      }
+    }
+    try {
+      var raw = localStorage.getItem('velora_football_channel_mappings');
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          window.__veloraFootballMappingsCache = parsed;
+          return parsed;
+        }
+      }
+    } catch (_) {}
+    return {};
+  }
+
+  function getFootballChannelMappings(countryContext) {
+    var rawStore = getRawFootballMappingsStore();
+    var cKey = countrySlug(countryContext);
+
+    // Vérifier si le store est au format multi-pays ou ancien format plat
+    var hasCountryKeys = rawStore._default || rawStore.france || rawStore.arabe || rawStore.mena || rawStore.maroc || rawStore.algerie || rawStore.uk || rawStore.espagne;
+
+    if (!hasCountryKeys) {
+      // Ancien format plat : renvoyer directement le dictionnaire
+      return rawStore || {};
+    }
+
+    var countryRules = (cKey && rawStore[cKey]) ? rawStore[cKey] : {};
+    var defaultRules = rawStore._default || {};
+
+    // Fusion : règles du pays prioritaire avec repli sur les règles par défaut
+    return Object.assign({}, defaultRules, countryRules);
+  }
+
+  function expandChannelMappings(rawChannels, countryContext) {
+    if (!Array.isArray(rawChannels) || rawChannels.length === 0) return [];
+    var mappings = getFootballChannelMappings(countryContext);
+    var result = [];
+
+    rawChannels.forEach(function (ch) {
+      if (!ch || typeof ch !== 'string') return;
+      var trimmed = ch.trim();
+      if (!trimmed || trimmed === 'Chaîne à confirmer') return;
+
+      var normTarget = normalizeChannelText(trimmed);
+      var matchedAliases = null;
+
+      // 1. Exact or normalized key lookup
+      for (var k in mappings) {
+        if (normalizeChannelText(k) === normTarget || k.trim().toLowerCase() === trimmed.toLowerCase()) {
+          matchedAliases = mappings[k];
+          break;
+        }
+      }
+
+      // 2. Fallback substring match if key is contained in channel
+      if (!matchedAliases) {
+        for (var k2 in mappings) {
+          var normK2 = normalizeChannelText(k2);
+          if (normK2 && (normTarget.includes(normK2) || normK2.includes(normTarget))) {
+            matchedAliases = mappings[k2];
+            break;
+          }
+        }
+      }
+
+      if (matchedAliases && Array.isArray(matchedAliases) && matchedAliases.length > 0) {
+        matchedAliases.forEach(function (alias) {
+          if (alias && typeof alias === 'string' && alias.trim()) {
+            result.push(alias.trim());
+          }
+        });
+      } else {
+        result.push(trimmed);
+      }
+    });
+
+    // Deduplicate preserving order
+    var seen = new Set();
+    return result.filter(function (c) {
+      var k = c.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  }
+
+  document.addEventListener('velora-football-mappings-changed', function (e) {
+    if (e && e.detail && e.detail.mappings) {
+      window.__veloraFootballMappingsCache = e.detail.mappings;
+    }
+  });
+
   async function searchBroadcastingChannels(match, priorityChannel) {
-    var targetChannels = Array.isArray(match.tvChannels) ? match.tvChannels.slice() : [];
+    var rawCountry = (typeof window.veloraGetActiveCountryId === 'function') ? window.veloraGetActiveCountryId() : null;
+    if (!rawCountry) {
+      try {
+        rawCountry = localStorage.getItem('lumina_selected_country_id') || sessionStorage.getItem('lumina_selected_country_id') || localStorage.getItem('velora_selected_country_name_v1');
+      } catch (_) {}
+    }
+
+    var rawChannels = Array.isArray(match.tvChannels) ? match.tvChannels.slice() : [];
     if (priorityChannel) {
-      targetChannels = [priorityChannel].concat(targetChannels.filter(function (c) { return c !== priorityChannel; }));
+      rawChannels = [priorityChannel].concat(rawChannels.filter(function (c) { return c !== priorityChannel; }));
+    }
+
+    var targetChannels = expandChannelMappings(rawChannels, rawCountry);
+    if (targetChannels.length === 0) {
+      targetChannels = rawChannels.slice();
     }
 
     var foundStreamsMap = new Map();
@@ -602,7 +733,7 @@
         : ['Chaîne à confirmer'];
 
       var channelsHtml = channels.map(function (ch) {
-        return '<span class="vel-match-modal-ch-pill">' +
+        return '<span class="vel-match-modal-ch-pill" data-channel-name="' + escapeHtml(ch) + '">' +
           '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
           '<span>' + escapeHtml(ch) + '</span>' +
         '</span>';
@@ -656,6 +787,12 @@
               channelsHtml +
             '</div>' +
           '</div>' +
+          '<div class="vel-football-modal-actions">' +
+            '<button type="button" class="vel-football-modal-btn vel-football-modal-btn--primary vel-football-modal-btn--watch">' +
+              '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block; vertical-align:middle; margin-right:6px;"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
+              '<span>Regarder</span>' +
+            '</button>' +
+          '</div>' +
         '</div>';
 
       function closeModal() {
@@ -669,6 +806,26 @@
       if (closeBtn) closeBtn.addEventListener('click', closeModal);
       var backdrop = modal.querySelector('.vel-football-modal-backdrop');
       if (backdrop) backdrop.addEventListener('click', closeModal);
+
+      var watchBtn = modal.querySelector('.vel-football-modal-btn--watch');
+      if (watchBtn) {
+        watchBtn.addEventListener('click', function () {
+          closeModal();
+          if (typeof window.veloraOpenMatchChannels === 'function') {
+            window.veloraOpenMatchChannels(matchObj);
+          }
+        });
+      }
+
+      modal.querySelectorAll('.vel-match-modal-ch-pill[data-channel-name]').forEach(function (pill) {
+        pill.addEventListener('click', function () {
+          var ch = pill.getAttribute('data-channel-name');
+          closeModal();
+          if (typeof window.veloraOpenMatchChannels === 'function') {
+            window.veloraOpenMatchChannels(matchObj, ch);
+          }
+        });
+      });
 
       document.body.appendChild(modal);
     }
@@ -1397,6 +1554,14 @@
       '  border: 1px solid rgba(255, 255, 255, 0.12);',
       '  padding: 0.28rem 0.65rem;',
       '  border-radius: 8px;',
+      '  cursor: pointer;',
+      '  transition: all 0.2s ease;',
+      '}',
+      '.vel-match-modal-ch-pill:hover {',
+      '  background: rgba(59, 130, 246, 0.2);',
+      '  border-color: rgba(59, 130, 246, 0.4);',
+      '  color: #60a5fa;',
+      '  transform: translateY(-1px);',
       '}',
       '.vel-football-modal-actions {',
       '  display: flex;',

@@ -5472,6 +5472,11 @@
             onclick="if(window.veloraShowLogosTab){window.veloraShowLogosTab();}else if(window.veloraLogosAdmin&amp;&amp;window.veloraLogosAdmin.showLogosTab){window.veloraLogosAdmin.showLogosTab();}else{document.querySelectorAll('#settings-tabs .settings-tabs__tab').forEach(function(b){b.classList.remove('settings-tabs__tab--active');b.setAttribute('aria-selected','false');});this.classList.add('settings-tabs__tab--active');this.setAttribute('aria-selected','true');document.querySelectorAll('.settings-tab-panel').forEach(function(p){p.classList.add('hidden');p.hidden=true;});var lp=document.getElementById('settings-tab-logos');if(lp){lp.classList.remove('hidden');lp.hidden=false;}}">
             ✨ Logos TV
           </button>
+          <button type="button" role="tab" id="settings-tab-btn-football" class="settings-tabs__tab"
+            data-settings-tab="football" aria-selected="false" aria-controls="settings-tab-football" tabindex="-1"
+            onclick="if(window.veloraShowFootballTab){window.veloraShowFootballTab();}else if(window.veloraFootballAdmin&amp;&amp;window.veloraFootballAdmin.showFootballTab){window.veloraFootballAdmin.showFootballTab();}">
+            ⚽ Football
+          </button>
           <button type="button" role="tab" id="settings-tab-btn-adult" class="settings-tabs__tab"
             data-settings-tab="adult" aria-selected="false" aria-controls="settings-tab-adult" tabindex="-1">
             🔞 Adulte +18
@@ -6599,6 +6604,133 @@
                 <button id="logos-json-cancel" type="button" class="vel-logos-btn-reset">Annuler</button>
                 <button id="logos-json-save" type="button" class="vel-logos-btn-submit">💾 Enregistrer sur le
                   VPS</button>
+              </div>
+            </dialog>
+          </section>
+
+          <section id="settings-tab-football" class="settings-tab-panel panel countries-admin-form vel-foot-admin-panel hidden"
+            role="tabpanel" aria-labelledby="settings-tab-btn-football" data-settings-tab="football" hidden>
+            <div class="vel-foot-header">
+              <div>
+                <h2><span>⚽</span> Mappage des Chaînes Football</h2>
+                <p>Associez les diffuseurs officiels des matchs aux chaînes IPTV de votre bouquet pour chaque pays ou région (ex: <code>Canal+</code> &rarr; <code>Canal+ Sport</code>, <code>Canal+ Foot</code>).</p>
+              </div>
+              <div class="vel-foot-actions-top">
+                <button id="foot-btn-load-defaults" type="button" class="vel-foot-btn vel-foot-btn-secondary"
+                  title="Charger les règles recommandées pour le pays actif">
+                  ✨ Règles recommandées
+                </button>
+                <button id="foot-btn-copy-rules" type="button" class="vel-foot-btn vel-foot-btn-secondary"
+                  title="Copier les règles configurées depuis un autre pays">
+                  📋 Copier d'un pays
+                </button>
+                <button id="foot-btn-open-json" type="button" class="vel-foot-btn vel-foot-btn-secondary"
+                  title="Afficher et modifier directement le format JSON brut">
+                  📝 Éditeur JSON
+                </button>
+              </div>
+            </div>
+
+            <!-- Barre de sélection du Pays (Synchronisée avec l'onglet Pays) -->
+            <div class="vel-foot-country-bar" id="foot-country-bar">
+              <div class="vel-foot-country-bar-label">
+                <span>🌍</span>
+                <strong>Pays du bouquet :</strong>
+              </div>
+              <div class="vel-foot-country-pills" id="foot-country-pills">
+                <!-- Rempli dynamiquement avec les pays visibles configurés dans l'onglet Pays -->
+              </div>
+            </div>
+
+            <p id="football-admin-status" class="vel-foot-status" aria-live="polite"></p>
+
+            <div class="vel-foot-cards-grid">
+              <!-- Formulaire d'ajout / modification -->
+              <div class="vel-foot-card" id="foot-map-form-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+                  <h3><span>➕</span> Ajouter / Modifier un Mappage</h3>
+                  <div style="display:flex; align-items:center; gap:0.5rem;">
+                    <label for="foot-form-country-select" style="font-size:0.8rem; font-weight:700; color:#94a3b8;">Pays cible :</label>
+                    <select id="foot-form-country-select" class="vel-foot-select" style="padding:0.3rem 0.6rem; font-size:0.82rem; font-weight:700; border-color:#3b82f6; background:rgba(15,23,42,0.9);">
+                      <!-- Rempli dynamiquement avec les pays visibles -->
+                    </select>
+                  </div>
+                </div>
+                <p class="desc">Sélectionnez le pays pour lequel vous souhaitez créer ou modifier la règle, puis définissez la chaîne du match et ses mots-clés de recherche.</p>
+                <form id="foot-map-form" onsubmit="return false;">
+                  <div class="vel-foot-form-group">
+                    <label for="foot-map-key">Nom chaîne du match (diffuseur)</label>
+                    <input type="text" id="foot-map-key" class="vel-foot-input" placeholder="ex: Canal+ ou beIN Sports 1" required autocomplete="off" />
+                  </div>
+                  <div class="vel-foot-form-group" style="margin-top: 0.5rem;">
+                    <label for="foot-map-aliases">Mots-clés de recherche / Alias (séparés par des virgules)</label>
+                    <input type="text" id="foot-map-aliases" class="vel-foot-input" placeholder="ex: Canal+ Sport, Canal+ Foot, Canal+ 360" required autocomplete="off" />
+                  </div>
+                  <div class="vel-foot-form-actions">
+                    <button type="submit" id="foot-map-submit-btn" class="vel-foot-btn vel-foot-btn-primary">➕ Ajouter la règle</button>
+                    <button type="button" id="foot-map-reset-btn" class="vel-foot-btn vel-foot-btn-secondary">Réinitialiser</button>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Testeur en direct -->
+              <div class="vel-foot-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem;">
+                  <h3><span>🧪</span> Testeur de Correspondance</h3>
+                  <select id="foot-test-country-select" class="vel-foot-select" style="padding:0.25rem 0.6rem; font-size:0.8rem;" aria-label="Pays pour le test">
+                    <!-- Rempli dynamiquement -->
+                  </select>
+                </div>
+                <p class="desc">Tapez un nom de diffuseur pour simuler instantanément les mots-clés recherchés dans le pays sélectionné.</p>
+                <div class="vel-foot-form-group">
+                  <label for="foot-test-input">Chaîne à tester</label>
+                  <input type="text" id="foot-test-input" class="vel-foot-input" placeholder="Tapez ex: Canal+, beIN 1, Sky Sports, DAZN..." autocomplete="off" />
+                </div>
+                <div id="foot-test-results" class="vel-foot-test-box">
+                  <span class="vel-foot-test-hint">Entrez le nom d'un diffuseur pour tester le résultat.</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tableau des règles actives -->
+            <div class="vel-foot-table-wrap">
+              <div class="vel-foot-table-header">
+                <div>
+                  <h3 style="margin:0; font-size:1rem; font-weight:800;">📋 Règles Actives</h3>
+                  <span id="foot-mappings-count" style="font-size:0.8rem; color:#94a3b8;">0 règle configurée</span>
+                </div>
+                <input type="search" id="foot-mappings-search" class="vel-foot-input vel-foot-search-input" placeholder="Filtrer les règles..." autocomplete="off" />
+              </div>
+              <div style="overflow-x: auto;">
+                <table class="vel-foot-table">
+                  <thead>
+                    <tr>
+                      <th>Chaîne du Match</th>
+                      <th>Mots-clés de Recherche (Alias)</th>
+                      <th style="text-align: right;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="foot-mappings-tbody">
+                    <tr><td colspan="3" class="vel-foot-empty">Chargement des règles...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Dialogue Éditeur JSON -->
+            <dialog id="foot-json-dialog" class="vel-foot-json-dialog">
+              <h3 style="margin-top:0;">📝 Éditeur JSON des Mappages Football</h3>
+              <div class="vel-foot-json-tabs">
+                <button type="button" id="foot-json-tab-country" class="vel-foot-json-tab-btn is-active">Pays actif</button>
+                <button type="button" id="foot-json-tab-all" class="vel-foot-json-tab-btn">🌐 Tous les pays (Multi-pays complet)</button>
+              </div>
+              <p style="font-size:0.82rem; color:#94a3b8; margin-bottom:0.75rem;">
+                Modifiez l'objet JSON ci-dessous directement pour importer ou exporter en masse. Format : <code>{ "Chaîne": ["Alias1", "Alias2"] }</code>.
+              </p>
+              <textarea id="foot-json-textarea" class="vel-foot-textarea" rows="14" style="width:100%; box-sizing:border-box; font-family:monospace; font-size:0.85rem;"></textarea>
+              <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1rem;">
+                <button id="foot-json-cancel" type="button" class="vel-foot-btn vel-foot-btn-secondary">Annuler</button>
+                <button id="foot-json-save" type="button" class="vel-foot-btn vel-foot-btn-primary">💾 Enregistrer le JSON</button>
               </div>
             </dialog>
           </section>
@@ -17457,6 +17589,7 @@
   <script defer src="/assets/velora-nav-controller.js?v=20260909-teardown-v6"></script>
   <link rel="stylesheet" href="/assets/velora-adult.css?v=20260912-hub-images-v3" />
   <script defer src="/assets/velora-adult.js?v=20260912-hub-images-v3"></script>
+  <script defer src="/assets/velora-football-admin.js?v=20260914-foot-admin-v1"></script>
 </body>
 
 </html>

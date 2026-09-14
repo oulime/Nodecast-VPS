@@ -8700,7 +8700,11 @@
             }
             if (document.body.dataset.veloraReturnHome === "true") {
               delete document.body.dataset.veloraReturnHome;
-              document.dispatchEvent(new CustomEvent("velora-return-home"));
+              var curTab = document.body.dataset.velActiveTab;
+              var isHomeActive = !curTab || curTab === "home" || document.body.classList.contains("vel-home-empty-active");
+              if (isHomeActive) {
+                document.dispatchEvent(new CustomEvent("velora-return-home"));
+              }
             }
           });
         });
@@ -16602,10 +16606,6 @@
       }
 
       function openTab(tab) {
-        stopHomeMedia();
-        setActive(tab);
-        closeBottomCountryMenu();
-        closeProfileMenu();
         delete document.body.dataset.veloraReturnHome;
         delete document.body.dataset.veloraReturnFavorites;
         delete window._veloraFavoriteReturnTab;
@@ -16613,6 +16613,10 @@
         delete document.body.dataset.veloraReturnAdult;
         document.body.classList.remove("vel-adult-active");
         document.body.classList.remove("vel-favorites-open", "vel-favorites-player-active");
+        stopHomeMedia();
+        setActive(tab);
+        closeBottomCountryMenu();
+        closeProfileMenu();
         if (typeof window.veloraCloseFavoritesPage === "function") {
           try { window.veloraCloseFavoritesPage(false); } catch (_) { }
         }
@@ -16978,6 +16982,14 @@
         if (lastNavTriggerAction === action && now - lastNavTriggerAt < 250) return;
         lastNavTriggerAt = now;
         lastNavTriggerAction = action;
+
+        if (action !== "home") {
+          delete document.body.dataset.veloraReturnHome;
+          delete document.body.dataset.veloraReturnFavorites;
+          delete window._veloraFavoriteReturnTab;
+          delete document.body.dataset.veloraSearchMediaOpen;
+          delete document.body.dataset.veloraReturnAdult;
+        }
 
         if (action === "home") showHome();
         else if (action === "live" || action === "movies" || action === "series") openTab(action);

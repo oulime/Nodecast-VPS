@@ -95,6 +95,13 @@
         // Already on this section tab, do not kill playing media
         return;
       }
+      if (bottomNavAction && bottomNavAction !== "home") {
+        delete document.body.dataset.veloraReturnHome;
+        delete document.body.dataset.veloraReturnFavorites;
+        delete window._veloraFavoriteReturnTab;
+        delete document.body.dataset.veloraSearchMediaOpen;
+        delete document.body.dataset.veloraReturnAdult;
+      }
       // If clicking home, major section tab switch, or back button, kill any playing media immediately
       cleanupAllActiveMediaAndSessions();
     }

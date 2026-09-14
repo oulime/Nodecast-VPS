@@ -2368,45 +2368,24 @@ function buildMediaFeedCache() {
 
         const key = `${countryId}:${packageId}`;
         if (!packageStreams.has(key)) {
-            packageStreams.set(key, { keys: new Set(), sourceAware: false });
+            packageStreams.set(key, []);
         }
-        const membership = packageStreams.get(key);
-        const sourceId = String(row.source_id || '').trim();
-        if (sourceId) {
-            membership.sourceAware = true;
-            membership.keys.add(`${sourceId}:${streamId}`);
-        } else {
-            membership.keys.add(streamId);
-        }
+        packageStreams.get(key).push(row);
         packageStreamCounts.set(key, (packageStreamCounts.get(key) || 0) + 1);
     }
 
-    const snapshots = {
-        movies: veloraCatalogCache.getSnapshot('vod_streams') || [],
-        series: veloraCatalogCache.getSnapshot('series') || []
-    };
+    const db = getDb();
+    const findItem = db.prepare(`
+        SELECT source_id, item_id, name, stream_icon, container_extension, provider_order, rating, year, added_at, data
+        FROM playlist_items
+        WHERE source_id = ? AND type = ? AND item_id = ? AND is_hidden = 0
+    `);
+    const enabledSourceIds = getEnabledSourceIdSet();
 
     let posterCache = {};
     try { posterCache = JSON.parse(fs.readFileSync(vodPosterCachePath, 'utf8')) || {}; } catch (_) {}
     let backdropCache = {};
     try { backdropCache = JSON.parse(fs.readFileSync(vodBackdropCachePath, 'utf8')) || {}; } catch (_) {}
-
-    const snapshotIndexes = {
-        movies: new Map(),
-        series: new Map()
-    };
-    for (const kind of ['movies', 'series']) {
-        const list = snapshots[kind];
-        const idx = snapshotIndexes[kind];
-        for (const item of list) {
-            const rawId = String(item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id ?? '');
-            const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
-            if (rawId) {
-                if (sourceId) idx.set(`${sourceId}:${rawId}`, item);
-                if (!idx.has(rawId)) idx.set(rawId, item);
-            }
-        }
-    }
 
     const countries = allRows('admin_countries');
     const orderRows = allRows('admin_country_package_order');
@@ -2426,6 +2405,7 @@ function buildMediaFeedCache() {
 
         for (const tab of ['movies', 'series']) {
             const kind = tab === 'movies' ? 'vod' : 'series';
+            const itemType = tab === 'movies' ? 'movie' : 'series';
             const countryPackages = resolvedPackages.filter(p => 
                 String(p.country_id) === countryId && (p.kind === kind || (kind === 'vod' && p.kind === 'movies'))
                 && p.is_hidden !== true && p.is_hidden !== 'true'
@@ -2446,131 +2426,121 @@ function buildMediaFeedCache() {
             for (const pkg of countryPackages) {
                 const pkgId = String(pkg.id);
                 const memKey = `${countryId}:${pkgId}`;
-                const membership = packageStreams.get(memKey) || { keys: new Set(), sourceAware: false };
-                const totalCount = packageStreamCounts.get(memKey) || membership.keys.size || 0;
+                const curationList = packageStreams.get(memKey) || [];
+                const totalCount = packageStreamCounts.get(memKey) || curationList.length || 0;
 
-                const providerSourceId = String(pkg.source_id ?? '').trim();
-                const providerCategoryId = String(pkg.category_id ?? '').trim();
-                const providerBacked = Boolean(providerSourceId && providerCategoryId);
+                const seen = new Set();
+                const rawItems = [];
 
-                const items = [];
-                const snapshotList = snapshots[tab];
-                const snapshotIdx = snapshotIndexes[tab];
+                for (const curation of curationList) {
+                    const sourceId = Number.parseInt(curation.source_id, 10);
+                    const streamId = String(curation.stream_id || '').trim();
+                    const key = `${sourceId}:${streamId}`;
+                    if (!Number.isInteger(sourceId) || !streamId || !enabledSourceIds.has(String(sourceId)) || seen.has(key)) continue;
+                    const item = findItem.get(sourceId, itemType, streamId);
+                    if (!item) continue;
+                    seen.add(key);
 
-                if (membership.keys.size > 0) {
-                    for (const key of membership.keys) {
-                        const item = snapshotIdx.get(key);
-                        if (!item) continue;
-                        const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
-                        const rawName = String(item.name || item.title || item.series_name || '').trim();
-                        const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
-                        const itemKey = `${sourceId}:${String(rawId)}`;
-                        const titleKey = normalizedPosterTitle(rawName);
+                    let data = {};
+                    try { data = JSON.parse(item.data || '{}'); } catch (_) {}
+                    rawItems.push({
+                        ...data,
+                        ...item,
+                        raw_stream_id: item.item_id,
+                        raw_series_id: item.item_id,
+                        stream_id: item.item_id,
+                        series_id: item.item_id
+                    });
+                }
 
-                        let posterUrl = '';
-                        let posterCandidate = item.stream_icon ?? item.cover ?? item.cover_big ?? item.movie_image ?? item.series_image ?? item.poster_path ?? item.poster ?? '';
-                        if (Array.isArray(posterCandidate) && posterCandidate.length > 0) posterCandidate = posterCandidate[0];
-                        if (typeof posterCandidate === 'string' && posterCandidate.trim()) {
-                            let url = posterCandidate.trim();
-                            if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w500${url}`;
-                            if (!url.includes('/w1280/') && !url.includes('/backdrop')) {
-                                posterUrl = url;
-                            }
-                        }
-                        if (!posterUrl) {
-                            posterUrl = posterCache[itemKey] || posterCache[titleKey] || '';
-                        }
-
-                        let backdropUrl = '';
-                        let backdropCandidate = item.backdrop_path ?? item.backdrop ?? item.backdrop_url ?? '';
-                        if (Array.isArray(backdropCandidate) && backdropCandidate.length > 0) backdropCandidate = backdropCandidate[0];
-                        if (typeof backdropCandidate === 'string' && backdropCandidate.trim()) {
-                            let url = backdropCandidate.trim();
-                            if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w780${url}`;
-                            backdropUrl = url;
-                        }
-                        if (!backdropUrl) {
-                            backdropUrl = backdropCache[itemKey] || backdropCache[titleKey] || '';
-                        }
-
-                        const finalPoster = posterUrl || backdropUrl;
-                        const finalBackdrop = backdropUrl || posterUrl;
-
-                        items.push({
-                            id: `feed:${pkgId}:${rawId}`,
-                            name: rawName,
-                            thumbUrl: finalPoster,
-                            posterUrl: finalPoster,
-                            backdropUrl: finalBackdrop,
-                            rating: item.rating || item.rating_5based || item.score || '',
-                            year: item.year || item.releaseDate || '',
-                            plot: item.plot || item.description || item.overview || '',
-                            streamId: rawId,
-                            sourceId: sourceId || pkg.source_id,
-                            globalStreamId: item.global_stream_id || item.nodecast_global_stream_id || rawId,
-                            containerExtension: item.container_extension || '',
-                            contentType: tab,
-                            packageId: pkgId
-                        });
-                        if (items.length >= MEDIA_FEED_ENTRIES_PER_PACKAGE) break;
-                    }
-                } else if (providerBacked) {
-                    for (const item of snapshotList) {
-                        const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
-                        if (sourceId === providerSourceId && String(item.raw_category_id ?? '') === providerCategoryId) {
-                            const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
-                            const rawName = String(item.name || item.title || item.series_name || '').trim();
-                            const itemKey = `${sourceId}:${String(rawId)}`;
-                            const titleKey = normalizedPosterTitle(rawName);
-
-                            let posterUrl = '';
-                            let posterCandidate = item.stream_icon ?? item.cover ?? item.cover_big ?? item.movie_image ?? item.series_image ?? item.poster_path ?? item.poster ?? '';
-                            if (Array.isArray(posterCandidate) && posterCandidate.length > 0) posterCandidate = posterCandidate[0];
-                            if (typeof posterCandidate === 'string' && posterCandidate.trim()) {
-                                let url = posterCandidate.trim();
-                                if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w500${url}`;
-                                if (!url.includes('/w1280/') && !url.includes('/backdrop')) {
-                                    posterUrl = url;
-                                }
-                            }
-                            if (!posterUrl) {
-                                posterUrl = posterCache[itemKey] || posterCache[titleKey] || '';
-                            }
-
-                            let backdropUrl = '';
-                            let backdropCandidate = item.backdrop_path ?? item.backdrop ?? item.backdrop_url ?? '';
-                            if (Array.isArray(backdropCandidate) && backdropCandidate.length > 0) backdropCandidate = backdropCandidate[0];
-                            if (typeof backdropCandidate === 'string' && backdropCandidate.trim()) {
-                                let url = backdropCandidate.trim();
-                                if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w780${url}`;
-                                backdropUrl = url;
-                            }
-                            if (!backdropUrl) {
-                                backdropUrl = backdropCache[itemKey] || backdropCache[titleKey] || '';
-                            }
-
-                            const finalPoster = posterUrl || backdropUrl;
-                            const finalBackdrop = backdropUrl || posterUrl;
-
-                            items.push({
-                                id: `feed:${pkgId}:${rawId}`,
-                                name: rawName,
-                                thumbUrl: finalPoster,
-                                posterUrl: finalPoster,
-                                backdropUrl: finalBackdrop,
-                                rating: item.rating || item.rating_5based || item.score || '',
-                                year: item.year || item.releaseDate || '',
-                                plot: item.plot || item.description || item.overview || '',
-                                streamId: rawId,
-                                sourceId: sourceId || pkg.source_id,
-                                globalStreamId: item.global_stream_id || item.nodecast_global_stream_id || rawId,
-                                containerExtension: item.container_extension || '',
-                                contentType: tab,
-                                packageId: pkgId
+                // If not in curations but provider-backed, query by category directly from SQLite
+                if (!rawItems.length) {
+                    const providerSourceId = Number.parseInt(pkg.source_id, 10);
+                    const providerCategoryId = String(pkg.category_id ?? '').trim();
+                    if (Number.isInteger(providerSourceId) && providerCategoryId && enabledSourceIds.has(String(providerSourceId))) {
+                        const catItems = db.prepare(`
+                            SELECT source_id, item_id, name, stream_icon, container_extension, provider_order, rating, year, added_at, data
+                            FROM playlist_items
+                            WHERE source_id = ? AND type = ? AND category_id = ? AND is_hidden = 0
+                            ORDER BY provider_order ASC, rowid ASC
+                        `).all(providerSourceId, itemType, providerCategoryId);
+                        for (const item of catItems) {
+                            let data = {};
+                            try { data = JSON.parse(item.data || '{}'); } catch (_) {}
+                            rawItems.push({
+                                ...data,
+                                ...item,
+                                raw_stream_id: item.item_id,
+                                raw_series_id: item.item_id,
+                                stream_id: item.item_id,
+                                series_id: item.item_id
                             });
-                            if (items.length >= MEDIA_FEED_ENTRIES_PER_PACKAGE) break;
                         }
                     }
+                }
+
+                // Sort rawItems in the EXACT provider order (provider_order ASC)
+                rawItems.sort((left, right) => {
+                    const a = Number.isFinite(left.provider_order) ? left.provider_order : Number.MAX_SAFE_INTEGER;
+                    const b = Number.isFinite(right.provider_order) ? right.provider_order : Number.MAX_SAFE_INTEGER;
+                    return a - b || String(left.name).localeCompare(String(right.name), 'fr');
+                });
+
+                const topCandidates = rawItems.slice(0, MEDIA_FEED_ENTRIES_PER_PACKAGE);
+                const items = [];
+
+                for (const item of topCandidates) {
+                    const rawId = String(item.item_id ?? item.stream_id ?? item.series_id ?? '');
+                    const rawName = String(item.name || item.title || item.series_name || '').trim();
+                    const sourceId = String(item.source_id ?? pkg.source_id ?? '').trim();
+                    const itemKey = `${sourceId}:${rawId}`;
+                    const titleKey = normalizedPosterTitle(rawName);
+
+                    let posterUrl = '';
+                    let posterCandidate = item.stream_icon ?? item.cover ?? item.cover_big ?? item.movie_image ?? item.series_image ?? item.poster_path ?? item.poster ?? '';
+                    if (Array.isArray(posterCandidate) && posterCandidate.length > 0) posterCandidate = posterCandidate[0];
+                    if (typeof posterCandidate === 'string' && posterCandidate.trim()) {
+                        let url = posterCandidate.trim();
+                        if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w500${url}`;
+                        if (!url.includes('/w1280/') && !url.includes('/backdrop')) {
+                            posterUrl = url;
+                        }
+                    }
+                    if (!posterUrl) {
+                        posterUrl = posterCache[itemKey] || posterCache[titleKey] || '';
+                    }
+
+                    let backdropUrl = '';
+                    let backdropCandidate = item.backdrop_path ?? item.backdrop ?? item.backdrop_url ?? '';
+                    if (Array.isArray(backdropCandidate) && backdropCandidate.length > 0) backdropCandidate = backdropCandidate[0];
+                    if (typeof backdropCandidate === 'string' && backdropCandidate.trim()) {
+                        let url = backdropCandidate.trim();
+                        if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w780${url}`;
+                        backdropUrl = url;
+                    }
+                    if (!backdropUrl) {
+                        backdropUrl = backdropCache[itemKey] || backdropCache[titleKey] || '';
+                    }
+
+                    const finalPoster = posterUrl || backdropUrl;
+                    const finalBackdrop = backdropUrl || posterUrl;
+
+                    items.push({
+                        id: `feed:${pkgId}:${rawId}`,
+                        name: rawName,
+                        thumbUrl: finalPoster,
+                        posterUrl: finalPoster,
+                        backdropUrl: finalBackdrop,
+                        rating: item.rating || item.rating_5based || item.score || '',
+                        year: item.year || item.releaseDate || '',
+                        plot: item.plot || item.description || item.overview || '',
+                        streamId: rawId,
+                        sourceId: sourceId || pkg.source_id,
+                        globalStreamId: item.global_stream_id || item.nodecast_global_stream_id || rawId,
+                        containerExtension: item.container_extension || '',
+                        contentType: tab,
+                        packageId: pkgId
+                    });
                 }
 
                 if (items.length < 3) continue;

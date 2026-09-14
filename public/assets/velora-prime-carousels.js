@@ -111,6 +111,35 @@
     });
   });
 
+  function getItemRecencyScore(it) {
+    if (!it) return 0;
+    if (it.added || it.added_at) {
+      const val = it.added || it.added_at;
+      const num = Number(val);
+      if (Number.isFinite(num) && num > 0) return num;
+      const parsed = Date.parse(val);
+      if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed / 1000);
+    }
+    if (it.last_modified || it.lastModified) {
+      const val = it.last_modified || it.lastModified;
+      const num = Number(val);
+      if (Number.isFinite(num) && num > 0) return num;
+      const parsed = Date.parse(val);
+      if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed / 1000);
+    }
+    const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? it.streamId ?? it.seriesId ?? it.id;
+    const numId = Number(rawId);
+    if (Number.isFinite(numId) && numId > 0) {
+      return numId;
+    }
+    const yrStr = String(it.releaseDate || it.release_date || it.year || "").trim();
+    const yrMatch = yrStr.match(/\b(19\d\d|20\d\d)\b/);
+    if (yrMatch) {
+      return parseInt(yrMatch[1], 10) * 1000;
+    }
+    return 0;
+  }
+
   function stripTitle(name) {
     let clean = String(name || "").trim();
 
@@ -375,7 +404,8 @@
           }
         }
         if (Array.isArray(rawList) && rawList.length > 0) {
-          const items = rawList.map((it, idx) => {
+          const sortedRawList = rawList.slice().sort((a, b) => getItemRecencyScore(b) - getItemRecencyScore(a));
+          const items = sortedRawList.map((it, idx) => {
             const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? idx;
             const { poster, backdrop } = extractMediaImages(it);
             return {
@@ -1088,44 +1118,29 @@
             const rawList = streamMap.get(pkg.id) || streamMap.get(String(pkg.id)) || (pkg.category_id ? streamMap.get(String(pkg.category_id)) : null);
             if (Array.isArray(rawList) && rawList.length > 0) {
               cloned.totalCount = Math.max(cloned.totalCount || 0, rawList.length);
-              const streamById = new Map();
-              rawList.forEach(it => {
-                const rawId = String(it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? '');
-                if (rawId) streamById.set(rawId, it);
-              });
+              const sortedRawList = rawList.slice().sort((a, b) => getItemRecencyScore(b) - getItemRecencyScore(a));
 
-              if (Array.isArray(cloned.items) && cloned.items.length > 0) {
-                cloned.items.forEach(it => {
-                  const raw = streamById.get(String(it.streamId || ''));
-                  if (raw) {
-                    const { poster, backdrop } = extractMediaImages(raw);
-                    if (poster) { cloned.posterUrl = poster; it.posterUrl = poster; it.thumbUrl = poster; }
-                    if (backdrop) it.backdropUrl = backdrop;
-                  }
-                });
-              } else {
-                cloned.items = rawList.slice(0, 20).map((it, idx) => {
-                  const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? idx;
-                  const { poster, backdrop } = extractMediaImages(it);
-                  return {
-                    id: `feed:${cloned.id}:${rawId}`,
-                    name: stripTitle(it.name || it.title || it.series_name || ""),
-                    rawName: it.name || it.title || it.series_name || "",
-                    thumbUrl: poster,
-                    posterUrl: poster,
-                    backdropUrl: backdrop,
-                    rating: it.rating || it.rating_5based || it.score || "",
-                    year: it.year || it.releaseDate || "",
-                    plot: it.plot || it.description || it.overview || "",
-                    streamId: rawId,
-                    sourceId: it.nodecast_source_id ?? it.source_id,
-                    globalStreamId: it.nodecast_global_stream_id ?? it.global_stream_id ?? rawId,
-                    containerExtension: it.container_extension || "",
-                    contentType: t,
-                    packageId: cloned.id
-                  };
-                });
-              }
+              cloned.items = sortedRawList.slice(0, 20).map((it, idx) => {
+                const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? idx;
+                const { poster, backdrop } = extractMediaImages(it);
+                return {
+                  id: `feed:${cloned.id}:${rawId}`,
+                  name: stripTitle(it.name || it.title || it.series_name || ""),
+                  rawName: it.name || it.title || it.series_name || "",
+                  thumbUrl: poster,
+                  posterUrl: poster,
+                  backdropUrl: backdrop,
+                  rating: it.rating || it.rating_5based || it.score || "",
+                  year: it.year || it.releaseDate || "",
+                  plot: it.plot || it.description || it.overview || "",
+                  streamId: rawId,
+                  sourceId: it.nodecast_source_id ?? it.source_id,
+                  globalStreamId: it.nodecast_global_stream_id ?? it.global_stream_id ?? rawId,
+                  containerExtension: it.container_extension || "",
+                  contentType: t,
+                  packageId: cloned.id
+                };
+              });
             }
           }
           return cloned;
@@ -1243,29 +1258,23 @@
             if (Array.isArray(rawList) && rawList.length > 0) {
               pkg.totalCount = Math.max(pkg.totalCount || 0, rawList.length);
 
-              const streamById = new Map();
-              rawList.forEach(it => {
-                const rawId = String(it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? '');
-                if (rawId) streamById.set(rawId, it);
-              });
-
               if (Array.isArray(pkg.items) && pkg.items.length > 0) {
-                // Enrich existing preview items with real vertical poster from appState
+                // Server feed already gave us the items in provider order. Just enrich artwork if missing
+                const streamById = new Map();
+                rawList.forEach(it => {
+                  const rawId = String(it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? '');
+                  if (rawId) streamById.set(rawId, it);
+                });
                 pkg.items.forEach(it => {
                   const raw = streamById.get(String(it.streamId || ''));
                   if (raw) {
                     const { poster, backdrop } = extractMediaImages(raw);
-                    if (poster) {
-                      it.posterUrl = poster;
-                      it.thumbUrl = poster;
-                    }
-                    if (backdrop) {
-                      it.backdropUrl = backdrop;
-                    }
+                    if (poster && !it.posterUrl) { it.posterUrl = poster; it.thumbUrl = poster; }
+                    if (backdrop && !it.backdropUrl) it.backdropUrl = backdrop;
                   }
                 });
               } else {
-                // Populate preview items if empty
+                // Fallback: populate from rawList preserving provider_order
                 pkg.items = rawList.slice(0, 20).map((it, idx) => {
                   const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? idx;
                   const { poster, backdrop } = extractMediaImages(it);
@@ -1280,7 +1289,7 @@
                     year: it.year || it.releaseDate || "",
                     plot: it.plot || it.description || it.overview || "",
                     streamId: rawId,
-                    sourceId: it.nodecast_source_id ?? it.source_id,
+                    sourceId: it.nodecast_source_id ?? it.source_id ?? pkg.source_id,
                     globalStreamId: it.nodecast_global_stream_id ?? it.global_stream_id ?? rawId,
                     containerExtension: it.container_extension || "",
                     contentType: tab,

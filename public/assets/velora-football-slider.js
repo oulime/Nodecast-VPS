@@ -637,9 +637,14 @@
     removeMatchBanner();
     if (!match) return;
 
-    var contentView = document.getElementById('content-view');
     var dynamicList = document.getElementById('dynamic-list');
-    if (!contentView) return;
+    var contentView = document.getElementById('content-view');
+    if (!dynamicList && !contentView) return;
+
+    // Ne JAMAIS afficher la bannière de match sur les pages de films / séries / VOD
+    if (contentView && (contentView.classList.contains('content-view--vod-film-detail') || contentView.classList.contains('content-view--vod-series-detail') || contentView.classList.contains('content-view--vod'))) {
+      return;
+    }
 
     var homeName = match.homeTeam?.name || 'Équipe 1';
     var awayName = match.awayTeam?.name || 'Équipe 2';
@@ -691,12 +696,31 @@
         '</div>' +
       '</div>';
 
-    if (dynamicList && dynamicList.parentNode === contentView) {
-      contentView.insertBefore(banner, dynamicList);
-    } else {
+    if (dynamicList) {
+      dynamicList.prepend(banner);
+    } else if (contentView) {
       contentView.prepend(banner);
     }
   }
+
+  // Nettoyage immédiat de la bannière de match lors de toute navigation vers un film, une série ou un autre onglet
+  document.addEventListener('velora-home-media-open', function (e) {
+    if (e && e.detail && e.detail.contentType !== 'live') {
+      removeMatchBanner();
+    }
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!e.target) return;
+    if (e.target.closest('.vod-card, .vel-vod-movie-card, .vel-vod-series-card, [data-bottom-nav], [data-nav], #btn-movies, #btn-series, #btn-home, #btn-adult, #btn-favorites, .nav-link, .sidebar-link, [data-action="back"], .vod-back-btn, .player-back-btn')) {
+      if (!e.target.closest('.vel-football-card, .vel-football-slider-card, [data-action="play-match"]')) {
+        removeMatchBanner();
+      }
+    }
+  }, true);
+
+  window.addEventListener('popstate', removeMatchBanner);
+  window.addEventListener('hashchange', removeMatchBanner);
 
   window.veloraOpenMatchChannels = async function (match, priorityChannel) {
     if (!match) return;

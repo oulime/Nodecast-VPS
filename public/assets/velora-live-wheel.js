@@ -1737,11 +1737,20 @@
         el.querySelector(".vel-channel-playing-badge")?.classList.toggle("hidden", !match);
       });
 
-      // Keep player container visible
+      // Keep player container visible and immediately display loading spinner
       const playerContainer = document.getElementById("player-container");
       if (playerContainer) {
         playerContainer.classList.remove("hidden");
         playerContainer.setAttribute("aria-hidden", "false");
+      }
+      if (typeof window.veloraShowPlayerBuffering === "function") {
+        window.veloraShowPlayerBuffering(ch.name || ch.title || "Chaîne");
+      } else {
+        const buffering = document.getElementById("player-buffering");
+        if (buffering) {
+          buffering.classList.remove("hidden");
+          buffering.setAttribute("aria-hidden", "false");
+        }
       }
 
       const pkgCoverRaw = this.activePackage ? this.resolvePackageCover(this.activePackage) : "";
@@ -2054,10 +2063,44 @@
     return "";
   }
 
-  window.veloraShowPpvNoEvent = function (channelName, customDetails) {
-    const overlay = document.getElementById("player-ppv-noevent-overlay");
+  window.veloraShowPlayerBuffering = function (channelName) {
+    window.veloraHidePpvNoEvent();
+    const playerContainer = document.getElementById("player-container");
+    if (playerContainer) {
+      playerContainer.classList.remove("hidden");
+      playerContainer.setAttribute("aria-hidden", "false");
+    }
     const buffering = document.getElementById("player-buffering");
-    if (buffering) buffering.classList.add("hidden");
+    if (buffering) {
+      buffering.classList.remove("hidden");
+      buffering.setAttribute("aria-hidden", "false");
+      const label = buffering.querySelector(".player-buffering__label");
+      if (label) label.textContent = "Chargement…";
+    }
+    const chName = (channelName && typeof channelName === "string" ? channelName : getActiveChannelName()).trim();
+    const nowPlaying = document.getElementById("now-playing");
+    if (nowPlaying && chName) {
+      nowPlaying.innerHTML = `
+        <div class="vel-live-ticker">
+          <span class="vel-live-badge">CHARGEMENT</span>
+          <span class="vel-live-ticker__title" title="${chName}">${chName}</span>
+        </div>
+      `;
+      nowPlaying.classList.remove("hidden");
+    }
+  };
+
+  window.veloraHidePlayerBuffering = function () {
+    const buffering = document.getElementById("player-buffering");
+    if (buffering) {
+      buffering.classList.add("hidden");
+      buffering.setAttribute("aria-hidden", "true");
+    }
+  };
+
+  window.veloraShowPpvNoEvent = function (channelName, customDetails) {
+    window.veloraHidePlayerBuffering();
+    const overlay = document.getElementById("player-ppv-noevent-overlay");
 
     let chName = "";
     if (typeof channelName === "string" && channelName.trim()) {
@@ -2106,15 +2149,43 @@
   window.veloraIsPpvOfflineStreamUrl = isPpvOfflineStreamUrl;
   window.veloraIsLikelyPpvChannel = isLikelyPpvChannel;
 
-  // Global click delegator for PPV actions
+  // Intercept window.veloraPlayLiveChannel to always show player loading immediately
+  function hookVeloraPlayLiveChannel() {
+    if (typeof window.veloraPlayLiveChannel === "function" && !window.veloraPlayLiveChannel._veloraLoadingHooked) {
+      const origPlayLive = window.veloraPlayLiveChannel;
+      const hooked = async function (item) {
+        try {
+          const chName = item ? (item.name || item.title || "") : "";
+          window.veloraShowPlayerBuffering(chName);
+        } catch (_) {}
+        return origPlayLive.apply(this, arguments);
+      };
+      hooked._veloraLoadingHooked = true;
+      window.veloraPlayLiveChannel = hooked;
+    }
+  }
+  hookVeloraPlayLiveChannel();
+  document.addEventListener("DOMContentLoaded", hookVeloraPlayLiveChannel);
+  document.addEventListener("velora-app-ready", hookVeloraPlayLiveChannel);
+  window.setTimeout(hookVeloraPlayLiveChannel, 400);
+  window.setTimeout(hookVeloraPlayLiveChannel, 1200);
+
+  // Global click delegator for Channel Selection & PPV actions
   document.addEventListener("click", function (e) {
+    // Show instant player buffering spinner when clicking on any channel item in the app
+    const channelRow = e.target && e.target.closest(".vel-media-item-row, .media-item, [data-stream-id]");
+    if (channelRow && !e.target.closest("#btn-close-player, .vel-channel-fav-btn, .vel-package-card")) {
+      const titleEl = channelRow.querySelector("h4, .media-info h4, .media-item__title, .vel-media-title, .vel-package-card__title");
+      const chName = titleEl ? (titleEl.getAttribute("title") || titleEl.textContent) : (channelRow.getAttribute("aria-label") || "");
+      window.veloraShowPlayerBuffering(chName);
+    }
+
     const retryBtn = e.target && e.target.closest("#vel-ppv-btn-retry");
     if (retryBtn) {
       e.preventDefault();
       e.stopPropagation();
       window.veloraHidePpvNoEvent();
-      const buffering = document.getElementById("player-buffering");
-      if (buffering) buffering.classList.remove("hidden");
+      window.veloraShowPlayerBuffering();
       const activeCard = document.querySelector(".media-item.is-active, .vel-media-item-row.is-active");
       if (activeCard) {
         const btn = activeCard.querySelector("button, .media-item__main") || activeCard;
@@ -2134,6 +2205,7 @@
       e.preventDefault();
       e.stopPropagation();
       window.veloraHidePpvNoEvent();
+      window.veloraHidePlayerBuffering();
       const closePlayer = document.getElementById("btn-close-player");
       if (closePlayer) {
         closePlayer.click();
@@ -2162,22 +2234,63 @@
       }
     };
 
+    video.addEventListener("loadstart", function () {
+      const src = video.currentSrc || video.src || "";
+      if (isPpvOfflineStreamUrl(src)) {
+        window.veloraShowPpvNoEvent();
+      } else {
+        window.veloraShowPlayerBuffering();
+      }
+    });
+
+    video.addEventListener("waiting", function () {
+      const src = video.currentSrc || video.src || "";
+      if (isPpvOfflineStreamUrl(src)) {
+        window.veloraShowPpvNoEvent();
+      } else {
+        window.veloraShowPlayerBuffering();
+      }
+    });
+
+    video.addEventListener("seeking", function () {
+      window.veloraShowPlayerBuffering();
+    });
+
+    video.addEventListener("playing", function () {
+      const src = video.currentSrc || video.src || "";
+      if (isPpvOfflineStreamUrl(src)) {
+        window.veloraShowPpvNoEvent();
+      } else {
+        window.veloraHidePpvNoEvent();
+        window.veloraHidePlayerBuffering();
+      }
+    });
+
+    video.addEventListener("canplay", function () {
+      const src = video.currentSrc || video.src || "";
+      if (!isPpvOfflineStreamUrl(src) && !video.paused) {
+        window.veloraHidePlayerBuffering();
+      }
+    });
+
+    video.addEventListener("timeupdate", function () {
+      if (video.currentTime > 0.1 && !video.paused) {
+        const src = video.currentSrc || video.src || "";
+        if (!isPpvOfflineStreamUrl(src)) {
+          window.veloraHidePlayerBuffering();
+        }
+      }
+    });
+
     video.addEventListener("error", function () {
+      window.veloraHidePlayerBuffering();
       const src = video.currentSrc || video.src || "";
       if (isPpvOfflineStreamUrl(src) || isLikelyPpvChannel(getActiveChannelName())) {
         window.veloraShowPpvNoEvent();
       }
     });
 
-    video.addEventListener("playing", function () {
-      const src = video.currentSrc || video.src || "";
-      if (!isPpvOfflineStreamUrl(src)) {
-        window.veloraHidePpvNoEvent();
-      }
-    });
-
     video.addEventListener("loadedmetadata", checkStreamOffline);
-    video.addEventListener("loadstart", checkStreamOffline);
   }
 
   if (document.readyState === "loading") {

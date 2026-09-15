@@ -1152,10 +1152,9 @@
     // Strict qualification check:
     // 1. Content already in Reprendre / History -> always qualified (immediate seek/position updates)
     // 2. Video completed/ended -> qualified
-    // 3. User watched continuously for >= minSec (default 3 mins) -> qualified
-    // 4. User sought or played to a position >= minSec -> qualified
-    // 5. Already marked qualified during this active session -> qualified
-    var isQualified = isFinished || alreadyInResume || !!existingEntry || sessionTracker.qualified || (isRewindCommit && sessionTracker.qualified) || (realCurrent >= minSec) || (continuousSecs >= minSec);
+    // 3. User actually watched for >= minSec (e.g. 3 mins configured in settings) -> qualified
+    // 4. Already marked qualified during this active session -> qualified
+    var isQualified = isFinished || alreadyInResume || !!existingEntry || sessionTracker.qualified || (isRewindCommit && sessionTracker.qualified) || (continuousSecs >= minSec);
 
     if (!isQualified) {
       return;
@@ -1668,10 +1667,7 @@
 
       vodVideo.addEventListener("seeking", function () {
         sessionTracker.seekFromTime = lastKnownVodTime || (Number.isFinite(vodVideo.currentTime) ? vodVideo.currentTime : 0);
-        if (!sessionTracker.qualified) {
-          sessionTracker.continuousSeconds = 0;
-          sessionTracker.lastTick = null;
-        }
+        sessionTracker.lastTick = null;
         updateActiveEpisodeLiveProgress();
       }, { passive: true });
 
@@ -1680,9 +1676,8 @@
         lastKnownVodTime = toTime;
         sessionTracker.rewindActive = false;
         sessionTracker.rewindContinuousSeconds = 0;
-        sessionTracker.qualified = true;
         updateActiveEpisodeLiveProgress();
-        if (toTime >= MIN_WATCH_SECONDS || sessionTracker.qualified) {
+        if (sessionTracker.qualified) {
           recordProgress(vodVideo, false, false, true);
           injectResumeSectionDirectly();
         }

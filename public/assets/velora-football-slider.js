@@ -577,39 +577,102 @@
       });
     }
 
-    // 3. Recherche via l'API de recherche du pays (VPS / Nodecast)
-    if (typeof window.veloraSearchCountryContent === 'function') {
-      var searchKwList2 = targetKeywords.length > 0 ? targetKeywords : rawChannels;
-      for (var i = 0; i < searchKwList2.length; i++) {
-        var chQuery = searchKwList2[i];
-        if (!chQuery || chQuery.length < 2 || chQuery === 'Chaîne à confirmer') continue;
+    // Helper dédié à la recherche stricte de chaînes TV (Live uniquement, jamais de films ni séries)
+    async function searchLiveCountryChannels(query) {
+      if (!query || query.length < 2) return [];
+      if (typeof window.veloraSearchCountryLiveContent === 'function') {
         try {
-          var searchRes = await window.veloraSearchCountryContent(chQuery);
-          var liveItems = (searchRes && Array.isArray(searchRes.live)) ? searchRes.live :
-                          (searchRes && Array.isArray(searchRes.results)) ? searchRes.results.filter(function (r) { return r && (r.type === 'channel' || r.type === 'live'); }) : [];
-
-          liveItems.forEach(function (item) {
-            var stObj = item.item || item;
-            var score = scoreChannelMatch(stObj, chQuery);
-            if (score >= 60) {
-              var sid = String(stObj.stream_id || stObj.id || item.stream_id || item.streamId);
-              var existing = foundStreamsMap.get(sid);
-              if (!existing || existing.score < score) {
-                foundStreamsMap.set(sid, { stream: stObj, score: score, matchedChannel: chQuery });
-              }
-            }
-          });
+          var res = await window.veloraSearchCountryLiveContent(query);
+          if (res && Array.isArray(res.live)) return res.live;
+          if (res && Array.isArray(res.results)) return res.results.filter(function (r) { return r && (r.type === 'channel' || r.type === 'live'); });
         } catch (_) {}
       }
+      try {
+        var countryId = (typeof window.veloraGetActiveCountryId === 'function') ? window.veloraGetActiveCountryId() : null;
+        if (!countryId) {
+          try {
+            countryId = localStorage.getItem('lumina_selected_country_id') || sessionStorage.getItem('lumina_selected_country_id');
+          } catch (_) {}
+        }
+        var authHeaders = {};
+        try {
+          var token = localStorage.getItem('authToken') || '';
+          if (token) authHeaders['Authorization'] = 'Bearer ' + token;
+        } catch (_) {}
+        var st = (typeof window.veloraGetState === 'function') ? window.veloraGetState() : null;
+        if (st && st.nodecastAuthHeaders) {
+          Object.assign(authHeaders, st.nodecastAuthHeaders);
+        }
+        var searchRes = await fetch('/api/search', {
+          method: 'POST',
+          headers: Object.assign({ 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' }, authHeaders),
+          body: JSON.stringify({ query: query, type: 'live', countryId: countryId, limit: 60 }),
+          cache: 'no-store'
+        });
+        if (searchRes.ok) {
+          var data = await searchRes.json();
+          if (data && Array.isArray(data.results)) {
+            return data.results.map(function (f) {
+              var m = String(f.itemId || '');
+              var b = String(f.sourceId || '');
+              var g = /^\d+$/.test(m) ? Number(m) : m;
+              var pkgId = String(f.packageId || '');
+              var stObj = {
+                stream_id: g,
+                raw_stream_id: g,
+                name: f.name || '',
+                category_id: pkgId,
+                category_ids: [pkgId],
+                stream_icon: f.streamIcon || '',
+                cover: f.streamIcon || '',
+                nodecast_source_id: b,
+                source_id: b,
+                nodecast_global_stream_id: f.globalStreamId,
+                nodecast_media: 'live'
+              };
+              return {
+                item: stObj,
+                stream_id: g,
+                streamId: g,
+                name: f.name || '',
+                label: f.name || '',
+                packageId: pkgId,
+                sourceId: b
+              };
+            });
+          }
+        }
+      } catch (_) {}
+      return [];
     }
 
-    // 4. Si aucune chaîne spécifique n'est trouvée, recherche par équipes du match (ex: chaînes EVENT)
+    // 3. Recherche via l'API de recherche du pays (Live / TV uniquement)
+    var searchKwList2 = targetKeywords.length > 0 ? targetKeywords : rawChannels;
+    for (var i = 0; i < searchKwList2.length; i++) {
+      var chQuery = searchKwList2[i];
+      if (!chQuery || chQuery.length < 2 || chQuery === 'Chaîne à confirmer') continue;
+      try {
+        var liveItems = await searchLiveCountryChannels(chQuery);
+        liveItems.forEach(function (item) {
+          var stObj = item.item || item;
+          var score = scoreChannelMatch(stObj, chQuery);
+          if (score >= 60) {
+            var sid = String(stObj.stream_id || stObj.id || item.stream_id || item.streamId);
+            var existing = foundStreamsMap.get(sid);
+            if (!existing || existing.score < score) {
+              foundStreamsMap.set(sid, { stream: stObj, score: score, matchedChannel: chQuery });
+            }
+          }
+        });
+      } catch (_) {}
+    }
+
+    // 4. Si aucune chaîne spécifique n'est trouvée, recherche par équipes du match (Live / TV uniquement)
     if (foundStreamsMap.size === 0 && (match.homeTeam?.name || match.awayTeam?.name)) {
       var queryTeams = [match.homeTeam?.name, match.awayTeam?.name].filter(Boolean);
       for (var k = 0; k < queryTeams.length; k++) {
         try {
-          var tRes = await window.veloraSearchCountryContent(queryTeams[k]);
-          var tLive = (tRes && Array.isArray(tRes.live)) ? tRes.live : [];
+          var tLive = await searchLiveCountryChannels(queryTeams[k]);
           tLive.forEach(function (item) {
             var stObj = item.item || item;
             var sid = String(stObj.stream_id || stObj.id || item.stream_id);

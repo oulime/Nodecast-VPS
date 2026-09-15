@@ -388,71 +388,224 @@
     return null;
   }
 
-  function getStreamsForPackages(packageIdentifiers, state, countryId) {
-    if (!Array.isArray(packageIdentifiers) || packageIdentifiers.length === 0) return [];
-    var matchedStreams = [];
-    var seenStreamIds = new Set();
-    var pkgIdSet = new Set();
+  var _livePackagesCache = null;
+  async function getAllLivePackagesList() {
+    if (_livePackagesCache && _livePackagesCache.length > 0) return _livePackagesCache;
+    if (window.veloraFootballAdmin && Array.isArray(window.veloraFootballAdmin.state?.allLivePackages) && window.veloraFootballAdmin.state.allLivePackages.length > 0) {
+      _livePackagesCache = window.veloraFootballAdmin.state.allLivePackages;
+      return _livePackagesCache;
+    }
+    try {
+      var token = localStorage.getItem('authToken') || '';
+      var headers = { 'apikey': 'local-vps' };
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+      var res = await fetch('/api/velora-db/rest/v1/admin_packages?kind=eq.live&order=name.asc', { headers: headers });
+      if (res.ok) {
+        var rows = await res.json();
+        if (Array.isArray(rows)) {
+          _livePackagesCache = rows;
+          return rows;
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
 
-    var allPkgs = (window.Pe && Array.isArray(window.Pe.packages)) ? window.Pe.packages : [];
+  async function fetchStreamsForPackage(pkg, countryId, state) {
+    if (!pkg) return [];
+    var pkgId = String(pkg.id || '').trim();
+    var catId = String(pkg.category_id || '').trim();
+    var srcId = String(pkg.source_id || '').trim();
+    var targetCountry = String(pkg.country_id || countryId || '').trim();
+    if (!targetCountry && typeof window.veloraGetActiveCountryId === 'function') {
+      targetCountry = String(window.veloraGetActiveCountryId() || '').trim();
+    }
+
+    // 1. Vérification en mémoire du catalogue Live
+    if (state && state.streamsByCatAll) {
+      var mem = (pkgId && state.streamsByCatAll.get(pkgId)) || (catId && state.streamsByCatAll.get(catId));
+      if (Array.isArray(mem) && mem.length > 0) {
+        return mem;
+      }
+    }
+
+    // 2. Chargement via l'API de chaînes du package (avec expansion des bouquets parents et ordre de curation)
+    if (pkgId) {
+      var candidates = [targetCountry, 'country_' + targetCountry.replace(/^country_/, ''), targetCountry.replace(/^country_/, '')].filter(Boolean);
+      for (var c = 0; c < candidates.length; c++) {
+        var cid = candidates[c];
+        try {
+          var token = localStorage.getItem('authToken') || '';
+          var headers = {};
+          if (token) headers['Authorization'] = 'Bearer ' + token;
+          var res = await fetch('/api/velora-db/admin/package-live-channels?countryId=' + encodeURIComponent(cid) + '&packageId=' + encodeURIComponent(pkgId), { headers: headers });
+          if (res.ok) {
+            var data = await res.json();
+            if (data && Array.isArray(data.channels) && data.channels.length > 0) {
+              return data.channels.map(function (ch) {
+                var sid = Number(ch.stream_id || ch.id || ch.raw_stream_id);
+                var numSid = Number.isFinite(sid) ? sid : (ch.stream_id || ch.id);
+                return {
+                  stream_id: numSid,
+                  raw_stream_id: numSid,
+                  itemId: String(numSid),
+                  name: ch.name || ch.title || '',
+                  label: ch.name || ch.title || '',
+                  stream_icon: ch.stream_icon || ch.cover || ch.thumb_url || '',
+                  cover: ch.stream_icon || ch.cover || ch.thumb_url || '',
+                  container_extension: ch.container_extension || '',
+                  category_id: String(pkgId || catId || ''),
+                  category_ids: [String(pkgId || catId || '')],
+                  nodecast_source_id: String(ch.source_id || ch.nodecast_source_id || srcId || ''),
+                  source_id: String(ch.source_id || ch.nodecast_source_id || srcId || ''),
+                  nodecast_media: 'live'
+                };
+              });
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    // 3. Fallback direct Xtream si source_id et category_id sont présents
+    if (srcId && catId) {
+      try {
+        var authHeaders = {};
+        if (state && state.nodecastAuthHeaders) Object.assign(authHeaders, state.nodecastAuthHeaders);
+        var xtreamRes = await fetch('/api/proxy/xtream/' + encodeURIComponent(srcId) + '/live_streams?category_id=' + encodeURIComponent(catId), { headers: authHeaders });
+        if (xtreamRes.ok) {
+          var xData = await xtreamRes.json();
+          var list = Array.isArray(xData) ? xData : (xData && Array.isArray(xData.streams) ? xData.streams : []);
+          if (list.length > 0) {
+            return list.map(function (ch) {
+              var sid = Number(ch.stream_id || ch.id);
+              var numSid = Number.isFinite(sid) ? sid : (ch.stream_id || ch.id);
+              return {
+                stream_id: numSid,
+                raw_stream_id: numSid,
+                itemId: String(numSid),
+                name: ch.name || ch.title || '',
+                label: ch.name || ch.title || '',
+                stream_icon: ch.stream_icon || ch.cover || '',
+                cover: ch.stream_icon || ch.cover || '',
+                container_extension: ch.container_extension || '',
+                category_id: String(pkgId || catId),
+                category_ids: [String(pkgId || catId)],
+                nodecast_source_id: srcId,
+                source_id: srcId,
+                nodecast_media: 'live'
+              };
+            });
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 4. Fallback: Requête recherche avec filtre packageId
+    if (pkgId) {
+      try {
+        var sRes = await fetch('/api/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ packageId: pkgId, type: 'live', countryId: targetCountry, limit: 120 })
+        });
+        if (sRes.ok) {
+          var sData = await sRes.json();
+          if (sData && Array.isArray(sData.results) && sData.results.length > 0) {
+            return sData.results.map(function (f) {
+              var m = String(f.itemId || f.stream_id || '');
+              var g = /^\d+$/.test(m) ? Number(m) : m;
+              return {
+                stream_id: g,
+                raw_stream_id: g,
+                itemId: String(g),
+                name: f.name || f.title || '',
+                label: f.name || f.title || '',
+                stream_icon: f.streamIcon || f.stream_icon || f.cover || '',
+                cover: f.streamIcon || f.stream_icon || f.cover || '',
+                category_id: String(pkgId || catId || ''),
+                category_ids: [String(pkgId || catId || '')],
+                nodecast_source_id: String(f.sourceId || f.source_id || srcId || ''),
+                source_id: String(f.sourceId || f.source_id || srcId || ''),
+                nodecast_media: 'live'
+              };
+            });
+          }
+        }
+      } catch (_) {}
+    }
+
+    return [];
+  }
+
+  async function getStreamsForPackagesAsync(packageIdentifiers, state, countryId) {
+    if (!Array.isArray(packageIdentifiers) || packageIdentifiers.length === 0) return [];
+
+    var allPkgs = await getAllLivePackagesList();
+    var matchedPkgObjects = [];
+    var seenPkgIds = new Set();
 
     packageIdentifiers.forEach(function (pkgIdent) {
       if (!pkgIdent) return;
       var identStr = String(pkgIdent).trim();
       var normIdent = normalizeChannelText(identStr);
 
-      pkgIdSet.add(identStr);
+      // 1. Recherche exacte par UUID / ID
+      var byId = allPkgs.find(function (p) { return p && String(p.id) === identStr; });
+      if (byId && !seenPkgIds.has(String(byId.id))) {
+        seenPkgIds.add(String(byId.id));
+        matchedPkgObjects.push(byId);
+        return;
+      }
 
+      // 2. Recherche exacte par nom
+      var exactByName = allPkgs.find(function (p) { return p && p.name && p.name.trim().toLowerCase() === identStr.toLowerCase(); });
+      if (exactByName && !seenPkgIds.has(String(exactByName.id))) {
+        seenPkgIds.add(String(exactByName.id));
+        matchedPkgObjects.push(exactByName);
+        return;
+      }
+
+      // 3. Recherche normalisée / sous-chaîne
       allPkgs.forEach(function (p) {
-        if (!p) return;
-        var pid = String(p.id);
+        if (!p || seenPkgIds.has(String(p.id))) return;
         var pName = String(p.name || '').trim();
         var pNorm = normalizeChannelText(pName);
 
-        if (pid === identStr || pName === identStr || pName.toLowerCase() === identStr.toLowerCase()) {
-          pkgIdSet.add(pid);
-        } else if (normIdent && (pNorm === normIdent || pNorm.includes(normIdent) || normIdent.includes(pNorm))) {
-          pkgIdSet.add(pid);
+        if (normIdent && pNorm && (pNorm === normIdent || pNorm.includes(normIdent) || normIdent.includes(pNorm))) {
+          seenPkgIds.add(String(p.id));
+          matchedPkgObjects.push(p);
         }
       });
     });
 
-    if (state && state.streamsByCatAll) {
-      pkgIdSet.forEach(function (pkgId) {
-        var streams = state.streamsByCatAll.get(String(pkgId));
-        if (Array.isArray(streams)) {
-          streams.forEach(function (st) {
-            var sid = String(st.stream_id || st.id);
-            if (!seenStreamIds.has(sid)) {
-              seenStreamIds.add(sid);
-              matchedStreams.push(st);
-            }
-          });
+    if (matchedPkgObjects.length === 0) {
+      packageIdentifiers.forEach(function (pkgIdent) {
+        var identStr = String(pkgIdent).trim();
+        if (identStr) {
+          matchedPkgObjects.push({ id: identStr, name: identStr });
         }
       });
+    }
 
-      if (matchedStreams.length === 0) {
-        state.streamsByCatAll.forEach(function (streams, catKey) {
-          var catNorm = normalizeChannelText(catKey);
-          packageIdentifiers.forEach(function (pkgIdent) {
-            var normIdent = normalizeChannelText(pkgIdent);
-            if (catNorm && normIdent && (catNorm.includes(normIdent) || normIdent.includes(catNorm))) {
-              if (Array.isArray(streams)) {
-                streams.forEach(function (st) {
-                  var sid = String(st.stream_id || st.id);
-                  if (!seenStreamIds.has(sid)) {
-                    seenStreamIds.add(sid);
-                    matchedStreams.push(st);
-                  }
-                });
-              }
-            }
-          });
+    var allStreams = [];
+    var seenStreamKeys = new Set();
+
+    for (var i = 0; i < matchedPkgObjects.length; i++) {
+      var pkgObj = matchedPkgObjects[i];
+      var streams = await fetchStreamsForPackage(pkgObj, countryId, state);
+      if (Array.isArray(streams)) {
+        streams.forEach(function (st) {
+          var sid = String(st.stream_id || st.id || st.raw_stream_id || st.name);
+          if (!seenStreamKeys.has(sid)) {
+            seenStreamKeys.add(sid);
+            allStreams.push(st);
+          }
         });
       }
     }
 
-    return matchedStreams;
+    return allStreams;
   }
 
   document.addEventListener('velora-football-mappings-changed', function (e) {
@@ -471,6 +624,7 @@
 
     var state = (typeof window.veloraGetState === 'function') ? window.veloraGetState() : null;
     var countryId = (typeof window.veloraGetActiveCountryId === 'function') ? window.veloraGetActiveCountryId() : null;
+    if (!countryId) countryId = rawCountry;
 
     var rawChannels = Array.isArray(match.tvChannels) ? match.tvChannels.slice() : [];
     if (priorityChannel) {
@@ -509,14 +663,16 @@
       }
     });
 
-    // 1. Priorité aux Packages IPTV configurés par l'administrateur
+    // 1. Priorité absolue aux Packages IPTV configurés par l'administrateur :
+    // Lorsqu'un ou plusieurs packages sont définis, AUCUNE recherche par nom/diffuseur/équipes n'est effectuée !
+    // On affiche directement la totalité des chaînes du/des packages concernés.
     if (matchedPackages.length > 0) {
-      var pkgStreams = getStreamsForPackages(matchedPackages, state, countryId);
+      var pkgStreams = await getStreamsForPackagesAsync(matchedPackages, state, countryId);
       if (pkgStreams.length > 0) {
         var scoringKeywords = matchedAliasesForPackageScoring.length > 0 ? matchedAliasesForPackageScoring : (targetKeywords.length > 0 ? targetKeywords : rawChannels);
         
         var scoredList = pkgStreams.map(function (st) {
-          var maxScore = 10; // score de base pour toute chaîne du package
+          var maxScore = 10;
           scoringKeywords.forEach(function (kw) {
             var sc = scoreChannelMatch(st, kw);
             if (sc > maxScore) maxScore = sc;
@@ -524,13 +680,16 @@
           return { stream: st, score: maxScore };
         });
 
-        // Les meilleures correspondances d'alias/chaînes en premier, suivies de tout le reste du package
+        // La meilleure correspondance de chaîne du package en tête de lecture, suivie de toutes les autres chaînes du package
         scoredList.sort(function (a, b) {
           return b.score - a.score;
         });
 
         return scoredList.map(function (e) { return e.stream; });
       }
+
+      // Si les packages configurés n'ont renvoyé aucune chaîne, ne pas faire de recherche sauvage non désirée
+      return [];
     }
 
     // 2. Recherche standard par mots-clés / alias

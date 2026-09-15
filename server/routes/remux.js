@@ -31,6 +31,18 @@ router.get('/', async (req, res) => {
         return res.status(400).json({ error: 'URL parameter is required' });
     }
 
+    if (/(?:^|[/?#&=:])(?:video\/)?(?:black|offline|standby|offair|noevent|placeholder|dummy)\.(?:ts|m3u8|mp4)|wdcdn\d*s?\.com\/video\/black|[\/=]black\.ts/i.test(url)) {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Expose-Headers', 'X-Velora-PPV-Status, X-Velora-Stream-State');
+        res.setHeader('X-Velora-PPV-Status', 'offline');
+        res.setHeader('X-Velora-Stream-State', 'no-event');
+        return res.status(404).json({
+            error: 'ppv_no_event',
+            status: 'offline',
+            message: "Ceci est une chaîne événementielle (PPV / Live Events). Aucun événement n'est en cours de diffusion pour le moment."
+        });
+    }
+
     const ffmpegPath = req.app.locals.ffmpegPath || 'ffmpeg';
 
     // Get User-Agent from settings

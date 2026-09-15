@@ -1442,6 +1442,11 @@ router.all('/stream/stop', (req, res) => {
     res.status(200).json({ ok: true, stopped });
 });
 
+function isPpvOfflineStreamUrl(targetUrl) {
+    if (!targetUrl || typeof targetUrl !== 'string') return false;
+    return /(?:^|[/?#&=:])(?:video\/)?(?:black|offline|standby|offair|noevent|placeholder|dummy)\.(?:ts|m3u8|mp4)|wdcdn\d*s?\.com\/video\/black|[\/=]black\.ts/i.test(targetUrl);
+}
+
 router.get('/stream', async (req, res) => {
     const maxRetries = 3;
     const retryDelays = [1500, 2500, 3500];
@@ -1450,6 +1455,19 @@ router.get('/stream', async (req, res) => {
     let { url } = req.query;
     if (!url) {
         return res.status(400).json({ error: 'URL required' });
+    }
+
+    if (isPpvOfflineStreamUrl(url)) {
+        res.set('Access-Control-Allow-Origin', '*');
+        res.set('Access-Control-Expose-Headers', 'X-Velora-PPV-Status, X-Velora-Stream-State');
+        res.set('X-Velora-PPV-Status', 'offline');
+        res.set('X-Velora-Stream-State', 'no-event');
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+        return res.status(404).json({
+            error: 'ppv_no_event',
+            status: 'offline',
+            message: "Ceci est une chaîne événementielle (PPV / Live Events). Aucun événement n'est en cours de diffusion pour le moment."
+        });
     }
 
     const isM3u8Url = /\.m3u8(\?|$)/i.test(url);
@@ -1662,6 +1680,25 @@ router.get('/stream', async (req, res) => {
                     });
                 }
             }
+
+            const responseFinalUrl = response.url || targetFetchUrl || '';
+            if (isPpvOfflineStreamUrl(responseFinalUrl)) {
+                cleanupListeners();
+                if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
+                    activeStreamControllersByAccount.delete(accountKey);
+                }
+                res.set('Access-Control-Allow-Origin', '*');
+                res.set('Access-Control-Expose-Headers', 'X-Velora-PPV-Status, X-Velora-Stream-State');
+                res.set('X-Velora-PPV-Status', 'offline');
+                res.set('X-Velora-Stream-State', 'no-event');
+                res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+                return res.status(404).json({
+                    error: 'ppv_no_event',
+                    status: 'offline',
+                    message: "Ceci est une chaîne événementielle (PPV / Live Events). Aucun événement n'est en cours de diffusion pour le moment."
+                });
+            }
+
             activeResponse = response;
             currentEntry.activeResponse = response;
             console.log(`[Proxy Stream] OPEN: Range: ${rangeHeader || 'None'} -> ${cleanUrl.substring(0, 80)}`);
@@ -1809,6 +1846,23 @@ router.get('/stream', async (req, res) => {
                 res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
 
                 let manifest = buffer.toString('utf-8');
+
+                if (isPpvOfflineStreamUrl(manifest)) {
+                    cleanupListeners();
+                    if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
+                        activeStreamControllersByAccount.delete(accountKey);
+                    }
+                    res.set('Access-Control-Allow-Origin', '*');
+                    res.set('Access-Control-Expose-Headers', 'X-Velora-PPV-Status, X-Velora-Stream-State');
+                    res.set('X-Velora-PPV-Status', 'offline');
+                    res.set('X-Velora-Stream-State', 'no-event');
+                    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+                    return res.status(404).json({
+                        error: 'ppv_no_event',
+                        status: 'offline',
+                        message: "Ceci est une chaîne événementielle (PPV / Live Events). Aucun événement n'est en cours de diffusion pour le moment."
+                    });
+                }
 
                 const finalUrlObj = new URL(finalUrl);
                 const baseUrl = finalUrlObj.origin + finalUrlObj.pathname.substring(0, finalUrlObj.pathname.lastIndexOf('/') + 1);

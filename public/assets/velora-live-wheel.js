@@ -2023,4 +2023,230 @@
   } else {
     new LiveWheelEngine();
   }
+
+  // =========================================================================
+  // VELORA PPV / LIVE EVENTS NO-EVENT UX CONTROLLER
+  // =========================================================================
+  function isPpvOfflineStreamUrl(url) {
+    if (!url || typeof url !== "string") return false;
+    return /(?:^|[/?#&=:])(?:video\/)?(?:black|offline|standby|offair|noevent|placeholder|dummy)\.(?:ts|m3u8|mp4)|wdcdn\d*s?\.com\/video\/black|[\/=]black\.ts/i.test(url);
+  }
+
+  function isLikelyPpvChannel(name) {
+    if (!name || typeof name !== "string") return false;
+    return /\b(ppv|event|events|live\s*event|dazn\s*event|disney\+?\s*event|bein\s*max|canal\+\s*live|ufc|boxe|wwe|fight\s*pass|multisports|prime\s*event|rmc\s*live|eurosport\s*event)\b/i.test(name);
+  }
+
+  function getActiveChannelName() {
+    const activeMedia = document.querySelector(".media-item.is-active, .vel-media-item-row.is-active, .media-item[aria-selected='true']");
+    if (activeMedia) {
+      const h4 = activeMedia.querySelector("h4, .media-info h4, .vel-package-card__title");
+      const title = h4 ? (h4.getAttribute("title") || h4.textContent) : activeMedia.getAttribute("aria-label");
+      if (title && title.trim()) return title.trim();
+    }
+    const nowPlayingEl = document.getElementById("now-playing");
+    if (nowPlayingEl) {
+      const tickerTitle = nowPlayingEl.querySelector(".vel-live-ticker__title");
+      const rawText = tickerTitle ? tickerTitle.textContent : nowPlayingEl.textContent;
+      const clean = (rawText || "").replace(/^[▶🔴\s]+/, "").replace(/—\s*En attente.*$/i, "").replace(/\[.*?\]/g, "").trim();
+      if (clean && !clean.toLowerCase().includes("chargement") && !clean.toLowerCase().includes("erreur")) return clean;
+    }
+    return "";
+  }
+
+  window.veloraShowPpvNoEvent = function (channelName, customDetails) {
+    const overlay = document.getElementById("player-ppv-noevent-overlay");
+    const buffering = document.getElementById("player-buffering");
+    if (buffering) buffering.classList.add("hidden");
+
+    let chName = "";
+    if (typeof channelName === "string" && channelName.trim()) {
+      chName = channelName.trim();
+    } else {
+      chName = getActiveChannelName();
+    }
+
+    if (overlay) {
+      const titleEl = overlay.querySelector("#vel-ppv-channel-name");
+      if (titleEl) {
+        titleEl.textContent = chName ? `Aucun événement en cours sur ${chName}` : "Aucun événement en cours de diffusion";
+      }
+      overlay.classList.remove("hidden");
+      overlay.setAttribute("aria-hidden", "false");
+    }
+
+    const nowPlaying = document.getElementById("now-playing");
+    if (nowPlaying) {
+      const clean = chName || "Canal Événementiel";
+      nowPlaying.innerHTML = `
+        <div class="vel-live-ticker">
+          <span class="vel-live-badge" style="background: rgba(244,63,94,0.18); color: #fb7185; border: 1px solid rgba(244,63,94,0.35);">
+            🔴 HORS DIRECT
+          </span>
+          <span class="vel-live-ticker__title" title="${clean}">${clean} — En attente d'événement</span>
+        </div>
+      `;
+      nowPlaying.classList.remove("hidden");
+    }
+
+    const video = document.getElementById("video");
+    if (video) {
+      try { video.pause(); } catch (_) {}
+    }
+  };
+
+  window.veloraHidePpvNoEvent = function () {
+    const overlay = document.getElementById("player-ppv-noevent-overlay");
+    if (overlay) {
+      overlay.classList.add("hidden");
+      overlay.setAttribute("aria-hidden", "true");
+    }
+  };
+
+  window.veloraIsPpvOfflineStreamUrl = isPpvOfflineStreamUrl;
+  window.veloraIsLikelyPpvChannel = isLikelyPpvChannel;
+
+  // Global click delegator for PPV actions
+  document.addEventListener("click", function (e) {
+    const retryBtn = e.target && e.target.closest("#vel-ppv-btn-retry");
+    if (retryBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      window.veloraHidePpvNoEvent();
+      const buffering = document.getElementById("player-buffering");
+      if (buffering) buffering.classList.remove("hidden");
+      const activeCard = document.querySelector(".media-item.is-active, .vel-media-item-row.is-active");
+      if (activeCard) {
+        const btn = activeCard.querySelector("button, .media-item__main") || activeCard;
+        btn.click();
+      } else {
+        const video = document.getElementById("video");
+        if (video && video.src) {
+          video.load();
+          video.play().catch(() => {});
+        }
+      }
+      return;
+    }
+
+    const closeBtn = e.target && e.target.closest("#vel-ppv-btn-close");
+    if (closeBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      window.veloraHidePpvNoEvent();
+      const closePlayer = document.getElementById("btn-close-player");
+      if (closePlayer) {
+        closePlayer.click();
+      } else if (typeof window.veloraStopAllPlayback === "function") {
+        window.veloraStopAllPlayback();
+      }
+      return;
+    }
+
+    // Hide PPV overlay on clicking any media item card or package card
+    if (e.target && e.target.closest(".media-item, .vel-media-item-row, .vel-package-card, #btn-close-player, #btn-logo-home")) {
+      window.veloraHidePpvNoEvent();
+    }
+  }, true);
+
+  // Monitor video events on #video
+  function bindVideoPpvWatchdog() {
+    const video = document.getElementById("video");
+    if (!video || video.dataset.veloraPpvBound === "1") return;
+    video.dataset.veloraPpvBound = "1";
+
+    const checkStreamOffline = function () {
+      const src = video.currentSrc || video.src || "";
+      if (isPpvOfflineStreamUrl(src)) {
+        window.veloraShowPpvNoEvent();
+      }
+    };
+
+    video.addEventListener("error", function () {
+      const src = video.currentSrc || video.src || "";
+      if (isPpvOfflineStreamUrl(src) || isLikelyPpvChannel(getActiveChannelName())) {
+        window.veloraShowPpvNoEvent();
+      }
+    });
+
+    video.addEventListener("playing", function () {
+      const src = video.currentSrc || video.src || "";
+      if (!isPpvOfflineStreamUrl(src)) {
+        window.veloraHidePpvNoEvent();
+      }
+    });
+
+    video.addEventListener("loadedmetadata", checkStreamOffline);
+    video.addEventListener("loadstart", checkStreamOffline);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bindVideoPpvWatchdog);
+  } else {
+    bindVideoPpvWatchdog();
+  }
+
+  // Global fetch & XHR response interceptors for PPV offline status and black.ts detection
+  if (typeof window.fetch === "function") {
+    const originalFetch = window.fetch;
+    window.fetch = function () {
+      const args = arguments;
+      const urlArg = typeof args[0] === "string" ? args[0] : (args[0] && args[0].url ? args[0].url : "");
+      return originalFetch.apply(this, args).then(function (response) {
+        try {
+          if (response) {
+            const ppvHeader = response.headers ? response.headers.get("X-Velora-PPV-Status") : null;
+            if (ppvHeader === "offline" || isPpvOfflineStreamUrl(urlArg) || (response.status === 404 && isLikelyPpvChannel(getActiveChannelName()))) {
+              const livePlayer = document.getElementById("player-container");
+              if (livePlayer && !livePlayer.classList.contains("hidden")) {
+                window.veloraShowPpvNoEvent();
+              }
+              return response;
+            }
+            if (response.ok && (urlArg.includes(".m3u8") || urlArg.includes("/stream") || urlArg.includes("/proxy/"))) {
+              response.clone().text().then(function (text) {
+                if (isPpvOfflineStreamUrl(text)) {
+                  const livePlayer = document.getElementById("player-container");
+                  if (livePlayer && !livePlayer.classList.contains("hidden")) {
+                    window.veloraShowPpvNoEvent();
+                  }
+                }
+              }).catch(function () {});
+            }
+          }
+        } catch (_) {}
+        return response;
+      });
+    };
+  }
+
+  if (typeof window.XMLHttpRequest === "function") {
+    const origOpen = XMLHttpRequest.prototype.open;
+    const origSend = XMLHttpRequest.prototype.send;
+
+    XMLHttpRequest.prototype.open = function (method, url) {
+      this._veloraUrl = typeof url === "string" ? url : "";
+      return origOpen.apply(this, arguments);
+    };
+
+    XMLHttpRequest.prototype.send = function () {
+      this.addEventListener("load", function () {
+        try {
+          const url = this._veloraUrl || "";
+          const ppvHeader = this.getResponseHeader ? this.getResponseHeader("X-Velora-PPV-Status") : null;
+          if (ppvHeader === "offline" || isPpvOfflineStreamUrl(url)) {
+            window.veloraShowPpvNoEvent();
+            return;
+          }
+          if (typeof this.responseText === "string" && (url.includes(".m3u8") || url.includes("/stream") || url.includes("/proxy/"))) {
+            if (isPpvOfflineStreamUrl(this.responseText)) {
+              window.veloraShowPpvNoEvent();
+            }
+          }
+        } catch (_) {}
+      });
+      return origSend.apply(this, arguments);
+    };
+  }
 })();
+

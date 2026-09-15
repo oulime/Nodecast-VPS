@@ -3201,6 +3201,275 @@
       backdrop-filter: none !important;
     }
 
+    /* PPV / Live Events Offline Player Overlay */
+    .player-ppv-noevent-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 45;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: radial-gradient(circle at 50% 40%, rgba(15, 23, 42, 0.94) 0%, rgba(4, 7, 15, 0.98) 100%);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      opacity: 1;
+      transition: opacity 0.35s ease, visibility 0.35s ease;
+      pointer-events: auto;
+      user-select: none;
+    }
+
+    .player-ppv-noevent-overlay.hidden {
+      display: none !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+
+    .vel-ppv-backdrop-glow {
+      position: absolute;
+      width: 280px;
+      height: 280px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.2) 0%, rgba(244, 63, 94, 0.12) 50%, transparent 75%);
+      filter: blur(45px);
+      pointer-events: none;
+      animation: vel-ppv-pulse-glow 4s ease-in-out infinite alternate;
+    }
+
+    @keyframes vel-ppv-pulse-glow {
+      0% { transform: scale(0.88); opacity: 0.55; }
+      100% { transform: scale(1.18); opacity: 1; }
+    }
+
+    .vel-ppv-card {
+      position: relative;
+      max-width: 440px;
+      width: 100%;
+      background: linear-gradient(145deg, rgba(24, 32, 50, 0.92), rgba(10, 15, 28, 0.97));
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+      border-radius: 22px;
+      padding: 24px 22px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      color: #fff;
+      animation: vel-ppv-appear 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes vel-ppv-appear {
+      0% { opacity: 0; transform: scale(0.92) translateY(8px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .vel-ppv-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .vel-ppv-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      background: rgba(56, 189, 248, 0.14);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #38bdf8;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .vel-ppv-state-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      background: rgba(244, 63, 94, 0.14);
+      border: 1px solid rgba(244, 63, 94, 0.35);
+      color: #fb7185;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    .vel-ppv-radar {
+      position: relative;
+      display: inline-flex;
+      width: 8px;
+      height: 8px;
+    }
+
+    .vel-ppv-radar-ping {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background-color: #38bdf8;
+      opacity: 0.75;
+      animation: vel-ppv-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+    }
+
+    .vel-ppv-radar-dot {
+      position: relative;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #38bdf8;
+    }
+
+    @keyframes vel-ppv-ping {
+      75%, 100% {
+        transform: scale(2.4);
+        opacity: 0;
+      }
+    }
+
+    .vel-ppv-icon-wrap {
+      margin-bottom: 12px;
+    }
+
+    .vel-ppv-icon-circle {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(99, 102, 241, 0.22));
+      border: 1.5px solid rgba(56, 189, 248, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 25px rgba(56, 189, 248, 0.25);
+      color: #38bdf8;
+    }
+
+    .vel-ppv-svg {
+      width: 28px;
+      height: 28px;
+      animation: vel-ppv-radar-pulse 2.2s ease-in-out infinite;
+    }
+
+    @keyframes vel-ppv-radar-pulse {
+      0%, 100% { transform: scale(1); opacity: 0.9; }
+      50% { transform: scale(1.08); opacity: 1; filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.8)); }
+    }
+
+    .vel-ppv-title {
+      margin: 0 0 8px 0;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1.35;
+    }
+
+    .vel-ppv-desc {
+      margin: 0 0 16px 0;
+      font-size: 0.84rem;
+      line-height: 1.48;
+      color: #94a3b8;
+      max-width: 380px;
+    }
+
+    .vel-ppv-info-box {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 10px 14px;
+      margin-bottom: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      text-align: left;
+    }
+
+    .vel-ppv-info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.78rem;
+      gap: 8px;
+    }
+
+    .vel-ppv-info-label {
+      color: #64748b;
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+
+    .vel-ppv-info-val {
+      color: #cbd5e1;
+      font-weight: 600;
+      text-align: right;
+    }
+
+    .vel-ppv-actions {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .vel-ppv-btn {
+      flex: 1;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      border: none;
+      outline: none;
+      font-family: inherit;
+    }
+
+    .vel-ppv-btn-primary {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+    }
+
+    .vel-ppv-btn-primary:hover, .vel-ppv-btn-primary:focus-visible {
+      background: linear-gradient(135deg, #0369a1, #1d4ed8);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45);
+    }
+
+    .vel-ppv-btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: #cbd5e1;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .vel-ppv-btn-secondary:hover, .vel-ppv-btn-secondary:focus-visible {
+      background: rgba(255, 255, 255, 0.14);
+      color: #ffffff;
+    }
+
+    @media (max-width: 480px) {
+      .vel-ppv-card {
+        padding: 18px 14px;
+        border-radius: 16px;
+      }
+      .vel-ppv-title {
+        font-size: 1.05rem;
+      }
+      .vel-ppv-desc {
+        font-size: 0.78rem;
+      }
+      .vel-ppv-actions {
+        flex-direction: column;
+      }
+    }
+
     /* iPhone Safari does not support fullscreen on an arbitrary container. The
          player therefore uses the fullscreen classes below as an in-page fallback.
          Dynamic viewport units keep the bottom controls above Safari's chrome. */
@@ -7159,6 +7428,59 @@
                   </button>
                   <button id="live-ctl-fullscreen" type="button" class="live-ctl-btn" aria-label="Fullscreen landscape"
                     tabindex="0" data-tv-focusable="true"></button>
+                </div>
+              </div>
+              <div id="player-ppv-noevent-overlay" class="player-ppv-noevent-overlay hidden" aria-hidden="true">
+                <div class="vel-ppv-backdrop-glow"></div>
+                <div class="vel-ppv-card">
+                  <div class="vel-ppv-header">
+                    <span class="vel-ppv-badge">
+                      <span class="vel-ppv-radar">
+                        <span class="vel-ppv-radar-ping"></span>
+                        <span class="vel-ppv-radar-dot"></span>
+                      </span>
+                      CANAL ÉVÉNEMENTIEL
+                    </span>
+                    <span class="vel-ppv-state-tag">HORS DIRECT</span>
+                  </div>
+
+                  <div class="vel-ppv-icon-wrap">
+                    <div class="vel-ppv-icon-circle">
+                      <svg class="vel-ppv-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4.93 4.93a10 10 0 0 0 0 14.14"/>
+                        <path d="M7.76 7.76a6 6 0 0 0 0 8.48"/>
+                        <circle cx="12" cy="12" r="2.5" fill="currentColor"/>
+                        <path d="M16.24 7.76a6 6 0 0 1 0 8.48"/>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                      </svg>
+                    </div>
+                  </div>
+
+                  <h3 id="vel-ppv-channel-name" class="vel-ppv-title">Aucun événement en cours</h3>
+                  <p class="vel-ppv-desc">
+                    Cette chaîne est un canal événementiel (PPV / Live Events). La diffusion est active uniquement lors du direct des rencontres ou programmes programmés.
+                  </p>
+
+                  <div class="vel-ppv-info-box">
+                    <div class="vel-ppv-info-row">
+                      <span class="vel-ppv-info-label">📡 Statut du flux :</span>
+                      <span class="vel-ppv-info-val">En attente de transmission</span>
+                    </div>
+                    <div class="vel-ppv-info-row">
+                      <span class="vel-ppv-info-label">💡 Conseil :</span>
+                      <span class="vel-ppv-info-val">Revenez à l'horaire de l'événement</span>
+                    </div>
+                  </div>
+
+                  <div class="vel-ppv-actions">
+                    <button type="button" id="vel-ppv-btn-retry" class="vel-ppv-btn vel-ppv-btn-primary" tabindex="0">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+                      Réessayer le flux
+                    </button>
+                    <button type="button" id="vel-ppv-btn-close" class="vel-ppv-btn vel-ppv-btn-secondary" tabindex="0">
+                      Fermer le lecteur
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -17588,7 +17910,7 @@
     })();
   </script>
   <script defer src="/assets/cast-bridge.js?v=20260821-cast-airplay-v1"></script>
-  <script defer src="/assets/velora-live-wheel.js?v=20260915-dark-contrast-v1"></script>
+  <script defer src="/assets/velora-live-wheel.js?v=20260915-ppv-noevent-ux-v3"></script>
   <link rel="stylesheet" href="/assets/velora-prime-carousel.css?v=20260914-exact-provider-order-v11" />
   <script defer src="/assets/velora-prime-carousels.js?v=20260914-random-packages-v1"></script>
   <script defer src="/assets/velora-football-slider.js?v=20260915-foot-slider-pkg-channels-v2"></script>

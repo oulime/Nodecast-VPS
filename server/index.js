@@ -619,6 +619,7 @@ app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/matches', require('./routes/matches'));
 app.use('/api', require('./routes/packageCovers'));
 app.use('/api/country-logos', require('./routes/countryLogos'));
+app.use('/api/tv', require('./routes/tvBridge'));
 
 // Retired trial/IP endpoints must not fall through to the SPA HTML response.
 app.all([
@@ -658,6 +659,11 @@ app.get('/foot.html', sendFootPage);
 // Backend admin iframe. express.static has index disabled, so serve it explicitly.
 app.get('/nodecast-admin/', (req, res) => {
     res.sendFile(path.join(publicDir, 'nodecast-admin', 'index.html'));
+});
+
+// Dedicated standalone TV Receiver
+app.get(['/tv', '/tv/'], (req, res) => {
+    res.sendFile(path.join(publicDir, 'tv', 'index.html'));
 });
 
 // Trial mode was removed. All viewers authenticate with username/password.

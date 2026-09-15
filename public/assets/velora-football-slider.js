@@ -343,18 +343,85 @@
     };
   }
 
+  function normalizeCompKey(comp) {
+    if (!comp) return '';
+    return String(comp)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+  }
+
+  function isCompetitionMatch(compA, compB) {
+    if (!compA || !compB) return false;
+    var rawA = String(compA).trim();
+    var rawB = String(compB).trim();
+    if (rawA === '_all' || rawB === '_all' || rawA.toLowerCase() === 'all' || rawB.toLowerCase() === 'all') return true;
+
+    var keyA = normalizeCompKey(rawA);
+    var keyB = normalizeCompKey(rawB);
+    if (!keyA || !keyB) return false;
+
+    // 1. Direct compact match (ex: "laliga" === "laliga", "premierleague" === "premierleague", "seriea" === "seriea")
+    if (keyA === keyB) return true;
+
+    // 2. Direct inclusion (ex: "laliga" in "laligaeasports", "championsleague" in "uefachampionsleague")
+    if (keyA.length >= 4 && keyB.length >= 4 && (keyA.includes(keyB) || keyB.includes(keyA))) {
+      return true;
+    }
+
+    // 3. Suppression des sponsors et préfixes officiels pour comparaison
+    var cleanA = keyA
+      .replace(/^(uefa|fifa|conmebol|caf|the|english|spanish|french|italian|german)/, '')
+      .replace(/(easports|ubereats|mcdonalds|mcdonald|santander|bkt|tim|enilive|emirates|carabao|betclic|orange|telekom)$/, '');
+    var cleanB = keyB
+      .replace(/^(uefa|fifa|conmebol|caf|the|english|spanish|french|italian|german)/, '')
+      .replace(/(easports|ubereats|mcdonalds|mcdonald|santander|bkt|tim|enilive|emirates|carabao|betclic|orange|telekom)$/, '');
+
+    if (cleanA && cleanB) {
+      if (cleanA === cleanB) return true;
+      if (cleanA.length >= 4 && cleanB.length >= 4 && (cleanA.includes(cleanB) || cleanB.includes(cleanA))) return true;
+    }
+
+    // 4. Dictionnaire d'alias et traductions officielles
+    var aliases = [
+      ['laliga', 'liga', 'primeradivision', 'espana'],
+      ['ligue1', 'l1', 'ligue1mcdonalds', 'ligue1ubereats'],
+      ['ligue2', 'l2', 'ligue2bkt'],
+      ['premierleague', 'pl', 'epl', 'premiership', 'england'],
+      ['seriea', 'calcio', 'serieaenilive', 'serieatim', 'italia'],
+      ['bundesliga', '1bundesliga', 'germany'],
+      ['championsleague', 'ucl', 'c1', 'liguedeschampions', 'uefachampionsleague'],
+      ['europaleague', 'uel', 'c3', 'ligueeuropa', 'uefaeuropaleague'],
+      ['conferenceleague', 'uecl', 'c4', 'uefaconferenceleague', 'uefaeuropaconferenceleague'],
+      ['copadelrey', 'coupeduroi'],
+      ['facup', 'thefacup', 'emiratesfacup'],
+      ['carabaocup', 'eflcup', 'leaguecup'],
+      ['coupedefrance', 'frenchcup'],
+      ['worldcup', 'coupedumonde', 'fifaworldcup', 'mondial'],
+      ['can', 'afcon', 'coupedafriquedesnations', 'africacupofnations']
+    ];
+
+    for (var i = 0; i < aliases.length; i++) {
+      var group = aliases[i];
+      var hasA = group.some(function (alias) { return keyA === alias || cleanA === alias || (alias.length >= 4 && keyA.includes(alias)); });
+      var hasB = group.some(function (alias) { return keyB === alias || cleanB === alias || (alias.length >= 4 && keyB.includes(alias)); });
+      if (hasA && hasB) return true;
+    }
+
+    return false;
+  }
+
   function matchRuleForChannel(broadcasterName, matchCompetition, rulesList) {
     if (!broadcasterName || !Array.isArray(rulesList) || rulesList.length === 0) return null;
     var normB = normalizeChannelText(broadcasterName);
-    var normComp = normalizeChannelText(matchCompetition || '');
 
-    // 1. Exact / inclusion match on channel AND matching competition
-    if (normComp) {
+    // 1. Correspondance de chaîne avec compétition spécifique correspondante
+    if (matchCompetition) {
       for (var i = 0; i < rulesList.length; i++) {
         var r = rulesList[i];
         if (r.competition && r.competition !== '_all') {
-          var rCompNorm = normalizeChannelText(r.competition);
-          if (rCompNorm && (normComp.includes(rCompNorm) || rCompNorm.includes(normComp))) {
+          if (isCompetitionMatch(r.competition, matchCompetition)) {
             var rChNorm = normalizeChannelText(r.channel);
             if (rChNorm === normB || (normB && (rChNorm.includes(normB) || normB.includes(rChNorm)))) {
               return r;
@@ -364,7 +431,7 @@
       }
     }
 
-    // 2. Exact match on channel with competition === '_all'
+    // 2. Correspondance exacte de chaîne pour compétition générale === '_all'
     for (var j = 0; j < rulesList.length; j++) {
       var r2 = rulesList[j];
       if (!r2.competition || r2.competition === '_all') {
@@ -374,7 +441,7 @@
       }
     }
 
-    // 3. Substring match on channel with competition === '_all'
+    // 3. Correspondance sous-chaîne pour compétition générale === '_all'
     for (var k = 0; k < rulesList.length; k++) {
       var r3 = rulesList[k];
       if (!r3.competition || r3.competition === '_all') {

@@ -256,6 +256,83 @@
     };
   }
 
+  function normalizeChannelText(str) {
+    if (!str) return "";
+    return String(str)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/\b(fhd|uhd|4k|hd|sd|hevc|h265|h264|50fps|60fps|1080p|720p|vip|raw|premium|multi-canal|multisports|bar)\b/gi, " ")
+      .replace(/[|+_\-\[\]():.#/]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function normalizeCompKey(comp) {
+    if (!comp) return "";
+    return String(comp)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+  }
+
+  function isCompetitionMatch(compA, compB) {
+    if (!compA || !compB) return false;
+    var rawA = String(compA).trim();
+    var rawB = String(compB).trim();
+    if (rawA === "_all" || rawB === "_all" || rawA.toLowerCase() === "all" || rawB.toLowerCase() === "all") return true;
+
+    var keyA = normalizeCompKey(rawA);
+    var keyB = normalizeCompKey(rawB);
+    if (!keyA || !keyB) return false;
+
+    if (keyA === keyB) return true;
+
+    if (keyA.length >= 4 && keyB.length >= 4 && (keyA.includes(keyB) || keyB.includes(keyA))) {
+      return true;
+    }
+
+    var cleanA = keyA
+      .replace(/^(uefa|fifa|conmebol|caf|the|english|spanish|french|italian|german)/, "")
+      .replace(/(easports|ubereats|mcdonalds|mcdonald|santander|bkt|tim|enilive|emirates|carabao|betclic|orange|telekom)$/, "");
+    var cleanB = keyB
+      .replace(/^(uefa|fifa|conmebol|caf|the|english|spanish|french|italian|german)/, "")
+      .replace(/(easports|ubereats|mcdonalds|mcdonald|santander|bkt|tim|enilive|emirates|carabao|betclic|orange|telekom)$/, "");
+
+    if (cleanA && cleanB) {
+      if (cleanA === cleanB) return true;
+      if (cleanA.length >= 4 && cleanB.length >= 4 && (cleanA.includes(cleanB) || cleanB.includes(cleanA))) return true;
+    }
+
+    var aliases = [
+      ["laliga", "liga", "primeradivision", "espana"],
+      ["ligue1", "l1", "ligue1mcdonalds", "ligue1ubereats"],
+      ["ligue2", "l2", "ligue2bkt"],
+      ["premierleague", "pl", "epl", "premiership", "england"],
+      ["seriea", "calcio", "serieaenilive", "serieatim", "italia"],
+      ["bundesliga", "1bundesliga", "germany"],
+      ["championsleague", "ucl", "c1", "liguedeschampions", "uefachampionsleague"],
+      ["europaleague", "uel", "c3", "ligueeuropa", "uefaeuropaleague"],
+      ["conferenceleague", "uecl", "c4", "uefaconferenceleague", "uefaeuropaconferenceleague"],
+      ["copadelrey", "coupeduroi"],
+      ["facup", "thefacup", "emiratesfacup"],
+      ["carabaocup", "eflcup", "leaguecup"],
+      ["coupedefrance", "frenchcup"],
+      ["worldcup", "coupedumonde", "fifaworldcup", "mondial"],
+      ["can", "afcon", "coupedafriquedesnations", "africacupofnations"]
+    ];
+
+    for (var i = 0; i < aliases.length; i++) {
+      var group = aliases[i];
+      var hasA = group.some(function (alias) { return keyA === alias || cleanA === alias || (alias.length >= 4 && keyA.includes(alias)); });
+      var hasB = group.some(function (alias) { return keyB === alias || cleanB === alias || (alias.length >= 4 && keyB.includes(alias)); });
+      if (hasA && hasB) return true;
+    }
+
+    return false;
+  }
+
   /**
    * Normalise une règle unitaire.
    */
@@ -1489,8 +1566,7 @@
     var countryRules = state.store[testCid] || [];
     var defaultRules = state.store._default || [];
 
-    var normQ = q.toLowerCase();
-    var normComp = compQ.toLowerCase();
+    var normQ = normalizeChannelText(q);
 
     function matchInRules(rules) {
       if (!Array.isArray(rules)) return null;
@@ -1499,12 +1575,12 @@
 
       for (var i = 0; i < rules.length; i++) {
         var r = rules[i];
-        var rChan = (r.channel || "").toLowerCase();
-        var rComp = (r.competition || "_all").toLowerCase();
+        var rChan = normalizeChannelText(r.channel || "");
+        var rComp = r.competition || "_all";
 
-        var chanMatches = rChan === normQ || normQ.includes(rChan) || rChan.includes(normQ);
+        var chanMatches = rChan === normQ || (normQ && (normQ.includes(rChan) || rChan.includes(normQ)));
         if (chanMatches) {
-          if (normComp && rComp !== "_all" && (normComp.includes(rComp) || rComp.includes(normComp))) {
+          if (compQ && rComp !== "_all" && isCompetitionMatch(rComp, compQ)) {
             return { rule: r, type: "comp_exact" };
           }
           if (rComp === "_all" && !allCompMatch) {

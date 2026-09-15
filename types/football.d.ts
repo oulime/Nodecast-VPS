@@ -7,6 +7,12 @@ export interface Team {
     logoUrl: string;
 }
 
+export interface Score {
+    home: number;
+    away: number;
+    formatted: string;
+}
+
 export interface Match {
     id: string;
     competition: string;
@@ -14,6 +20,11 @@ export interface Match {
     homeTeam: Team;
     awayTeam: Team;
     tvChannels: string[];
+    hypeScore?: number;
+    score?: Score | null;
+    status?: 'scheduled' | 'starting_soon' | 'live' | 'finished';
+    minute?: string;
+    isLive?: boolean;
 }
 
 export type MatchesTodayResponse = Match[];

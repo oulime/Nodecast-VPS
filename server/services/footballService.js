@@ -836,6 +836,277 @@ function getBroadcastersForCountry(compName, scrapedChannels, countryConfig) {
     return ['Chaîne à confirmer'];
 }
 
+// ==========================================
+// MOTEUR DE SCORES TEMPS RÉEL (LIVE SCORES)
+// ==========================================
+
+const ESPN_LEAGUES = [
+    'eng.1', 'eng.2', 'eng.league_cup', 'eng.fa',
+    'esp.1', 'esp.2', 'esp.copa_del_rey',
+    'fra.1', 'fra.2', 'fra.coupe_de_france',
+    'ita.1', 'ita.2', 'ita.coppa_italia',
+    'ger.1', 'ger.2', 'ger.dfb_pokal',
+    'ned.1', 'por.1', 'tur.1', 'bel.1', 'sau.1',
+    'uefa.champions', 'uefa.europa', 'uefa.europa.conf',
+    'fifa.world', 'uefa.euro', 'uefa.nations', 'conmebol.copa_america'
+];
+
+let globalLiveScoresCache = null;
+let globalLiveScoresExpiresAt = 0;
+const LIVE_SCORES_TTL_MS = 45 * 1000; // 45 secondes pour un direct réactif
+
+const TEAM_MATCHING_ALIASES = {
+    'valence': 'valencia',
+    'valence cf': 'valencia',
+    'pise': 'pisa',
+    'willem': 'willem ii',
+    'seville': 'sevilla',
+    'bologne': 'bologna',
+    'rome': 'roma',
+    'lazie': 'lazio',
+    'milan ac': 'ac milan',
+    'ac milan': 'milan',
+    'inter milan': 'inter',
+    'inter': 'internazionale',
+    'barcelone': 'barcelona',
+    'barca': 'barcelona',
+    'atletico': 'atletico madrid',
+    'atletico de madrid': 'atletico madrid',
+    'bayern': 'bayern munich',
+    'dortmund': 'borussia dortmund',
+    'leverkusen': 'bayer leverkusen',
+    'leipzig': 'rb leipzig',
+    'sporting': 'sporting cp',
+    'benfica': 'sl benfica',
+    'porto': 'fc porto',
+    'paris sg': 'psg',
+    'paris saint germain': 'psg',
+    'marseille': 'om',
+    'lyon': 'ol',
+    'saint etienne': 'asse'
+};
+
+function normalizeTeamForScoreMatching(str) {
+    if (!str) return '';
+    let s = String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+        .replace(/\b(fc|cf|sc|ac|as|rc|us|afc|ssc|cd|ca|ud|ogc|vfb|vfl|bvb|tsv|fsv|sv|rb|de|du|le|la|les|the|united|utd|city|town|hotspur|amsterdam)\b/g, ' ')
+        .replace(/[^a-z0-9]/g, ' ')
+        .replace(/\s+/g, ' ').trim();
+
+    for (const [k, v] of Object.entries(TEAM_MATCHING_ALIASES)) {
+        if (s === k || s.includes(k)) {
+            s = s.replace(k, v);
+        }
+    }
+    return s.trim();
+}
+
+function calculateTeamMatchScore(s1, s2) {
+    const n1 = normalizeTeamForScoreMatching(s1);
+    const n2 = normalizeTeamForScoreMatching(s2);
+    if (!n1 || !n2) return 0;
+    if (n1 === n2) return 100;
+    if (n1.includes(n2) || n2.includes(n1)) return 85;
+    const t1 = n1.split(' ').filter(x => x.length >= 3);
+    const t2 = n2.split(' ').filter(x => x.length >= 3);
+    for (const a of t1) {
+        for (const b of t2) {
+            if (a === b || a.startsWith(b) || b.startsWith(a)) return 75;
+        }
+    }
+    return 0;
+}
+
+/**
+ * Récupère les scores et statuts en direct depuis le scoreboard multi-ligues
+ */
+async function fetchLiveScores() {
+    const now = Date.now();
+    if (globalLiveScoresCache && globalLiveScoresExpiresAt > now) {
+        return globalLiveScoresCache;
+    }
+
+    const events = [];
+    await Promise.all(ESPN_LEAGUES.map(async (league) => {
+        try {
+            const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/scoreboard`;
+            const res = await fetch(url, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                    'Accept': 'application/json'
+                },
+                signal: AbortSignal.timeout(4500)
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            if (Array.isArray(data.events)) {
+                data.events.forEach(ev => {
+                    const comp = ev.competitions?.[0];
+                    if (!comp) return;
+                    const home = comp.competitors?.find(c => c.homeAway === 'home');
+                    const away = comp.competitors?.find(c => c.homeAway === 'away');
+                    events.push({
+                        id: ev.id,
+                        league,
+                        leagueName: data.leagues?.[0]?.name || '',
+                        name: ev.name || '',
+                        date: ev.date || '',
+                        state: ev.status?.type?.state || 'pre', // 'pre', 'in', 'post'
+                        detail: ev.status?.type?.shortDetail || ev.status?.type?.detail || '',
+                        clock: ev.status?.displayClock || '',
+                        homeTeam: home?.team?.displayName || home?.team?.name || '',
+                        homeScore: home?.score != null ? Number(home.score) : 0,
+                        awayTeam: away?.team?.displayName || away?.team?.name || '',
+                        awayScore: away?.score != null ? Number(away.score) : 0
+                    });
+                });
+            }
+        } catch (_) {}
+    }));
+
+    globalLiveScoresCache = events;
+    globalLiveScoresExpiresAt = now + LIVE_SCORES_TTL_MS;
+    return events;
+}
+
+/**
+ * Enrichit un match avec son score en direct et son statut
+ */
+function enrichMatchWithLiveScore(match, liveEvents = []) {
+    let bestEvent = null;
+    let bestScore = 0;
+    let isInverted = false;
+
+    if (Array.isArray(liveEvents) && liveEvents.length > 0) {
+        liveEvents.forEach(ev => {
+            const hScoreDirect = calculateTeamMatchScore(match.homeTeam?.name || match.homeTeamName, ev.homeTeam);
+            const aScoreDirect = calculateTeamMatchScore(match.awayTeam?.name || match.awayTeamName, ev.awayTeam);
+            const totalDirect = hScoreDirect + aScoreDirect;
+
+            const hScoreInv = calculateTeamMatchScore(match.homeTeam?.name || match.homeTeamName, ev.awayTeam);
+            const aScoreInv = calculateTeamMatchScore(match.awayTeam?.name || match.awayTeamName, ev.homeTeam);
+            const totalInv = hScoreInv + aScoreInv;
+
+            if (totalDirect > bestScore && hScoreDirect > 0 && aScoreDirect > 0) {
+                bestScore = totalDirect;
+                bestEvent = ev;
+                isInverted = false;
+            } else if (totalInv > bestScore && hScoreInv > 0 && aScoreInv > 0) {
+                bestScore = totalInv;
+                bestEvent = ev;
+                isInverted = true;
+            }
+        });
+    }
+
+    // Calcul temporel basé sur l'heure de coup d'envoi locale
+    let diffMinutes = 9999;
+    if (match.time) {
+        const cleaned = String(match.time).trim().replace(/[hH.]/, ':');
+        const parts = cleaned.match(/(\d{1,2})\s*:\s*(\d{2})/);
+        if (parts) {
+            const hours = parseInt(parts[1], 10);
+            const minutes = parseInt(parts[2], 10);
+            const now = new Date();
+            const matchDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+            diffMinutes = Math.round((now.getTime() - matchDate.getTime()) / 60000);
+        }
+    }
+
+    if (bestEvent) {
+        const hScore = Number(isInverted ? bestEvent.awayScore : bestEvent.homeScore) || 0;
+        const aScore = Number(isInverted ? bestEvent.homeScore : bestEvent.awayScore) || 0;
+
+        if (bestEvent.state === 'in') {
+            return {
+                score: {
+                    home: hScore,
+                    away: aScore,
+                    formatted: `${hScore} - ${aScore}`
+                },
+                status: 'live',
+                minute: bestEvent.clock || bestEvent.detail || (diffMinutes > 0 ? `${diffMinutes}'` : 'En direct'),
+                isLive: true
+            };
+        } else if (bestEvent.state === 'post') {
+            return {
+                score: {
+                    home: hScore,
+                    away: aScore,
+                    formatted: `${hScore} - ${aScore}`
+                },
+                status: 'finished',
+                minute: 'Terminé',
+                isLive: false
+            };
+        } else {
+            // État 'pre' sur ESPN, vérifier si l'heure du match est déjà atteinte
+            if (diffMinutes > 0 && diffMinutes <= 115) {
+                return {
+                    score: {
+                        home: hScore,
+                        away: aScore,
+                        formatted: `${hScore} - ${aScore}`
+                    },
+                    status: 'live',
+                    minute: `${Math.min(90, Math.max(1, diffMinutes))}'`,
+                    isLive: true
+                };
+            } else if (diffMinutes > 115) {
+                return {
+                    score: {
+                        home: hScore,
+                        away: aScore,
+                        formatted: `${hScore} - ${aScore}`
+                    },
+                    status: 'finished',
+                    minute: 'Terminé',
+                    isLive: false
+                };
+            } else {
+                return {
+                    score: null,
+                    status: diffMinutes >= -30 ? 'starting_soon' : 'scheduled',
+                    minute: match.time,
+                    isLive: false
+                };
+            }
+        }
+    }
+
+    // Fallback temporel si le match n'est pas dans le flux ESPN
+    if (diffMinutes > 0 && diffMinutes <= 115) {
+        return {
+            score: {
+                home: 0,
+                away: 0,
+                formatted: '0 - 0'
+            },
+            status: 'live',
+            minute: `${Math.min(90, Math.max(1, diffMinutes))}'`,
+            isLive: true
+        };
+    } else if (diffMinutes > 115) {
+        return {
+            score: {
+                home: 0,
+                away: 0,
+                formatted: '0 - 0'
+            },
+            status: 'finished',
+            minute: 'Terminé',
+            isLive: false
+        };
+    } else {
+        return {
+            score: null,
+            status: diffMinutes >= -30 ? 'starting_soon' : 'scheduled',
+            minute: match.time,
+            isLive: false
+        };
+    }
+}
+
 /**
  * Point d'entrée principal :
  * - allMatches = false (défaut) : Filtre uniquement les GRANDS MATCHS pour le slider d'accueil (triés par hype)
@@ -848,86 +1119,96 @@ async function getTodayMatches(countryInput = 'france', forceRefresh = false, al
     const now = Date.now();
 
     const cachedEntry = countryCaches.get(cacheScopeKey);
+    let baseMatches = null;
 
     if (!forceRefresh && cachedEntry && cachedEntry.expiresAt > now) {
-        return {
-            cached: true,
-            country: countryConfig,
-            matches: cachedEntry.data
-        };
+        baseMatches = cachedEntry.data;
+    } else {
+        try {
+            const rawList = await scrapeTodayMatches();
+
+            // Mode Slider Accueil : Filtrage strict sur les grands chocs & top tiers
+            let targetMatches = rawList;
+            if (!allMatches) {
+                targetMatches = rawList.filter(m => {
+                    const compConfig = identifyTopStageCompetition(m.competition);
+                    if (!compConfig) return false;
+                    if (compConfig.allMatches) return true;
+                    return isBigClub(m.homeTeamName) || isBigClub(m.awayTeamName);
+                });
+
+                // Tri par Hype Score décroissant pour l'accueil
+                targetMatches.sort((a, b) => {
+                    if (b.hypeScore !== a.hypeScore) {
+                        return b.hypeScore - a.hypeScore;
+                    }
+                    return a.time.localeCompare(b.time);
+                });
+            }
+
+            // Récupération des logos HD et diffuseurs TV adaptés au pays
+            baseMatches = await Promise.all(targetMatches.map(async (m) => {
+                const [homeLogo, awayLogo] = await Promise.all([
+                    fetchTeamLogo(m.homeTeamName),
+                    fetchTeamLogo(m.awayTeamName)
+                ]);
+
+                const tvChannels = getBroadcastersForCountry(m.competition, m.tvChannels, countryConfig);
+
+                return {
+                    id: m.id,
+                    competition: m.competition,
+                    time: m.time,
+                    homeTeam: {
+                        name: m.homeTeamName,
+                        logoUrl: homeLogo
+                    },
+                    awayTeam: {
+                        name: m.awayTeamName,
+                        logoUrl: awayLogo
+                    },
+                    tvChannels,
+                    hypeScore: m.hypeScore
+                };
+            }));
+
+            countryCaches.set(cacheScopeKey, {
+                data: baseMatches,
+                expiresAt: now + CACHE_TTL_MS
+            });
+        } catch (err) {
+            console.error(`[Football Service] Erreur (${countryKey}):`, err.message);
+
+            if (cachedEntry) {
+                baseMatches = cachedEntry.data;
+            } else {
+                throw err;
+            }
+        }
     }
 
+    // Récupération des scores en direct & enrichissement instantané
+    let liveEvents = [];
     try {
-        const rawList = await scrapeTodayMatches();
+        liveEvents = await fetchLiveScores();
+    } catch (_) {}
 
-        // Mode Slider Accueil : Filtrage strict sur les grands chocs & top tiers
-        let targetMatches = rawList;
-        if (!allMatches) {
-            targetMatches = rawList.filter(m => {
-                const compConfig = identifyTopStageCompetition(m.competition);
-                if (!compConfig) return false;
-                if (compConfig.allMatches) return true;
-                return isBigClub(m.homeTeamName) || isBigClub(m.awayTeamName);
-            });
-
-            // Tri par Hype Score décroissant pour l'accueil
-            targetMatches.sort((a, b) => {
-                if (b.hypeScore !== a.hypeScore) {
-                    return b.hypeScore - a.hypeScore;
-                }
-                return a.time.localeCompare(b.time);
-            });
-        }
-
-        // Récupération des logos HD et diffuseurs TV adaptés au pays
-        const matches = await Promise.all(targetMatches.map(async (m) => {
-            const [homeLogo, awayLogo] = await Promise.all([
-                fetchTeamLogo(m.homeTeamName),
-                fetchTeamLogo(m.awayTeamName)
-            ]);
-
-            const tvChannels = getBroadcastersForCountry(m.competition, m.tvChannels, countryConfig);
-
-            return {
-                id: m.id,
-                competition: m.competition,
-                time: m.time,
-                homeTeam: {
-                    name: m.homeTeamName,
-                    logoUrl: homeLogo
-                },
-                awayTeam: {
-                    name: m.awayTeamName,
-                    logoUrl: awayLogo
-                },
-                tvChannels,
-                hypeScore: m.hypeScore
-            };
-        }));
-
-        countryCaches.set(cacheScopeKey, {
-            data: matches,
-            expiresAt: now + CACHE_TTL_MS
-        });
-
+    const enrichedMatches = baseMatches.map(m => {
+        const liveInfo = enrichMatchWithLiveScore(m, liveEvents);
         return {
-            cached: false,
-            country: countryConfig,
-            matches
+            ...m,
+            score: liveInfo.score,
+            status: liveInfo.status,
+            minute: liveInfo.minute,
+            isLive: liveInfo.isLive
         };
-    } catch (err) {
-        console.error(`[Football Service] Erreur (${countryKey}):`, err.message);
+    });
 
-        if (cachedEntry) {
-            return {
-                cached: true,
-                country: countryConfig,
-                matches: cachedEntry.data
-            };
-        }
-
-        throw err;
-    }
+    return {
+        cached: !!cachedEntry && !forceRefresh,
+        country: countryConfig,
+        matches: enrichedMatches
+    };
 }
 
 /**
@@ -941,11 +1222,15 @@ function clearCache(countryInput = null) {
     } else {
         countryCaches.clear();
     }
+    globalLiveScoresCache = null;
+    globalLiveScoresExpiresAt = 0;
 }
 
 module.exports = {
     getTodayMatches,
     clearCache,
+    fetchLiveScores,
+    enrichMatchWithLiveScore,
     fetchTeamLogo,
     isBigClub,
     calculateMatchHypeScore,
@@ -958,4 +1243,5 @@ module.exports = {
     COUNTRY_CONFIGS,
     DEFAULT_FOOTBALL_SHIELD_SVG
 };
+
 

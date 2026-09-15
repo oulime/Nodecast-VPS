@@ -922,6 +922,28 @@
     if (ex) ex.remove();
   }
 
+  function buildScoreOrVsHtml(match, timeInfo) {
+    var isLive = match.isLive || timeInfo.status === 'live' || (match.score && match.status === 'live');
+    var isFinished = timeInfo.status === 'finished' || match.status === 'finished';
+
+    if (isLive) {
+      var scoreStr = match.score ? (match.score.home + ' - ' + match.score.away) : '0 - 0';
+      var minStr = match.minute ? ('🔴 ' + escapeHtml(match.minute)) : '🔴 EN DIRECT';
+      return '<div class="vel-football-card__score-pill is-live" data-score-wrap="1">' +
+        '<span class="vel-football-score-nums">' + scoreStr + '</span>' +
+        '<span class="vel-football-score-live-tag">' + minStr + '</span>' +
+      '</div>';
+    } else if (isFinished) {
+      var scoreStr = match.score ? (match.score.home + ' - ' + match.score.away) : '0 - 0';
+      return '<div class="vel-football-card__score-pill is-finished" data-score-wrap="1">' +
+        '<span class="vel-football-score-nums">' + scoreStr + '</span>' +
+        '<span class="vel-football-score-ft-tag">FIN</span>' +
+      '</div>';
+    } else {
+      return '<span class="vel-football-card__vs" data-score-wrap="1">VS</span>';
+    }
+  }
+
   function renderMatchBanner(match) {
     removeMatchBanner();
     if (!match) return;
@@ -941,23 +963,8 @@
     var awayInitial = awayName.charAt(0).toUpperCase();
     var timeInfo = getMatchTimeDetails(match.time);
 
-    var timeBadgeHtml = '';
-    if (timeInfo.status === 'live') {
-      timeBadgeHtml = '<span class="vel-football-card__time-badge vel-football-card__time-badge--live">' +
-        '<span class="vel-football-card__live-dot"></span>' +
-        '<span>EN DIRECT</span>' +
-      '</span>';
-    } else if (timeInfo.status === 'starting_soon') {
-      timeBadgeHtml = '<span class="vel-football-card__time-badge vel-football-card__time-badge--starting-soon">' +
-        '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>' +
-        '<span>' + escapeHtml(match.time || '--:--') + '</span>' +
-      '</span>';
-    } else {
-      timeBadgeHtml = '<span class="vel-football-card__time-badge">' +
-        '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>' +
-        '<span>' + escapeHtml(match.time || '--:--') + '</span>' +
-      '</span>';
-    }
+    var timeBadgeHtml = buildTimeBadgeHtml(timeInfo.status, match.time, match.minute);
+    var middleHtml = buildScoreOrVsHtml(match, timeInfo);
 
     var banner = document.createElement('div');
     banner.id = 'vel-live-match-banner';
@@ -975,7 +982,7 @@
           '<span class="vel-match-banner-team-name">' + escapeHtml(homeName) + '</span>' +
         '</div>' +
         '<div class="vel-match-banner-vs-wrap">' +
-          '<span class="vel-match-banner-vs">VS</span>' +
+          middleHtml +
         '</div>' +
         '<div class="vel-match-banner-team vel-match-banner-team--away">' +
           '<div class="vel-match-banner-logo-wrap">' +
@@ -1125,11 +1132,12 @@
     });
   }
 
-  function buildTimeBadgeHtml(status, matchTimeStr) {
+  function buildTimeBadgeHtml(status, matchTimeStr, minute) {
     if (status === 'live') {
+      var label = minute ? ('EN DIRECT • ' + escapeHtml(minute)) : 'EN DIRECT';
       return '<span class="vel-football-card__time-badge vel-football-card__time-badge--live">' +
         '<span class="vel-football-card__live-dot"></span>' +
-        '<span>EN DIRECT</span>' +
+        '<span>' + label + '</span>' +
       '</span>';
     } else if (status === 'starting_soon') {
       return '<span class="vel-football-card__time-badge vel-football-card__time-badge--starting-soon">' +
@@ -1156,24 +1164,33 @@
     card.setAttribute('role', 'button');
 
     var timeInfo = getMatchTimeDetails(match.time);
+    if (match.isLive || (match.score && match.status === 'live')) {
+      timeInfo.status = 'live';
+    } else if (match.status === 'finished') {
+      timeInfo.status = 'finished';
+    }
+
     card.__veloraMatch = match;
     card.__veloraOriginalIndex = Number.isFinite(originalIndex) ? originalIndex : 0;
     card.dataset.matchStatus = timeInfo.status;
 
     if (timeInfo.status === 'live') {
       card.classList.add('is-live');
-      card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + ' - EN DIRECT (' + (match.time || '') + ')');
+      var scoreLabel = match.score ? (' [' + match.score.home + ' - ' + match.score.away + ']') : '';
+      card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + scoreLabel + ' - EN DIRECT (' + (match.minute || match.time || '') + ')');
     } else if (timeInfo.status === 'starting_soon') {
       card.classList.add('is-starting-soon');
       card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + ' à ' + (match.time || '') + ' (Bientôt)');
     } else if (timeInfo.status === 'finished') {
       card.classList.add('is-finished');
-      card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + ' (Terminé)');
+      var scoreLabel = match.score ? (' [' + match.score.home + ' - ' + match.score.away + ']') : '';
+      card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + scoreLabel + ' (Terminé)');
     } else {
       card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + ' à ' + (match.time || ''));
     }
 
-    var timeBadgeHtml = buildTimeBadgeHtml(timeInfo.status, match.time);
+    var timeBadgeHtml = buildTimeBadgeHtml(timeInfo.status, match.time, match.minute);
+    var middleHtml = buildScoreOrVsHtml(match, timeInfo);
     var homeInitial = (match.homeTeam?.name || 'H').charAt(0).toUpperCase();
     var awayInitial = (match.awayTeam?.name || 'A').charAt(0).toUpperCase();
 
@@ -1189,7 +1206,7 @@
           '</div>' +
           '<span class="vel-football-card__team-name">' + escapeHtml(match.homeTeam?.name || '') + '</span>' +
         '</div>' +
-        '<span class="vel-football-card__vs">VS</span>' +
+        middleHtml +
         '<div class="vel-football-card__team">' +
           '<div class="vel-football-card__logo-wrap">' +
             '<img class="vel-football-card__logo" src="' + escapeHtml(match.awayTeam?.logoUrl || '') + '" alt="' + escapeHtml(match.awayTeam?.name || '') + '" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML=\'<span class=\\\'vel-football-card__fallback-logo\\\'>' + awayInitial + '</span>\'">' +
@@ -1210,7 +1227,8 @@
       var homeInitial = homeName.charAt(0).toUpperCase();
       var awayInitial = awayName.charAt(0).toUpperCase();
 
-      var isFinished = timeStatusInfo.status === 'finished';
+      var isFinished = timeStatusInfo.status === 'finished' || matchObj.status === 'finished';
+      var isLive = timeStatusInfo.status === 'live' || matchObj.isLive;
       var diffMinutes = Math.max(0, timeStatusInfo.diffMinutes);
       var hours = Math.floor(diffMinutes / 60);
       var mins = diffMinutes % 60;
@@ -1236,10 +1254,13 @@
       modal.setAttribute('aria-modal', 'true');
 
       var noticeText = isFinished
-        ? 'Ce match est <strong>déjà terminé</strong> (coup d\'envoi était à ' + escapeHtml(matchObj.time || '') + ').'
-        : 'Ce match <strong>n\'a pas encore commencé</strong>.<br>Coup d\'envoi dans <strong>' + timeRemainingStr + '</strong>.';
+        ? 'Ce match est <strong>déjà terminé</strong>' + (matchObj.score ? ' (Score final : <strong>' + matchObj.score.formatted + '</strong>)' : '') + '.'
+        : isLive
+          ? 'Ce match est <strong>actuellement en direct</strong>' + (matchObj.score ? ' (Score : <strong>' + matchObj.score.formatted + '</strong> • ' + (matchObj.minute || '') + ')' : '') + '.'
+          : 'Ce match <strong>n\'a pas encore commencé</strong>.<br>Coup d\'envoi dans <strong>' + timeRemainingStr + '</strong>.';
 
-      var noticeIcon = isFinished ? '🏁' : '⏳';
+      var noticeIcon = isFinished ? '🏁' : (isLive ? '🔴' : '⏳');
+      var modalMiddleHtml = buildScoreOrVsHtml(matchObj, timeStatusInfo);
 
       modal.innerHTML =
         '<div class="vel-football-modal-backdrop"></div>' +
@@ -1247,7 +1268,7 @@
           '<button type="button" class="vel-football-modal-close" aria-label="Fermer">✕</button>' +
           '<div class="vel-football-modal-header">' +
             '<span class="vel-football-modal-comp">' + escapeHtml(matchObj.competition || 'Football') + '</span>' +
-            '<span class="vel-football-modal-time">' + escapeHtml(matchObj.time || '--:--') + '</span>' +
+            '<span class="vel-football-modal-time">' + escapeHtml(matchObj.minute || matchObj.time || '--:--') + '</span>' +
           '</div>' +
           '<div class="vel-football-modal-teams">' +
             '<div class="vel-football-modal-team">' +
@@ -1256,7 +1277,9 @@
               '</div>' +
               '<span class="vel-football-modal-team-name">' + escapeHtml(homeName) + '</span>' +
             '</div>' +
-            '<span class="vel-football-modal-vs">VS</span>' +
+            '<div class="vel-match-banner-vs-wrap">' +
+              modalMiddleHtml +
+            '</div>' +
             '<div class="vel-football-modal-team">' +
               '<div class="vel-football-modal-logo-wrap">' +
                 '<img class="vel-football-modal-logo" src="' + escapeHtml(matchObj.awayTeam?.logoUrl || '') + '" alt="' + escapeHtml(awayName) + '" onerror="this.onerror=null; this.parentElement.innerHTML=\'<span class=\\\'vel-football-modal-fallback-logo\\\'>' + awayInitial + '</span>\'">' +
@@ -1264,14 +1287,14 @@
               '<span class="vel-football-modal-team-name">' + escapeHtml(awayName) + '</span>' +
             '</div>' +
           '</div>' +
-          '<div class="vel-football-modal-notice ' + (isFinished ? 'is-finished' : '') + '">' +
+          '<div class="vel-football-modal-notice ' + (isFinished ? 'is-finished' : (isLive ? 'is-live' : '')) + '">' +
             '<span class="vel-football-modal-notice-icon">' + noticeIcon + '</span>' +
             '<div class="vel-football-modal-notice-text">' + noticeText + '</div>' +
           '</div>' +
           '<div class="vel-football-modal-channels-section">' +
             '<div class="vel-football-modal-channels-title">' +
               '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>' +
-              '<span>Diffusion TV prévue :</span>' +
+              '<span>Diffusion TV :</span>' +
             '</div>' +
             '<div class="vel-football-modal-channels-grid">' +
               channelsHtml +
@@ -1326,7 +1349,7 @@
         e.stopPropagation();
       }
       var tInfo = getMatchTimeDetails(match.time);
-      if (tInfo.status === 'upcoming' || tInfo.status === 'finished') {
+      if (tInfo.status === 'upcoming') {
         showMatchNoticeModal(match, tInfo);
       } else {
         if (typeof window.veloraOpenMatchChannels === 'function') {
@@ -1371,6 +1394,12 @@
       if (!match) return;
 
       var tInfo = getMatchTimeDetails(match.time);
+      if (match.isLive || (match.score && match.status === 'live')) {
+        tInfo.status = 'live';
+      } else if (match.status === 'finished') {
+        tInfo.status = 'finished';
+      }
+
       var oldStatus = card.dataset.matchStatus;
 
       // Si le match est terminé depuis plus de 30 minutes, le faire disparaître en douceur
@@ -1393,6 +1422,31 @@
         originalIndex: card.__veloraOriginalIndex || 0
       });
 
+      // Toujours mettre à jour le contenu dynamique du badge et du score
+      var topEl = card.querySelector('.vel-football-card__top');
+      if (topEl) {
+        var oldBadge = topEl.querySelector('.vel-football-card__time-badge');
+        var newBadgeHtml = buildTimeBadgeHtml(tInfo.status, match.time, match.minute);
+        if (oldBadge) {
+          var temp = document.createElement('div');
+          temp.innerHTML = newBadgeHtml;
+          var newBadgeEl = temp.firstElementChild;
+          if (newBadgeEl) oldBadge.replaceWith(newBadgeEl);
+        }
+      }
+
+      var matchEl = card.querySelector('.vel-football-card__match');
+      if (matchEl) {
+        var oldMiddle = matchEl.querySelector('[data-score-wrap="1"]');
+        var newMiddleHtml = buildScoreOrVsHtml(match, tInfo);
+        if (oldMiddle) {
+          var tempM = document.createElement('div');
+          tempM.innerHTML = newMiddleHtml;
+          var newMiddleEl = tempM.firstElementChild;
+          if (newMiddleEl) oldMiddle.replaceWith(newMiddleEl);
+        }
+      }
+
       if (oldStatus !== tInfo.status) {
         needsReorder = true;
         card.dataset.matchStatus = tInfo.status;
@@ -1402,26 +1456,14 @@
         card.classList.toggle('is-starting-soon', tInfo.status === 'starting_soon');
         card.classList.toggle('is-finished', tInfo.status === 'finished');
 
-        // Mise à jour du badge horaire
-        var topEl = card.querySelector('.vel-football-card__top');
-        if (topEl) {
-          var oldBadge = topEl.querySelector('.vel-football-card__time-badge');
-          var newBadgeHtml = buildTimeBadgeHtml(tInfo.status, match.time);
-          if (oldBadge) {
-            var temp = document.createElement('div');
-            temp.innerHTML = newBadgeHtml;
-            var newBadgeEl = temp.firstElementChild;
-            if (newBadgeEl) oldBadge.replaceWith(newBadgeEl);
-          }
-        }
-
         // Mise à jour de l'accessibilité
+        var scoreLabel = match.score ? (' [' + match.score.home + ' - ' + match.score.away + ']') : '';
         if (tInfo.status === 'live') {
-          card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + ' - EN DIRECT (' + (match.time || '') + ')');
+          card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + scoreLabel + ' - EN DIRECT (' + (match.minute || match.time || '') + ')');
         } else if (tInfo.status === 'starting_soon') {
           card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + ' à ' + (match.time || '') + ' (Bientôt)');
         } else if (tInfo.status === 'finished') {
-          card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + ' (Terminé)');
+          card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + scoreLabel + ' (Terminé)');
         } else {
           card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + ' à ' + (match.time || ''));
         }
@@ -1444,8 +1486,41 @@
     }
   }
 
-  // Lancement du ticker temps réel toutes les 10 secondes (léger et instantané)
-  setInterval(updateSliderRealTime, 10000);
+  /**
+   * Actualisation périodique des scores en direct en arrière-plan (toutes les 45s)
+   */
+  async function refreshLiveScoresSilently() {
+    try {
+      var country = detectActiveCountry();
+      var freshMatches = await fetchTodayMatches(country, true);
+      if (!Array.isArray(freshMatches) || freshMatches.length === 0) return;
+
+      var root = document.getElementById('vel-home-sections');
+      if (!root) return;
+      var section = root.querySelector('.vel-home-section--football');
+      if (!section) return;
+      var rail = section.querySelector('.vel-home-section__rail');
+      if (!rail) return;
+
+      var cards = Array.from(rail.querySelectorAll('.vel-football-card'));
+      cards.forEach(function (card) {
+        var curMatch = card.__veloraMatch;
+        if (!curMatch) return;
+        var updated = freshMatches.find(function (m) {
+          return m.id === curMatch.id ||
+            (m.homeTeam?.name === curMatch.homeTeam?.name && m.awayTeam?.name === curMatch.awayTeam?.name);
+        });
+        if (updated) {
+          card.__veloraMatch = updated;
+        }
+      });
+
+      updateSliderRealTime();
+    } catch (_) {}
+  }
+
+  // Polling silencieux des scores en direct toutes les 45s
+  setInterval(refreshLiveScoresSilently, 45000);
 
   function renderFootballSection(matches, country) {
     if (!Array.isArray(matches) || matches.length === 0) return null;
@@ -1703,6 +1778,55 @@
       '.vel-football-card.is-starting-soon {',
       '  border-color: rgba(34, 197, 94, 0.35) !important;',
       '  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5), 0 0 12px rgba(34, 197, 94, 0.12) !important;',
+      '}',
+      '/* Live & Finished Score Pill */',
+      '.vel-football-card__score-pill {',
+      '  display: inline-flex;',
+      '  flex-direction: column;',
+      '  align-items: center;',
+      '  justify-content: center;',
+      '  padding: 0.22rem 0.58rem;',
+      '  border-radius: 8px;',
+      '  background: rgba(15, 23, 42, 0.85);',
+      '  border: 1px solid rgba(255, 255, 255, 0.12);',
+      '  min-width: 54px;',
+      '  gap: 0.12rem;',
+      '  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);',
+      '  flex-shrink: 0;',
+      '}',
+      '.vel-football-card__score-pill.is-live {',
+      '  background: linear-gradient(135deg, rgba(220, 38, 38, 0.28) 0%, rgba(185, 28, 28, 0.42) 100%);',
+      '  border-color: rgba(239, 68, 68, 0.6);',
+      '  box-shadow: 0 0 12px rgba(239, 68, 68, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);',
+      '}',
+      '.vel-football-card__score-pill.is-finished {',
+      '  background: rgba(30, 41, 59, 0.7);',
+      '  border-color: rgba(148, 163, 184, 0.28);',
+      '}',
+      '.vel-football-score-nums {',
+      '  font-size: 1.05rem;',
+      '  font-weight: 900;',
+      '  color: #ffffff;',
+      '  letter-spacing: 0.05em;',
+      '  line-height: 1;',
+      '  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);',
+      '}',
+      '.vel-football-score-live-tag {',
+      '  font-size: 0.6rem;',
+      '  font-weight: 800;',
+      '  text-transform: uppercase;',
+      '  color: #fca5a5;',
+      '  letter-spacing: 0.05em;',
+      '  line-height: 1;',
+      '  white-space: nowrap;',
+      '}',
+      '.vel-football-score-ft-tag {',
+      '  font-size: 0.58rem;',
+      '  font-weight: 700;',
+      '  text-transform: uppercase;',
+      '  color: #94a3b8;',
+      '  letter-spacing: 0.04em;',
+      '  line-height: 1;',
       '}',
       '.vel-football-card__time-badge--finished {',
       '  color: #94a3b8 !important;',

@@ -76,12 +76,19 @@
             this.setupEventListeners();
             this.loadMatches();
 
-            // Actualisation automatique des statuts horaires toutes les minutes
+            // Actualisation automatique des statuts horaires toutes les 30 secondes
             setInterval(() => {
                 if (!this.isLoading && !this.hasError && this.matches.length > 0) {
                     this.filterAndRender();
                 }
-            }, 60000);
+            }, 30000);
+
+            // Actualisation silencieuse des scores en direct toutes les 45 secondes
+            setInterval(() => {
+                if (!this.hasError && this.matches.length > 0) {
+                    this.loadMatches(true, true);
+                }
+            }, 45000);
         }
 
         setupEventListeners() {
@@ -136,7 +143,16 @@
             }
         }
 
-        getMatchTimeDetails(matchTimeStr) {
+        getMatchTimeDetails(matchTimeStr, matchObj) {
+            if (matchObj) {
+                if (matchObj.isLive || (matchObj.score && matchObj.status === 'live')) {
+                    return { diffMinutes: 0, status: 'live', formattedTime: matchTimeStr };
+                }
+                if (matchObj.status === 'finished') {
+                    return { diffMinutes: -120, status: 'finished', formattedTime: matchTimeStr };
+                }
+            }
+
             if (!matchTimeStr) return { diffMinutes: 9999, status: 'upcoming', formattedTime: '--:--' };
 
             const cleaned = String(matchTimeStr).trim().replace(/[hH.]/, ':');
@@ -163,10 +179,12 @@
             }
         }
 
-        async loadMatches(forceRefresh = false) {
-            this.isLoading = true;
-            this.hasError = false;
-            this.renderLoadingSkeletons();
+        async loadMatches(forceRefresh = false, isSilent = false) {
+            if (!isSilent) {
+                this.isLoading = true;
+                this.hasError = false;
+                this.renderLoadingSkeletons();
+            }
 
             try {
                 const queryParts = ['all=true'];
@@ -189,10 +207,17 @@
                 this.hasError = false;
             } catch (err) {
                 console.error('[Foot] Erreur de chargement:', err);
-                this.isLoading = false;
-                this.hasError = true;
-                this.errorMessage = err.message || 'Impossible de récupérer les matchs';
+                if (!isSilent) {
+                    this.isLoading = false;
+                    this.hasError = true;
+                    this.errorMessage = err.message || 'Impossible de récupérer les matchs';
+                }
             }
+
+            this.renderChips();
+            this.updateBadgeCount();
+            this.filterAndRender();
+        }
 
             this.renderChips();
             this.updateBadgeCount();
@@ -332,15 +357,19 @@
             const card = document.createElement('div');
             card.className = 'foot-card';
 
-            const timeInfo = this.getMatchTimeDetails(match.time);
+            const timeInfo = this.getMatchTimeDetails(match.time, match);
             let timeBadgeHtml = '';
 
-            if (timeInfo.status === 'live') {
+            const isLive = timeInfo.status === 'live' || match.isLive || (match.score && match.status === 'live');
+            const isFinished = timeInfo.status === 'finished' || match.status === 'finished';
+
+            if (isLive) {
                 card.classList.add('is-live');
+                const liveMinute = match.minute ? ` • ${this.escapeHtml(match.minute)}` : (match.time ? ` • ${this.escapeHtml(match.time)}` : '');
                 timeBadgeHtml = `
                     <span class="foot-status-badge status-live">
                         <span class="foot-live-dot"></span>
-                        <span>EN DIRECT • ${this.escapeHtml(match.time || '')}</span>
+                        <span>EN DIRECT${liveMinute}</span>
                     </span>
                 `;
             } else if (timeInfo.status === 'starting_soon') {
@@ -353,10 +382,10 @@
                         <span>Bientôt (${this.escapeHtml(match.time || '--:--')})</span>
                     </span>
                 `;
-            } else if (timeInfo.status === 'finished') {
+            } else if (isFinished) {
                 timeBadgeHtml = `
                     <span class="foot-status-badge status-ft">
-                        <span>Terminé (${this.escapeHtml(match.time || '')})</span>
+                        <span>Terminé</span>
                     </span>
                 `;
             } else {
@@ -368,6 +397,32 @@
                         </svg>
                         <span>${this.escapeHtml(match.time || '--:--')}</span>
                     </span>
+                `;
+            }
+
+            let middleScoreHtml = '';
+            if (isLive) {
+                const scoreText = match.score ? `${match.score.home} - ${match.score.away}` : '0 - 0';
+                const minText = match.minute ? `🔴 ${this.escapeHtml(match.minute)}` : '🔴 DIRECT';
+                middleScoreHtml = `
+                    <div class="foot-score-box is-live">
+                        <span class="foot-score-digits">${scoreText}</span>
+                        <span class="foot-score-live-badge">${minText}</span>
+                    </div>
+                `;
+            } else if (isFinished) {
+                const scoreText = match.score ? `${match.score.home} - ${match.score.away}` : '0 - 0';
+                middleScoreHtml = `
+                    <div class="foot-score-box is-finished">
+                        <span class="foot-score-digits">${scoreText}</span>
+                        <span class="foot-score-ft-badge">Score final</span>
+                    </div>
+                `;
+            } else {
+                middleScoreHtml = `
+                    <div class="foot-vs-wrap">
+                        <span class="foot-vs-text">VS</span>
+                    </div>
                 `;
             }
 
@@ -399,7 +454,7 @@
                     ${timeBadgeHtml}
                 </div>
 
-                <!-- Body: Home Team VS Away Team -->
+                <!-- Body: Home Team VS Away Team & Score -->
                 <div class="foot-card-body">
                     <div class="foot-team foot-team-home">
                         <div class="foot-team-logo-wrap">
@@ -412,9 +467,7 @@
                         <span class="foot-team-name">${this.escapeHtml(match.homeTeam?.name || 'Équipe 1')}</span>
                     </div>
 
-                    <div class="foot-vs-wrap">
-                        <span class="foot-vs-text">VS</span>
-                    </div>
+                    ${middleScoreHtml}
 
                     <div class="foot-team foot-team-away">
                         <div class="foot-team-logo-wrap">

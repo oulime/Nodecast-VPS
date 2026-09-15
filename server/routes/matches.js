@@ -18,7 +18,7 @@ router.get('/today', async (req, res) => {
         const allMatches = req.query.all === 'true' || req.query.all === '1' || req.query.scope === 'all';
         const result = await footballService.getTodayMatches(country, forceRefresh, allMatches);
 
-        res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=7200');
+        res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
         res.setHeader('X-Cache-Hit', result.cached ? 'HIT' : 'MISS');
         res.setHeader('X-Country', String(result.country?.id || 'france'));
         res.setHeader('X-Country-Name', encodeURIComponent(String(result.country?.name || 'France')));

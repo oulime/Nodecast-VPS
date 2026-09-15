@@ -2063,6 +2063,125 @@
     return "";
   }
 
+  const logoColorCache = new Map();
+
+  function applyBufferingColors(bufferingEl, colors) {
+    if (!bufferingEl) return;
+    const wrap = bufferingEl.querySelector(".player-buffering__logo-wrap");
+    if (wrap && colors) {
+      wrap.style.setProperty("--buffering-primary", colors.primary || "#38bdf8");
+      wrap.style.setProperty("--buffering-secondary", colors.secondary || "#818cf8");
+      wrap.style.setProperty("--buffering-glow", colors.glow || "rgba(56, 189, 248, 0.45)");
+    }
+  }
+
+  function extractLogoColors(src, callback) {
+    if (!src || typeof src !== "string") {
+      callback({ primary: "#38bdf8", secondary: "#818cf8", glow: "rgba(56, 189, 248, 0.45)" });
+      return;
+    }
+    const cleanSrc = src.trim();
+    if (logoColorCache.has(cleanSrc)) {
+      callback(logoColorCache.get(cleanSrc));
+      return;
+    }
+
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = function () {
+      try {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        const size = 32;
+        canvas.width = size;
+        canvas.height = size;
+        ctx.drawImage(img, 0, 0, size, size);
+        const imgData = ctx.getImageData(0, 0, size, size).data;
+
+        const colors = [];
+        for (let i = 0; i < imgData.length; i += 4) {
+          const r = imgData[i];
+          const g = imgData[i + 1];
+          const b = imgData[i + 2];
+          const a = imgData[i + 3];
+
+          // Skip transparent or semi-transparent pixels
+          if (a < 80) continue;
+
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          const delta = max - min;
+          const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+          const saturation = max === 0 ? 0 : delta / max;
+
+          // Skip extreme black / extreme white unless dominant
+          const isNeutral = brightness < 25 || (brightness > 235 && saturation < 0.12);
+          const weight = isNeutral ? 0.1 : (saturation * 2.5 + (brightness > 50 && brightness < 210 ? 1.2 : 0.6));
+
+          colors.push({ r, g, b, weight, brightness, saturation });
+        }
+
+        if (colors.length === 0) {
+          const fallback = { primary: "#38bdf8", secondary: "#818cf8", glow: "rgba(56, 189, 248, 0.45)" };
+          logoColorCache.set(cleanSrc, fallback);
+          callback(fallback);
+          return;
+        }
+
+        // Sort by saturation and vibrant weight
+        colors.sort((c1, c2) => c2.weight - c1.weight);
+        const top = colors[0];
+
+        let r1 = top.r, g1 = top.g, b1 = top.b;
+        if (top.saturation < 0.2) {
+          // If the logo is monochromatic/white/gray (e.g. Canal+), boost slightly with a crisp silver/blue glow
+          r1 = Math.min(255, r1 + 35);
+          g1 = Math.min(255, g1 + 35);
+          b1 = Math.min(255, b1 + 55);
+        }
+
+        // Find a distinct secondary color for the gradient
+        let sec = colors.find(c => {
+          const diff = Math.abs(c.r - r1) + Math.abs(c.g - g1) + Math.abs(c.b - b1);
+          return diff > 80;
+        });
+
+        let r2, g2, b2;
+        if (sec) {
+          r2 = sec.r;
+          g2 = sec.g;
+          b2 = sec.b;
+        } else {
+          // Hue shift for harmonious gradient
+          r2 = Math.min(255, Math.round(g1 * 0.7 + b1 * 0.3));
+          g2 = Math.min(255, Math.round(b1 * 0.7 + r1 * 0.3));
+          b2 = Math.min(255, Math.round(r1 * 0.7 + g1 * 0.3));
+          if (r2 === r1 && g2 === g1 && b2 === b1) {
+            r2 = Math.min(255, r1 + 50);
+            b2 = Math.min(255, b1 + 90);
+          }
+        }
+
+        const primary = `rgb(${r1}, ${g1}, ${b1})`;
+        const secondary = `rgb(${r2}, ${g2}, ${b2})`;
+        const glow = `rgba(${r1}, ${g1}, ${b1}, 0.55)`;
+
+        const result = { primary, secondary, glow };
+        logoColorCache.set(cleanSrc, result);
+        callback(result);
+      } catch (err) {
+        const fallback = { primary: "#38bdf8", secondary: "#818cf8", glow: "rgba(56, 189, 248, 0.45)" };
+        logoColorCache.set(cleanSrc, fallback);
+        callback(fallback);
+      }
+    };
+    img.onerror = function () {
+      const fallback = { primary: "#38bdf8", secondary: "#818cf8", glow: "rgba(56, 189, 248, 0.45)" };
+      callback(fallback);
+    };
+    img.src = cleanSrc;
+  }
+
   window.veloraShowPlayerBuffering = function (channelName, logoUrl) {
     window.veloraHidePpvNoEvent();
     const playerContainer = document.getElementById("player-container");
@@ -2091,6 +2210,9 @@
 
       if (logoImg && fallbackSpinner) {
         if (resolvedLogo && !isCountryFlagUrl(resolvedLogo)) {
+          extractLogoColors(resolvedLogo, function (colors) {
+            applyBufferingColors(buffering, colors);
+          });
           logoImg.onload = function () {
             logoImg.classList.remove("hidden");
             fallbackSpinner.classList.add("hidden");
@@ -2098,6 +2220,7 @@
           logoImg.onerror = function () {
             logoImg.classList.add("hidden");
             fallbackSpinner.classList.remove("hidden");
+            applyBufferingColors(buffering, { primary: "#38bdf8", secondary: "#818cf8", glow: "rgba(56, 189, 248, 0.45)" });
           };
           logoImg.src = resolvedLogo;
           logoImg.classList.remove("hidden");
@@ -2106,6 +2229,7 @@
           logoImg.src = "";
           logoImg.classList.add("hidden");
           fallbackSpinner.classList.remove("hidden");
+          applyBufferingColors(buffering, { primary: "#38bdf8", secondary: "#818cf8", glow: "rgba(56, 189, 248, 0.45)" });
         }
       }
     }

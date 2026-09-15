@@ -1576,9 +1576,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet" />
-  <link href="/assets/velora-home-sections.css?v=20260912-foot-nocircle-v12" rel="stylesheet" />
+  <link href="/assets/velora-home-sections.css?v=20260915-resume-title-logo-v1" rel="stylesheet" />
   <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-54"></script>
-  <script defer src="/assets/velora-home-sections.js?v=20260914-sync-pkg-v2"></script>
+  <script defer src="/assets/velora-home-sections.js?v=20260915-resume-title-logo-v1"></script>
   <script defer src="/assets/velora-home-cache-fallback.js?v=20260912-home-sections-restore-v3"></script>
   <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=20260911-tab-click-guard-v1"></script>
   <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-54"></script>
@@ -1586,7 +1586,7 @@
   <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-54"></script>
   <link rel="stylesheet" href="/assets/velora-favorites.css?v=white-logo-v20260911-1" />
   <script defer src="/assets/velora-favorites.js?v=20260911-search-fav-name-v5"></script>
-  <script defer src="/assets/velora-watch-history.js?v=20260915-resume-seek-threshold-v1"></script>
+  <script defer src="/assets/velora-watch-history.js?v=20260915-resume-title-logo-v1"></script>
   <script defer src="/assets/velora-catalog-scroll-memory.js?v=20260902-scroll-memory-v6"></script>
   <script defer src="/assets/velora-cache-inventory.js?v=instant-nav-v20260821-54"></script>
   <script defer src="/assets/manual-pays-visible-memberships.js?v=instant-nav-v20260907-151"></script>
@@ -3170,6 +3170,68 @@
       display: none !important;
     }
 
+    .player-buffering__logo-wrap {
+      position: relative;
+      width: 84px;
+      height: 84px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 20px;
+      background: radial-gradient(circle at center, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98));
+      border: 1.5px solid rgba(56, 189, 248, 0.45);
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.7), 0 0 30px rgba(56, 189, 248, 0.28);
+      padding: 10px;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+
+    .player-buffering__ring {
+      position: absolute;
+      inset: -2px;
+      border-radius: 22px;
+      padding: 2px;
+      background: conic-gradient(from 0deg, transparent 40%, rgba(56, 189, 248, 0.95) 80%, rgba(168, 85, 247, 0.95) 100%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      animation: vel-spin-ring 1.8s linear infinite;
+      pointer-events: none;
+    }
+
+    @keyframes vel-spin-ring {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .player-buffering__logo {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.7));
+      animation: vel-logo-pulse 1.4s ease-in-out infinite alternate;
+      position: relative;
+      z-index: 2;
+    }
+
+    .player-buffering__logo.hidden {
+      display: none !important;
+    }
+
+    @keyframes vel-logo-pulse {
+      0% {
+        transform: scale(0.92);
+        opacity: 0.75;
+        filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.7)) brightness(0.9);
+      }
+      100% {
+        transform: scale(1.06);
+        opacity: 1;
+        filter: drop-shadow(0 8px 18px rgba(56, 189, 248, 0.6)) brightness(1.15);
+      }
+    }
+
     .player-buffering__spinner {
       width: 2.75rem;
       height: 2.75rem;
@@ -3179,6 +3241,12 @@
       border-right-color: #818cf8;
       animation: vel-player-spin 0.8s cubic-bezier(0.4, 0.1, 0.2, 1) infinite;
       box-shadow: 0 0 24px rgba(56, 189, 248, 0.35);
+      position: relative;
+      z-index: 2;
+    }
+
+    .player-buffering__spinner.hidden {
+      display: none !important;
     }
 
     @keyframes vel-player-spin {
@@ -3194,6 +3262,21 @@
       text-transform: uppercase;
       color: #f1f5f9;
       text-shadow: 0 2px 10px rgba(0, 0, 0, 0.95), 0 0 20px rgba(0, 0, 0, 0.8) !important;
+    }
+
+    @media (max-width: 480px) {
+      .player-buffering__logo-wrap {
+        width: 68px;
+        height: 68px;
+        border-radius: 16px;
+        padding: 8px;
+      }
+      .player-buffering__ring {
+        border-radius: 18px;
+      }
+      .player-buffering__label {
+        font-size: 0.78rem !important;
+      }
     }
 
     #player-container:fullscreen video::-webkit-media-controls,
@@ -7272,7 +7355,11 @@
                 crossorigin="anonymous"></video>
               <div id="player-buffering" class="player-buffering hidden" aria-hidden="true" role="status"
                 aria-live="polite" aria-label="Chargement de la lecture">
-                <div class="player-buffering__spinner" aria-hidden="true"></div>
+                <div class="player-buffering__logo-wrap">
+                  <div class="player-buffering__ring" aria-hidden="true"></div>
+                  <img id="player-buffering-logo" class="player-buffering__logo hidden" alt="Logo chaîne" src="" />
+                  <div id="player-buffering-fallback-spinner" class="player-buffering__spinner" aria-hidden="true"></div>
+                </div>
                 <span class="player-buffering__label">Chargement…</span>
               </div>
               <div id="live-controls-overlay" class="live-controls-overlay hidden" aria-hidden="true">
@@ -17743,7 +17830,7 @@
     })();
   </script>
   <script defer src="/assets/cast-bridge.js?v=20260821-cast-airplay-v1"></script>
-  <script defer src="/assets/velora-live-wheel.js?v=20260915-player-buffering-v4"></script>
+  <script defer src="/assets/velora-live-wheel.js?v=20260915-logo-buffering-v5"></script>
   <link rel="stylesheet" href="/assets/velora-prime-carousel.css?v=20260914-exact-provider-order-v11" />
   <script defer src="/assets/velora-prime-carousels.js?v=20260914-random-packages-v1"></script>
   <script defer src="/assets/velora-football-slider.js?v=20260915-foot-slider-pkg-channels-v2"></script>

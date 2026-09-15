@@ -672,6 +672,36 @@
 .vel-home-section__card--resume .vel-home-section__name {
   display: none !important;
 }
+.vel-home-section__card--resume .vel-home-section__title-logo {
+  position: absolute !important;
+  bottom: 12px !important;
+  left: 12px !important;
+  max-height: clamp(38px, 6.8vw, 64px) !important;
+  max-width: min(78%, 230px) !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain !important;
+  object-position: left bottom !important;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.98)) drop-shadow(0 4px 14px rgba(0, 0, 0, 0.92)) drop-shadow(0 0 2px rgba(0, 0, 0, 0.85)) !important;
+  z-index: 4 !important;
+  pointer-events: none !important;
+  transform: none !important;
+  transition: none !important;
+}
+.vel-home-section__card--resume .vel-home-section__title-logo.vel-title-logo--wide {
+  min-width: clamp(95px, 13vw, 150px) !important;
+  max-height: clamp(34px, 5.8vw, 56px) !important;
+  max-width: min(80%, 240px) !important;
+}
+.vel-home-section__card--resume .vel-home-section__title-logo.vel-title-logo--standard {
+  min-width: clamp(90px, 12.5vw, 140px) !important;
+  max-height: clamp(42px, 7.5vw, 70px) !important;
+  max-width: min(76%, 220px) !important;
+}
+.vel-home-section__card--resume .vel-home-section__title-logo.vel-title-logo--tall {
+  max-height: clamp(34px, 5.5vw, 52px) !important;
+  max-width: min(58%, 170px) !important;
+}
 @media(max-width:640px) {
   .vel-home-section__card--resume {
     flex: 0 0 clamp(12.5rem, 62vw, 17.5rem) !important;

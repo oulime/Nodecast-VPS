@@ -1737,14 +1737,20 @@
         el.querySelector(".vel-channel-playing-badge")?.classList.toggle("hidden", !match);
       });
 
-      // Keep player container visible and immediately display loading spinner
+      const pkgCoverRaw = this.activePackage ? this.resolvePackageCover(this.activePackage) : "";
+      const pkgCover = (!isCountryFlagUrl(pkgCoverRaw)) ? pkgCoverRaw : "";
+      let safeIcon = String(ch.stream_icon || ch.logo || ch.cover || "").trim();
+      if (isCountryFlagUrl(safeIcon)) safeIcon = "";
+      if (!safeIcon && pkgCover) safeIcon = pkgCover;
+
+      // Keep player container visible and immediately display animated channel logo loading
       const playerContainer = document.getElementById("player-container");
       if (playerContainer) {
         playerContainer.classList.remove("hidden");
         playerContainer.setAttribute("aria-hidden", "false");
       }
       if (typeof window.veloraShowPlayerBuffering === "function") {
-        window.veloraShowPlayerBuffering(ch.name || ch.title || "Chaîne");
+        window.veloraShowPlayerBuffering(ch.name || ch.title || "Chaîne", safeIcon);
       } else {
         const buffering = document.getElementById("player-buffering");
         if (buffering) {
@@ -1752,12 +1758,6 @@
           buffering.setAttribute("aria-hidden", "false");
         }
       }
-
-      const pkgCoverRaw = this.activePackage ? this.resolvePackageCover(this.activePackage) : "";
-      const pkgCover = (!isCountryFlagUrl(pkgCoverRaw)) ? pkgCoverRaw : "";
-      let safeIcon = String(ch.stream_icon || ch.logo || ch.cover || "").trim();
-      if (isCountryFlagUrl(safeIcon)) safeIcon = "";
-      if (!safeIcon && pkgCover) safeIcon = pkgCover;
 
       const item = {
         ...ch,
@@ -2063,7 +2063,7 @@
     return "";
   }
 
-  window.veloraShowPlayerBuffering = function (channelName) {
+  window.veloraShowPlayerBuffering = function (channelName, logoUrl) {
     window.veloraHidePpvNoEvent();
     const playerContainer = document.getElementById("player-container");
     if (playerContainer) {
@@ -2076,6 +2076,38 @@
       buffering.setAttribute("aria-hidden", "false");
       const label = buffering.querySelector(".player-buffering__label");
       if (label) label.textContent = "Chargement…";
+
+      const logoImg = buffering.querySelector("#player-buffering-logo");
+      const fallbackSpinner = buffering.querySelector("#player-buffering-fallback-spinner") || buffering.querySelector(".player-buffering__spinner");
+
+      let resolvedLogo = (logoUrl && typeof logoUrl === "string" ? logoUrl.trim() : "");
+      if (!resolvedLogo) {
+        const activeCard = document.querySelector(".media-item.is-active, .vel-media-item-row.is-active, .vel-media-item-row--active");
+        if (activeCard) {
+          const img = activeCard.querySelector("img.media-icon, img.vel-media-logo, img");
+          if (img && img.src && !isCountryFlagUrl(img.src)) resolvedLogo = img.src;
+        }
+      }
+
+      if (logoImg && fallbackSpinner) {
+        if (resolvedLogo && !isCountryFlagUrl(resolvedLogo)) {
+          logoImg.onload = function () {
+            logoImg.classList.remove("hidden");
+            fallbackSpinner.classList.add("hidden");
+          };
+          logoImg.onerror = function () {
+            logoImg.classList.add("hidden");
+            fallbackSpinner.classList.remove("hidden");
+          };
+          logoImg.src = resolvedLogo;
+          logoImg.classList.remove("hidden");
+          fallbackSpinner.classList.add("hidden");
+        } else {
+          logoImg.src = "";
+          logoImg.classList.add("hidden");
+          fallbackSpinner.classList.remove("hidden");
+        }
+      }
     }
     const chName = (channelName && typeof channelName === "string" ? channelName : getActiveChannelName()).trim();
     const nowPlaying = document.getElementById("now-playing");
@@ -2095,6 +2127,8 @@
     if (buffering) {
       buffering.classList.add("hidden");
       buffering.setAttribute("aria-hidden", "true");
+      const logoImg = buffering.querySelector("#player-buffering-logo");
+      if (logoImg) logoImg.classList.add("hidden");
     }
   };
 
@@ -2156,7 +2190,8 @@
       const hooked = async function (item) {
         try {
           const chName = item ? (item.name || item.title || "") : "";
-          window.veloraShowPlayerBuffering(chName);
+          const logo = item ? (item.stream_icon || item.logo || item.cover || "") : "";
+          window.veloraShowPlayerBuffering(chName, logo);
         } catch (_) {}
         return origPlayLive.apply(this, arguments);
       };
@@ -2177,7 +2212,9 @@
     if (channelRow && !e.target.closest("#btn-close-player, .vel-channel-fav-btn, .vel-package-card")) {
       const titleEl = channelRow.querySelector("h4, .media-info h4, .media-item__title, .vel-media-title, .vel-package-card__title");
       const chName = titleEl ? (titleEl.getAttribute("title") || titleEl.textContent) : (channelRow.getAttribute("aria-label") || "");
-      window.veloraShowPlayerBuffering(chName);
+      const img = channelRow.querySelector("img.media-icon, img.vel-media-logo, img");
+      const logoUrl = img ? img.src : "";
+      window.veloraShowPlayerBuffering(chName, logoUrl);
     }
 
     const retryBtn = e.target && e.target.closest("#vel-ppv-btn-retry");

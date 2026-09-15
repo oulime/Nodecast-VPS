@@ -166,9 +166,19 @@
       if (thumb) thumb.classList.add("vel-dark-logo-mode");
     };
 
+    const removeDark = () => {
+      target.classList.remove("vel-dark-logo-mode");
+      const card = target.closest(".vel-coverflow-card");
+      if (card) card.classList.remove("vel-dark-logo-mode");
+      const thumb = target.closest(".media-item__thumb");
+      if (thumb) thumb.classList.remove("vel-dark-logo-mode");
+    };
+
     if (logoToneCache.has(src)) {
       if (logoToneCache.get(src) === "dark") {
         applyDark();
+      } else {
+        removeDark();
       }
       return;
     }
@@ -187,6 +197,8 @@
         logoToneCache.set(src, result.tone);
         if (result.isDark) {
           applyDark();
+        } else {
+          removeDark();
         }
       } catch (_) {
         // If tainted canvas due to cross-origin, retry through image proxy
@@ -204,6 +216,7 @@
               const result = detectImageToneFromCanvas(imgData);
               logoToneCache.set(src, result.tone);
               if (result.isDark) applyDark();
+              else removeDark();
             } catch (e) {
               logoToneCache.set(src, "unknown");
             }
@@ -1574,6 +1587,8 @@
           if (!isFlag) {
             if (logoToneCache.get(logo) === "dark") {
               thumbWrap.classList.add("vel-dark-logo-mode");
+            } else if (logoToneCache.has(logo)) {
+              thumbWrap.classList.remove("vel-dark-logo-mode");
             } else if (window.veloraDetectLogoDarkness) {
               window.veloraDetectLogoDarkness(img, thumbWrap);
             }

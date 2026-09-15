@@ -317,13 +317,13 @@
       .vel-home-section__card--resume .vel-home-section__title-logo.is-dark-logo,
       .vel-home-section__card--resume .vel-home-section__title-logo.vel-title-logo--dark,
       .vel-home-section__card--resume.has-dark-title-logo .vel-home-section__title-logo {
-        background: rgba(255, 255, 255, 0.92) !important;
-        padding: 3px 8px !important;
-        border-radius: 7px !important;
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.6) !important;
-        backdrop-filter: blur(10px) !important;
-        -webkit-backdrop-filter: blur(10px) !important;
-        filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35)) !important;
+        background: transparent !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.35)) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.9)) !important;
       }
       @media(max-width:640px) {
         .vel-home-section__card--resume {

@@ -314,6 +314,17 @@
         max-height: clamp(34px, 5.5vw, 52px) !important;
         max-width: min(58%, 170px) !important;
       }
+      .vel-home-section__card--resume .vel-home-section__title-logo.is-dark-logo,
+      .vel-home-section__card--resume .vel-home-section__title-logo.vel-title-logo--dark,
+      .vel-home-section__card--resume.has-dark-title-logo .vel-home-section__title-logo {
+        background: rgba(255, 255, 255, 0.92) !important;
+        padding: 3px 8px !important;
+        border-radius: 7px !important;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.6) !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+        filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35)) !important;
+      }
       @media(max-width:640px) {
         .vel-home-section__card--resume {
           flex: 0 0 clamp(12.5rem, 62vw, 17.5rem) !important;
@@ -2393,6 +2404,9 @@
               if (r >= 2.4) logoImg.classList.add("vel-title-logo--wide");
               else if (r <= 1.45) logoImg.classList.add("vel-title-logo--tall");
               else logoImg.classList.add("vel-title-logo--standard");
+            }
+            if (typeof window.veloraDetectDarkLogo === "function") {
+              window.veloraDetectDarkLogo(logoImg, card);
             }
           }
           logoImg.onload = smartScale;

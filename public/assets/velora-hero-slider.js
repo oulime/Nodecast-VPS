@@ -303,6 +303,9 @@
         } else {
           imgEl.classList.add("is-balanced-logo");
         }
+        if (typeof window.veloraDetectDarkLogo === "function") {
+          window.veloraDetectDarkLogo(imgEl, logoWrap);
+        }
       }
 
       logoImg.onload = function() {

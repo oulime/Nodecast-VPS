@@ -335,6 +335,9 @@
               else if (r <= 1.45) logoImg.classList.add("vel-title-logo--tall");
               else logoImg.classList.add("vel-title-logo--standard");
             }
+            if (typeof window.veloraDetectDarkLogo === "function") {
+              window.veloraDetectDarkLogo(logoImg, card);
+            }
           };
           logoImg.onload = smartScale;
           logoImg.onerror = function () {

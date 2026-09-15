@@ -135,6 +135,19 @@
   pointer-events: none;
 }
 
+/* Dark / Mostly Black Transparent Logos: Frosted white pill background */
+.vel-hero-title-logo.is-dark-logo,
+.vel-hero-title-logo.vel-title-logo--dark,
+.has-dark-title-logo .vel-hero-title-logo {
+  background: rgba(255, 255, 255, 0.92) !important;
+  padding: 8px 16px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.6) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35)) !important;
+}
+
 /* Smart Optical Aspect-Ratio Modifiers */
 .vel-hero-title-logo.is-tall-logo {
   max-height: clamp(85px, 13vw, 135px);

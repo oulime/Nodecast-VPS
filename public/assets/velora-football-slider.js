@@ -15,22 +15,181 @@
   var injectDebounceTimer = null;
   var isUserTouching = false;
   var touchEndTimer = null;
+  var footballSettingsCache = null;
+  var footballSettingsLastFetch = 0;
+
+  function countrySlug(raw) {
+    if (!raw) return '';
+    return String(raw)
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/^country_/, '')
+      .replace(/[^\p{L}\p{N}]+/gu, '_')
+      .replace(/^_+|_+$/g, '');
+  }
+
+  function getEquivalentCountrySlugs(input) {
+    var slug = countrySlug(input);
+    if (!slug) return [];
+    var set = new Set([slug]);
+
+    if (/^(arabe|arabic|arab|mena|oriental|maghreb|maroc|morocco|algerie|algeria|tunisie|tunisia|egypt|egypte|saudi|saoudite|qatar|emirats|uae|kuwait|koweit|bahrain|oman|iraq|irak|jordan|jordanie|lebanon|liban|libya|libye|sudan|soudan|yemen|syria|syrie|palestine|dz|ma|tn|eg|sa|ae|qa|kw|om|bh|iq|jo|lb|ly|sd|ye|sy)$/i.test(slug)) {
+      set.add('arabe');
+      set.add('mena');
+      set.add('arabic');
+    }
+    if (/^(uk|gb|gbr|england|angleterre|united_kingdom|great_britain|royaume_uni)$/i.test(slug)) {
+      set.add('uk');
+      set.add('angleterre');
+      set.add('royaume_uni');
+      set.add('great_britain');
+    }
+    if (/^(spain|espagne|espana)$/i.test(slug)) {
+      set.add('spain');
+      set.add('espagne');
+      set.add('espana');
+    }
+    if (/^(usa|us|united_states|etats_unis)$/i.test(slug)) {
+      set.add('usa');
+      set.add('us');
+      set.add('etats_unis');
+      set.add('united_states');
+    }
+    if (/^(italy|italie|italia)$/i.test(slug)) {
+      set.add('italy');
+      set.add('italie');
+      set.add('italia');
+    }
+    if (/^(germany|allemagne|deutschland)$/i.test(slug)) {
+      set.add('germany');
+      set.add('allemagne');
+      set.add('deutschland');
+    }
+    if (/^(portugal|portugais|portuguese)$/i.test(slug)) {
+      set.add('portugal');
+    }
+    if (/^(france|french)$/i.test(slug)) {
+      set.add('france');
+    }
+    if (/^(bresil|brazil|brasil)$/i.test(slug)) {
+      set.add('bresil');
+      set.add('brazil');
+      set.add('brasil');
+    }
+    if (/^(belgique|belgium|belgie)$/i.test(slug)) {
+      set.add('belgique');
+      set.add('belgium');
+    }
+    if (/^(afrique|africa)$/i.test(slug)) {
+      set.add('afrique');
+      set.add('africa');
+    }
+    if (/^(asia|asie|asian)$/i.test(slug)) {
+      set.add('asia');
+      set.add('asie');
+    }
+
+    return Array.from(set);
+  }
+
+  function getLoadedFootballSettings() {
+    if (footballSettingsCache) return footballSettingsCache;
+    try {
+      if (window.__veloraFootballMappingsCache && typeof window.__veloraFootballMappingsCache === 'object') {
+        footballSettingsCache = window.__veloraFootballMappingsCache;
+        return footballSettingsCache;
+      }
+      var raw = localStorage.getItem('velora_football_channel_mappings');
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          footballSettingsCache = parsed;
+          return footballSettingsCache;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  async function syncFootballSettingsFromDb() {
+    var now = Date.now();
+    if (footballSettingsCache && (now - footballSettingsLastFetch < 10000)) {
+      return footballSettingsCache;
+    }
+    try {
+      var token = localStorage.getItem('authToken') || '';
+      var headers = { 'apikey': 'local-vps' };
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+      var res = await fetch('/api/velora-db/rest/v1/admin_settings?key=eq.football_channel_mappings', { headers: headers });
+      if (res.ok) {
+        var rows = await res.json();
+        if (Array.isArray(rows) && rows.length > 0 && rows[0].value) {
+          var val = rows[0].value;
+          var parsed = typeof val === 'string' ? JSON.parse(val) : val;
+          if (parsed && typeof parsed === 'object') {
+            footballSettingsCache = parsed;
+            footballSettingsLastFetch = now;
+            window.__veloraFootballMappingsCache = parsed;
+            localStorage.setItem('velora_football_channel_mappings', JSON.stringify(parsed));
+            return parsed;
+          }
+        }
+      }
+    } catch (_) {}
+    return footballSettingsCache;
+  }
+
+  // DÉSACTIVÉ PAR DÉFAUT pour tous les pays sauf si activé explicitement dans les paramètres admin
+  function isCountryFootballEnabled(countryInput) {
+    var settings = getLoadedFootballSettings();
+    if (!settings || typeof settings !== 'object') {
+      return false;
+    }
+    var countrySettingsMap = settings._country_settings || settings._settings || {};
+    var equivalentSlugs = getEquivalentCountrySlugs(countryInput);
+
+    for (var i = 0; i < equivalentSlugs.length; i++) {
+      var s = equivalentSlugs[i];
+      if (countrySettingsMap[s] && countrySettingsMap[s].enabled === true) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function getCountryIgnoredChannels(countryInput) {
+    var settings = getLoadedFootballSettings();
+    if (!settings || typeof settings !== 'object') return [];
+    var countrySettingsMap = settings._country_settings || settings._settings || {};
+    var equivalentSlugs = getEquivalentCountrySlugs(countryInput);
+    var ignored = [];
+
+    for (var i = 0; i < equivalentSlugs.length; i++) {
+      var s = equivalentSlugs[i];
+      if (countrySettingsMap[s] && Array.isArray(countrySettingsMap[s].ignoredChannels)) {
+        ignored = ignored.concat(countrySettingsMap[s].ignoredChannels);
+      }
+    }
+    return ignored.map(function (x) { return String(x || '').trim(); }).filter(Boolean);
+  }
 
   function normalizeCountry(c) {
     if (!c) return 'france';
-    var s = String(c).toLowerCase().replace(/^country_/, '').replace(/[_\-\s]+/g, ' ').trim();
-    
-    // Support caractères arabes et termes régionaux MENA
-    if (/[\u0600-\u06FF]/.test(s) || /(arabe|arabic|arab|mena|oriental|maghreb|maroc|morocco|algerie|algeria|tunisie|tunisia|egypt|egypte|saudi|saoudite|qatar|emirats|uae|kuwait|koweit|bahrain|oman|iraq|irak|jordan|jordanie|lebanon|liban|libya|libye|sudan|soudan|yemen|syria|syrie|palestine|\b(ar|dz|ma|tn|eg|sa|ae|qa|kw|om|bh|iq|jo|lb|ly|sd|ye|sy)\b)/i.test(s)) {
-      return 'mena';
+    var s = String(c)
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/^country_/, '')
+      .replace(/[^\p{L}\p{N}]+/gu, '_')
+      .replace(/^_+|_+$/g, '')
+      .trim();
+
+    // Support caractères arabes et termes régionaux
+    if (/[\u0600-\u06FF]/.test(s) || /^(arabe|arabic|arab|mena|oriental|maghreb|maroc|algerie|tunisie|egypt|saudi|qatar|emirats|kuwait)$/i.test(s)) {
+      return 'arabe';
     }
-    if (/(uk|gb|gbr|england|angleterre|united kingdom|great britain|royaume uni|royaume-uni|\b(uk|gb)\b)/i.test(s)) return 'uk';
-    if (/(spain|espagne|espana|españa|spanish|\b(es|esp)\b)/i.test(s)) return 'spain';
-    if (/(usa|us|united states|etats unis|etats-unis|états-unis|america|amerique|amérique|\b(us|usa)\b)/i.test(s)) return 'usa';
-    if (/(italy|italie|italia|italian|\b(it|ita)\b)/i.test(s)) return 'italy';
-    if (/(germany|allemagne|deutschland|german|\b(de|deu|ger)\b)/i.test(s)) return 'germany';
-    if (/(portugal|portugais|portuguese|\b(pt|prt)\b)/i.test(s)) return 'portugal';
-    return 'france';
+    return s || 'france';
   }
 
   function detectActiveCountry(hint) {
@@ -77,6 +236,12 @@
   }
 
   async function fetchTodayMatches(country, forceRefresh) {
+    // Si le module football est désactivé pour ce pays, ne rien récupérer et vider le cache
+    if (!isCountryFootballEnabled(country)) {
+      cachedMatchesByCountry.delete(country);
+      return [];
+    }
+
     if (!forceRefresh && cachedMatchesByCountry.has(country)) {
       var entry = cachedMatchesByCountry.get(country);
       if (entry && entry.expiresAt > Date.now()) {
@@ -689,6 +854,8 @@
   document.addEventListener('velora-football-mappings-changed', function (e) {
     if (e && e.detail && e.detail.mappings) {
       window.__veloraFootballMappingsCache = e.detail.mappings;
+      cachedMatchesByCountry.clear();
+      scheduleInjection(50);
     }
   });
 
@@ -1610,6 +1777,12 @@
     var country = detectActiveCountry(hintCountry);
     var existingFootball = root.querySelector('.vel-home-section--football');
 
+    // Si le module football est désactivé pour ce pays, supprimer immédiatement toute section existante
+    if (!isCountryFootballEnabled(country)) {
+      if (existingFootball) existingFootball.remove();
+      return;
+    }
+
     // Si la section existe déjà avec le BON pays et du contenu, vérifier uniquement sa position
     if (existingFootball && existingFootball.dataset.footballCountry === country && existingFootball.querySelectorAll('.vel-football-card').length > 0) {
       var resumeSec = root.querySelector('.vel-home-section--resume');
@@ -1664,6 +1837,9 @@
 
   window.veloraRenderFootballSectionDirect = function (hintCountry) {
     var country = detectActiveCountry(hintCountry);
+    if (!isCountryFootballEnabled(country)) {
+      return null;
+    }
     if (cachedMatchesByCountry.has(country)) {
       var entry = cachedMatchesByCountry.get(country);
       if (entry && Array.isArray(entry.matches) && entry.matches.length > 0) {
@@ -2254,15 +2430,37 @@
     document.addEventListener('DOMContentLoaded', function () {
       injectFootballToastStyles();
       attachRootObserver();
-      scheduleInjection(100);
+      syncFootballSettingsFromDb().then(function () {
+        scheduleInjection(50);
+      });
       checkPendingMatchFromSession();
     });
   } else {
     injectFootballToastStyles();
     attachRootObserver();
-    scheduleInjection(100);
+    syncFootballSettingsFromDb().then(function () {
+      scheduleInjection(50);
+    });
     checkPendingMatchFromSession();
   }
+
+  // Écoute de changement de configuration admin
+  document.addEventListener('velora-football-mappings-changed', function (e) {
+    if (e && e.detail && e.detail.mappings) {
+      footballSettingsCache = e.detail.mappings;
+      window.__veloraFootballMappingsCache = e.detail.mappings;
+    }
+    cachedMatchesByCountry.clear();
+    scheduleInjection(10);
+  });
+  window.addEventListener('velora-football-mappings-changed', function (e) {
+    if (e && e.detail && e.detail.mappings) {
+      footballSettingsCache = e.detail.mappings;
+      window.__veloraFootballMappingsCache = e.detail.mappings;
+    }
+    cachedMatchesByCountry.clear();
+    scheduleInjection(10);
+  });
 
   // Actualisation périodique toutes les minutes pour basculer automatiquement en DIRECT / Bientôt
   setInterval(function () {

@@ -225,22 +225,102 @@ const COUNTRY_CONFIGS = {
 };
 
 /**
- * Normalise un identifiant ou nom de pays vers notre dictionnaire supporté
+ * Normalise un identifiant ou nom de pays vers un slug standardisé
+ */
+function toCountrySlug(raw) {
+    if (!raw) return '';
+    return String(raw)
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/^country_/, '')
+        .replace(/[^\p{L}\p{N}]+/gu, '_')
+        .replace(/^_+|_+$/g, '');
+}
+
+/**
+ * Retourne la liste des slugs équivalents pour la résolution multi-pays / alias
+ */
+function getEquivalentCountrySlugs(input) {
+    const slug = toCountrySlug(input);
+    if (!slug) return [];
+    const set = new Set([slug]);
+
+    if (/^(arabe|arabic|arab|mena|oriental|maghreb|maroc|morocco|algerie|algeria|tunisie|tunisia|egypt|egypte|saudi|saoudite|qatar|emirats|uae|kuwait|koweit|bahrain|oman|iraq|irak|jordan|jordanie|lebanon|liban|libya|libye|sudan|soudan|yemen|syria|syrie|palestine|dz|ma|tn|eg|sa|ae|qa|kw|om|bh|iq|jo|lb|ly|sd|ye|sy)$/i.test(slug)) {
+        set.add('arabe');
+        set.add('mena');
+        set.add('arabic');
+    }
+    if (/^(uk|gb|gbr|england|angleterre|united_kingdom|great_britain|royaume_uni)$/i.test(slug)) {
+        set.add('uk');
+        set.add('angleterre');
+        set.add('royaume_uni');
+        set.add('great_britain');
+    }
+    if (/^(spain|espagne|espana)$/i.test(slug)) {
+        set.add('spain');
+        set.add('espagne');
+        set.add('espana');
+    }
+    if (/^(usa|us|united_states|etats_unis)$/i.test(slug)) {
+        set.add('usa');
+        set.add('us');
+        set.add('etats_unis');
+        set.add('united_states');
+    }
+    if (/^(italy|italie|italia)$/i.test(slug)) {
+        set.add('italy');
+        set.add('italie');
+        set.add('italia');
+    }
+    if (/^(germany|allemagne|deutschland)$/i.test(slug)) {
+        set.add('germany');
+        set.add('allemagne');
+        set.add('deutschland');
+    }
+    if (/^(portugal|portugais|portuguese)$/i.test(slug)) {
+        set.add('portugal');
+    }
+    if (/^(france|french)$/i.test(slug)) {
+        set.add('france');
+    }
+    if (/^(bresil|brazil|brasil)$/i.test(slug)) {
+        set.add('bresil');
+        set.add('brazil');
+        set.add('brasil');
+    }
+    if (/^(belgique|belgium|belgie)$/i.test(slug)) {
+        set.add('belgique');
+        set.add('belgium');
+    }
+    if (/^(afrique|africa)$/i.test(slug)) {
+        set.add('afrique');
+        set.add('africa');
+    }
+    if (/^(asia|asie|asian)$/i.test(slug)) {
+        set.add('asia');
+        set.add('asie');
+    }
+
+    return Array.from(set);
+}
+
+/**
+ * Normalise un identifiant ou nom de pays vers notre dictionnaire de diffuseurs
  */
 function normalizeCountryCode(countryInput) {
     if (!countryInput) return 'france';
-    const s = String(countryInput).toLowerCase().replace(/^country_/, '').replace(/[_\-\s]+/g, ' ').trim();
-
-    if (/[\u0600-\u06FF]/.test(s) || /(arabe|arabic|arab|mena|oriental|maghreb|maroc|morocco|algerie|algeria|tunisie|tunisia|egypt|egypte|saudi|saoudite|qatar|emirats|uae|kuwait|koweit|bahrain|oman|iraq|irak|jordan|jordanie|lebanon|liban|libya|libye|sudan|soudan|yemen|syria|syrie|palestine|\b(ar|dz|ma|tn|eg|sa|ae|qa|kw|om|bh|iq|jo|lb|ly|sd|ye|sy)\b)/i.test(s)) {
+    const s = toCountrySlug(countryInput);
+    if (/^(arabe|arabic|arab|mena|oriental|maghreb|maroc|algerie|tunisie|egypt|saudi|qatar|emirats|kuwait|koweit)$/i.test(s)) {
         return 'mena';
     }
-    if (/(uk|gb|gbr|england|angleterre|united kingdom|great britain|royaume uni|royaume-uni|\b(uk|gb)\b)/i.test(s)) return 'uk';
-    if (/(spain|espagne|espana|españa|spanish|\b(es|esp)\b)/i.test(s)) return 'spain';
-    if (/(usa|us|united states|etats unis|etats-unis|états-unis|america|amerique|amérique|\b(us|usa)\b)/i.test(s)) return 'usa';
-    if (/(italy|italie|italia|italian|\b(it|ita)\b)/i.test(s)) return 'italy';
-    if (/(germany|allemagne|deutschland|german|\b(de|deu|ger)\b)/i.test(s)) return 'germany';
-    if (/(portugal|portugais|portuguese|\b(pt|prt)\b)/i.test(s)) return 'portugal';
-    return 'france';
+    if (/^(uk|gb|gbr|england|angleterre|united_kingdom|great_britain|royaume_uni)$/i.test(s)) return 'uk';
+    if (/^(spain|espagne|espana)$/i.test(s)) return 'spain';
+    if (/^(usa|us|united_states|etats_unis)$/i.test(s)) return 'usa';
+    if (/^(italy|italie|italia)$/i.test(s)) return 'italy';
+    if (/^(germany|allemagne|deutschland)$/i.test(s)) return 'germany';
+    if (/^(portugal|portugais|portuguese)$/i.test(s)) return 'portugal';
+    return s || 'france';
 }
 
 /**
@@ -248,7 +328,13 @@ function normalizeCountryCode(countryInput) {
  */
 function getCountryConfig(countryKey) {
     const key = normalizeCountryCode(countryKey);
-    return COUNTRY_CONFIGS[key] || COUNTRY_CONFIGS.france;
+    return COUNTRY_CONFIGS[key] || {
+        id: key,
+        name: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '),
+        flag: '🌍',
+        channelsLabel: `Chaînes TV (${key})`,
+        broadcasters: {}
+    };
 }
 
 let getSqliteDb = null;
@@ -256,25 +342,61 @@ try {
     getSqliteDb = require('../db/sqlite').getDb;
 } catch (_) {}
 
+let cachedVpsSettings = null;
+let cachedVpsSettingsExpiresAt = 0;
+
 /**
- * Récupère les paramètres football persistés dans SQLite (admin_settings)
+ * Synchronise les paramètres football depuis le VPS (source de vérité en développement local)
  */
-function getRawFootballMappingsFromDb() {
+async function fetchFootballSettingsFromVps() {
+    const now = Date.now();
+    if (cachedVpsSettings && cachedVpsSettingsExpiresAt > now) {
+        return cachedVpsSettings;
+    }
     try {
-        if (!getSqliteDb) return null;
-        const db = getSqliteDb();
-        if (!db) return null;
-        const row = db.prepare("SELECT data FROM velora_admin_rows WHERE table_name = 'admin_settings' AND (row_id = 'football_channel_mappings' OR data LIKE '%football_channel_mappings%') LIMIT 1").get();
-        if (row && row.data) {
-            const parsed = JSON.parse(row.data);
-            const val = parsed.value;
-            if (typeof val === 'string') {
-                return JSON.parse(val);
-            } else if (val && typeof val === 'object') {
-                return val;
+        const vpsBase = String(process.env.VPS_DATA_API_BASE || 'https://nodecast.veloravip.net').trim().replace(/\/+$/, '');
+        const res = await fetch(`${vpsBase}/api/velora-db/rest/v1/admin_settings?key=eq.football_channel_mappings`, {
+            headers: { 'apikey': 'local-vps' },
+            signal: AbortSignal.timeout(3500)
+        });
+        if (res.ok) {
+            const rows = await res.json();
+            if (Array.isArray(rows) && rows.length > 0 && rows[0].value) {
+                const val = rows[0].value;
+                const parsed = typeof val === 'string' ? JSON.parse(val) : val;
+                if (parsed && typeof parsed === 'object') {
+                    cachedVpsSettings = parsed;
+                    cachedVpsSettingsExpiresAt = now + 15000;
+                    return parsed;
+                }
             }
         }
     } catch (_) {}
+    return cachedVpsSettings;
+}
+
+/**
+ * Récupère les paramètres football persistés dans SQLite (admin_settings) ou depuis le cache VPS
+ */
+function getRawFootballMappingsFromDb() {
+    try {
+        if (getSqliteDb) {
+            const db = getSqliteDb();
+            if (db) {
+                const row = db.prepare("SELECT data FROM velora_admin_rows WHERE table_name = 'admin_settings' AND (row_id = 'football_channel_mappings' OR data LIKE '%football_channel_mappings%') LIMIT 1").get();
+                if (row && row.data) {
+                    const parsed = JSON.parse(row.data);
+                    const val = parsed.value;
+                    if (typeof val === 'string') {
+                        return JSON.parse(val);
+                    } else if (val && typeof val === 'object') {
+                        return val;
+                    }
+                }
+            }
+        }
+    } catch (_) {}
+    if (cachedVpsSettings) return cachedVpsSettings;
     return null;
 }
 
@@ -283,8 +405,6 @@ function getRawFootballMappingsFromDb() {
  */
 function getFootballCountrySettings(countryInput) {
     const rawSettings = getRawFootballMappingsFromDb();
-    const cSlug = String(countryInput || '').toLowerCase().replace(/^country_/, '').replace(/[_\-\s]+/g, '_').trim() || 'france';
-    const countryKey = normalizeCountryCode(countryInput);
 
     // Par défaut, le football est DÉSACTIVÉ pour tous les pays
     if (!rawSettings || typeof rawSettings !== 'object') {
@@ -292,9 +412,15 @@ function getFootballCountrySettings(countryInput) {
     }
 
     const countrySettingsMap = rawSettings._country_settings || rawSettings._settings || {};
+    const equivalentSlugs = getEquivalentCountrySlugs(countryInput);
 
-    // Chercher la configuration pour ce pays
-    const matchedSettings = countrySettingsMap[cSlug] || countrySettingsMap[countryKey] || countrySettingsMap[countryInput] || null;
+    let matchedSettings = null;
+    for (const s of equivalentSlugs) {
+        if (countrySettingsMap[s]) {
+            matchedSettings = countrySettingsMap[s];
+            break;
+        }
+    }
 
     const isEnabled = matchedSettings ? matchedSettings.enabled === true : false;
     let ignored = [];
@@ -1213,6 +1339,9 @@ function enrichMatchWithLiveScore(match, liveEvents = []) {
  * - allMatches = true : Renvoie TOUS les matchs du jour pour la page /foot
  */
 async function getTodayMatches(countryInput = 'france', forceRefresh = false, allMatches = false) {
+    if (forceRefresh || !cachedVpsSettings || Date.now() > cachedVpsSettingsExpiresAt) {
+        await fetchFootballSettingsFromVps();
+    }
     const countryConfig = getCountryConfig(countryInput);
     const countryKey = countryConfig.id;
     const { enabled, ignoredChannels } = getFootballCountrySettings(countryInput);

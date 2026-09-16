@@ -54,18 +54,19 @@
 
         normalizeCountry(c) {
             if (!c) return 'france';
-            const s = String(c).toLowerCase().replace(/^country_/, '').replace(/[_\-\s]+/g, ' ').trim();
+            const s = String(c)
+                .normalize('NFKD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .replace(/^country_/, '')
+                .replace(/[^\p{L}\p{N}]+/gu, '_')
+                .replace(/^_+|_+$/g, '')
+                .trim();
 
-            if (/[\u0600-\u06FF]/.test(s) || /(arabe|arabic|arab|mena|oriental|maghreb|maroc|morocco|algerie|algeria|tunisie|tunisia|egypt|egypte|saudi|saoudite|qatar|emirats|uae|kuwait|koweit|bahrain|oman|iraq|irak|jordan|jordanie|lebanon|liban|libya|libye|sudan|soudan|yemen|syria|syrie|palestine|\b(ar|dz|ma|tn|eg|sa|ae|qa|kw|om|bh|iq|jo|lb|ly|sd|ye|sy)\b)/i.test(s)) {
-                return 'mena';
+            if (/[\u0600-\u06FF]/.test(s) || /^(arabe|arabic|arab|mena|oriental)$/i.test(s)) {
+                return 'arabe';
             }
-            if (/(uk|gb|gbr|england|angleterre|united kingdom|great britain|royaume uni|royaume-uni|\b(uk|gb)\b)/i.test(s)) return 'uk';
-            if (/(spain|espagne|espana|españa|spanish|\b(es|esp)\b)/i.test(s)) return 'spain';
-            if (/(usa|us|united states|etats unis|etats-unis|états-unis|america|amerique|amérique|\b(us|usa)\b)/i.test(s)) return 'usa';
-            if (/(italy|italie|italia|italian|\b(it|ita)\b)/i.test(s)) return 'italy';
-            if (/(germany|allemagne|deutschland|german|\b(de|deu|ger)\b)/i.test(s)) return 'germany';
-            if (/(portugal|portugais|portuguese|\b(pt|prt)\b)/i.test(s)) return 'portugal';
-            return 'france';
+            return s || 'france';
         }
 
         init() {

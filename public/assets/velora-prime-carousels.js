@@ -722,6 +722,19 @@
         overlay.className = "vel-pkg-modal__card-overlay";
         overlay.innerHTML = '<div class="U6kOYF"><svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg></div>';
 
+        const rawR = item.rating || item.vod_rating || item.vote_average || item.score || item.rating_5based;
+        if (rawR != null && rawR !== "") {
+          const numR = typeof rawR === "number" ? rawR : parseFloat(String(rawR).replace(",", "."));
+          if (Number.isFinite(numR) && numR > 0) {
+            const dispR = numR <= 5 ? (numR * 2).toFixed(1) : numR.toFixed(1);
+            const ratingBadge = document.createElement("span");
+            ratingBadge.className = "vel-prime-rating-badge vel-media-rating-badge";
+            ratingBadge.textContent = `★ ${dispR}`;
+            ratingBadge.setAttribute("aria-label", `Note ${dispR}`);
+            thumbWrap.appendChild(ratingBadge);
+          }
+        }
+
         thumbWrap.append(overlay);
         card.appendChild(thumbWrap);
 
@@ -949,6 +962,19 @@
     const overlay = document.createElement("div");
     overlay.className = "MaQfAR OhaBAC";
     overlay.innerHTML = '<div class="U6kOYF"><svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg></div>';
+
+    const rawR = item.rating || item.vod_rating || item.vote_average || item.score || item.rating_5based;
+    if (rawR != null && rawR !== "") {
+      const numR = typeof rawR === "number" ? rawR : parseFloat(String(rawR).replace(",", "."));
+      if (Number.isFinite(numR) && numR > 0) {
+        const dispR = numR <= 5 ? (numR * 2).toFixed(1) : numR.toFixed(1);
+        const ratingBadge = document.createElement("span");
+        ratingBadge.className = "vel-prime-rating-badge vel-media-rating-badge";
+        ratingBadge.textContent = `★ ${dispR}`;
+        ratingBadge.setAttribute("aria-label", `Note ${dispR}`);
+        packshot.appendChild(ratingBadge);
+      }
+    }
 
     packshot.append(btn, lz, overlay);
     section.appendChild(packshot);

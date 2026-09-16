@@ -630,6 +630,7 @@
       this.packages = [];
       this.childPackagesMap = new Map();
       this.cachedApiPackages = [];
+      this.vodSeriesPackageIds = new Set();
       
       // Main Wheel State
       this.currentIndex = 0;
@@ -969,6 +970,12 @@
       const activeTab = String(body.dataset.velActiveTab || "").toLowerCase();
       const topLevel = String(body.dataset.velTopLevel || "").toLowerCase();
 
+      // NEVER active on Movies, Series, or Adult tabs
+      if (activeTab === "movies" || activeTab === "series" || activeTab === "adult" ||
+          topLevel === "movies" || topLevel === "series" || topLevel === "adult") {
+        return false;
+      }
+
       return (activeTab === "live" || topLevel === "live") && !body.dataset.veloraReturnFavorites;
     }
 
@@ -1043,31 +1050,68 @@
         const res = await fetch("/api/velora-db/country-package-cache");
         if (res.ok) {
           const data = await res.json();
-          this.cachedApiPackages = data.packages || [];
+          const allPkgs = Array.isArray(data.packages) ? data.packages : [];
+          // STRICT RULE: Only Live TV bouquets allowed in the live wheel cache
+          this.cachedApiPackages = allPkgs.filter(p => p && (p.kind === "live" || p.type === "live"));
+          this.vodSeriesPackageIds = new Set(
+            allPkgs
+              .filter(p => p && (p.kind === "vod" || p.kind === "series" || p.type === "vod" || p.type === "series"))
+              .map(p => String(p.id))
+          );
         }
       } catch (_) {}
+    }
+
+    isForbiddenVodOrSeries(id, title, card) {
+      const normId = String(id || "").trim();
+      const normTitle = String(title || "").trim().toUpperCase();
+
+      // 1. Matched known VOD or Series ID from catalog
+      if (this.vodSeriesPackageIds && this.vodSeriesPackageIds.has(normId)) return true;
+
+      // 2. Checked against DOM attributes
+      if (card) {
+        if (card.dataset.kind === "vod" || card.dataset.kind === "series" || card.dataset.type === "vod" || card.dataset.type === "series") return true;
+        if (card.classList.contains("vel-package-card--vod") || card.classList.contains("vel-package-card--series") || card.classList.contains("vel-package-card--movie")) return true;
+      }
+
+      // 3. Checked against packages-view grid context
+      const packagesView = document.getElementById("packages-view");
+      if (packagesView) {
+        const renderKey = String(packagesView.dataset.renderedGridKey || "");
+        if (renderKey.startsWith("movies|") || renderKey.startsWith("series|")) return true;
+      }
+
+      // 4. Common movie/series genre / VOD package indicators
+      if (/^(FR\s*[-–]\s*)?(BOX\s*OFFICE|ANCIEN\s*FILM|FILMS\s*20\d\d|S[ÉE]RIES\s*20\d\d|NETFLIX\s*FILMS|PRIME\s*FILMS|DISNEY\s*FILMS|CINEMA\s*A\s*LA\s*DEMANDE|TOP\s*FILMS)/i.test(normTitle)) {
+        return true;
+      }
+
+      return false;
     }
 
     refreshPackages() {
       if (!this.isLiveActive()) return;
 
+      const countryId = getActiveCountryId();
       const packagesView = document.getElementById("packages-view");
-      if (!packagesView) return;
+      const renderKey = String(packagesView?.dataset.renderedGridKey || "");
+      const isPackagesViewStale = renderKey.startsWith("movies|") || renderKey.startsWith("series|");
 
-      const rawCards = [...packagesView.querySelectorAll(":scope > .vel-package-card[data-package-id]")];
-      if (rawCards.length === 0 && this.cachedApiPackages.length === 0) return;
-
-      const rawCardIds = rawCards.map(c => String(c.dataset.packageId || "")).join(",");
-      const currentPkgIds = this.packages.map(p => String(p.id || "")).join(",");
-      const packagesListChanged = rawCardIds !== currentPkgIds || this.packages.length === 0;
-
-      if (packagesListChanged) {
-        const list = [];
-        const childMap = new Map();
-
-        rawCards.forEach((card, i) => {
+      let rawCards = [];
+      if (packagesView && !isPackagesViewStale) {
+        rawCards = [...packagesView.querySelectorAll(":scope > .vel-package-card[data-package-id]")].filter(card => {
           const id = String(card.dataset.packageId || "");
-          const existingPkg = this.packages.find(p => p.id === id);
+          const title = card.querySelector(".vel-package-card__title")?.textContent || "";
+          return !this.isForbiddenVodOrSeries(id, title, card);
+        });
+      }
+
+      // If no valid live cards found in DOM or DOM has stale movie/series cards, fallback directly to curated live packages for this country!
+      let liveSourcePackages = [];
+      if (rawCards.length > 0) {
+        liveSourcePackages = rawCards.map((card, i) => {
+          const id = String(card.dataset.packageId || "");
           const titleEl = card.querySelector(".vel-package-card__title");
           const title = titleEl ? titleEl.textContent.trim() : card.getAttribute("aria-label") || `Bouquet ${i+1}`;
           const apiPkg = this.cachedApiPackages.find(p => String(p.id) === id);
@@ -1087,25 +1131,85 @@
           const is_parent = card.classList.contains("vel-package-card--parent") || Boolean(apiPkg?.is_parent) || (Array.isArray(apiPkg?.child_package_ids) && apiPkg.child_package_ids.length > 0);
           const childIds = apiPkg?.child_package_ids || [];
 
-          const tempPkg = {
+          return {
             id,
             name: title,
             display_name: title,
-            category_id: catId,
-            cover_url: rawCover
+            catId,
+            rawCover,
+            is_parent,
+            childIds,
+            originalCard: card,
+            apiPkg
+          };
+        });
+      } else if (this.cachedApiPackages.length > 0) {
+        const countryLivePkgs = this.cachedApiPackages.filter(p => !p.country_id || p.country_id === countryId);
+        const candidatePkgs = countryLivePkgs.length > 0 ? countryLivePkgs : this.cachedApiPackages;
+
+        liveSourcePackages = candidatePkgs.map(apiPkg => {
+          const id = String(apiPkg.id);
+          const title = apiPkg.name || apiPkg.display_name || "Bouquet";
+          const catId = apiPkg.category_id || id;
+          const savedLogo = window.__veloraCustomPackageLogos?.[id]
+            || window.__veloraCustomPackageLogos?.[catId]
+            || window.__veloraCustomPackageLogos?.[title]
+            || (function () {
+              try {
+                const l = JSON.parse(localStorage.getItem("velora_package_covers") || "{}");
+                return l[id] || l[catId] || l[title] || "";
+              } catch (_) { return ""; }
+            })();
+          const rawCover = apiPkg.cover_url || savedLogo || "";
+          const is_parent = Boolean(apiPkg.is_parent) || (Array.isArray(apiPkg.child_package_ids) && apiPkg.child_package_ids.length > 0);
+          const childIds = apiPkg.child_package_ids || [];
+
+          return {
+            id,
+            name: title,
+            display_name: title,
+            catId,
+            rawCover,
+            is_parent,
+            childIds,
+            originalCard: null,
+            apiPkg
+          };
+        });
+      }
+
+      if (liveSourcePackages.length === 0) return;
+
+      const currentPkgIds = this.packages.map(p => String(p.id || "")).join(",");
+      const newPkgIds = liveSourcePackages.map(p => String(p.id || "")).join(",");
+      const packagesListChanged = newPkgIds !== currentPkgIds || this.packages.length === 0;
+
+      if (packagesListChanged) {
+        const list = [];
+        const childMap = new Map();
+
+        liveSourcePackages.forEach((srcPkg) => {
+          const id = srcPkg.id;
+          const existingPkg = this.packages.find(p => p.id === id);
+          const tempPkg = {
+            id,
+            name: srcPkg.name,
+            display_name: srcPkg.display_name,
+            category_id: srcPkg.catId,
+            cover_url: srcPkg.rawCover
           };
           const cover_url = this.resolvePackageCover(tempPkg);
 
           const pkgObj = {
             id,
-            name: title,
-            display_name: title,
+            name: srcPkg.name,
+            display_name: srcPkg.display_name,
             cover_url,
-            is_parent,
-            child_package_ids: childIds,
-            originalCard: card,
-            source_id: apiPkg?.source_id,
-            category_id: apiPkg?.category_id || catId,
+            is_parent: srcPkg.is_parent,
+            child_package_ids: srcPkg.childIds,
+            originalCard: srcPkg.originalCard,
+            source_id: srcPkg.apiPkg?.source_id,
+            category_id: srcPkg.apiPkg?.category_id || srcPkg.catId,
             _cachedChannels: (existingPkg && existingPkg._cachedChannels) || (typeof wheelChannelCache !== "undefined" ? wheelChannelCache.get(id) : null) || null,
             _cachedTheme: (existingPkg && existingPkg._cachedTheme) || null
           };
@@ -1113,8 +1217,8 @@
 
           // Build child packages list
           const children = [];
-          if (childIds.length > 0) {
-            childIds.forEach(cid => {
+          if (srcPkg.childIds.length > 0) {
+            srcPkg.childIds.forEach(cid => {
               const childApi = this.cachedApiPackages.find(p => String(p.id) === String(cid));
               if (childApi) {
                 const childTemp = {

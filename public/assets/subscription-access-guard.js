@@ -224,6 +224,75 @@
   }
 
   let activeStreamSession = null;
+  let supersededMediaState = null;
+
+  function pausePlaybackForSupersede() {
+    let wasPlaying = false;
+    document.querySelectorAll("video, audio").forEach(function (media) {
+      if (!media.paused || Boolean(media.currentSrc) || Boolean(media.src)) {
+        wasPlaying = true;
+        supersededMediaState = {
+          mediaEl: media,
+          id: media.id || "",
+          src: media.currentSrc || media.src || "",
+          currentTime: media.currentTime || 0,
+          containerId: media.id === "video-vod" ? "vod-player-container" : "player-container",
+          streamId: activeStreamSession?.streamId || media.getAttribute("data-stream-id") || "",
+          streamTitle: activeStreamSession?.streamTitle || ""
+        };
+        try { media.pause(); } catch (_) {}
+      }
+    });
+    return wasPlaying;
+  }
+
+  async function resumePlaybackHere() {
+    hideSupersededModal();
+
+    // 1. Un-hide all player containers
+    ["player-container", "vod-player-container", "now-playing", "now-playing-vod"].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove("hidden");
+    });
+
+    // 2. Identify target video element
+    let video = supersededMediaState?.mediaEl
+      || (supersededMediaState?.id && document.getElementById(supersededMediaState.id))
+      || document.getElementById("video")
+      || document.getElementById("video-vod")
+      || document.querySelector("video");
+
+    if (video) {
+      // Re-register stream slot immediately with fresh session key
+      startStreamTracking(video);
+
+      // Attempt immediate playback
+      try {
+        const p = video.play();
+        if (p !== undefined) {
+          p.catch(function (err) {
+            console.warn("[Velora] Direct resume play warning, re-attaching source:", err);
+            if (supersededMediaState?.src && (!video.src || !video.currentSrc)) {
+              video.src = supersededMediaState.src;
+              video.load();
+              if (supersededMediaState.currentTime) {
+                try { video.currentTime = supersededMediaState.currentTime; } catch (_) {}
+              }
+              video.play().catch(function () {});
+            }
+          });
+        }
+      } catch (err) {
+        console.warn("[Velora] Resume exception:", err);
+      }
+    }
+
+    try {
+      window.dispatchEvent(new CustomEvent("velora-stream-resume-requested", {
+        detail: supersededMediaState || {}
+      }));
+    } catch (_) {}
+  }
 
   function ensureSupersededModal() {
     let modal = document.getElementById("vel-stream-superseded");
@@ -257,13 +326,12 @@
       </div>`;
     document.body.appendChild(modal);
 
-    modal.querySelector(".vel-stream-superseded__close").addEventListener("click", hideSupersededModal);
-    modal.querySelector(".vel-stream-superseded__resume").addEventListener("click", function () {
+    modal.querySelector(".vel-stream-superseded__close").addEventListener("click", function () {
       hideSupersededModal();
-      const video = document.querySelector("video");
-      if (video) {
-        video.play().catch(function () {});
-      }
+      stopPlayback();
+    });
+    modal.querySelector(".vel-stream-superseded__resume").addEventListener("click", function () {
+      resumePlaybackHere();
     });
 
     return modal;
@@ -322,7 +390,7 @@
   }
 
   function onStreamSuperseded() {
-    stopPlayback();
+    pausePlaybackForSupersede();
     stopStreamTracking(false);
     showSupersededModal();
   }

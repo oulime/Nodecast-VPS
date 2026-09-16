@@ -76,6 +76,21 @@
     name.className = "vel-home-section__name";
     name.textContent = entry.name || "";
     button.append(media, name);
+    var isMediaCard = section.content_type === "movies" || section.content_type === "series" || entry.contentType === "movies" || entry.contentType === "series";
+    if (isMediaCard) {
+      var rawR = entry.rating || entry.vod_rating || entry.vote_average || entry.score || entry.rating_5based;
+      if (rawR != null && rawR !== "") {
+        var numR = typeof rawR === "number" ? rawR : parseFloat(String(rawR).replace(",", "."));
+        if (Number.isFinite(numR) && numR > 0) {
+          var dispR = numR <= 5 ? (numR * 2).toFixed(1) : numR.toFixed(1);
+          var ratingEl = document.createElement("span");
+          ratingEl.className = "vel-home-section__rating-badge vel-media-rating-badge";
+          ratingEl.textContent = "★ " + dispR;
+          ratingEl.setAttribute("aria-label", "Note " + dispR);
+          button.appendChild(ratingEl);
+        }
+      }
+    }
     if (typeof window.veloraBindHomeCardActivation === "function") {
       window.veloraBindHomeCardActivation(button, section, entry);
     }

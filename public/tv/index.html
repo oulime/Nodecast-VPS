@@ -101,6 +101,9 @@
           <p id="tv-media-subtitle" class="tv-media-subtitle"></p>
         </div>
         <div class="tv-osd__top-actions">
+          <button type="button" id="tv-btn-aspect" class="tv-fs-btn" aria-label="Format d'affichage" style="font-size:18px;padding:14px 22px;background:rgba(255,255,255,0.18);">
+            📐 Format d'origine
+          </button>
           <button type="button" id="tv-btn-mute" class="tv-fs-btn" aria-label="Son" style="font-size:18px;padding:14px 22px;background:rgba(255,255,255,0.18);">
             🔊 Son
           </button>
@@ -110,29 +113,29 @@
         </div>
       </div>
 
+      <!-- Big Center Controls (-10s, Play/Pause, +10s) -->
+      <div id="tv-center-controls" class="tv-center-controls">
+        <button type="button" id="tv-btn-rw" class="tv-center-btn" title="Reculer 10s">
+          <svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.2 3.16-1.98 5.12-1.98 3.86 0 7.07 2.76 7.79 6.41l2.42-.48C21.75 11.45 17.58 8 12.5 8z"/><text x="12" y="15" font-size="7.5" font-weight="bold" text-anchor="middle" fill="currentColor">10</text></svg>
+          <span>−10s</span>
+        </button>
+        <button type="button" id="tv-btn-playpause" class="tv-center-btn tv-center-btn--play" title="Lecture / Pause">
+          <span id="tv-playpause-icon">❚❚</span>
+        </button>
+        <button type="button" id="tv-btn-ff" class="tv-center-btn" title="Avancer 10s">
+          <svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor"><path d="M11.5 8c2.65 0 5.05.99 6.9 2.6L22 7v9h-9l3.62-3.62c-1.39-1.2-3.16-1.98-5.12-1.98-3.86 0-7.07 2.76-7.79 6.41l-2.42-.48C2.25 11.45 6.42 8 11.5 8z"/><text x="12" y="15" font-size="7.5" font-weight="bold" text-anchor="middle" fill="currentColor">10</text></svg>
+          <span>+10s</span>
+        </button>
+      </div>
+
       <div class="tv-osd__bottom">
-        <div class="tv-progress-row">
+        <div class="tv-progress-row" id="tv-progress-row">
           <span id="tv-time-current" class="tv-time">00:00</span>
           <div id="tv-progress-track" class="tv-progress-track">
             <div id="tv-progress-buffered" class="tv-progress-buffered"></div>
             <div id="tv-progress-bar" class="tv-progress-bar"></div>
           </div>
           <span id="tv-time-total" class="tv-time">00:00</span>
-        </div>
-
-        <div class="tv-controls-hint">
-          <div class="tv-hint-item">
-            <span class="tv-hint-key">OK / ⏯</span>
-            <span>Lecture / Pause</span>
-          </div>
-          <div class="tv-hint-item tv-hint-seek">
-            <span class="tv-hint-key">◀ / ▶</span>
-            <span>−10s / +10s</span>
-          </div>
-          <div class="tv-hint-item">
-            <span class="tv-hint-key">↩ Retour</span>
-            <span>Arrêter</span>
-          </div>
         </div>
       </div>
     </div>

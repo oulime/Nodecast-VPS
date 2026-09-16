@@ -30,6 +30,13 @@
     progressBar: document.getElementById("tv-progress-bar"),
     progressBuffered: document.getElementById("tv-progress-buffered"),
     progressTrack: document.getElementById("tv-progress-track"),
+    progressRow: document.getElementById("tv-progress-row"),
+    btnAspect: document.getElementById("tv-btn-aspect"),
+    centerControls: document.getElementById("tv-center-controls"),
+    btnRw: document.getElementById("tv-btn-rw"),
+    btnPlayPause: document.getElementById("tv-btn-playpause"),
+    playPauseIcon: document.getElementById("tv-playpause-icon"),
+    btnFf: document.getElementById("tv-btn-ff"),
     pinDisplay: document.getElementById("tv-pin-display"),
     statusBar: document.getElementById("tv-status-bar"),
     statusText: document.getElementById("tv-status-text"),
@@ -327,6 +334,8 @@
 
     // Attempt fullscreen on our player container
     triggerTvFullscreen(true);
+    initAspectRatio();
+    updatePlayPauseIcon();
 
     // Update OSD metadata
     if (dom.title) dom.title.textContent = media.title || "Lecture en cours";
@@ -495,16 +504,76 @@
     if (dom.standby) dom.standby.classList.remove("hidden");
   }
 
-  // Wake and auto-hide OSD
+  // Wake and auto-hide OSD & cursor
   function wakeOsd() {
     if (!dom.osd) return;
     dom.osd.classList.remove("tv-osd--hidden");
+    if (dom.playerWrap) dom.playerWrap.classList.remove("is-idle");
     if (state.osdTimer) clearTimeout(state.osdTimer);
     state.osdTimer = setTimeout(function () {
       if (dom.video && !dom.video.paused) {
         dom.osd.classList.add("tv-osd--hidden");
+        if (dom.playerWrap) dom.playerWrap.classList.add("is-idle");
       }
     }, 3500);
+  }
+
+  function updatePlayPauseIcon() {
+    var v = dom.video;
+    if (!v) return;
+    if (dom.playPauseIcon) {
+      dom.playPauseIcon.textContent = v.paused ? "▶" : "❚❚";
+    }
+    if (dom.btnPlayPause) {
+      dom.btnPlayPause.classList.toggle("is-paused", v.paused);
+      dom.btnPlayPause.title = v.paused ? "Lecture" : "Pause";
+    }
+  }
+
+  var ASPECT_MODES = [
+    { mode: "contain", label: "📐 Format d'origine" },
+    { mode: "fill", label: "⛶ Remplir l'écran" },
+    { mode: "cover", label: "🔍 Zoom 16:9" }
+  ];
+  var currentAspectIndex = 0;
+
+  function applyAspectRatio(mode) {
+    var v = dom.video;
+    if (!v) return;
+    v.classList.remove("tv-fit-contain", "tv-fit-fill", "tv-fit-cover");
+    v.classList.add("tv-fit-" + mode);
+    var found = ASPECT_MODES.find(function (a) { return a.mode === mode; });
+    if (dom.btnAspect && found) {
+      dom.btnAspect.textContent = found.label;
+    }
+    localStorage.setItem("velora_tv_aspect", mode);
+  }
+
+  function initAspectRatio() {
+    var saved = localStorage.getItem("velora_tv_aspect") || "contain";
+    var idx = ASPECT_MODES.findIndex(function (a) { return a.mode === saved; });
+    currentAspectIndex = idx >= 0 ? idx : 0;
+    applyAspectRatio(ASPECT_MODES[currentAspectIndex].mode);
+  }
+
+  function handleProgressSeek(e) {
+    e.stopPropagation();
+    e.preventDefault();
+    var v = dom.video;
+    if (!v || !Number.isFinite(v.duration) || v.duration <= 0) return;
+    var track = dom.progressTrack || dom.progressRow;
+    if (!track) return;
+    var rect = track.getBoundingClientRect();
+    var clientX = e.clientX;
+    if (clientX === undefined && e.touches && e.touches[0]) {
+      clientX = e.touches[0].clientX;
+    }
+    if (clientX === undefined) return;
+    var ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    v.currentTime = ratio * v.duration;
+    if (dom.progressBar) dom.progressBar.style.width = (ratio * 100) + "%";
+    if (dom.timeCurrent) dom.timeCurrent.textContent = formatTime(v.currentTime);
+    wakeOsd();
   }
 
   // Autoplay countdown for series next episode
@@ -610,6 +679,17 @@
 
     v.addEventListener("playing", function () {
       if (dom.buffering) dom.buffering.classList.add("hidden");
+      updatePlayPauseIcon();
+      wakeOsd();
+    });
+
+    v.addEventListener("pause", function () {
+      updatePlayPauseIcon();
+      wakeOsd();
+    });
+
+    v.addEventListener("play", function () {
+      updatePlayPauseIcon();
       wakeOsd();
     });
 
@@ -687,6 +767,62 @@
     });
   }
 
+  // Aspect ratio toggle button
+  if (dom.btnAspect) {
+    dom.btnAspect.addEventListener("click", function (e) {
+      e.stopPropagation();
+      currentAspectIndex = (currentAspectIndex + 1) % ASPECT_MODES.length;
+      applyAspectRatio(ASPECT_MODES[currentAspectIndex].mode);
+      wakeOsd();
+    });
+  }
+
+  // Center Rewind 10s button
+  if (dom.btnRw) {
+    dom.btnRw.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var v = dom.video;
+      if (v) {
+        v.currentTime = Math.max(0, v.currentTime - 10);
+        wakeOsd();
+      }
+    });
+  }
+
+  // Center Play / Pause button
+  if (dom.btnPlayPause) {
+    dom.btnPlayPause.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var v = dom.video;
+      if (v) {
+        if (v.paused) v.play().catch(function () {});
+        else v.pause();
+        updatePlayPauseIcon();
+        wakeOsd();
+      }
+    });
+  }
+
+  // Center Forward 10s button
+  if (dom.btnFf) {
+    dom.btnFf.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var v = dom.video;
+      if (v) {
+        v.currentTime = Math.min(v.duration || 0, v.currentTime + 10);
+        wakeOsd();
+      }
+    });
+  }
+
+  // Progress track click seeking
+  if (dom.progressTrack) {
+    dom.progressTrack.addEventListener("click", handleProgressSeek);
+  }
+  if (dom.progressRow) {
+    dom.progressRow.addEventListener("click", handleProgressSeek);
+  }
+
   // Fullscreen button
   var btnFs = document.getElementById("tv-btn-fullscreen");
   if (btnFs) {
@@ -746,10 +882,20 @@
   // Player click handling:
   // - Single click: Wakes OSD and enters fullscreen if not yet in FS (NEVER exits fullscreen!)
   // - Double click (2 fast clicks): Toggles Play / Pause cleanly without affecting fullscreen!
+  // - Ignores clicks on buttons, center controls, progress bar, or aspect ratio button
   var clickDebounceTimer = null;
   if (dom.playerWrap) {
     dom.playerWrap.addEventListener("click", function (e) {
-      if (e.target && e.target.closest && e.target.closest("button")) return;
+      if (e.target && e.target.closest && (
+        e.target.closest("button") ||
+        e.target.closest("#tv-center-controls") ||
+        e.target.closest(".tv-center-btn") ||
+        e.target.closest("#tv-progress-track") ||
+        e.target.closest("#tv-progress-row") ||
+        e.target.closest(".tv-fs-btn")
+      )) {
+        return;
+      }
       unmuteAudio();
 
       if (clickDebounceTimer) {
@@ -760,6 +906,7 @@
         if (v) {
           if (v.paused) v.play().catch(function () {});
           else v.pause();
+          updatePlayPauseIcon();
         }
         wakeOsd();
       } else {
@@ -777,6 +924,9 @@
   // Dismiss hint banner when entering fullscreen
   function checkFullscreenState() {
     var isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+    if (dom.playerWrap) {
+      dom.playerWrap.classList.toggle("is-fullscreen", isFs);
+    }
     if (fsHintBanner) {
       if (isFs) fsHintBanner.classList.add("is-hidden");
     }
@@ -797,6 +947,8 @@
   // Init listeners
   window.addEventListener("keydown", handleRemoteKey);
   window.addEventListener("mousemove", wakeOsd);
+  window.addEventListener("pointermove", wakeOsd);
   bindVideoEvents();
+  initAspectRatio();
   initSession();
 })();

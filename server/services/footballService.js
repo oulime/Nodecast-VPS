@@ -39,6 +39,7 @@ const COUNTRY_CONFIGS = {
             'turquie': ['beIN Sports MAX 6'],
             'coupe de france': ['France 3', 'beIN Sports 1', 'YouTube'],
             'fa cup': ['beIN Sports 1', 'beIN Sports 2'],
+            'carabao': ['beIN Sports 1', 'beIN Sports 2', 'Canal+'],
             'copa del rey': ['L\'Équipe'],
             'coppa italia': ['L\'Équipe'],
             'dfb-pokal': ['L\'Équipe'],
@@ -195,6 +196,8 @@ const COUNTRY_CONFIGS = {
             'coupe du monde': ['beIN Sports MAX 1/2 HD', 'Alkass Extra 1 HD', 'beIN 4K'],
             'euro': ['beIN Sports MAX 1/2/3 HD', 'TOD'],
             'nations league': ['beIN Sports 1 HD', 'TOD'],
+            'fa cup': ['beIN Sports 1 HD', 'beIN Sports 2 HD', 'TOD'],
+            'carabao': ['beIN Sports 1 HD', 'beIN Sports 2 HD', 'TOD'],
             'saudi': ['SSC 1 HD', 'SSC EXTRA 1 HD', 'Shahid VIP'],
             'afc': ['beIN Sports AFC HD', 'SSC 1 HD', 'Alkass Nine HD'],
             'copa america': ['beIN Sports MAX 1 HD', 'TOD']
@@ -761,14 +764,25 @@ function formatCompetitionName(rawComp) {
     if (lower.includes('serie a')) return 'Serie A';
     if (lower.includes('serie b')) return 'Serie B';
     if (lower.includes('liga') || lower.includes('laliga')) return 'LaLiga';
+    if (lower.includes('qualif can') || lower.includes('elim can') || lower.includes('qualifications can') || lower.includes('eliminatoires can') || lower.includes('qualif afcon')) return 'Éliminatoires CAN';
+    if (lower.includes('qualif euro') || lower.includes('elim euro') || lower.includes('qualifications euro') || lower.includes('eliminatoires euro')) return 'Éliminatoires Euro';
+    if (lower.includes('qualif coupe du monde') || lower.includes('elim coupe du monde') || lower.includes('qualifications cdm') || lower.includes('eliminatoires cdm') || lower.includes('world cup qual')) return 'Éliminatoires Coupe du Monde';
+    if (lower.includes('can') || lower.includes('afcon') || lower.includes('coupe d\'afrique')) return 'Coupe d\'Afrique des Nations (CAN)';
+    if (lower.includes('copa america') || lower.includes('copa américa')) return 'Copa América';
+    if (lower.includes('asian cup') || lower.includes('coupe d\'asie')) return 'Coupe d\'Asie des Nations';
+    if (lower.includes('arab cup') || lower.includes('coupe arabe')) return 'Coupe Arabe de la FIFA';
+    if (lower.includes('gold cup')) return 'Gold Cup';
     if (lower.includes('coupe de france')) return 'Coupe de France';
     if (lower.includes('fa cup')) return 'FA Cup';
+    if (lower.includes('carabao') || lower.includes('league cup') || lower.includes('efl cup') || lower.includes('coupe de la ligue')) return 'Carabao Cup';
     if (lower.includes('copa del rey')) return 'Copa del Rey';
     if (lower.includes('coppa italia')) return 'Coppa Italia';
     if (lower.includes('dfb-pokal') || lower.includes('dfb pokal')) return 'DFB-Pokal';
     if (lower.includes('world cup') || lower.includes('coupe du monde')) return 'Coupe du Monde FIFA';
     if (lower.includes('euro') && !lower.includes('europa')) return 'UEFA Euro';
     if (lower.includes('nations league') || lower.includes('ligue des nations')) return 'Ligue des Nations';
+    if (lower.includes('amical') || lower.includes('amicaux') || lower.includes('friendly')) return 'Match Amical International';
+    if (lower.includes('olympique') || lower.includes('jeux olympiques')) return 'Tournoi Olympique';
     if (lower.includes('saudi') || lower.includes('arabie saoudite')) return 'Saudi Pro League';
     if (lower.includes('mls')) return 'MLS';
 
@@ -845,12 +859,12 @@ function cleanChannelName(rawAlt) {
         .trim();
 }
 
-// SYSTÈME DE TIERS & POIDS DES CLUBS
+// SYSTÈME DE TIERS & POIDS DES CLUBS ET SÉLECTIONS NATIONALES
 const CONTEMPORARY_CLUB_TIERS = [
-    { weight: 200, keywords: ['real madrid', 'barcelon', 'barca', 'arsenal', 'manchester city', 'man city', 'liverpool', 'paris', 'psg', 'bayern'] },
-    { weight: 130, keywords: ['chelsea', 'manchester united', 'man united', 'man u', 'tottenham', 'spurs', 'atletico', 'atlético', 'leverkusen'] },
-    { weight: 80, keywords: ['inter', 'juventus', 'juve', 'milan', 'ac milan', 'napoli', 'naples', 'dortmund', 'marseille', 'om', 'monaco', 'aston villa', 'newcastle'] },
-    { weight: 40, keywords: ['lyon', 'ol', 'lille', 'losc', 'atalanta', 'roma', 'lazio', 'bilbao', 'athletic', 'sociedad', 'seville', 'sevilla', 'leipzig', 'benfica', 'sporting', 'porto', 'ajax', 'psv', 'feyenoord', 'galatasaray', 'fenerbahce', 'rennes', 'lens', 'nice'] }
+    { weight: 200, keywords: ['real madrid', 'barcelon', 'barca', 'arsenal', 'manchester city', 'man city', 'liverpool', 'paris', 'psg', 'bayern', 'france', 'bresil', 'brazil', 'argentine', 'argentina', 'angleterre', 'england', 'espagne', 'spain', 'allemagne', 'germany'] },
+    { weight: 130, keywords: ['chelsea', 'manchester united', 'man united', 'man u', 'tottenham', 'spurs', 'atletico', 'atlético', 'leverkusen', 'italie', 'italy', 'portugal', 'pays-bas', 'netherlands', 'belgique', 'belgium', 'maroc', 'morocco', 'algerie', 'algeria', 'croatie', 'croatia', 'uruguay', 'senegal'] },
+    { weight: 80, keywords: ['inter', 'juventus', 'juve', 'milan', 'ac milan', 'napoli', 'naples', 'dortmund', 'marseille', 'om', 'monaco', 'aston villa', 'newcastle', 'cote d\'ivoire', 'tunisie', 'tunisia', 'egypte', 'egypt', 'cameroun', 'cameroon', 'nigeria', 'colombie', 'colombia', 'mexique', 'mexico', 'japon', 'japan', 'coree', 'usa', 'etats-unis'] },
+    { weight: 40, keywords: ['lyon', 'ol', 'lille', 'losc', 'atalanta', 'roma', 'lazio', 'bilbao', 'athletic', 'sociedad', 'seville', 'sevilla', 'leipzig', 'benfica', 'sporting', 'porto', 'ajax', 'psv', 'feyenoord', 'galatasaray', 'fenerbahce', 'rennes', 'lens', 'nice', 'mali', 'ghana', 'rd congo', 'guinee', 'suisse', 'danemark', 'autriche', 'turquie', 'serbie', 'ecosse', 'pologne', 'arabie saoudite', 'chili', 'perou'] }
 ];
 
 function getClubWeight(teamName) {
@@ -871,13 +885,21 @@ function calculateMatchHypeScore(homeTeam, awayTeam, competition) {
     const minW = Math.min(w1, w2);
     let leagueBonus = 10;
     const lowerComp = String(competition || '').toLowerCase();
-    if (lowerComp.includes('champions league')) leagueBonus = 150;
+    if (lowerComp.includes('world cup') || lowerComp.includes('coupe du monde')) leagueBonus = 180;
+    else if (lowerComp.includes('euro') && !lowerComp.includes('europa')) leagueBonus = 160;
+    else if (lowerComp.includes('champions league')) leagueBonus = 150;
+    else if (lowerComp.includes('can') || lowerComp.includes('afcon') || lowerComp.includes('coupe d\'afrique')) leagueBonus = 140;
+    else if (lowerComp.includes('copa america') || lowerComp.includes('copa américa')) leagueBonus = 130;
+    else if (lowerComp.includes('nations league') || lowerComp.includes('ligue des nations')) leagueBonus = 100;
+    else if (lowerComp.includes('qualif') || lowerComp.includes('elim') || lowerComp.includes('qualification') || lowerComp.includes('eliminatoire')) leagueBonus = 90;
     else if (lowerComp.includes('premier league')) leagueBonus = 60;
+    else if (lowerComp.includes('carabao') || lowerComp.includes('league cup') || lowerComp.includes('fa cup') || lowerComp.includes('copa del rey') || lowerComp.includes('coupe de france') || lowerComp.includes('coppa italia') || lowerComp.includes('dfb-pokal')) leagueBonus = 45;
     else if (lowerComp.includes('liga')) leagueBonus = 40;
     else if (lowerComp.includes('ligue 1')) leagueBonus = 35;
     else if (lowerComp.includes('serie a')) leagueBonus = 30;
     else if (lowerComp.includes('bundesliga')) leagueBonus = 30;
     else if (lowerComp.includes('europa league')) leagueBonus = 40;
+    else if (lowerComp.includes('amical') || lowerComp.includes('friendly')) leagueBonus = 50;
 
     return (maxW * 100) + (minW * 25) + (w1 * w2 * 0.5) + leagueBonus;
 }
@@ -905,19 +927,37 @@ function identifyTopStageCompetition(rawComp) {
         if (lower.includes(ex)) return null;
     }
 
-    if (lower.includes('2. bundesliga') || lower.includes('d2 allemagne')) return null;
-    if (lower.includes('bundesliga')) return { key: 'bundesliga', name: 'Bundesliga', allMatches: false };
+    // Compétitions internationales & Équipes Nationales (Tous les matchs retenus d'office)
+    if (lower.includes('world cup') || lower.includes('coupe du monde') || lower.includes('cdm')) return { key: 'world cup', name: 'Coupe du Monde FIFA', allMatches: true };
+    if (lower.includes('euro') && !lower.includes('europa')) return { key: 'euro', name: 'UEFA Euro', allMatches: true };
+    if (lower.includes('can') || lower.includes('afcon') || lower.includes('coupe d\'afrique')) return { key: 'can', name: 'Coupe d\'Afrique des Nations', allMatches: true };
+    if (lower.includes('nations league') || lower.includes('ligue des nations')) return { key: 'nations league', name: 'Ligue des Nations', allMatches: true };
+    if (lower.includes('copa america') || lower.includes('copa américa')) return { key: 'copa america', name: 'Copa América', allMatches: true };
+    if (lower.includes('asian cup') || lower.includes('coupe d\'asie')) return { key: 'asian cup', name: 'Coupe d\'Asie des Nations', allMatches: true };
+    if (lower.includes('arab cup') || lower.includes('coupe arabe')) return { key: 'arab cup', name: 'Coupe Arabe de la FIFA', allMatches: true };
+    if (lower.includes('gold cup')) return { key: 'gold cup', name: 'Gold Cup', allMatches: true };
+    if (lower.includes('qualif') || lower.includes('elim') || lower.includes('qualification') || lower.includes('eliminatoire')) return { key: 'qualif', name: 'Éliminatoires Internationaux', allMatches: true };
+    if (lower.includes('amical') || lower.includes('amicaux') || lower.includes('friendly')) return { key: 'amical', name: 'Match Amical International', allMatches: true };
+    if (lower.includes('olympique') || lower.includes('jeux olympiques')) return { key: 'olympics', name: 'Tournoi Olympique', allMatches: true };
+
+    // Compétitions européennes de clubs
     if (lower.includes('champions league') || lower.includes('ligue des champions')) return { key: 'champions league', name: 'UEFA Champions League', allMatches: true };
     if (lower.includes('europa league') || lower.includes('ligue europa')) return { key: 'europa league', name: 'UEFA Europa League', allMatches: false };
     if (lower.includes('conference')) return { key: 'conference', name: 'UEFA Conference League', allMatches: false };
+
+    // Grands Championnats et Coupes nationales
     if (lower.includes('premier league')) return { key: 'premier league', name: 'Premier League', allMatches: false };
+    if (lower.includes('carabao') || lower.includes('league cup') || lower.includes('efl cup') || lower.includes('coupe de la ligue')) return { key: 'carabao', name: 'Carabao Cup', allMatches: false };
+    if (lower.includes('fa cup')) return { key: 'fa cup', name: 'FA Cup', allMatches: false };
+    if (lower.includes('copa del rey') || lower.includes('coupe du roi')) return { key: 'copa del rey', name: 'Copa del Rey', allMatches: false };
+    if (lower.includes('coppa italia') || lower.includes('coupe d\'italie')) return { key: 'coppa italia', name: 'Coppa Italia', allMatches: false };
+    if (lower.includes('dfb-pokal') || lower.includes('dfb pokal') || lower.includes('coupe d\'allemagne')) return { key: 'dfb-pokal', name: 'DFB-Pokal', allMatches: false };
+    if (lower.includes('coupe de france')) return { key: 'coupe de france', name: 'Coupe de France', allMatches: false };
     if (lower.includes('liga') || lower.includes('laliga')) return { key: 'liga', name: 'LaLiga', allMatches: false };
     if (lower.includes('serie a')) return { key: 'serie a', name: 'Serie A', allMatches: false };
     if (lower.includes('ligue 1')) return { key: 'ligue 1', name: 'Ligue 1', allMatches: false };
-    if (lower.includes('world cup') || lower.includes('coupe du monde')) return { key: 'world cup', name: 'Coupe du Monde FIFA', allMatches: true };
-    if (lower.includes('euro') && !lower.includes('europa')) return { key: 'euro', name: 'UEFA Euro', allMatches: true };
-    if (lower.includes('nations league') || lower.includes('ligue des nations')) return { key: 'nations league', name: 'Ligue des Nations UEFA', allMatches: true };
-    if (lower.includes('copa america')) return { key: 'copa america', name: 'Copa América', allMatches: true };
+    if (lower.includes('2. bundesliga') || lower.includes('d2 allemagne')) return null;
+    if (lower.includes('bundesliga')) return { key: 'bundesliga', name: 'Bundesliga', allMatches: false };
 
     return null;
 }

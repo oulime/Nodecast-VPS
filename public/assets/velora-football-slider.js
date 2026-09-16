@@ -572,10 +572,20 @@
       ['conferenceleague', 'uecl', 'c4', 'uefaconferenceleague', 'uefaeuropaconferenceleague'],
       ['copadelrey', 'coupeduroi'],
       ['facup', 'thefacup', 'emiratesfacup'],
-      ['carabaocup', 'eflcup', 'leaguecup'],
+      ['carabaocup', 'carabao', 'eflcup', 'efl', 'leaguecup', 'coupedelaligue', 'coupedelaligueanglaise'],
       ['coupedefrance', 'frenchcup'],
-      ['worldcup', 'coupedumonde', 'fifaworldcup', 'mondial'],
-      ['can', 'afcon', 'coupedafriquedesnations', 'africacupofnations']
+      ['worldcup', 'coupedumonde', 'fifaworldcup', 'mondial', 'cdm'],
+      ['euro', 'uefaeuro', 'championnatdeurope'],
+      ['nationsleague', 'liguedesnations', 'uefanationsleague', 'concacafnationsleague'],
+      ['copaamerica', 'copaamérica', 'conmebolcopaamerica'],
+      ['asiancup', 'coupedasie', 'afcasiancup'],
+      ['arabcup', 'coupearabe', 'fifaarabcup'],
+      ['goldcup', 'concacafgoldcup'],
+      ['can', 'afcon', 'coupedafriquedesnations', 'africacupofnations'],
+      ['qualifcan', 'elimcan', 'qualificationscan', 'eliminatoirescan'],
+      ['qualifcdm', 'elimcdm', 'qualifworldcup', 'elimcoupedumonde', 'qualificationscoupedumonde', 'eliminatoirescdm'],
+      ['qualifeuro', 'elimeuro', 'qualificationseuro', 'eliminatoireseuro'],
+      ['amical', 'amicaux', 'friendly', 'matchamical', 'matchsamicaux', 'internationalfriendly']
     ];
 
     for (var i = 0; i < aliases.length; i++) {

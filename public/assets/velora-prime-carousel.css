@@ -321,6 +321,7 @@ body.vel-home-empty-active {
 .vJYTdI {
   position: relative;
   width: 100%;
+  overflow: visible;
 }
 
 /* Scroll List */
@@ -331,8 +332,11 @@ body.vel-home-empty-active {
   overflow-y: hidden;
   scroll-behavior: smooth;
   list-style: none;
-  margin: 0;
-  padding: 2px 2px 8px !important;
+  margin: 0 calc(-1 * clamp(16px, 3.5vw, 48px));
+  padding: 4px clamp(16px, 3.5vw, 48px) 8px clamp(16px, 3.5vw, 48px) !important;
+  scroll-padding-left: clamp(16px, 3.5vw, 48px);
+  scroll-padding-right: clamp(16px, 3.5vw, 48px);
+  scroll-snap-type: x proximity;
   scrollbar-width: none;
   -ms-overflow-style: none;
   -webkit-overflow-scrolling: touch;

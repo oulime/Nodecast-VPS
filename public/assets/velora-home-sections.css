@@ -5,9 +5,40 @@
 .vel-home-sections > .vel-home-section:first-of-type {
   margin-top: 0 !important;
   padding-top: 0 !important;
+}.vel-home-section__rail-wrap,
+.vel-home-section .vJYTdI,
+.vJYTdI {
+  position: relative !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
 }
-.vel-home-section__rail,.vel-home-section .lw1NJZ{display:flex !important;gap:clamp(10px,1.4vw,18px) !important;overflow-x:auto !important;overscroll-behavior-inline:contain;scroll-snap-type:x proximity;scrollbar-width:none !important;padding:2px 2px 2px !important;cursor:grab;touch-action:pan-x pan-y;user-select:none;-webkit-user-select:none;scroll-behavior:smooth}
-.vel-home-section__rail::-webkit-scrollbar,.vel-home-section .lw1NJZ::-webkit-scrollbar{display:none !important}
+.vel-home-section__rail,
+.vel-home-section .lw1NJZ,
+.lw1NJZ {
+  display: flex !important;
+  gap: clamp(10px, 1.4vw, 18px) !important;
+  overflow-x: auto !important;
+  overscroll-behavior-inline: contain !important;
+  scroll-snap-type: x proximity !important;
+  scrollbar-width: none !important;
+  padding: 4px clamp(16px, 3.5vw, 48px) 8px clamp(16px, 3.5vw, 48px) !important;
+  margin: 0 calc(-1 * clamp(16px, 3.5vw, 48px)) !important;
+  scroll-padding-left: clamp(16px, 3.5vw, 48px) !important;
+  scroll-padding-right: clamp(16px, 3.5vw, 48px) !important;
+  cursor: grab !important;
+  touch-action: pan-x pan-y !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -webkit-overflow-scrolling: touch !important;
+  scroll-behavior: smooth !important;
+}
+.vel-home-section__rail::-webkit-scrollbar,
+.vel-home-section .lw1NJZ::-webkit-scrollbar,
+.lw1NJZ::-webkit-scrollbar {
+  display: none !important;
+}
 .vel-home-section__card{flex:0 0 clamp(148px,17vw,215px) !important;max-width:clamp(148px,17vw,215px) !important;min-width:0 !important;padding:0 !important;overflow:hidden !important;scroll-snap-align:start;border:1px solid rgba(255,255,255,.08) !important;border-radius:10px !important;background:#12121a !important;color:#fff !important;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.5) !important;transition:none !important;transform:none !important}
 .vel-home-section__card--live{flex-basis:clamp(10rem,31vw,13.5rem) !important}
 .vel-home-section__media{display:block !important;width:100% !important;aspect-ratio:2/3 !important;object-fit:cover !important;background:#12121a !important;border-radius:inherit !important;transition:none !important;transform:none !important}
@@ -2215,16 +2246,37 @@
 /* ============================================================
    Rail / Slider des Matchs de Football sur l'Accueil (Sous Reprendre)
    ============================================================ */
-.vel-home-section--football {
+.vel-home-section--football,
+.vel-home-section.vel-home-section--football,
+.vel-home-section--football.UI3iHJ {
   position: relative !important;
   width: 100% !important;
   margin: 0.3rem 0 0.8rem 0 !important;
-  padding: 0 !important;
+  padding: 0 clamp(16px, 3.5vw, 48px) !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
 }
 
 .vel-home-section--football .vel-home-section__rail-wrap {
   margin: 0 !important;
   padding: 0 !important;
+  overflow: visible !important;
+}
+
+.vel-home-section--football .vel-home-section__rail {
+  display: flex !important;
+  gap: clamp(10px, 1.4vw, 18px) !important;
+  overflow-x: auto !important;
+  overscroll-behavior-inline: contain !important;
+  scroll-snap-type: x proximity !important;
+  scrollbar-width: none !important;
+  padding: 4px clamp(16px, 3.5vw, 48px) 8px clamp(16px, 3.5vw, 48px) !important;
+  margin: 0 calc(-1 * clamp(16px, 3.5vw, 48px)) !important;
+  scroll-padding-left: clamp(16px, 3.5vw, 48px) !important;
+  scroll-padding-right: clamp(16px, 3.5vw, 48px) !important;
+  cursor: grab !important;
+  touch-action: pan-x pan-y !important;
+  -webkit-overflow-scrolling: touch !important;
 }
 
 .vel-football-card {
@@ -2541,18 +2593,21 @@
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
     overscroll-behavior-inline: contain !important;
-    scroll-snap-type: none !important;
+    scroll-snap-type: x proximity !important;
+    scroll-padding-left: clamp(16px, 3.5vw, 48px) !important;
+    scroll-padding-right: clamp(16px, 3.5vw, 48px) !important;
     scroll-behavior: auto !important;
     touch-action: pan-x pan-y !important;
-    padding-bottom: 6px !important;
+    padding: 4px clamp(16px, 3.5vw, 48px) 8px clamp(16px, 3.5vw, 48px) !important;
+    margin: 0 calc(-1 * clamp(16px, 3.5vw, 48px)) !important;
   }
   .vel-football-card {
-    flex: 0 0 clamp(15.5rem, 72vw, 19.5rem) !important;
-    max-width: clamp(15.5rem, 72vw, 19.5rem) !important;
-    width: clamp(15.5rem, 72vw, 19.5rem) !important;
-    height: 124px !important;
+    flex: 0 0 clamp(16.5rem, 76vw, 20.5rem) !important;
+    max-width: clamp(16.5rem, 76vw, 20.5rem) !important;
+    width: clamp(16.5rem, 76vw, 20.5rem) !important;
+    height: 128px !important;
     padding: 0.65rem 0.85rem !important;
-    scroll-snap-align: none !important;
+    scroll-snap-align: start !important;
     touch-action: pan-x pan-y !important;
   }
   .vel-football-card__logo-wrap {

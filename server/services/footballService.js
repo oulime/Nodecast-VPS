@@ -940,24 +940,29 @@ function identifyTopStageCompetition(rawComp) {
     if (lower.includes('amical') || lower.includes('amicaux') || lower.includes('friendly')) return { key: 'amical', name: 'Match Amical International', allMatches: true };
     if (lower.includes('olympique') || lower.includes('jeux olympiques')) return { key: 'olympics', name: 'Tournoi Olympique', allMatches: true };
 
-    // Compétitions européennes de clubs
+    // Compétitions européennes de clubs (Tous les matchs retenus)
     if (lower.includes('champions league') || lower.includes('ligue des champions')) return { key: 'champions league', name: 'UEFA Champions League', allMatches: true };
-    if (lower.includes('europa league') || lower.includes('ligue europa')) return { key: 'europa league', name: 'UEFA Europa League', allMatches: false };
-    if (lower.includes('conference')) return { key: 'conference', name: 'UEFA Conference League', allMatches: false };
+    if (lower.includes('europa league') || lower.includes('ligue europa')) return { key: 'europa league', name: 'UEFA Europa League', allMatches: true };
+    if (lower.includes('conference')) return { key: 'conference', name: 'UEFA Conference League', allMatches: true };
 
-    // Grands Championnats et Coupes nationales
-    if (lower.includes('premier league')) return { key: 'premier league', name: 'Premier League', allMatches: false };
-    if (lower.includes('carabao') || lower.includes('league cup') || lower.includes('efl cup') || lower.includes('coupe de la ligue')) return { key: 'carabao', name: 'Carabao Cup', allMatches: false };
-    if (lower.includes('fa cup')) return { key: 'fa cup', name: 'FA Cup', allMatches: false };
-    if (lower.includes('copa del rey') || lower.includes('coupe du roi')) return { key: 'copa del rey', name: 'Copa del Rey', allMatches: false };
-    if (lower.includes('coppa italia') || lower.includes('coupe d\'italie')) return { key: 'coppa italia', name: 'Coppa Italia', allMatches: false };
-    if (lower.includes('dfb-pokal') || lower.includes('dfb pokal') || lower.includes('coupe d\'allemagne')) return { key: 'dfb-pokal', name: 'DFB-Pokal', allMatches: false };
-    if (lower.includes('coupe de france')) return { key: 'coupe de france', name: 'Coupe de France', allMatches: false };
-    if (lower.includes('liga') || lower.includes('laliga')) return { key: 'liga', name: 'LaLiga', allMatches: false };
-    if (lower.includes('serie a')) return { key: 'serie a', name: 'Serie A', allMatches: false };
-    if (lower.includes('ligue 1')) return { key: 'ligue 1', name: 'Ligue 1', allMatches: false };
+    // Grands Championnats et Coupes nationales (Tous les matchs de 1ère division et coupes majeures retenus)
+    if (lower.includes('premier league')) return { key: 'premier league', name: 'Premier League', allMatches: true };
+    if (lower.includes('carabao') || lower.includes('league cup') || lower.includes('efl cup') || lower.includes('coupe de la ligue')) return { key: 'carabao', name: 'Carabao Cup', allMatches: true };
+    if (lower.includes('fa cup')) return { key: 'fa cup', name: 'FA Cup', allMatches: true };
+    if (lower.includes('copa del rey') || lower.includes('coupe du roi')) return { key: 'copa del rey', name: 'Copa del Rey', allMatches: true };
+    if (lower.includes('coppa italia') || lower.includes('coupe d\'italie')) return { key: 'coppa italia', name: 'Coppa Italia', allMatches: true };
+    if (lower.includes('dfb-pokal') || lower.includes('dfb pokal') || lower.includes('coupe d\'allemagne')) return { key: 'dfb-pokal', name: 'DFB-Pokal', allMatches: true };
+    if (lower.includes('coupe de france')) return { key: 'coupe de france', name: 'Coupe de France', allMatches: true };
+    if (lower.includes('liga') || lower.includes('laliga')) return { key: 'liga', name: 'LaLiga', allMatches: true };
+    if (lower.includes('serie a')) return { key: 'serie a', name: 'Serie A', allMatches: true };
+    if (lower.includes('ligue 1')) return { key: 'ligue 1', name: 'Ligue 1', allMatches: true };
     if (lower.includes('2. bundesliga') || lower.includes('d2 allemagne')) return null;
-    if (lower.includes('bundesliga')) return { key: 'bundesliga', name: 'Bundesliga', allMatches: false };
+    if (lower.includes('bundesliga')) return { key: 'bundesliga', name: 'Bundesliga', allMatches: true };
+    if (lower.includes('d1 portugal') || lower.includes('liga portugal')) return { key: 'portugal', name: 'Liga Portugal', allMatches: true };
+    if (lower.includes('saudi') || lower.includes('arabie saoudite')) return { key: 'saudi', name: 'Saudi Pro League', allMatches: true };
+    if (lower.includes('d1 pays-bas') || lower.includes('eredivisie')) return { key: 'eredivisie', name: 'Eredivisie', allMatches: true };
+    if (lower.includes('d1 belgique') || lower.includes('pro league')) return { key: 'belgique', name: 'Jupiler Pro League', allMatches: true };
+    if (lower.includes('d1 turquie') || lower.includes('super lig') || lower.includes('süper lig')) return { key: 'turquie', name: 'Süper Lig', allMatches: true };
 
     return null;
 }

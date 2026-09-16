@@ -158,9 +158,20 @@
     }
   }
 
+  function cleanChannelSearchName(channelName) {
+    if (!channelName || typeof channelName !== 'string') return '';
+    return channelName
+      .replace(/\s*\([^)]*\)/g, ' ')
+      .replace(/\s*\[[^\]]*\]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   function normalizeChannelText(str) {
     if (!str) return '';
     return String(str)
+      .replace(/\s*\([^)]*\)/g, ' ')
+      .replace(/\s*\[[^\]]*\]/g, ' ')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
@@ -693,9 +704,14 @@
     var countryId = (typeof window.veloraGetActiveCountryId === 'function') ? window.veloraGetActiveCountryId() : null;
     if (!countryId) countryId = rawCountry;
 
-    var rawChannels = Array.isArray(match.tvChannels) ? match.tvChannels.slice() : [];
+    var rawChannels = Array.isArray(match.tvChannels)
+      ? match.tvChannels.map(cleanChannelSearchName).filter(Boolean)
+      : [];
     if (priorityChannel) {
-      rawChannels = [priorityChannel].concat(rawChannels.filter(function (c) { return c !== priorityChannel; }));
+      var cleanPriority = cleanChannelSearchName(priorityChannel);
+      if (cleanPriority) {
+        rawChannels = [cleanPriority].concat(rawChannels.filter(function (c) { return c !== cleanPriority; }));
+      }
     }
 
     var rules = getCountryRulesList(rawCountry);
@@ -705,7 +721,8 @@
 
     rawChannels.forEach(function (bc) {
       if (!bc || typeof bc !== 'string' || bc === 'Chaîne à confirmer') return;
-      var trimmed = bc.trim();
+      var trimmed = cleanChannelSearchName(bc);
+      if (!trimmed) return;
       var r = matchRuleForChannel(trimmed, match.competition, rules.countryRules) ||
               matchRuleForChannel(trimmed, match.competition, rules.defaultRules);
 
@@ -717,12 +734,14 @@
         }
         if (Array.isArray(r.aliases) && r.aliases.length > 0) {
           r.aliases.forEach(function (alias) {
-            if (alias && !targetKeywords.includes(alias)) targetKeywords.push(alias);
-            if (alias && !matchedAliasesForPackageScoring.includes(alias)) matchedAliasesForPackageScoring.push(alias);
+            var cleanAlias = cleanChannelSearchName(alias);
+            if (cleanAlias && !targetKeywords.includes(cleanAlias)) targetKeywords.push(cleanAlias);
+            if (cleanAlias && !matchedAliasesForPackageScoring.includes(cleanAlias)) matchedAliasesForPackageScoring.push(cleanAlias);
           });
         } else {
-          if (!targetKeywords.includes(r.channel)) targetKeywords.push(r.channel);
-          if (!matchedAliasesForPackageScoring.includes(r.channel)) matchedAliasesForPackageScoring.push(r.channel);
+          var cleanRuleCh = cleanChannelSearchName(r.channel);
+          if (cleanRuleCh && !targetKeywords.includes(cleanRuleCh)) targetKeywords.push(cleanRuleCh);
+          if (cleanRuleCh && !matchedAliasesForPackageScoring.includes(cleanRuleCh)) matchedAliasesForPackageScoring.push(cleanRuleCh);
         }
       } else {
         if (!targetKeywords.includes(trimmed)) targetKeywords.push(trimmed);
@@ -873,9 +892,9 @@
     }
 
     // 3. Recherche via l'API de recherche du pays (Live / TV uniquement)
-    var searchKwList2 = targetKeywords.length > 0 ? targetKeywords : rawChannels;
+    var searchKwList2 = (targetKeywords.length > 0 ? targetKeywords : rawChannels).map(cleanChannelSearchName).filter(Boolean);
     for (var i = 0; i < searchKwList2.length; i++) {
-      var chQuery = searchKwList2[i];
+      var chQuery = cleanChannelSearchName(searchKwList2[i]);
       if (!chQuery || chQuery.length < 2 || chQuery === 'Chaîne à confirmer') continue;
       try {
         var liveItems = await searchLiveCountryChannels(chQuery);

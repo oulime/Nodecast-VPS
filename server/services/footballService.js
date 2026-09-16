@@ -174,28 +174,28 @@ const COUNTRY_CONFIGS = {
         flag: '🌍',
         channelsLabel: 'القنوات الناقلة العربية (beIN Sports, SSC, Abu Dhabi Sports)',
         broadcasters: {
-            'champions league': ['beIN Sports 1 HD (عربي)', 'beIN Sports 2 HD', 'beIN 4K', 'TOD'],
-            'ligue des champions': ['beIN Sports 1 HD (عربي)', 'beIN Sports 2 HD', 'beIN 4K', 'TOD'],
-            'europa league': ['beIN Sports 2 HD (عربي)', 'beIN Sports 3 HD (عربي)', 'TOD'],
-            'ligue europa': ['beIN Sports 2 HD (عربي)', 'beIN Sports 3 HD (عربي)', 'TOD'],
-            'conference': ['beIN Sports 4 HD (عربي)', 'TOD'],
-            'premier league': ['beIN Sports 1 HD Premium', 'beIN Sports 2 HD (عربي)', 'beIN 4K'],
-            'championship': ['beIN Sports 3 HD (عربي)'],
-            'liga': ['beIN Sports 1 HD (عربي)', 'beIN Sports 3 HD (عربي)', 'TOD'],
-            'ligue 1': ['beIN Sports 4 HD (عربي)', 'beIN Sports 1 HD (عربي)'],
-            'ligue 2': ['beIN Sports 4 HD (عربي)'],
-            'serie a': ['Abu Dhabi Sports Premium 1 (أبوظبي)', 'STARZPLAY', 'AD Sports 2 HD'],
-            'bundesliga': ['beIN Sports 5 HD (عربي)', 'beIN Sports HD', 'TOD'],
-            '2. bundesliga': ['beIN Sports 5 HD (عربي)'],
-            'portugal': ['SSC 1 HD (السعودية)', 'beIN Sports HD'],
-            'turquie': ['beIN Sports HD (عربي)'],
+            'champions league': ['beIN Sports 1 HD', 'beIN Sports 2 HD', 'beIN 4K', 'TOD'],
+            'ligue des champions': ['beIN Sports 1 HD', 'beIN Sports 2 HD', 'beIN 4K', 'TOD'],
+            'europa league': ['beIN Sports 2 HD', 'beIN Sports 3 HD', 'TOD'],
+            'ligue europa': ['beIN Sports 2 HD', 'beIN Sports 3 HD', 'TOD'],
+            'conference': ['beIN Sports 4 HD', 'TOD'],
+            'premier league': ['beIN Sports 1 HD Premium', 'beIN Sports 2 HD', 'beIN 4K'],
+            'championship': ['beIN Sports 3 HD'],
+            'liga': ['beIN Sports 1 HD', 'beIN Sports 3 HD', 'TOD'],
+            'ligue 1': ['beIN Sports 4 HD', 'beIN Sports 1 HD'],
+            'ligue 2': ['beIN Sports 4 HD'],
+            'serie a': ['Abu Dhabi Sports Premium 1', 'STARZPLAY', 'AD Sports 2 HD'],
+            'bundesliga': ['beIN Sports 5 HD', 'beIN Sports HD', 'TOD'],
+            '2. bundesliga': ['beIN Sports 5 HD'],
+            'portugal': ['SSC 1 HD', 'beIN Sports HD'],
+            'turquie': ['beIN Sports HD'],
             'pays-bas': ['Abu Dhabi Sports HD'],
             'belgique': ['Abu Dhabi Sports HD'],
-            'world cup': ['beIN Sports MAX 1/2 HD', 'Alkass Extra 1 HD (الكاس)', 'beIN 4K'],
-            'coupe du monde': ['beIN Sports MAX 1/2 HD', 'Alkass Extra 1 HD (الكاس)', 'beIN 4K'],
-            'euro': ['beIN Sports MAX 1/2/3 HD', 'TOD (عربي)'],
-            'nations league': ['beIN Sports 1 HD (عربي)', 'TOD'],
-            'saudi': ['SSC 1 HD (السعودية)', 'SSC EXTRA 1 HD', 'Shahid VIP'],
+            'world cup': ['beIN Sports MAX 1/2 HD', 'Alkass Extra 1 HD', 'beIN 4K'],
+            'coupe du monde': ['beIN Sports MAX 1/2 HD', 'Alkass Extra 1 HD', 'beIN 4K'],
+            'euro': ['beIN Sports MAX 1/2/3 HD', 'TOD'],
+            'nations league': ['beIN Sports 1 HD', 'TOD'],
+            'saudi': ['SSC 1 HD', 'SSC EXTRA 1 HD', 'Shahid VIP'],
             'afc': ['beIN Sports AFC HD', 'SSC 1 HD', 'Alkass Nine HD'],
             'copa america': ['beIN Sports MAX 1 HD', 'TOD']
         }
@@ -616,6 +616,9 @@ function cleanChannelName(rawAlt) {
         .replace(/\s+programme.*$/i, '')
         .replace(/\s+soir.*$/i, '')
         .replace(/\s+direct.*$/i, '')
+        .replace(/\s*\([^)]*\)/g, ' ')
+        .replace(/\s*\[[^\]]*\]/g, ' ')
+        .replace(/\s+/g, ' ')
         .trim();
 }
 
@@ -825,7 +828,7 @@ function getBroadcastersForCountry(compName, scrapedChannels, countryConfig) {
         }
     }
 
-    if (countryConfig.id === 'mena') return ['beIN Sports 1 HD (عربي)', 'TOD'];
+    if (countryConfig.id === 'mena') return ['beIN Sports 1 HD', 'TOD'];
     if (countryConfig.id === 'uk') return ['Sky Sports Premier League', 'TNT Sports 1'];
     if (countryConfig.id === 'spain') return ['Movistar Plus+', 'DAZN LaLiga'];
     if (countryConfig.id === 'usa') return ['Paramount+', 'NBC Sports', 'ESPN+'];

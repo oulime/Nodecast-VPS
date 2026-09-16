@@ -219,11 +219,6 @@
             this.filterAndRender();
         }
 
-            this.renderChips();
-            this.updateBadgeCount();
-            this.filterAndRender();
-        }
-
         renderChips() {
             if (!this.chipsContainer) return;
             if (!this.matches || this.matches.length === 0) {
@@ -499,8 +494,17 @@
                 e.preventDefault();
                 e.stopPropagation();
                 const badge = e.target && e.target.closest && e.target.closest('.foot-broadcaster-badge');
-                const priorityChannel = badge ? badge.getAttribute('data-channel-name') : null;
-                const payload = Object.assign({}, match, { priorityChannel: priorityChannel });
+                let priorityChannel = badge ? badge.getAttribute('data-channel-name') : null;
+                if (priorityChannel) {
+                    priorityChannel = priorityChannel.replace(/\s*\([^)]*\)/g, ' ').replace(/\s*\[[^\]]*\]/g, ' ').replace(/\s+/g, ' ').trim();
+                }
+                const cleanChannels = Array.isArray(match.tvChannels)
+                    ? match.tvChannels.map(c => typeof c === 'string' ? c.replace(/\s*\([^)]*\)/g, ' ').replace(/\s*\[[^\]]*\]/g, ' ').replace(/\s+/g, ' ').trim() : c).filter(Boolean)
+                    : [];
+                const payload = Object.assign({}, match, {
+                    tvChannels: cleanChannels.length > 0 ? cleanChannels : match.tvChannels,
+                    priorityChannel: priorityChannel
+                });
                 try {
                     sessionStorage.setItem('velora_pending_match', JSON.stringify(payload));
                 } catch (_) {}

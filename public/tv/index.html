@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>VeloraVIP — TV Receiver</title>
+  <link rel="stylesheet" href="/tv/tv-player.css" />
+  <!-- HLS.js for wide Smart TV browser compatibility -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
+</head>
+<body class="tv-body">
+  <!-- Standby / Pairing Screen -->
+  <div id="tv-standby" class="tv-standby">
+    <div class="tv-brand">
+      <div class="tv-brand__logo">
+        <span class="tv-brand__text">Velora<span>VIP</span></span>
+        <span class="tv-brand__badge">TV</span>
+      </div>
+    </div>
+
+    <div class="tv-card">
+      <div class="tv-card__left">
+        <p class="tv-card__eyebrow">DIFFUSION SUR GRAND ÉCRAN</p>
+        <h1 id="tv-title" class="tv-card__title">Connectez votre Smart TV</h1>
+        <p class="tv-card__instructions">
+          Sur votre téléphone, ouvrez <strong>Mon Profil</strong> &gt; <strong>Connexion Smart TV</strong> et entrez ce code :
+        </p>
+
+        <div class="tv-pin-wrapper">
+          <div class="tv-pin" id="tv-pin-display">
+            <span class="tv-pin__digit">−</span>
+            <span class="tv-pin__digit">−</span>
+            <span class="tv-pin__digit">−</span>
+            <span class="tv-pin__digit">−</span>
+          </div>
+        </div>
+
+        <div class="tv-status" id="tv-status-bar">
+          <span class="tv-status__dot tv-status__dot--pulse"></span>
+          <span id="tv-status-text" class="tv-status__text">Génération du code de connexion…</span>
+        </div>
+
+        <div class="tv-linked-box hidden" id="tv-linked-box">
+          <div class="tv-linked-avatar">✓</div>
+          <div class="tv-linked-info">
+            <p class="tv-linked-title">TV associée avec succès</p>
+            <p class="tv-linked-user" id="tv-linked-username">Compte connecté</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="tv-card__divider">
+        <span>OU</span>
+      </div>
+
+      <div class="tv-card__right">
+        <div class="tv-qr-container">
+          <div id="tv-qrcode" class="tv-qr-box"></div>
+          <p class="tv-qr-caption">Scannez avec votre appareil photo</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="tv-footer-hints">
+      <span>💡 Choisissez un film ou une chaîne sur votre téléphone pour lancer la lecture ici.</span>
+      <button type="button" id="tv-standby-fs-btn" class="tv-fs-btn" style="margin-left:24px;font-size:18px;padding:12px 24px;">
+        ⛶ Activer le Plein Écran
+      </button>
+    </div>
+  </div>
+
+  <!-- Big-Screen TV Video Player -->
+  <div id="tv-player-wrap" class="tv-player-wrap hidden">
+    <video id="tv-video" playsinline preload="auto"></video>
+
+    <!-- TV Buffering Spinner -->
+    <div id="tv-buffering" class="tv-buffering hidden">
+      <div class="tv-spinner"></div>
+      <span class="tv-buffering__text">Chargement du flux…</span>
+    </div>
+
+    <!-- TV Fullscreen Floating Reminder -->
+    <div id="tv-fs-hint-banner" class="tv-fs-hint-banner">
+      <span class="tv-fs-icon">⛶</span>
+      <span>Appuyez sur <strong>OK</strong> ou cliquez pour le <strong>Plein Écran</strong></span>
+    </div>
+
+    <!-- TV Unmute Reminder (Shown if TV browser policy muted audio) -->
+    <div id="tv-unmute-banner" class="tv-unmute-banner hidden">
+      <span class="tv-unmute-icon">🔇</span>
+      <span>Son coupé par la TV — <strong>Appuyez sur OK ou cliquez pour le son 🔊</strong></span>
+    </div>
+
+    <!-- TV On-Screen Display (OSD) -->
+    <div id="tv-osd" class="tv-osd">
+      <div class="tv-osd__top">
+        <div class="tv-media-meta">
+          <span id="tv-live-badge" class="tv-live-badge hidden">● EN DIRECT</span>
+          <h2 id="tv-media-title" class="tv-media-title">Titre de la vidéo</h2>
+          <p id="tv-media-subtitle" class="tv-media-subtitle"></p>
+        </div>
+        <div class="tv-osd__top-actions">
+          <button type="button" id="tv-btn-mute" class="tv-fs-btn" aria-label="Son" style="font-size:18px;padding:14px 22px;background:rgba(255,255,255,0.18);">
+            🔊 Son
+          </button>
+          <button type="button" id="tv-btn-fullscreen" class="tv-fs-btn" aria-label="Plein écran">
+            ⛶ Plein écran
+          </button>
+        </div>
+      </div>
+
+      <div class="tv-osd__bottom">
+        <div class="tv-progress-row">
+          <span id="tv-time-current" class="tv-time">00:00</span>
+          <div id="tv-progress-track" class="tv-progress-track">
+            <div id="tv-progress-buffered" class="tv-progress-buffered"></div>
+            <div id="tv-progress-bar" class="tv-progress-bar"></div>
+          </div>
+          <span id="tv-time-total" class="tv-time">00:00</span>
+        </div>
+
+        <div class="tv-controls-hint">
+          <div class="tv-hint-item">
+            <span class="tv-hint-key">OK / ⏯</span>
+            <span>Lecture / Pause</span>
+          </div>
+          <div class="tv-hint-item tv-hint-seek">
+            <span class="tv-hint-key">◀ / ▶</span>
+            <span>−10s / +10s</span>
+          </div>
+          <div class="tv-hint-item">
+            <span class="tv-hint-key">↩ Retour</span>
+            <span>Arrêter</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Series Autoplay Next Episode Countdown Card -->
+    <div id="tv-next-card" class="tv-next-card hidden">
+      <div class="tv-next-card__inner">
+        <div class="tv-next-card__poster" id="tv-next-poster"></div>
+        <div class="tv-next-card__content">
+          <p class="tv-next-card__header">
+            ÉPISODE SUIVANT DANS <strong id="tv-next-seconds">5</strong>s
+          </p>
+          <h3 id="tv-next-title" class="tv-next-card__title">Nom de l'épisode</h3>
+          <div class="tv-next-card__actions">
+            <button type="button" id="tv-next-cancel" class="tv-next-btn tv-next-btn--cancel">Annuler (↩)</button>
+            <button type="button" id="tv-next-play" class="tv-next-btn tv-next-btn--play">Lire maintenant (OK)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/tv/tv-player.js"></script>
+</body>
+</html>

@@ -76,7 +76,8 @@
               var requestUrl = new URL(typeof input === "string" ? input : input.url, window.location.href);
               var isApiRequest = requestUrl.origin === window.location.origin && requestUrl.pathname.indexOf("/api/") === 0;
               var isLoginRequest = /^\/api\/auth\/(login|setup|setup-required)$/.test(requestUrl.pathname);
-              if (isApiRequest && !isLoginRequest && response.status === 401) redirectToLogin();
+              var isTvRequest = requestUrl.pathname.indexOf("/api/tv/") === 0;
+              if (isApiRequest && !isLoginRequest && !isTvRequest && response.status === 401) redirectToLogin();
             } catch (_) { }
             return response;
           });
@@ -18226,6 +18227,7 @@
   <link rel="stylesheet" href="/assets/velora-adult.css?v=20260912-hub-images-v3" />
   <script defer src="/assets/velora-adult.js?v=20260912-hub-images-v3"></script>
   <script defer src="/assets/velora-football-admin.js?v=20260915-foot-admin-comp-matching-v8"></script>
+  <script defer src="/assets/tv-connect-bridge.js?v=20260915-instant-profile-v2"></script>
 </body>
 
 </html>

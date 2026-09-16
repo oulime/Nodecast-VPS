@@ -144,39 +144,92 @@
             }
         }
 
+        getParisKickoffUtcMs(timeStr) {
+            if (!timeStr) return null;
+            const cleaned = String(timeStr).trim().replace(/[hH.]/, ':');
+            const parts = cleaned.match(/(\d{1,2})\s*:\s*(\d{2})/);
+            if (!parts) return null;
+            const targetHours = parseInt(parts[1], 10);
+            const targetMinutes = parseInt(parts[2], 10);
+
+            const now = new Date();
+            try {
+                const parisFmt = new Intl.DateTimeFormat('en-US', {
+                    timeZone: 'Europe/Paris',
+                    year: 'numeric',
+                    month: 'numeric',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: 'numeric',
+                    second: 'numeric',
+                    hour12: false
+                });
+                const partsMap = {};
+                parisFmt.formatToParts(now).forEach(p => { partsMap[p.type] = parseInt(p.value, 10); });
+
+                const pYear = partsMap.year || now.getFullYear();
+                const pMonth = partsMap.month || (now.getMonth() + 1);
+                const pDay = partsMap.day || now.getDate();
+                const pHour = partsMap.hour != null ? partsMap.hour : now.getHours();
+                const pMin = partsMap.minute != null ? partsMap.minute : now.getMinutes();
+
+                const parisNowMs = Date.UTC(pYear, pMonth - 1, pDay, pHour, pMin, now.getSeconds());
+                const parisOffsetMs = parisNowMs - now.getTime();
+
+                const matchParisMs = Date.UTC(pYear, pMonth - 1, pDay, targetHours, targetMinutes, 0);
+                return matchParisMs - parisOffsetMs;
+            } catch (_) {
+                const isCEST = now.getMonth() >= 2 && now.getMonth() <= 9;
+                const offsetHours = isCEST ? 2 : 1;
+                const todayUtcStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0);
+                return todayUtcStart + (targetHours - offsetHours) * 3600000 + targetMinutes * 60000;
+            }
+        }
+
+        formatMatchDisplayTime(matchTimeStr, kickoffUtcMs) {
+            if (!matchTimeStr) return '--:--';
+            if (!kickoffUtcMs) kickoffUtcMs = this.getParisKickoffUtcMs(matchTimeStr);
+            if (!kickoffUtcMs) return String(matchTimeStr);
+            try {
+                const d = new Date(kickoffUtcMs);
+                const userHours = d.getHours();
+                const userMins = d.getMinutes();
+                const hh = userHours < 10 ? (`0${userHours}`) : String(userHours);
+                const mm = userMins < 10 ? (`0${userMins}`) : String(userMins);
+                return `${hh}:${mm}`;
+            } catch (_) {
+                return String(matchTimeStr);
+            }
+        }
+
         getMatchTimeDetails(matchTimeStr, matchObj) {
+            const kickoffUtc = (matchObj && matchObj.utcKickoff) ? matchObj.utcKickoff : this.getParisKickoffUtcMs(matchTimeStr);
+            const formattedTime = this.formatMatchDisplayTime(matchTimeStr, kickoffUtc);
+
             if (matchObj) {
                 if (matchObj.isLive || (matchObj.score && matchObj.status === 'live')) {
-                    return { diffMinutes: 0, status: 'live', formattedTime: matchTimeStr };
+                    return { diffMinutes: 0, status: 'live', formattedTime };
                 }
                 if (matchObj.status === 'finished') {
-                    return { diffMinutes: -120, status: 'finished', formattedTime: matchTimeStr };
+                    return { diffMinutes: -120, status: 'finished', formattedTime };
                 }
             }
 
             if (!matchTimeStr) return { diffMinutes: 9999, status: 'upcoming', formattedTime: '--:--' };
+            if (kickoffUtc == null) return { diffMinutes: 9999, status: 'upcoming', formattedTime: matchTimeStr };
 
-            const cleaned = String(matchTimeStr).trim().replace(/[hH.]/, ':');
-            const parts = cleaned.match(/(\d{1,2})\s*:\s*(\d{2})/);
-            if (!parts) return { diffMinutes: 9999, status: 'upcoming', formattedTime: matchTimeStr };
-
-            const hours = parseInt(parts[1], 10);
-            const minutes = parseInt(parts[2], 10);
-
-            const now = new Date();
-            const matchDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
-
-            const diffMs = matchDate.getTime() - now.getTime();
+            const nowUtc = Date.now();
+            const diffMs = kickoffUtc - nowUtc;
             const diffMinutes = Math.round(diffMs / 60000);
 
             if (diffMinutes < -115) {
-                return { diffMinutes, status: 'finished', formattedTime: matchTimeStr };
+                return { diffMinutes, status: 'finished', formattedTime };
             } else if (diffMinutes <= 0) {
-                return { diffMinutes, status: 'live', formattedTime: matchTimeStr };
+                return { diffMinutes, status: 'live', formattedTime };
             } else if (diffMinutes <= 30) {
-                return { diffMinutes, status: 'starting_soon', formattedTime: matchTimeStr };
+                return { diffMinutes, status: 'starting_soon', formattedTime };
             } else {
-                return { diffMinutes, status: 'upcoming', formattedTime: matchTimeStr };
+                return { diffMinutes, status: 'upcoming', formattedTime };
             }
         }
 
@@ -271,7 +324,7 @@
         updateBadgeCount() {
             if (!this.badgeCount) return;
             const total = this.matches.length;
-            const liveCount = this.matches.filter(m => this.getMatchTimeDetails(m.time).status === 'live').length;
+            const liveCount = this.matches.filter(m => this.getMatchTimeDetails(m.time, m).status === 'live').length;
 
             if (liveCount > 0) {
                 this.badgeCount.innerHTML = `<span>${total} matchs</span> • <strong style="color: #ef4444;">🔴 ${liveCount} en direct</strong>`;
@@ -308,8 +361,8 @@
             const rankOrder = { live: 0, starting_soon: 1, upcoming: 2, finished: 3 };
 
             list.sort((a, b) => {
-                const infoA = this.getMatchTimeDetails(a.time);
-                const infoB = this.getMatchTimeDetails(b.time);
+                const infoA = this.getMatchTimeDetails(a.time, a);
+                const infoB = this.getMatchTimeDetails(b.time, b);
 
                 const rankA = rankOrder[infoA.status] ?? 2;
                 const rankB = rankOrder[infoB.status] ?? 2;
@@ -356,6 +409,7 @@
             card.className = 'foot-card';
 
             const timeInfo = this.getMatchTimeDetails(match.time, match);
+            const displayTime = timeInfo.formattedTime || match.time || '--:--';
             let timeBadgeHtml = '';
 
             const isLive = timeInfo.status === 'live' || match.isLive || (match.score && match.status === 'live');
@@ -363,7 +417,7 @@
 
             if (isLive) {
                 card.classList.add('is-live');
-                const liveMinute = match.minute ? ` • ${this.escapeHtml(match.minute)}` : (match.time ? ` • ${this.escapeHtml(match.time)}` : '');
+                const liveMinute = match.minute ? ` • ${this.escapeHtml(match.minute)}` : (displayTime ? ` • ${this.escapeHtml(displayTime)}` : '');
                 timeBadgeHtml = `
                     <span class="foot-status-badge status-live">
                         <span class="foot-live-dot"></span>
@@ -377,7 +431,7 @@
                             <circle cx="12" cy="12" r="10"></circle>
                             <polyline points="12 6 12 12 16 14"></polyline>
                         </svg>
-                        <span>Bientôt (${this.escapeHtml(match.time || '--:--')})</span>
+                        <span>Bientôt (${this.escapeHtml(displayTime)})</span>
                     </span>
                 `;
             } else if (isFinished) {
@@ -393,7 +447,7 @@
                             <circle cx="12" cy="12" r="10"></circle>
                             <polyline points="12 6 12 12 16 14"></polyline>
                         </svg>
-                        <span>${this.escapeHtml(match.time || '--:--')}</span>
+                        <span>${this.escapeHtml(displayTime)}</span>
                     </span>
                 `;
             }

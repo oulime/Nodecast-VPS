@@ -1369,6 +1369,48 @@ async function fetchLiveScores() {
     return events;
 }
 
+function getParisKickoffUtcMs(timeStr) {
+    if (!timeStr) return null;
+    const cleaned = String(timeStr).trim().replace(/[hH.]/, ':');
+    const parts = cleaned.match(/(\d{1,2})\s*:\s*(\d{2})/);
+    if (!parts) return null;
+    const targetHours = parseInt(parts[1], 10);
+    const targetMinutes = parseInt(parts[2], 10);
+
+    const now = new Date();
+    try {
+        const parisFmt = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Europe/Paris',
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: 'numeric',
+            second: 'numeric',
+            hour12: false
+        });
+        const partsMap = {};
+        parisFmt.formatToParts(now).forEach(p => { partsMap[p.type] = parseInt(p.value, 10); });
+
+        const pYear = partsMap.year || now.getFullYear();
+        const pMonth = partsMap.month || (now.getMonth() + 1);
+        const pDay = partsMap.day || now.getDate();
+        const pHour = partsMap.hour != null ? partsMap.hour : now.getHours();
+        const pMin = partsMap.minute != null ? partsMap.minute : now.getMinutes();
+
+        const parisNowMs = Date.UTC(pYear, pMonth - 1, pDay, pHour, pMin, now.getSeconds());
+        const parisOffsetMs = parisNowMs - now.getTime();
+
+        const matchParisMs = Date.UTC(pYear, pMonth - 1, pDay, targetHours, targetMinutes, 0);
+        return matchParisMs - parisOffsetMs;
+    } catch (_) {
+        const isCEST = now.getMonth() >= 2 && now.getMonth() <= 9;
+        const offsetHours = isCEST ? 2 : 1;
+        const todayUtcStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0);
+        return todayUtcStart + (targetHours - offsetHours) * 3600000 + targetMinutes * 60000;
+    }
+}
+
 /**
  * Enrichit un match avec son score en direct et son statut
  */
@@ -1399,18 +1441,11 @@ function enrichMatchWithLiveScore(match, liveEvents = []) {
         });
     }
 
-    // Calcul temporel basé sur l'heure de coup d'envoi locale
+    // Calcul temporel basé sur l'heure de coup d'envoi à Paris (UTC absolu)
     let diffMinutes = 9999;
-    if (match.time) {
-        const cleaned = String(match.time).trim().replace(/[hH.]/, ':');
-        const parts = cleaned.match(/(\d{1,2})\s*:\s*(\d{2})/);
-        if (parts) {
-            const hours = parseInt(parts[1], 10);
-            const minutes = parseInt(parts[2], 10);
-            const now = new Date();
-            const matchDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
-            diffMinutes = Math.round((now.getTime() - matchDate.getTime()) / 60000);
-        }
+    const kickoffUtc = getParisKickoffUtcMs(match.time);
+    if (kickoffUtc != null) {
+        diffMinutes = Math.round((Date.now() - kickoffUtc) / 60000);
     }
 
     if (bestEvent) {
@@ -1582,6 +1617,7 @@ async function getTodayMatches(countryInput = 'france', forceRefresh = false, al
                     id: m.id,
                     competition: m.competition,
                     time: m.time,
+                    utcKickoff: getParisKickoffUtcMs(m.time),
                     homeTeam: {
                         name: m.homeTeamName,
                         logoUrl: homeLogo

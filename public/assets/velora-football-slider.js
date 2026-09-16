@@ -1157,9 +1157,9 @@
     var awayName = match.awayTeam?.name || 'Équipe 2';
     var homeInitial = homeName.charAt(0).toUpperCase();
     var awayInitial = awayName.charAt(0).toUpperCase();
-    var timeInfo = getMatchTimeDetails(match.time);
+    var timeInfo = getMatchTimeDetails(match.time, match);
 
-    var timeBadgeHtml = buildTimeBadgeHtml(timeInfo.status, match.time, match.minute);
+    var timeBadgeHtml = buildTimeBadgeHtml(timeInfo.status, timeInfo.formattedTime || match.time, match.minute);
     var middleHtml = buildScoreOrVsHtml(match, timeInfo);
 
     var banner = document.createElement('div');
@@ -1262,20 +1262,82 @@
     }
   };
 
-  function getMatchTimeDetails(matchTimeStr) {
-    if (!matchTimeStr) return { diffMinutes: 9999, status: 'upcoming', formattedTime: '--:--' };
-
-    var cleaned = String(matchTimeStr).trim().replace(/[hH.]/, ':');
+  function getParisKickoffUtcMs(timeStr) {
+    if (!timeStr) return null;
+    var cleaned = String(timeStr).trim().replace(/[hH.]/, ':');
     var parts = cleaned.match(/(\d{1,2})\s*:\s*(\d{2})/);
-    if (!parts) return { diffMinutes: 9999, status: 'upcoming', formattedTime: matchTimeStr };
-
-    var hours = parseInt(parts[1], 10);
-    var minutes = parseInt(parts[2], 10);
+    if (!parts) return null;
+    var targetHours = parseInt(parts[1], 10);
+    var targetMinutes = parseInt(parts[2], 10);
 
     var now = new Date();
-    var matchDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+    try {
+      var parisFmt = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Europe/Paris',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+        hour12: false
+      });
+      var partsMap = {};
+      parisFmt.formatToParts(now).forEach(function (p) { partsMap[p.type] = parseInt(p.value, 10); });
 
-    var diffMs = matchDate.getTime() - now.getTime();
+      var pYear = partsMap.year || now.getFullYear();
+      var pMonth = partsMap.month || (now.getMonth() + 1);
+      var pDay = partsMap.day || now.getDate();
+      var pHour = partsMap.hour != null ? partsMap.hour : now.getHours();
+      var pMin = partsMap.minute != null ? partsMap.minute : now.getMinutes();
+
+      var parisNowMs = Date.UTC(pYear, pMonth - 1, pDay, pHour, pMin, now.getSeconds());
+      var parisOffsetMs = parisNowMs - now.getTime();
+
+      var matchParisMs = Date.UTC(pYear, pMonth - 1, pDay, targetHours, targetMinutes, 0);
+      return matchParisMs - parisOffsetMs;
+    } catch (_) {
+      var isCEST = now.getMonth() >= 2 && now.getMonth() <= 9;
+      var offsetHours = isCEST ? 2 : 1;
+      var todayUtcStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0);
+      return todayUtcStart + (targetHours - offsetHours) * 3600000 + targetMinutes * 60000;
+    }
+  }
+
+  function formatMatchDisplayTime(matchTimeStr, kickoffUtcMs) {
+    if (!matchTimeStr) return '--:--';
+    if (!kickoffUtcMs) kickoffUtcMs = getParisKickoffUtcMs(matchTimeStr);
+    if (!kickoffUtcMs) return String(matchTimeStr);
+    try {
+      var d = new Date(kickoffUtcMs);
+      var userHours = d.getHours();
+      var userMins = d.getMinutes();
+      var hh = userHours < 10 ? ('0' + userHours) : String(userHours);
+      var mm = userMins < 10 ? ('0' + userMins) : String(userMins);
+      return hh + ':' + mm;
+    } catch (_) {
+      return String(matchTimeStr);
+    }
+  }
+
+  function getMatchTimeDetails(matchTimeStr, matchObj) {
+    var kickoffUtc = (matchObj && matchObj.utcKickoff) ? matchObj.utcKickoff : getParisKickoffUtcMs(matchTimeStr);
+    var formattedTime = formatMatchDisplayTime(matchTimeStr, kickoffUtc);
+
+    if (matchObj) {
+      if (matchObj.isLive || (matchObj.score && matchObj.status === 'live')) {
+        return { diffMinutes: 0, status: 'live', formattedTime: formattedTime };
+      }
+      if (matchObj.status === 'finished') {
+        return { diffMinutes: -120, status: 'finished', formattedTime: formattedTime };
+      }
+    }
+
+    if (!matchTimeStr) return { diffMinutes: 9999, status: 'upcoming', formattedTime: '--:--' };
+    if (kickoffUtc == null) return { diffMinutes: 9999, status: 'upcoming', formattedTime: matchTimeStr };
+
+    var nowUtc = Date.now();
+    var diffMs = kickoffUtc - nowUtc;
     var diffMinutes = Math.round(diffMs / 60000);
 
     // Live: de l'heure du coup d'envoi jusqu'à la fin du match (~110 mins)
@@ -1284,15 +1346,15 @@
     // Expired: plus de 30 minutes après la fin du match (diffMinutes < -140) -> retiré du slider
     // Upcoming: match prévu plus tard
     if (diffMinutes < -140) {
-      return { diffMinutes: diffMinutes, status: 'expired', formattedTime: matchTimeStr };
+      return { diffMinutes: diffMinutes, status: 'expired', formattedTime: formattedTime };
     } else if (diffMinutes < -110) {
-      return { diffMinutes: diffMinutes, status: 'finished', formattedTime: matchTimeStr };
+      return { diffMinutes: diffMinutes, status: 'finished', formattedTime: formattedTime };
     } else if (diffMinutes <= 0) {
-      return { diffMinutes: diffMinutes, status: 'live', formattedTime: matchTimeStr };
+      return { diffMinutes: diffMinutes, status: 'live', formattedTime: formattedTime };
     } else if (diffMinutes <= 30) {
-      return { diffMinutes: diffMinutes, status: 'starting_soon', formattedTime: matchTimeStr };
+      return { diffMinutes: diffMinutes, status: 'starting_soon', formattedTime: formattedTime };
     } else {
-      return { diffMinutes: diffMinutes, status: 'upcoming', formattedTime: matchTimeStr };
+      return { diffMinutes: diffMinutes, status: 'upcoming', formattedTime: formattedTime };
     }
   }
 
@@ -1301,7 +1363,7 @@
 
     var valid = [];
     matches.forEach(function (m, idx) {
-      var tInfo = getMatchTimeDetails(m.time);
+      var tInfo = getMatchTimeDetails(m.time, m);
       if (tInfo.status !== 'expired') {
         valid.push({
           match: m,
@@ -1593,12 +1655,7 @@
     card.setAttribute('tabindex', '0');
     card.setAttribute('role', 'button');
 
-    var timeInfo = getMatchTimeDetails(match.time);
-    if (match.isLive || (match.score && match.status === 'live')) {
-      timeInfo.status = 'live';
-    } else if (match.status === 'finished') {
-      timeInfo.status = 'finished';
-    }
+    var timeInfo = getMatchTimeDetails(match.time, match);
 
     card.__veloraMatch = match;
     card.__veloraOriginalIndex = Number.isFinite(originalIndex) ? originalIndex : 0;
@@ -1612,22 +1669,24 @@
     card.style.setProperty('--comp-theme-pill-bg', theme.pillBg);
     card.style.setProperty('--comp-theme-pill-border', theme.pillBorder);
 
+    var displayTime = timeInfo.formattedTime || match.time || '--:--';
+
     if (timeInfo.status === 'live') {
       card.classList.add('is-live');
       var scoreLabel = match.score ? (' [' + match.score.home + ' - ' + match.score.away + ']') : '';
-      card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + scoreLabel + ' - EN DIRECT (' + (match.minute || match.time || '') + ')');
+      card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + scoreLabel + ' - EN DIRECT (' + (match.minute || displayTime) + ')');
     } else if (timeInfo.status === 'starting_soon') {
       card.classList.add('is-starting-soon');
-      card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + ' à ' + (match.time || '') + ' (Bientôt)');
+      card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + ' à ' + displayTime + ' (Bientôt)');
     } else if (timeInfo.status === 'finished') {
       card.classList.add('is-finished');
       var scoreLabel = match.score ? (' [' + match.score.home + ' - ' + match.score.away + ']') : '';
       card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + scoreLabel + ' (Terminé)');
     } else {
-      card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + ' à ' + (match.time || ''));
+      card.setAttribute('aria-label', (match.homeTeam?.name || '') + ' vs ' + (match.awayTeam?.name || '') + ' à ' + displayTime);
     }
 
-    var timeBadgeHtml = buildTimeBadgeHtml(timeInfo.status, match.time, match.minute);
+    var timeBadgeHtml = buildTimeBadgeHtml(timeInfo.status, displayTime, match.minute);
     var middleHtml = buildScoreOrVsHtml(match, timeInfo);
     var homeInitial = (match.homeTeam?.name || 'H').charAt(0).toUpperCase();
     var awayInitial = (match.awayTeam?.name || 'A').charAt(0).toUpperCase();
@@ -1674,7 +1733,7 @@
       if (existing) existing.remove();
 
       if (!matchObj) return;
-      timeStatusInfo = timeStatusInfo || getMatchTimeDetails(matchObj.time);
+      timeStatusInfo = timeStatusInfo || getMatchTimeDetails(matchObj.time, matchObj);
 
       var homeName = matchObj.homeTeam?.name || 'Équipe 1';
       var awayName = matchObj.awayTeam?.name || 'Équipe 2';
@@ -1722,7 +1781,7 @@
           '<button type="button" class="vel-football-modal-close" aria-label="Fermer">✕</button>' +
           '<div class="vel-football-modal-header">' +
             '<span class="vel-football-modal-comp">' + escapeHtml(matchObj.competition || 'Football') + '</span>' +
-            '<span class="vel-football-modal-time">' + escapeHtml(matchObj.minute || matchObj.time || '--:--') + '</span>' +
+            '<span class="vel-football-modal-time">' + escapeHtml(matchObj.minute || timeStatusInfo.formattedTime || matchObj.time || '--:--') + '</span>' +
           '</div>' +
           '<div class="vel-football-modal-teams">' +
             '<div class="vel-football-modal-team">' +
@@ -1802,7 +1861,7 @@
         e.preventDefault();
         e.stopPropagation();
       }
-      var tInfo = getMatchTimeDetails(match.time);
+      var tInfo = getMatchTimeDetails(match.time, match);
       if (tInfo.status === 'upcoming') {
         showMatchNoticeModal(match, tInfo);
       } else {
@@ -1847,7 +1906,7 @@
       var match = card.__veloraMatch;
       if (!match) return;
 
-      var tInfo = getMatchTimeDetails(match.time);
+      var tInfo = getMatchTimeDetails(match.time, match);
       if (match.isLive || (match.score && match.status === 'live')) {
         tInfo.status = 'live';
       } else if (match.status === 'finished') {

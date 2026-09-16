@@ -9,6 +9,7 @@ const cache = require('../services/cache');
 const veloraCatalogCache = require('../services/veloraCatalogCache');
 const path = require('path');
 const fs = require('fs');
+const activeStreamsStore = require('../services/activeStreamsStore');
 const http = require('http');
 const https = require('https');
 const { spawn } = require('child_process');
@@ -1391,10 +1392,96 @@ function getStreamAccountKey(streamUrl = '', req) {
     }
 }
 
+router.all('/stream/heartbeat', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Velora-Client-Id,X-Velora-Device-Id,X-Velora-Token');
+    if (req.method === 'OPTIONS') return res.status(200).end();
+
+    const user = activeStreamsStore.extractUserFromRequest(req);
+    const body = req.method === 'POST' ? (req.body || {}) : {};
+    const query = req.query || {};
+
+    const deviceId = String(body.deviceId || query.deviceId || req.headers['x-velora-device-id'] || getClientIdentifier(req)).trim();
+    const deviceType = String(body.deviceType || query.deviceType || (user?.isTv ? 'tv' : 'machine')).trim().toLowerCase() === 'tv' ? 'tv' : 'machine';
+    const streamId = String(body.streamId || query.streamId || body.url || query.url || '').trim();
+    const streamTitle = String(body.streamTitle || query.streamTitle || body.title || query.title || '').trim();
+    const sessionKey = String(body.sessionKey || query.sessionKey || '').trim();
+    const action = String(body.action || query.action || 'heartbeat').trim().toLowerCase();
+
+    // If user is not authenticated, acknowledge gracefully
+    if (!user || !user.id) {
+        return res.json({ ok: true, active: true, unauthenticated: true });
+    }
+
+    if (action === 'stop' || action === 'release') {
+        activeStreamsStore.releaseStream({
+            userId: user.id,
+            deviceType,
+            deviceId,
+            sessionKey
+        });
+        return res.json({ ok: true, stopped: true });
+    }
+
+    if (action === 'register' || action === 'start') {
+        const reg = activeStreamsStore.registerStream({
+            userId: user.id,
+            deviceType,
+            deviceId,
+            streamId,
+            streamTitle,
+            ipAddress: req.ip || getClientIdentifier(req),
+            sessionKey
+        });
+        return res.json({
+            ok: true,
+            active: true,
+            sessionKey: reg.sessionKey,
+            deviceType,
+            superseded: reg.superseded
+        });
+    }
+
+    // Default: heartbeat
+    const result = activeStreamsStore.heartbeat({
+        userId: user.id,
+        deviceType,
+        deviceId,
+        sessionKey
+    });
+
+    return res.json({
+        ok: result.ok,
+        active: result.active,
+        superseded: result.superseded || false,
+        message: result.message || null,
+        deviceType
+    });
+});
+
 router.all('/stream/stop', (req, res) => {
     const url = req.query?.url || req.body?.url || '';
     const accountKey = getStreamAccountKey(url, req);
     let stopped = false;
+
+    // Release slot in activeStreamsStore
+    try {
+        const user = activeStreamsStore.extractUserFromRequest(req);
+        if (user && user.id) {
+            const body = req.method === 'POST' ? (req.body || {}) : {};
+            const query = req.query || {};
+            const deviceId = String(body.deviceId || query.deviceId || req.headers['x-velora-device-id'] || getClientIdentifier(req)).trim();
+            const deviceType = String(body.deviceType || query.deviceType || (user.isTv ? 'tv' : 'machine')).trim().toLowerCase() === 'tv' ? 'tv' : 'machine';
+            const sessionKey = String(body.sessionKey || query.sessionKey || '').trim();
+            activeStreamsStore.releaseStream({
+                userId: user.id,
+                deviceType,
+                deviceId,
+                sessionKey
+            });
+        }
+    } catch (_) {}
 
     if (url && activeStreamControllersByAccount.has(accountKey)) {
         const entry = activeStreamControllersByAccount.get(accountKey);
@@ -1441,6 +1528,7 @@ router.all('/stream/stop', (req, res) => {
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
     res.status(200).json({ ok: true, stopped });
 });
+
 
 function isPpvOfflineStreamUrl(targetUrl) {
     if (!targetUrl || typeof targetUrl !== 'string') return false;

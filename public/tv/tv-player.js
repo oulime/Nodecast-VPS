@@ -319,6 +319,90 @@
     }
   }
 
+  /* =========================================================================
+     TV STREAM SLOT & CONCURRENCY HEARTBEAT (1 TV + 1 Machine)
+     ========================================================================= */
+  var tvStreamSession = null;
+
+  function sendTvHeartbeat(action) {
+    var token = localStorage.getItem("authToken");
+    var deviceId = state.deviceId || localStorage.getItem("velora_tv_device_id");
+    var tvToken = state.tvToken || localStorage.getItem("velora_tv_token");
+    if (!deviceId) return;
+
+    var currentMedia = state.currentMedia || {};
+    var streamId = currentMedia.id || currentMedia.url || (dom.video ? dom.video.currentSrc : "tv-stream");
+    var streamTitle = currentMedia.title || "";
+
+    fetch("/api/proxy/stream/heartbeat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": token ? ("Bearer " + token) : "",
+        "X-Device-Id": deviceId,
+        "X-TV-Token": tvToken || ""
+      },
+      body: JSON.stringify({
+        action: action,
+        deviceType: "tv",
+        deviceId: deviceId,
+        streamId: streamId,
+        streamTitle: streamTitle,
+        sessionKey: tvStreamSession ? tvStreamSession.sessionKey : ""
+      }),
+      keepalive: action === "stop"
+    }).then(function (res) {
+      if (res.status === 409) {
+        return res.json().then(function (data) {
+          if (data && data.superseded) {
+            console.warn("[TV] Stream superseded by another TV session");
+            stopPlayback();
+          }
+        });
+      }
+    }).catch(function (err) {
+      console.warn("[TV] Heartbeat network warning:", err);
+    });
+  }
+
+  function startTvStreamTracking() {
+    if (tvStreamSession && tvStreamSession.timer) {
+      clearInterval(tvStreamSession.timer);
+    }
+
+    var sessionKey = "tv_sk_" + Math.random().toString(36).slice(2, 11) + "_" + Date.now().toString(36);
+    tvStreamSession = {
+      sessionKey: sessionKey,
+      timer: null
+    };
+
+    sendTvHeartbeat("register");
+
+    tvStreamSession.timer = setInterval(function () {
+      var v = dom.video;
+      if (!v || v.paused || v.ended || !v.currentSrc) {
+        stopTvStreamTracking(false);
+        return;
+      }
+      sendTvHeartbeat("heartbeat");
+    }, 15000);
+  }
+
+  function stopTvStreamTracking(sendStop) {
+    if (sendStop === undefined) sendStop = true;
+    if (!tvStreamSession) return;
+
+    if (tvStreamSession.timer) {
+      clearInterval(tvStreamSession.timer);
+      tvStreamSession.timer = null;
+    }
+
+    if (sendStop) {
+      sendTvHeartbeat("stop");
+    }
+    tvStreamSession = null;
+  }
+
   // Play a stream on TV
   function playMedia(media) {
     state.currentMedia = media;
@@ -336,6 +420,7 @@
     triggerTvFullscreen(true);
     initAspectRatio();
     updatePlayPauseIcon();
+    startTvStreamTracking();
 
     // Update OSD metadata
     if (dom.title) dom.title.textContent = media.title || "Lecture en cours";
@@ -487,6 +572,7 @@
   }
 
   function stopPlayback() {
+    stopTvStreamTracking(true);
     var v = dom.video;
     if (v) {
       v.pause();
@@ -686,11 +772,13 @@
     v.addEventListener("pause", function () {
       updatePlayPauseIcon();
       wakeOsd();
+      stopTvStreamTracking(true);
     });
 
     v.addEventListener("play", function () {
       updatePlayPauseIcon();
       wakeOsd();
+      startTvStreamTracking();
     });
 
     v.addEventListener("canplay", function () {
@@ -948,6 +1036,8 @@
   window.addEventListener("keydown", handleRemoteKey);
   window.addEventListener("mousemove", wakeOsd);
   window.addEventListener("pointermove", wakeOsd);
+  window.addEventListener("pagehide", function () { stopTvStreamTracking(true); });
+  window.addEventListener("beforeunload", function () { stopTvStreamTracking(true); });
   bindVideoEvents();
   initAspectRatio();
   initSession();

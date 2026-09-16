@@ -34,11 +34,8 @@ body.vel-adult-player-active .vel-adult-portal,
 }
 
 body.vel-adult-active,
-body.vel-adult-player-active,
 body.vel-adult-active html,
-body.vel-adult-player-active html,
-html:has(body.vel-adult-active),
-html:has(body.vel-adult-player-active) {
+html:has(body.vel-adult-active) {
   overflow-y: auto !important;
   overflow-x: clip !important;
   height: auto !important;
@@ -47,12 +44,17 @@ html:has(body.vel-adult-player-active) {
   touch-action: pan-y !important;
 }
 
-body.vel-adult-active .app,
-body.vel-adult-player-active .app,
-.app:has(#adult-view:not(.hidden)),
-.app:has(.vel-adult-portal:not(.hidden)),
-body.vel-adult-active .main--velora,
-body.vel-adult-player-active .main--velora {
+body.vel-adult-player-active,
+body.vel-adult-player-active html,
+html:has(body.vel-adult-player-active) {
+  overflow: hidden !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+body.vel-adult-active:not(.vel-adult-player-active) .app,
+body.vel-adult-active:not(.vel-adult-player-active) .main--velora {
   display: block !important;
   width: 100% !important;
   min-height: 100vh !important;
@@ -67,8 +69,21 @@ body.vel-adult-player-active .main--velora {
   -webkit-overflow-scrolling: touch !important;
 }
 
-body.vel-adult-active .main--velora .vel-dashboard,
-body.vel-adult-player-active .main--velora .vel-dashboard {
+body.vel-adult-player-active .app,
+body.vel-adult-player-active .main--velora {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  height: calc(100dvh - var(--vel-bottom-nav-height, 76px)) !important;
+  max-height: calc(100dvh - var(--vel-bottom-nav-height, 76px)) !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: #06050e !important;
+}
+
+body.vel-adult-active:not(.vel-adult-player-active) .main--velora .vel-dashboard {
   display: block !important;
   grid-template-columns: 1fr !important;
   width: 100% !important;
@@ -84,8 +99,21 @@ body.vel-adult-player-active .main--velora .vel-dashboard {
   -webkit-overflow-scrolling: touch !important;
 }
 
-body.vel-adult-active .main--velora .vel-body,
+body.vel-adult-player-active .main--velora .vel-dashboard,
 body.vel-adult-player-active .main--velora .vel-body {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+}
+
+body.vel-adult-active:not(.vel-adult-player-active) .main--velora .vel-body {
   display: block !important;
   width: 100% !important;
   max-width: 100% !important;
@@ -100,8 +128,7 @@ body.vel-adult-player-active .main--velora .vel-body {
   -webkit-overflow-scrolling: touch !important;
 }
 
-body.vel-adult-active #adult-view:not(.hidden),
-body.vel-adult-player-active #adult-view:not(.hidden) {
+body.vel-adult-active:not(.vel-adult-player-active) #adult-view:not(.hidden) {
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
@@ -115,8 +142,22 @@ body.vel-adult-player-active #adult-view:not(.hidden) {
   -webkit-overflow-scrolling: touch !important;
 }
 
-body.vel-adult-active #vel-adult-packages-container,
-body.vel-adult-player-active #vel-adult-packages-container {
+body.vel-adult-player-active #adult-view:not(.hidden) {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  z-index: 10 !important;
+}
+
+body.vel-adult-active:not(.vel-adult-player-active) #vel-adult-packages-container {
   display: block !important;
   width: 100% !important;
   height: auto !important;
@@ -124,6 +165,20 @@ body.vel-adult-player-active #vel-adult-packages-container {
   overflow-x: visible !important;
   overflow-y: visible !important;
   -webkit-overflow-scrolling: touch !important;
+}
+
+body.vel-adult-player-active #vel-adult-packages-container {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
 }
 
 body.vel-adult-active #vel-home-empty-page,
@@ -1037,17 +1092,17 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
    Adult Dedicated Video Player & Sticky Upper Section
    -------------------------------------------------------------------------- */
 .vel-adult-sticky-top {
-  position: -webkit-sticky !important;
-  position: sticky !important;
-  top: 0 !important;
-  z-index: 100 !important;
-  width: 100%;
-  max-width: 960px;
-  margin: 0 auto 12px !important;
-  padding: 8px 0 4px 0 !important;
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  max-width: 960px !important;
+  margin: 0 auto !important;
+  padding: 6px 12px 2px 12px !important;
   background: #06050e !important;
   background: radial-gradient(circle at 50% 0%, rgba(225, 29, 72, 0.14) 0%, rgba(6, 5, 14, 0.98) 78%) !important;
   box-sizing: border-box !important;
+  position: relative !important;
+  top: auto !important;
+  z-index: 20 !important;
 }
 
 .vel-adult-sub-header {
@@ -1607,12 +1662,29 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
 }
 
 .vel-adult-movie-list-items {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  touch-action: pan-y !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
   -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+  overscroll-behavior-y: contain !important;
+  width: 100% !important;
+  max-width: 960px !important;
+  margin: 0 auto !important;
+  padding: 4px 12px calc(var(--vel-bottom-nav-height, 76px) + 24px) 12px !important;
+  gap: 8px !important;
+  box-sizing: border-box !important;
   pointer-events: auto !important;
+}
+
+.vel-adult-movie-list-items *,
+.vel-adult-channel-list-items * {
+  touch-action: pan-y !important;
 }
 
 /* Skeleton Placeholder Cards during initial streaming */
@@ -1964,11 +2036,23 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
 }
 
 .vel-adult-channel-list-items {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  touch-action: pan-y !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
   -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+  overscroll-behavior-y: contain !important;
+  width: 100% !important;
+  max-width: 960px !important;
+  margin: 0 auto !important;
+  padding: 4px 12px calc(var(--vel-bottom-nav-height, 76px) + 24px) 12px !important;
+  gap: 6px !important;
+  box-sizing: border-box !important;
   pointer-events: auto !important;
 }
 
@@ -2130,71 +2214,67 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
     width: 100% !important;
   }
 
-  /* When Adult Player & List is active on Mobile: seamless full-page scrolling */
+  /* When Adult Player & List is active on Mobile: rock-solid flex layout with inner scrolling */
   body.vel-adult-player-active,
   body.vel-adult-player-active html,
   html:has(body.vel-adult-player-active) {
-    overflow-y: auto !important;
-    overflow-x: clip !important;
-    height: auto !important;
-    min-height: 100% !important;
+    overflow: hidden !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
     -webkit-overflow-scrolling: touch !important;
-    touch-action: pan-y !important;
   }
 
   body.vel-adult-player-active .app,
-  .app:has(#adult-view:not(.hidden)),
   body.vel-adult-player-active .main--velora {
-    overflow: visible !important;
-    overflow-x: visible !important;
-    overflow-y: visible !important;
-    height: auto !important;
-    min-height: 100% !important;
-    max-height: none !important;
-    display: block !important;
+    height: calc(100dvh - var(--vel-bottom-nav-height, 68px)) !important;
+    max-height: calc(100dvh - var(--vel-bottom-nav-height, 68px)) !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
     width: 100% !important;
     padding: 0 !important;
     margin: 0 !important;
     background: #06050e !important;
-    -webkit-overflow-scrolling: touch !important;
   }
 
   body.vel-adult-player-active .main--velora .vel-dashboard,
   body.vel-adult-player-active .main--velora .vel-body {
-    display: block !important;
-    height: auto !important;
-    min-height: 100% !important;
-    overflow: visible !important;
-    overflow-x: visible !important;
-    overflow-y: visible !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
-    -webkit-overflow-scrolling: touch !important;
   }
 
   body.vel-adult-player-active #adult-view:not(.hidden) {
-    display: block !important;
-    height: auto !important;
-    min-height: 100% !important;
-    padding: 0 0 calc(var(--vel-bottom-nav-height, 76px) + 36px) 0 !important;
-    overflow: visible !important;
-    overflow-x: visible !important;
-    overflow-y: visible !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    padding: 0 !important;
+    overflow: hidden !important;
     box-sizing: border-box !important;
     width: 100% !important;
-    -webkit-overflow-scrolling: touch !important;
   }
 
   body.vel-adult-player-active #vel-adult-packages-container {
-    display: block !important;
-    min-height: 100% !important;
-    height: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
     width: 100% !important;
-    overflow: visible !important;
-    overflow-x: visible !important;
-    overflow-y: visible !important;
-    -webkit-overflow-scrolling: touch !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
 
   .vel-adult-header {
@@ -2438,19 +2518,19 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
     max-width: 100% !important;
   }
 
-  /* Sticky upper section on mobile: pins back button + search + player together at top */
+  /* Upper pinned section on mobile: pins back button + search + player together at top */
   .vel-adult-sticky-top {
-    position: -webkit-sticky !important;
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 100 !important;
+    flex: 0 0 auto !important;
     width: 100% !important;
     max-width: 100% !important;
-    margin: 0 0 6px 0 !important;
-    padding: 6px 8px 6px 8px !important;
+    margin: 0 !important;
+    padding: 4px 8px 2px 8px !important;
     background: #06050e !important;
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.8) !important;
     box-sizing: border-box !important;
+    position: relative !important;
+    top: auto !important;
+    z-index: 20 !important;
   }
 
   .vel-adult-sub-header {
@@ -2506,10 +2586,22 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
   /* Items container: comfortable side margins and scrollable below sticky header */
   .vel-adult-movie-list-items,
   .vel-adult-channel-list-items {
-    padding: 4px 8px calc(var(--vel-bottom-nav-height, 76px) + 24px) 8px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-y !important;
+    overscroll-behavior-y: contain !important;
+    padding: 4px 8px calc(var(--vel-bottom-nav-height, 68px) + 24px) 8px !important;
     gap: 8px !important;
     width: 100% !important;
     box-sizing: border-box !important;
+    pointer-events: auto !important;
   }
 
   /* Individual VOD row: rounded card with side breathing room */
@@ -2520,6 +2612,7 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
     width: 100% !important;
     box-sizing: border-box !important;
     margin: 0 !important;
+    touch-action: pan-y !important;
     scroll-margin-top: clamp(180px, 42vh, 320px) !important;
   }
 
@@ -2566,6 +2659,7 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
     border-radius: 10px !important;
     width: 100% !important;
     box-sizing: border-box !important;
+    touch-action: pan-y !important;
     scroll-margin-top: clamp(180px, 42vh, 320px) !important;
   }
 
@@ -2575,8 +2669,9 @@ body.vel-adult-player-active #adult-view .vel-adult-header {
 }
 
 @media (max-width: 420px) {
-  .vel-adult-movie-list-items {
-    padding: 0 8px !important;
+  .vel-adult-movie-list-items,
+  .vel-adult-channel-list-items {
+    padding: 4px 6px calc(var(--vel-bottom-nav-height, 68px) + 24px) 6px !important;
     gap: 6px !important;
   }
 

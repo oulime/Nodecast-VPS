@@ -1930,9 +1930,15 @@
           if (entries[0] && entries[0].isIntersecting) {
             requestAnimationFrame(() => appendNextChannelChunk());
           }
-        }, { rootMargin: "350px 0px" });
+        }, { root: itemsContainer, rootMargin: "350px 0px" });
         activeLiveSentinelObserver.observe(sentinelEl);
       }
+
+      itemsContainer.addEventListener("scroll", () => {
+        if (itemsContainer.scrollTop + itemsContainer.clientHeight >= itemsContainer.scrollHeight - 350) {
+          appendNextChannelChunk();
+        }
+      }, { passive: true });
     }
 
     let searchTimeout = null;
@@ -1958,8 +1964,8 @@
     const channel = list[index];
 
     const rows = document.querySelectorAll(".vel-adult-channel-row");
-    rows.forEach((row, idx) => {
-      const isCurrent = idx === index;
+    rows.forEach((row) => {
+      const isCurrent = row.dataset.index === String(index);
       row.classList.toggle("vel-adult-channel-row--active", isCurrent);
       if (isCurrent && index > 0 && programmaticallyTriggered) {
         try { row.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (_) {}
@@ -2172,8 +2178,8 @@
     currentAdultVodDuration = Number(movie.duration_secs || movie.duration) || null;
 
     const rows = document.querySelectorAll(".vel-adult-movie-row");
-    rows.forEach((row, idx) => {
-      const isCurrent = idx === index;
+    rows.forEach((row) => {
+      const isCurrent = row.dataset.index === String(index);
       row.classList.toggle("vel-adult-movie-row--active", isCurrent);
       const badge = row.querySelector(".vel-adult-movie-row__playing-badge");
       if (badge) badge.style.display = isCurrent ? "inline-flex" : "none";
@@ -2488,9 +2494,15 @@
           if (entries[0] && entries[0].isIntersecting) {
             requestAnimationFrame(() => appendNextMovieChunk());
           }
-        }, { rootMargin: "400px 0px" });
+        }, { root: itemsContainer, rootMargin: "400px 0px" });
         activeVodSentinelObserver.observe(sentinelEl);
       }
+
+      itemsContainer.addEventListener("scroll", () => {
+        if (itemsContainer.scrollTop + itemsContainer.clientHeight >= itemsContainer.scrollHeight - 350) {
+          appendNextMovieChunk();
+        }
+      }, { passive: true });
     }
 
     let searchTimeout = null;

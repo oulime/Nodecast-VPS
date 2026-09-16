@@ -17182,11 +17182,9 @@
     }
 
     body.vel-home-empty-active,
-    body.vel-adult-active,
-    body.vel-adult-player-active,
+    body.vel-adult-active:not(.vel-adult-player-active),
     html:has(body.vel-home-empty-active),
-    html:has(body.vel-adult-active),
-    html:has(body.vel-adult-player-active) {
+    html:has(body.vel-adult-active:not(.vel-adult-player-active)) {
       overflow-x: clip !important;
       overflow-y: auto !important;
       height: auto !important;
@@ -17201,20 +17199,12 @@
     body.vel-home-empty-active .main--velora .vel-body,
     body.vel-home-empty-active #vel-home-empty-page,
     body.vel-home-empty-active .vel-home-sections,
-    body.vel-adult-active .app,
-    body.vel-adult-player-active .app,
-    .app:has(#adult-view:not(.hidden)),
-    .app:has(.vel-adult-portal:not(.hidden)),
-    body.vel-adult-active .main--velora,
-    body.vel-adult-player-active .main--velora,
-    body.vel-adult-active .main--velora .vel-dashboard,
-    body.vel-adult-player-active .main--velora .vel-dashboard,
-    body.vel-adult-active .main--velora .vel-body,
-    body.vel-adult-player-active .main--velora .vel-body,
-    body.vel-adult-active #adult-view:not(.hidden),
-    body.vel-adult-player-active #adult-view:not(.hidden),
-    body.vel-adult-active #vel-adult-packages-container,
-    body.vel-adult-player-active #vel-adult-packages-container {
+    body.vel-adult-active:not(.vel-adult-player-active) .app,
+    body.vel-adult-active:not(.vel-adult-player-active) .main--velora,
+    body.vel-adult-active:not(.vel-adult-player-active) .main--velora .vel-dashboard,
+    body.vel-adult-active:not(.vel-adult-player-active) .main--velora .vel-body,
+    body.vel-adult-active:not(.vel-adult-player-active) #adult-view:not(.hidden),
+    body.vel-adult-active:not(.vel-adult-player-active) #vel-adult-packages-container {
       height: auto !important;
       min-height: 100% !important;
       max-height: none !important;

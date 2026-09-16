@@ -2229,66 +2229,141 @@
 
 .vel-football-card {
   position: relative !important;
-  flex: 0 0 clamp(16.5rem, 28vw, 21rem) !important;
-  max-width: clamp(16.5rem, 28vw, 21rem) !important;
+  flex: 0 0 clamp(17.5rem, 28vw, 22rem) !important;
+  max-width: clamp(17.5rem, 28vw, 22rem) !important;
   min-width: 0 !important;
-  height: 138px !important;
-  border-radius: 14px !important;
-  background: linear-gradient(145deg, #151f36 0%, #0d1222 100%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.13) !important;
-  box-shadow: 0 10px 26px -4px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  height: 148px !important;
+  border-radius: 18px !important;
+  background: var(--comp-theme-bg, linear-gradient(135deg, rgba(20, 29, 49, 0.95) 0%, rgba(10, 14, 26, 0.98) 100%)) !important;
+  border: 1px solid var(--comp-theme-border, rgba(255, 255, 255, 0.12)) !important;
+  box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
   overflow: hidden !important;
   display: flex !important;
   flex-direction: column !important;
   justify-content: space-between !important;
-  padding: 0.75rem 0.95rem !important;
+  padding: 0.8rem 1rem 0.85rem 1rem !important;
   cursor: pointer !important;
   text-align: left !important;
   color: #fff !important;
-  transform: none !important;
-  transition: none !important;
-  animation: none !important;
+  transform: translateZ(0) !important;
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.28s ease, box-shadow 0.28s ease !important;
   user-select: none !important;
   -webkit-user-select: none !important;
   -webkit-tap-highlight-color: transparent !important;
   text-decoration: none !important;
   scroll-snap-align: start !important;
+  isolation: isolate !important;
 }
 
-.vel-football-card:hover,
-.vel-football-card:focus,
-.vel-football-card:focus-visible,
+/* Filigrane d'ambiance de la compétition en arrière-plan */
+.vel-football-card__watermark {
+  position: absolute !important;
+  right: -12px !important;
+  bottom: -15px !important;
+  width: 125px !important;
+  height: 125px !important;
+  opacity: 0.13 !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+  transform: rotate(-8deg) !important;
+  transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+}
+
+.vel-football-card__watermark img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  filter: drop-shadow(0 0 14px rgba(255, 255, 255, 0.2)) !important;
+}
+
+.vel-football-card:hover .vel-football-card__watermark {
+  opacity: 0.25 !important;
+  transform: rotate(-3deg) scale(1.1) !important;
+}
+
+/* Lueur radiale supérieure */
+.vel-football-card__glow {
+  position: absolute !important;
+  top: -50px !important;
+  left: 20% !important;
+  width: 60% !important;
+  height: 80px !important;
+  background: radial-gradient(ellipse, var(--comp-theme-glow, rgba(59, 130, 246, 0.22)) 0%, rgba(0, 0, 0, 0) 70%) !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+}
+
+.vel-football-card:hover {
+  transform: translateY(-3px) scale(1.02) !important;
+  border-color: var(--comp-theme-color, rgba(96, 165, 250, 0.5)) !important;
+  box-shadow: 0 16px 38px -4px rgba(0, 0, 0, 0.8), 0 0 24px var(--comp-theme-glow, rgba(59, 130, 246, 0.25)), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+}
+
 .vel-football-card:active {
-  transform: none !important;
-  transition: none !important;
-  animation: none !important;
-  border-color: rgba(255, 255, 255, 0.13) !important;
-  box-shadow: 0 10px 26px -4px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
-  outline: none !important;
-  filter: none !important;
+  transform: scale(0.985) !important;
 }
 
 .vel-football-card__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  width: 100%;
-  margin-bottom: 0.25rem;
+  position: relative !important;
+  z-index: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0.5rem !important;
+  width: 100% !important;
+  margin-bottom: 0.35rem !important;
+}
+
+.vel-football-card__comp-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.45rem !important;
+  background: var(--comp-theme-pill-bg, rgba(255, 255, 255, 0.08)) !important;
+  border: 1px solid var(--comp-theme-pill-border, rgba(255, 255, 255, 0.14)) !important;
+  padding: 0.22rem 0.65rem 0.22rem 0.45rem !important;
+  border-radius: 9999px !important;
+  max-width: 65% !important;
+  min-width: 0 !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+.vel-football-card__comp-logo {
+  width: 20px !important;
+  height: 20px !important;
+  object-fit: contain !important;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7)) !important;
+  flex-shrink: 0 !important;
+  display: block !important;
+}
+
+.vel-football-card__comp-dot {
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 50% !important;
+  background: var(--comp-theme-color, #38bdf8) !important;
+  box-shadow: 0 0 6px var(--comp-theme-color, #38bdf8) !important;
+  flex-shrink: 0 !important;
 }
 
 .vel-football-card__comp {
-  font-size: 0.74rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #93c5fd;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 65%;
-  line-height: 1.2;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  font-size: 0.73rem !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: var(--comp-theme-color, #f1f5f9) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  line-height: 1.2 !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8) !important;
 }
 
 .vel-football-card__time-badge {
@@ -2351,13 +2426,13 @@
 }
 
 .vel-football-card.is-live {
-  border-color: rgba(239, 68, 68, 0.45) !important;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5), 0 0 15px rgba(239, 68, 68, 0.18) !important;
+  border-color: rgba(239, 68, 68, 0.55) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 18px rgba(239, 68, 68, 0.25) !important;
 }
 
 .vel-football-card.is-starting-soon {
-  border-color: rgba(34, 197, 94, 0.35) !important;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5), 0 0 12px rgba(34, 197, 94, 0.12) !important;
+  border-color: rgba(34, 197, 94, 0.42) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 14px rgba(34, 197, 94, 0.18) !important;
 }
 
 .vel-football-card__time-badge--finished {
@@ -2369,89 +2444,94 @@
 }
 
 .vel-football-card__match {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.55rem;
-  margin: auto 0 0.1rem 0;
-  width: 100%;
-  flex: 1;
+  position: relative !important;
+  z-index: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0.6rem !important;
+  margin: auto 0 0.1rem 0 !important;
+  width: 100% !important;
+  flex: 1 !important;
 }
 
 .vel-football-card__team {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  flex: 1;
-  min-width: 0;
-  gap: 0.4rem;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  text-align: center !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+  gap: 0.35rem !important;
 }
 
 .vel-football-card__logo-wrap {
   width: 56px !important;
   height: 56px !important;
-  border-radius: 0 !important;
-  background: transparent !important;
+  border-radius: 50% !important;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 70%) !important;
   border: none !important;
   box-shadow: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 2px !important;
+  transition: transform 0.25s ease !important;
+}
+
+.vel-football-card:hover .vel-football-card__logo-wrap {
+  transform: scale(1.06) !important;
 }
 
 .vel-football-card__logo {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: 52px;
-  object-fit: contain;
-  filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.85));
-  display: block;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  width: auto !important;
+  height: 50px !important;
+  object-fit: contain !important;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.85)) !important;
+  display: block !important;
 }
 
 .vel-football-card__fallback-logo {
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
-  background: rgba(59, 130, 246, 0.15);
-  border: 1px solid rgba(59, 130, 246, 0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: #60a5fa;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 12px !important;
+  background: rgba(59, 130, 246, 0.15) !important;
+  border: 1px solid rgba(59, 130, 246, 0.35) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 1.25rem !important;
+  font-weight: 800 !important;
+  color: #60a5fa !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6) !important;
 }
 
 .vel-football-card__team-name {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: #ffffff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  width: 100%;
-  line-height: 1.2;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  font-size: 0.84rem !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  width: 100% !important;
+  line-height: 1.2 !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9) !important;
 }
 
 .vel-football-card__vs {
-  font-size: 0.7rem;
-  font-weight: 900;
-  color: #94a3b8;
-  padding: 0.22rem 0.48rem;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  line-height: 1;
-  letter-spacing: 0.06em;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-  flex-shrink: 0;
+  font-size: 0.7rem !important;
+  font-weight: 900 !important;
+  color: #cbd5e1 !important;
+  padding: 0.24rem 0.55rem !important;
+  border-radius: 8px !important;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.04) 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  line-height: 1 !important;
+  letter-spacing: 0.08em !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4) !important;
+  flex-shrink: 0 !important;
 }
 
 @media (max-width: 768px) {

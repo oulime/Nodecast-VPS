@@ -1353,6 +1353,240 @@
     }
   }
 
+  var COMPETITION_LOGOS = {
+    'champions league': 'https://media.api-sports.io/football/leagues/2.png',
+    'europa league': 'https://media.api-sports.io/football/leagues/3.png',
+    'conference': 'https://media.api-sports.io/football/leagues/848.png',
+    'super cup': 'https://media.api-sports.io/football/leagues/531.png',
+    'premier league': 'https://media.api-sports.io/football/leagues/39.png',
+    'carabao': 'https://media.api-sports.io/football/leagues/48.png',
+    'league cup': 'https://media.api-sports.io/football/leagues/48.png',
+    'efl': 'https://media.api-sports.io/football/leagues/48.png',
+    'fa cup': 'https://media.api-sports.io/football/leagues/45.png',
+    'championship': 'https://media.api-sports.io/football/leagues/40.png',
+    'la liga': 'https://media.api-sports.io/football/leagues/140.png',
+    'laliga': 'https://media.api-sports.io/football/leagues/140.png',
+    'liga': 'https://media.api-sports.io/football/leagues/140.png',
+    'copa del rey': 'https://media.api-sports.io/football/leagues/143.png',
+    'ligue 1': 'https://media.api-sports.io/football/leagues/61.png',
+    'coupe de france': 'https://media.api-sports.io/football/leagues/66.png',
+    'ligue 2': 'https://media.api-sports.io/football/leagues/62.png',
+    'serie a': 'https://media.api-sports.io/football/leagues/135.png',
+    'coppa italia': 'https://media.api-sports.io/football/leagues/137.png',
+    'bundesliga': 'https://media.api-sports.io/football/leagues/78.png',
+    'dfb-pokal': 'https://media.api-sports.io/football/leagues/81.png',
+    'portugal': 'https://media.api-sports.io/football/leagues/94.png',
+    'eredivisie': 'https://media.api-sports.io/football/leagues/88.png',
+    'pays-bas': 'https://media.api-sports.io/football/leagues/88.png',
+    'belgique': 'https://media.api-sports.io/football/leagues/144.png',
+    'turquie': 'https://media.api-sports.io/football/leagues/203.png',
+    'saudi': 'https://media.api-sports.io/football/leagues/307.png',
+    'botola': 'https://media.api-sports.io/football/leagues/200.png',
+    'algerie': 'https://media.api-sports.io/football/leagues/186.png',
+    'tunisie': 'https://media.api-sports.io/football/leagues/202.png',
+    'egypte': 'https://media.api-sports.io/football/leagues/233.png',
+    'brasileirao': 'https://media.api-sports.io/football/leagues/71.png',
+    'bresil': 'https://media.api-sports.io/football/leagues/71.png',
+    'world cup': 'https://media.api-sports.io/football/leagues/1.png',
+    'coupe du monde': 'https://media.api-sports.io/football/leagues/1.png',
+    'cdm': 'https://media.api-sports.io/football/leagues/1.png',
+    'euro': 'https://media.api-sports.io/football/leagues/4.png',
+    'can': 'https://media.api-sports.io/football/leagues/6.png',
+    'afcon': 'https://media.api-sports.io/football/leagues/6.png',
+    'coupe d\'afrique': 'https://media.api-sports.io/football/leagues/6.png',
+    'nations league': 'https://media.api-sports.io/football/leagues/5.png',
+    'copa america': 'https://media.api-sports.io/football/leagues/9.png',
+    'asian cup': 'https://media.api-sports.io/football/leagues/7.png',
+    'arab cup': 'https://media.api-sports.io/football/leagues/32.png',
+    'gold cup': 'https://media.api-sports.io/football/leagues/22.png',
+    'mls': 'https://media.api-sports.io/football/leagues/253.png'
+  };
+
+  var COMPETITION_THEMES = {
+    'champions league': {
+      color: '#38bdf8',
+      glow: 'rgba(56, 189, 248, 0.35)',
+      bg: 'linear-gradient(135deg, rgba(8, 28, 68, 0.95) 0%, rgba(5, 12, 28, 0.98) 100%)',
+      border: 'rgba(56, 189, 248, 0.28)',
+      pillBg: 'rgba(56, 189, 248, 0.12)',
+      pillBorder: 'rgba(56, 189, 248, 0.3)'
+    },
+    'europa league': {
+      color: '#fb923c',
+      glow: 'rgba(249, 115, 22, 0.35)',
+      bg: 'linear-gradient(135deg, rgba(46, 22, 10, 0.95) 0%, rgba(18, 10, 8, 0.98) 100%)',
+      border: 'rgba(249, 115, 22, 0.3)',
+      pillBg: 'rgba(249, 115, 22, 0.14)',
+      pillBorder: 'rgba(249, 115, 22, 0.38)'
+    },
+    'conference': {
+      color: '#4ade80',
+      glow: 'rgba(34, 197, 94, 0.32)',
+      bg: 'linear-gradient(135deg, rgba(12, 38, 22, 0.95) 0%, rgba(6, 18, 12, 0.98) 100%)',
+      border: 'rgba(34, 197, 94, 0.28)',
+      pillBg: 'rgba(34, 197, 94, 0.12)',
+      pillBorder: 'rgba(34, 197, 94, 0.32)'
+    },
+    'premier league': {
+      color: '#f472b6',
+      glow: 'rgba(236, 72, 153, 0.32)',
+      bg: 'linear-gradient(135deg, rgba(44, 12, 48, 0.95) 0%, rgba(18, 6, 22, 0.98) 100%)',
+      border: 'rgba(236, 72, 153, 0.28)',
+      pillBg: 'rgba(236, 72, 153, 0.14)',
+      pillBorder: 'rgba(236, 72, 153, 0.34)'
+    },
+    'carabao': {
+      color: '#34d399',
+      glow: 'rgba(16, 185, 129, 0.32)',
+      bg: 'linear-gradient(135deg, rgba(8, 36, 26, 0.95) 0%, rgba(5, 18, 14, 0.98) 100%)',
+      border: 'rgba(16, 185, 129, 0.28)',
+      pillBg: 'rgba(16, 185, 129, 0.12)',
+      pillBorder: 'rgba(16, 185, 129, 0.32)'
+    },
+    'fa cup': {
+      color: '#f87171',
+      glow: 'rgba(239, 68, 68, 0.32)',
+      bg: 'linear-gradient(135deg, rgba(42, 14, 16, 0.95) 0%, rgba(18, 7, 8, 0.98) 100%)',
+      border: 'rgba(239, 68, 68, 0.28)',
+      pillBg: 'rgba(239, 68, 68, 0.12)',
+      pillBorder: 'rgba(239, 68, 68, 0.32)'
+    },
+    'la liga': {
+      color: '#fb7185',
+      glow: 'rgba(244, 63, 94, 0.34)',
+      bg: 'linear-gradient(135deg, rgba(44, 14, 22, 0.95) 0%, rgba(18, 7, 10, 0.98) 100%)',
+      border: 'rgba(244, 63, 94, 0.28)',
+      pillBg: 'rgba(244, 63, 94, 0.14)',
+      pillBorder: 'rgba(244, 63, 94, 0.34)'
+    },
+    'copa del rey': {
+      color: '#fbbf24',
+      glow: 'rgba(245, 158, 11, 0.32)',
+      bg: 'linear-gradient(135deg, rgba(42, 28, 8, 0.95) 0%, rgba(18, 12, 5, 0.98) 100%)',
+      border: 'rgba(245, 158, 11, 0.28)',
+      pillBg: 'rgba(245, 158, 11, 0.14)',
+      pillBorder: 'rgba(245, 158, 11, 0.34)'
+    },
+    'ligue 1': {
+      color: '#38bdf8',
+      glow: 'rgba(56, 189, 248, 0.32)',
+      bg: 'linear-gradient(135deg, rgba(14, 30, 58, 0.95) 0%, rgba(8, 14, 28, 0.98) 100%)',
+      border: 'rgba(56, 189, 248, 0.28)',
+      pillBg: 'rgba(56, 189, 248, 0.12)',
+      pillBorder: 'rgba(56, 189, 248, 0.32)'
+    },
+    'coupe de france': {
+      color: '#60a5fa',
+      glow: 'rgba(59, 130, 246, 0.32)',
+      bg: 'linear-gradient(135deg, rgba(14, 28, 56, 0.95) 0%, rgba(8, 14, 28, 0.98) 100%)',
+      border: 'rgba(59, 130, 246, 0.28)',
+      pillBg: 'rgba(59, 130, 246, 0.12)',
+      pillBorder: 'rgba(59, 130, 246, 0.32)'
+    },
+    'serie a': {
+      color: '#60a5fa',
+      glow: 'rgba(37, 99, 235, 0.34)',
+      bg: 'linear-gradient(135deg, rgba(12, 26, 54, 0.95) 0%, rgba(6, 12, 26, 0.98) 100%)',
+      border: 'rgba(37, 99, 235, 0.3)',
+      pillBg: 'rgba(37, 99, 235, 0.14)',
+      pillBorder: 'rgba(37, 99, 235, 0.38)'
+    },
+    'coppa italia': {
+      color: '#34d399',
+      glow: 'rgba(16, 185, 129, 0.32)',
+      bg: 'linear-gradient(135deg, rgba(10, 32, 24, 0.95) 0%, rgba(6, 16, 12, 0.98) 100%)',
+      border: 'rgba(16, 185, 129, 0.28)',
+      pillBg: 'rgba(16, 185, 129, 0.12)',
+      pillBorder: 'rgba(16, 185, 129, 0.32)'
+    },
+    'bundesliga': {
+      color: '#f87171',
+      glow: 'rgba(220, 38, 38, 0.34)',
+      bg: 'linear-gradient(135deg, rgba(44, 12, 16, 0.95) 0%, rgba(18, 6, 8, 0.98) 100%)',
+      border: 'rgba(220, 38, 38, 0.28)',
+      pillBg: 'rgba(220, 38, 38, 0.14)',
+      pillBorder: 'rgba(220, 38, 38, 0.34)'
+    },
+    'world cup': {
+      color: '#fbbf24',
+      glow: 'rgba(245, 158, 11, 0.36)',
+      bg: 'linear-gradient(135deg, rgba(46, 32, 8, 0.95) 0%, rgba(20, 14, 5, 0.98) 100%)',
+      border: 'rgba(245, 158, 11, 0.32)',
+      pillBg: 'rgba(245, 158, 11, 0.16)',
+      pillBorder: 'rgba(245, 158, 11, 0.42)'
+    },
+    'euro': {
+      color: '#38bdf8',
+      glow: 'rgba(14, 165, 233, 0.34)',
+      bg: 'linear-gradient(135deg, rgba(12, 30, 58, 0.95) 0%, rgba(6, 14, 28, 0.98) 100%)',
+      border: 'rgba(14, 165, 233, 0.28)',
+      pillBg: 'rgba(14, 165, 233, 0.14)',
+      pillBorder: 'rgba(14, 165, 233, 0.34)'
+    },
+    'can': {
+      color: '#4ade80',
+      glow: 'rgba(34, 197, 94, 0.36)',
+      bg: 'linear-gradient(135deg, rgba(12, 38, 20, 0.95) 0%, rgba(6, 18, 10, 0.98) 100%)',
+      border: 'rgba(34, 197, 94, 0.3)',
+      pillBg: 'rgba(34, 197, 94, 0.15)',
+      pillBorder: 'rgba(34, 197, 94, 0.38)'
+    },
+    'nations league': {
+      color: '#818cf8',
+      glow: 'rgba(99, 102, 241, 0.32)',
+      bg: 'linear-gradient(135deg, rgba(22, 20, 52, 0.95) 0%, rgba(10, 10, 24, 0.98) 100%)',
+      border: 'rgba(99, 102, 241, 0.28)',
+      pillBg: 'rgba(99, 102, 241, 0.14)',
+      pillBorder: 'rgba(99, 102, 241, 0.34)'
+    },
+    'copa america': {
+      color: '#a78bfa',
+      glow: 'rgba(139, 92, 246, 0.32)',
+      bg: 'linear-gradient(135deg, rgba(28, 18, 52, 0.95) 0%, rgba(12, 8, 24, 0.98) 100%)',
+      border: 'rgba(139, 92, 246, 0.28)',
+      pillBg: 'rgba(139, 92, 246, 0.14)',
+      pillBorder: 'rgba(139, 92, 246, 0.34)'
+    },
+    'saudi': {
+      color: '#34d399',
+      glow: 'rgba(16, 185, 129, 0.34)',
+      bg: 'linear-gradient(135deg, rgba(8, 38, 24, 0.95) 0%, rgba(4, 18, 12, 0.98) 100%)',
+      border: 'rgba(16, 185, 129, 0.28)',
+      pillBg: 'rgba(16, 185, 129, 0.14)',
+      pillBorder: 'rgba(16, 185, 129, 0.34)'
+    }
+  };
+
+  function getCompetitionLogo(compName) {
+    if (!compName) return '';
+    var lower = String(compName).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    for (var key in COMPETITION_LOGOS) {
+      if (lower.includes(key)) {
+        return COMPETITION_LOGOS[key];
+      }
+    }
+    return '';
+  }
+
+  function getCompetitionTheme(compName) {
+    var defaultTheme = {
+      color: '#93c5fd',
+      glow: 'rgba(59, 130, 246, 0.25)',
+      bg: 'linear-gradient(135deg, rgba(20, 29, 49, 0.95) 0%, rgba(10, 14, 26, 0.98) 100%)',
+      border: 'rgba(255, 255, 255, 0.12)',
+      pillBg: 'rgba(255, 255, 255, 0.08)',
+      pillBorder: 'rgba(255, 255, 255, 0.14)'
+    };
+    if (!compName) return defaultTheme;
+    var lower = String(compName).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    for (var key in COMPETITION_THEMES) {
+      if (lower.includes(key)) {
+        return COMPETITION_THEMES[key];
+      }
+    }
+    return defaultTheme;
+  }
+
   function createFootballMatchCard(match, originalIndex) {
     var card = document.createElement('div');
     card.className = 'vel-football-card';
@@ -1369,6 +1603,14 @@
     card.__veloraMatch = match;
     card.__veloraOriginalIndex = Number.isFinite(originalIndex) ? originalIndex : 0;
     card.dataset.matchStatus = timeInfo.status;
+
+    var theme = getCompetitionTheme(match.competition);
+    card.style.setProperty('--comp-theme-color', theme.color);
+    card.style.setProperty('--comp-theme-glow', theme.glow);
+    card.style.setProperty('--comp-theme-bg', theme.bg);
+    card.style.setProperty('--comp-theme-border', theme.border);
+    card.style.setProperty('--comp-theme-pill-bg', theme.pillBg);
+    card.style.setProperty('--comp-theme-pill-border', theme.pillBorder);
 
     if (timeInfo.status === 'live') {
       card.classList.add('is-live');
@@ -1390,20 +1632,36 @@
     var homeInitial = (match.homeTeam?.name || 'H').charAt(0).toUpperCase();
     var awayInitial = (match.awayTeam?.name || 'A').charAt(0).toUpperCase();
 
+    var compLogo = getCompetitionLogo(match.competition);
+    var compLogoHtml = compLogo
+      ? '<img class="vel-football-card__comp-logo" src="' + escapeHtml(compLogo) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+      : '<span class="vel-football-card__comp-dot"></span>';
+
+    var watermarkHtml = compLogo
+      ? '<div class="vel-football-card__watermark" aria-hidden="true">' +
+          '<img src="' + escapeHtml(compLogo) + '" alt="" loading="lazy" onerror="this.parentElement.style.display=\'none\'">' +
+        '</div>'
+      : '';
+
     card.innerHTML =
+      watermarkHtml +
+      '<div class="vel-football-card__glow" aria-hidden="true"></div>' +
       '<div class="vel-football-card__top">' +
-        '<span class="vel-football-card__comp">' + escapeHtml(match.competition || 'Football') + '</span>' +
+        '<div class="vel-football-card__comp-pill">' +
+          compLogoHtml +
+          '<span class="vel-football-card__comp">' + escapeHtml(match.competition || 'Football') + '</span>' +
+        '</div>' +
         timeBadgeHtml +
       '</div>' +
       '<div class="vel-football-card__match">' +
-        '<div class="vel-football-card__team">' +
+        '<div class="vel-football-card__team vel-football-card__team--home">' +
           '<div class="vel-football-card__logo-wrap">' +
             '<img class="vel-football-card__logo" src="' + escapeHtml(match.homeTeam?.logoUrl || '') + '" alt="' + escapeHtml(match.homeTeam?.name || '') + '" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML=\'<span class=\\\'vel-football-card__fallback-logo\\\'>' + homeInitial + '</span>\'">' +
           '</div>' +
           '<span class="vel-football-card__team-name">' + escapeHtml(match.homeTeam?.name || '') + '</span>' +
         '</div>' +
         middleHtml +
-        '<div class="vel-football-card__team">' +
+        '<div class="vel-football-card__team vel-football-card__team--away">' +
           '<div class="vel-football-card__logo-wrap">' +
             '<img class="vel-football-card__logo" src="' + escapeHtml(match.awayTeam?.logoUrl || '') + '" alt="' + escapeHtml(match.awayTeam?.name || '') + '" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML=\'<span class=\\\'vel-football-card__fallback-logo\\\'>' + awayInitial + '</span>\'">' +
           '</div>' +

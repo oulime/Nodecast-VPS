@@ -528,8 +528,11 @@ const MAJOR_TEAM_LOGOS = {
     'atletico madrid': 'https://media.api-sports.io/football/teams/530.png',
     'bilbao': 'https://media.api-sports.io/football/teams/531.png',
     'athletic bilbao': 'https://media.api-sports.io/football/teams/531.png',
+    'athletic club': 'https://media.api-sports.io/football/teams/531.png',
     'seville': 'https://media.api-sports.io/football/teams/536.png',
     'sevilla': 'https://media.api-sports.io/football/teams/536.png',
+    'seville fc': 'https://media.api-sports.io/football/teams/536.png',
+    'sevilla fc': 'https://media.api-sports.io/football/teams/536.png',
     'betis': 'https://media.api-sports.io/football/teams/543.png',
     'real betis': 'https://media.api-sports.io/football/teams/543.png',
     'sociedad': 'https://media.api-sports.io/football/teams/548.png',
@@ -537,6 +540,8 @@ const MAJOR_TEAM_LOGOS = {
     'villarreal': 'https://media.api-sports.io/football/teams/533.png',
     'valence': 'https://media.api-sports.io/football/teams/532.png',
     'valencia': 'https://media.api-sports.io/football/teams/532.png',
+    'valencia cf': 'https://media.api-sports.io/football/teams/532.png',
+    'rayo': 'https://media.api-sports.io/football/teams/728.png',
     'rayo v.': 'https://media.api-sports.io/football/teams/728.png',
     'rayo vallecano': 'https://media.api-sports.io/football/teams/728.png',
     'elche': 'https://media.api-sports.io/football/teams/797.png',
@@ -544,13 +549,37 @@ const MAJOR_TEAM_LOGOS = {
     'celta vigo': 'https://media.api-sports.io/football/teams/538.png',
     'celta': 'https://media.api-sports.io/football/teams/538.png',
     'mallorca': 'https://media.api-sports.io/football/teams/798.png',
+    'majorque': 'https://media.api-sports.io/football/teams/798.png',
     'getafe': 'https://media.api-sports.io/football/teams/546.png',
     'levante': 'https://media.api-sports.io/football/teams/539.png',
     'malaga': 'https://media.api-sports.io/football/teams/534.png',
-    'la corogne': 'https://media.api-sports.io/football/teams/542.png',
-    'deportivo': 'https://media.api-sports.io/football/teams/542.png',
+    'alaves': 'https://media.api-sports.io/football/teams/542.png',
+    'deportivo alaves': 'https://media.api-sports.io/football/teams/542.png',
+    'la corogne': 'https://media.api-sports.io/football/teams/544.png',
+    'la coruna': 'https://media.api-sports.io/football/teams/544.png',
+    'deportivo la corogne': 'https://media.api-sports.io/football/teams/544.png',
+    'deportivo la coruna': 'https://media.api-sports.io/football/teams/544.png',
+    'deportivo': 'https://media.api-sports.io/football/teams/544.png',
     'espanyol': 'https://media.api-sports.io/football/teams/540.png',
+    'espanyol barcelone': 'https://media.api-sports.io/football/teams/540.png',
     'girona': 'https://media.api-sports.io/football/teams/547.png',
+    'girone': 'https://media.api-sports.io/football/teams/547.png',
+    'las palmas': 'https://media.api-sports.io/football/teams/537.png',
+    'almeria': 'https://media.api-sports.io/football/teams/723.png',
+    'cadiz': 'https://media.api-sports.io/football/teams/724.png',
+    'cadix': 'https://media.api-sports.io/football/teams/724.png',
+    'granada': 'https://media.api-sports.io/football/teams/715.png',
+    'grenade': 'https://media.api-sports.io/football/teams/715.png',
+    'valladolid': 'https://media.api-sports.io/football/teams/720.png',
+    'real valladolid': 'https://media.api-sports.io/football/teams/720.png',
+    'leganes': 'https://media.api-sports.io/football/teams/745.png',
+    'eibar': 'https://media.api-sports.io/football/teams/545.png',
+    'zaragoza': 'https://media.api-sports.io/football/teams/726.png',
+    'saragosse': 'https://media.api-sports.io/football/teams/726.png',
+    'oviedo': 'https://media.api-sports.io/football/teams/718.png',
+    'sporting gijon': 'https://media.api-sports.io/football/teams/725.png',
+    'racing santander': 'https://media.api-sports.io/football/teams/722.png',
+    'tenerife': 'https://media.api-sports.io/football/teams/717.png',
 
     // France
     'paris': 'https://media.api-sports.io/football/teams/85.png',
@@ -575,7 +604,7 @@ const MAJOR_TEAM_LOGOS = {
     'brest': 'https://media.api-sports.io/football/teams/1063.png',
     'montpellier': 'https://media.api-sports.io/football/teams/82.png',
     'auxerre': 'https://media.api-sports.io/football/teams/108.png',
-    'saint-etienne': 'https://media.api-sports.io/football/teams/1063.png',
+    'saint-etienne': 'https://media.api-sports.io/football/teams/527.png',
     'le mans': 'https://media.api-sports.io/football/teams/112.png',
     'troyes': 'https://media.api-sports.io/football/teams/110.png',
     'metz': 'https://media.api-sports.io/football/teams/111.png',
@@ -817,33 +846,43 @@ function escapeRegex(s) {
 
 async function fetchTeamLogo(teamName) {
     if (!teamName) return DEFAULT_FOOTBALL_SHIELD_SVG;
-    const clean = String(teamName).toLowerCase().replace(/\s+/g, ' ').trim();
-    if (!clean) return DEFAULT_FOOTBALL_SHIELD_SVG;
+    const rawClean = String(teamName).toLowerCase().replace(/\s+/g, ' ').trim();
+    if (!rawClean) return DEFAULT_FOOTBALL_SHIELD_SVG;
+
+    // Normalisation sans accents / diacritiques (ex: "séville fc" -> "seville fc")
+    const clean = rawClean
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
 
     // 1. Vérifier le cache mémoire
     if (teamLogoCache.has(clean)) {
         return teamLogoCache.get(clean);
     }
+    if (teamLogoCache.has(rawClean)) {
+        return teamLogoCache.get(rawClean);
+    }
 
     // 2. Recherche directe dans la table des logos HD officiels (Correspondance exacte)
-    if (MAJOR_TEAM_LOGOS[clean]) {
-        const logo = MAJOR_TEAM_LOGOS[clean];
+    if (MAJOR_TEAM_LOGOS[clean] || MAJOR_TEAM_LOGOS[rawClean]) {
+        const logo = MAJOR_TEAM_LOGOS[clean] || MAJOR_TEAM_LOGOS[rawClean];
         teamLogoCache.set(clean, logo);
         return logo;
     }
 
-    // 3. Recherche avec correspondance par mot complet
+    // 3. Recherche avec correspondance par mot complet ou sous-chaîne significative
     for (const [key, logoUrl] of Object.entries(MAJOR_TEAM_LOGOS)) {
-        if (key.length <= 3) {
+        const normKey = key.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (normKey.length <= 3) {
             // Pour les abréviations courtes (ex: 'psg', 'om', 'ol'), mot complet obligatoire (évite 'ol' dans 'olympiakos')
-            const re = new RegExp(`(?:^|\\s)${escapeRegex(key)}(?:\\s|$)`, 'i');
-            if (re.test(clean)) {
+            const re = new RegExp(`(?:^|\\s)${escapeRegex(normKey)}(?:\\s|$)`, 'i');
+            if (re.test(clean) || re.test(rawClean)) {
                 teamLogoCache.set(clean, logoUrl);
                 return logoUrl;
             }
         } else {
             // Pour les clés de 4 caractères ou plus
-            if (clean === key || clean.startsWith(key + ' ') || clean.endsWith(' ' + key) || clean.includes(' ' + key + ' ')) {
+            if (clean === normKey || clean.startsWith(normKey + ' ') || clean.endsWith(' ' + normKey) || clean.includes(' ' + normKey + ' ') ||
+                rawClean === key || rawClean.startsWith(key + ' ') || rawClean.endsWith(' ' + key) || rawClean.includes(' ' + key + ' ')) {
                 teamLogoCache.set(clean, logoUrl);
                 return logoUrl;
             }
@@ -852,7 +891,7 @@ async function fetchTeamLogo(teamName) {
 
     // 4. Appel API TheSportsDB avec User-Agent navigateur
     try {
-        const query = encodeURIComponent(clean.replace(/\s*fém.*$/i, '').replace(/\s*u\d+.*$/i, '').trim());
+        const query = encodeURIComponent(clean.replace(/\s*fém.*$/i, '').replace(/\s*u\d+.*$/i, '').replace(/\s*fc$/i, '').trim());
         const url = `https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${query}`;
         const res = await fetch(url, {
             headers: {
@@ -1550,6 +1589,7 @@ function clearCache(countryInput = null) {
         countryCaches.delete(`${countryConfig.id}_big`);
     } else {
         countryCaches.clear();
+        teamLogoCache.clear();
     }
     globalLiveScoresCache = null;
     globalLiveScoresExpiresAt = 0;

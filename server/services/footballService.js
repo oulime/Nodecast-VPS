@@ -251,6 +251,103 @@ function getCountryConfig(countryKey) {
     return COUNTRY_CONFIGS[key] || COUNTRY_CONFIGS.france;
 }
 
+let getSqliteDb = null;
+try {
+    getSqliteDb = require('../db/sqlite').getDb;
+} catch (_) {}
+
+/**
+ * Récupère les paramètres football persistés dans SQLite (admin_settings)
+ */
+function getRawFootballMappingsFromDb() {
+    try {
+        if (!getSqliteDb) return null;
+        const db = getSqliteDb();
+        if (!db) return null;
+        const row = db.prepare("SELECT data FROM velora_admin_rows WHERE table_name = 'admin_settings' AND (row_id = 'football_channel_mappings' OR data LIKE '%football_channel_mappings%') LIMIT 1").get();
+        if (row && row.data) {
+            const parsed = JSON.parse(row.data);
+            const val = parsed.value;
+            if (typeof val === 'string') {
+                return JSON.parse(val);
+            } else if (val && typeof val === 'object') {
+                return val;
+            }
+        }
+    } catch (_) {}
+    return null;
+}
+
+/**
+ * Récupère les options du pays : activation (DÉSACTIVÉ par défaut) et chaînes ignorées
+ */
+function getFootballCountrySettings(countryInput) {
+    const rawSettings = getRawFootballMappingsFromDb();
+    const cSlug = String(countryInput || '').toLowerCase().replace(/^country_/, '').replace(/[_\-\s]+/g, '_').trim() || 'france';
+    const countryKey = normalizeCountryCode(countryInput);
+
+    // Par défaut, le football est DÉSACTIVÉ pour tous les pays
+    if (!rawSettings || typeof rawSettings !== 'object') {
+        return { enabled: false, ignoredChannels: [] };
+    }
+
+    const countrySettingsMap = rawSettings._country_settings || rawSettings._settings || {};
+
+    // Chercher la configuration pour ce pays
+    const matchedSettings = countrySettingsMap[cSlug] || countrySettingsMap[countryKey] || countrySettingsMap[countryInput] || null;
+
+    const isEnabled = matchedSettings ? matchedSettings.enabled === true : false;
+    let ignored = [];
+    if (matchedSettings && Array.isArray(matchedSettings.ignoredChannels)) {
+        ignored = matchedSettings.ignoredChannels;
+    } else if (matchedSettings && typeof matchedSettings.ignoredChannels === 'string') {
+        ignored = matchedSettings.ignoredChannels.split(/[,\n]+/);
+    }
+
+    if (countrySettingsMap._default && Array.isArray(countrySettingsMap._default.ignoredChannels)) {
+        ignored = ignored.concat(countrySettingsMap._default.ignoredChannels);
+    }
+
+    const cleanIgnored = ignored.map(s => String(s || '').trim()).filter(Boolean);
+
+    return {
+        enabled: isEnabled, // Par défaut OFF pour tous les pays
+        ignoredChannels: cleanIgnored
+    };
+}
+
+/**
+ * Vérifie si une chaîne figure dans la liste des chaînes ignorées pour ce pays
+ */
+function isChannelIgnored(channelName, ignoredList = []) {
+    if (!channelName || !ignoredList || ignoredList.length === 0) return false;
+    const cleanChan = String(channelName)
+        .replace(/\s*\([^)]*\)/g, ' ')
+        .replace(/\s*\[[^\]]*\]/g, ' ')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .toLowerCase()
+        .trim();
+
+    if (!cleanChan) return false;
+
+    return ignoredList.some(ig => {
+        const cleanIg = String(ig)
+            .replace(/\s*\([^)]*\)/g, ' ')
+            .replace(/\s*\[[^\]]*\]/g, ' ')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]/gi, ' ')
+            .replace(/\s+/g, ' ')
+            .toLowerCase()
+            .trim();
+        if (!cleanIg) return false;
+        return cleanChan === cleanIg || cleanChan.includes(cleanIg) || cleanIg.includes(cleanChan);
+    });
+}
+
 // Cache mémoire des logos des équipes
 const teamLogoCache = new Map();
 
@@ -1118,6 +1215,18 @@ function enrichMatchWithLiveScore(match, liveEvents = []) {
 async function getTodayMatches(countryInput = 'france', forceRefresh = false, allMatches = false) {
     const countryConfig = getCountryConfig(countryInput);
     const countryKey = countryConfig.id;
+    const { enabled, ignoredChannels } = getFootballCountrySettings(countryInput);
+
+    // Par défaut, le football est DÉSACTIVÉ pour tous les pays
+    if (!enabled) {
+        return {
+            cached: false,
+            country: countryConfig,
+            enabled: false,
+            matches: []
+        };
+    }
+
     const cacheScopeKey = `${countryKey}_${allMatches ? 'all' : 'big'}`;
     const now = Date.now();
 
@@ -1156,7 +1265,15 @@ async function getTodayMatches(countryInput = 'france', forceRefresh = false, al
                     fetchTeamLogo(m.awayTeamName)
                 ]);
 
-                const tvChannels = getBroadcastersForCountry(m.competition, m.tvChannels, countryConfig);
+                let tvChannels = getBroadcastersForCountry(m.competition, m.tvChannels, countryConfig);
+
+                // Filtrage des chaînes ignorées pour ce pays
+                if (Array.isArray(tvChannels) && ignoredChannels.length > 0) {
+                    tvChannels = tvChannels.filter(ch => !isChannelIgnored(ch, ignoredChannels));
+                    if (tvChannels.length === 0) {
+                        tvChannels = ['Chaîne à confirmer'];
+                    }
+                }
 
                 return {
                     id: m.id,
@@ -1210,6 +1327,7 @@ async function getTodayMatches(countryInput = 'france', forceRefresh = false, al
     return {
         cached: !!cachedEntry && !forceRefresh,
         country: countryConfig,
+        enabled: true,
         matches: enrichedMatches
     };
 }

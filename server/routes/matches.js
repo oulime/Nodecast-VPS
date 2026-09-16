@@ -24,6 +24,7 @@ router.get('/today', async (req, res) => {
         res.setHeader('X-Country-Name', encodeURIComponent(String(result.country?.name || 'France')));
         res.setHeader('X-Total-Matches', String(result.matches.length));
         res.setHeader('X-Matches-Scope', allMatches ? 'all' : 'big');
+        res.setHeader('X-Football-Enabled', result.enabled ? 'true' : 'false');
 
         // Format attendu : tableau direct d'objets match (100% rétrocompatible)
         return res.json(result.matches);

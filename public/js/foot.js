@@ -201,8 +201,10 @@
                     throw new Error(`Erreur serveur (${response.status})`);
                 }
 
+                const isEnabled = response.headers.get('X-Football-Enabled') !== 'false';
                 const data = await response.json();
                 this.matches = Array.isArray(data) ? data : [];
+                this.isFootballEnabled = isEnabled;
                 this.isLoading = false;
                 this.hasError = false;
             } catch (err) {
@@ -549,6 +551,7 @@
 
         renderEmptyState() {
             if (!this.matchesGrid) return;
+            const isOff = this.isFootballEnabled === false;
             this.matchesGrid.innerHTML = `
                 <div class="foot-empty-state" style="grid-column: 1 / -1;">
                     <div class="foot-state-icon">
@@ -558,9 +561,9 @@
                             <path d="M2 12h20"></path>
                         </svg>
                     </div>
-                    <h3 class="foot-state-title">Aucun match trouvé</h3>
+                    <h3 class="foot-state-title">${isOff ? 'Module Football désactivé' : 'Aucun match trouvé'}</h3>
                     <p class="foot-state-desc">
-                        Aucun match ne correspond à vos critères de recherche pour le moment.
+                        ${isOff ? 'La fonctionnalité Football est actuellement désactivée pour ce pays dans les paramètres administrateur.' : 'Aucun match ne correspond à vos critères de recherche pour le moment.'}
                     </p>
                 </div>
             `;

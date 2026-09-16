@@ -170,6 +170,7 @@
   var state = {
     // Structure multi-pays: { "_default": [ { id, channel, competition, packages, aliases } ], ... }
     store: {},
+    countrySettings: {}, // { "france": { enabled: false, ignoredChannels: [] }, ... }
     visibleCountriesList: [],
     allLivePackages: [],
     selectedCountry: "france",
@@ -411,17 +412,48 @@
       return normalized;
     }
 
+    // Extraction des options des pays (_country_settings)
+    if (raw._country_settings && typeof raw._country_settings === "object") {
+      state.countrySettings = {};
+      for (var k in raw._country_settings) {
+        var cs = countrySlug(k);
+        var item = raw._country_settings[k] || {};
+        var igList = Array.isArray(item.ignoredChannels)
+          ? item.ignoredChannels.map(String).map(function (s) { return s.trim(); }).filter(Boolean)
+          : (typeof item.ignoredChannels === "string" ? item.ignoredChannels.split(/[,\n]+/).map(function (s) { return s.trim(); }).filter(Boolean) : []);
+        state.countrySettings[cs] = {
+          enabled: item.enabled === true,
+          ignoredChannels: igList
+        };
+      }
+    }
+
     if (Array.isArray(raw)) {
       normalized._default = normalizeCountryRules(raw);
       return normalized;
     }
 
     for (var c in raw) {
+      if (c === "_country_settings" || c === "_settings") continue;
       var slug = countrySlug(c);
       normalized[slug] = normalizeCountryRules(raw[c]);
     }
 
     return normalized;
+  }
+
+  function getCountrySettings(countryId) {
+    var cid = countrySlug(countryId);
+    if (!state.countrySettings) {
+      state.countrySettings = {};
+    }
+    if (!state.countrySettings[cid]) {
+      state.countrySettings[cid] = {
+        enabled: false, // Par défaut OFF pour tous les pays
+        ignoredChannels: []
+      };
+    }
+    return state.countrySettings[cid];
   }
 
   function getCountryMappings(countryId) {
@@ -990,9 +1022,10 @@
     try {
       var norm = normalizeStore(storeObj);
       state.store = norm;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(norm));
-      window.__veloraFootballMappingsCache = norm;
-      document.dispatchEvent(new CustomEvent("velora-football-mappings-changed", { detail: { mappings: norm } }));
+      var payload = Object.assign({}, norm, { _country_settings: state.countrySettings || {} });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      window.__veloraFootballMappingsCache = payload;
+      document.dispatchEvent(new CustomEvent("velora-football-mappings-changed", { detail: { mappings: payload } }));
     } catch (_) {}
   }
 
@@ -1031,7 +1064,8 @@
 
   async function persistToDatabase(storeObj) {
     var norm = normalizeStore(storeObj);
-    saveLocalStore(norm);
+    var payload = Object.assign({}, norm, { _country_settings: state.countrySettings || {} });
+    saveLocalStore(payload);
     try {
       var t = localStorage.getItem("authToken");
       var headers = { "Content-Type": "application/json", "apikey": KEY };
@@ -1042,7 +1076,7 @@
         headers: Object.assign({}, headers, { "Prefer": "resolution=merge-duplicates" }),
         body: JSON.stringify({
           key: SETTING_DB_KEY,
-          value: JSON.stringify(norm)
+          value: JSON.stringify(payload)
         })
       });
     } catch (err) {
@@ -1182,10 +1216,17 @@
         var rulesList = state.store[c.id] || [];
         var count = rulesList.length;
         var isActive = state.selectedCountry === c.id;
+        var cSettings = getCountrySettings(c.id);
+        var isEnabled = cSettings.enabled === true;
+
+        var statusDot = isEnabled
+          ? '<span title="Football Activé pour ce pays" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10b981; margin-right:2px; box-shadow:0 0 6px rgba(16,185,129,0.7);"></span>'
+          : '<span title="Football Désactivé (Par défaut)" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#ef4444; opacity:0.65; margin-right:2px;"></span>';
 
         return '<button type="button" class="vel-foot-country-pill ' + (isActive ? "is-active" : "") + '" data-country-id="' + esc(c.id) + '">' +
           '<span>' + c.flag + '</span> ' +
           '<span>' + esc(c.name) + '</span> ' +
+          statusDot +
           '<span class="vel-foot-country-badge">' + count + '</span>' +
         '</button>';
       }).join("");
@@ -1213,7 +1254,67 @@
         : "➕ Ajouter la règle (" + activeMeta.name + ")";
     }
 
+    updateCountryOptionsUI();
     renderPackagesDatalist();
+  }
+
+  function updateCountryOptionsUI() {
+    var activeMeta = getCountryMeta(state.selectedCountry);
+    var cs = getCountrySettings(state.selectedCountry);
+
+    var flagEl = getEl("foot-opt-country-flag");
+    var nameEl = getEl("foot-opt-country-name");
+    var hintNameEl = getEl("foot-opt-country-hint-name");
+    var switchEl = getEl("foot-country-enabled-switch");
+    var badgeEl = getEl("foot-country-enabled-status-badge");
+    var ignoredEl = getEl("foot-country-ignored-channels-input");
+
+    if (flagEl) flagEl.textContent = activeMeta.flag || "🌍";
+    if (nameEl) nameEl.textContent = activeMeta.name;
+    if (hintNameEl) hintNameEl.textContent = activeMeta.name;
+
+    if (switchEl) {
+      switchEl.checked = cs.enabled === true;
+    }
+
+    if (badgeEl) {
+      if (cs.enabled === true) {
+        badgeEl.textContent = "🟢 Activé";
+        badgeEl.style.background = "rgba(16, 185, 129, 0.2)";
+        badgeEl.style.color = "#6ee7b7";
+        badgeEl.style.borderColor = "rgba(16, 185, 129, 0.4)";
+      } else {
+        badgeEl.textContent = "🔴 Désactivé (Par défaut)";
+        badgeEl.style.background = "rgba(239, 68, 68, 0.2)";
+        badgeEl.style.color = "#fca5a5";
+        badgeEl.style.borderColor = "rgba(239, 68, 68, 0.4)";
+      }
+    }
+
+    if (ignoredEl) {
+      ignoredEl.value = (cs.ignoredChannels || []).join(", ");
+    }
+  }
+
+  async function saveActiveCountryOptions() {
+    var cs = getCountrySettings(state.selectedCountry);
+    var switchEl = getEl("foot-country-enabled-switch");
+    var ignoredEl = getEl("foot-country-ignored-channels-input");
+
+    var isEnabled = switchEl ? switchEl.checked : false;
+    var rawIgnored = ignoredEl ? ignoredEl.value : "";
+    var ignoredList = rawIgnored.split(/[,\n]+/).map(function (s) { return s.trim(); }).filter(Boolean);
+
+    cs.enabled = isEnabled;
+    cs.ignoredChannels = ignoredList;
+    state.countrySettings[state.selectedCountry] = cs;
+
+    await persistToDatabase(state.store);
+    renderCountrySelector();
+    updateCountryOptionsUI();
+
+    var activeMeta = getCountryMeta(state.selectedCountry);
+    setStatus("✨ Options enregistrées pour " + activeMeta.name + " (Football " + (isEnabled ? "Activé" : "Désactivé") + ", " + ignoredList.length + " chaîne(s) ignorée(s)).");
   }
 
   function renderMappingsTable() {
@@ -1600,6 +1701,22 @@
     }
 
     var targetMeta = getCountryMeta(testCid);
+    var targetSettings = getCountrySettings(testCid);
+    var isTargetEnabled = targetSettings.enabled === true;
+    var ignoredList = targetSettings.ignoredChannels || [];
+
+    var isIgnored = ignoredList.some(function (ig) {
+      var nIg = normalizeChannelText(ig);
+      return nIg && (normQ === nIg || normQ.includes(nIg) || nIg.includes(normQ));
+    });
+
+    var statusNotice = !isTargetEnabled
+      ? '<div style="margin-bottom:0.4rem; padding:0.35rem 0.6rem; border-radius:6px; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); font-size:0.78rem; color:#fca5a5;">⚠️ <strong>Note :</strong> Le module Football est actuellement désactivé pour ' + esc(targetMeta.name) + '.</div>'
+      : '';
+
+    var ignoredNotice = isIgnored
+      ? '<div style="margin-bottom:0.4rem; padding:0.35rem 0.6rem; border-radius:6px; background:rgba(234,179,8,0.15); border:1px solid rgba(234,179,8,0.35); font-size:0.78rem; color:#fde047;">🚫 <strong>Chaîne ignorée :</strong> Cette chaîne figure dans la liste des chaînes ignorées pour ' + esc(targetMeta.name) + ' et sera exclue des données API.</div>'
+      : '';
 
     if (matchRes && matchRes.rule) {
       var r = matchRes.rule;
@@ -1629,6 +1746,8 @@
       }
 
       resBox.innerHTML = '<div class="vel-foot-test-match-found">' +
+        statusNotice +
+        ignoredNotice +
         '<div class="vel-foot-test-header">✅ Règle appliquée pour <strong>« ' + esc(r.channel) + ' »</strong> [' + esc(compLabel) + '] <small style="color:#94a3b8;">(' + sourceLabel + ')</small> :</div>' +
         (pkgs.length > 0 ? '<div style="margin: 0.3rem 0;"><strong>Packages :</strong> ' + pkgsHtml + '</div>' : '') +
         (aliases.length > 0 ? '<div style="margin: 0.3rem 0;"><strong>Mots-clés :</strong> ' + aliasesHtml + '</div>' : '') +
@@ -1636,6 +1755,8 @@
       '</div>';
     } else {
       resBox.innerHTML = '<div class="vel-foot-test-no-match">' +
+        statusNotice +
+        ignoredNotice +
         '<div class="vel-foot-test-header">ℹ️ Aucune règle configurée pour <strong>« ' + esc(q) + ' »</strong> ' + (compQ ? 'en [' + esc(compQ) + '] ' : '') + 'dans ' + targetMeta.name + '.</div>' +
         '<div class="vel-foot-test-subtext">➡️ Recherche standard par nom direct : <code>' + esc(q) + '</code>.</div>' +
         '<button type="button" class="vel-foot-btn-action" style="margin-top:0.4rem;" onclick="window.veloraFootballAdmin &amp;&amp; window.veloraFootballAdmin.quickCreateMapping(\'' + esc(q).replace(/'/g, "\\'") + '\', \'' + esc(compQ).replace(/'/g, "\\'") + '\')">➕ Créer une règle pour « ' + esc(q) + ' » dans ' + targetMeta.name + '</button>' +
@@ -1678,7 +1799,8 @@
     if (jsonDialogMode === "country") {
       textarea.value = JSON.stringify(getCountryMappings(state.selectedCountry), null, 2);
     } else {
-      textarea.value = JSON.stringify(state.store, null, 2);
+      var fullPayload = Object.assign({}, state.store, { _country_settings: state.countrySettings });
+      textarea.value = JSON.stringify(fullPayload, null, 2);
     }
 
     dialog.showModal();
@@ -1728,6 +1850,9 @@
     openJsonEditor: openJsonEditor,
     saveJsonEditor: saveJsonEditor,
     runLiveTest: runLiveTest,
+    saveCountrySettings: saveActiveCountryOptions,
+    saveActiveCountryOptions: saveActiveCountryOptions,
+    getCountrySettings: getCountrySettings,
     getStore: function () { return state.store; },
     getMappings: function (countryId) {
       if (!countryId) return state.store;
@@ -1759,6 +1884,13 @@
     if (countryPill && countryPill.dataset.countryId) {
       e.preventDefault();
       selectCountry(countryPill.dataset.countryId);
+      return;
+    }
+
+    // Enregistrer options pays
+    if (e.target.closest("#foot-btn-save-country-options")) {
+      e.preventDefault();
+      saveActiveCountryOptions();
       return;
     }
 
@@ -1847,6 +1979,17 @@
   });
 
   document.addEventListener("change", function (e) {
+    if (e.target && e.target.id === "foot-country-enabled-switch") {
+      var cs = getCountrySettings(state.selectedCountry);
+      cs.enabled = e.target.checked;
+      state.countrySettings[state.selectedCountry] = cs;
+      persistToDatabase(state.store);
+      updateCountryOptionsUI();
+      renderCountrySelector();
+      var activeMeta = getCountryMeta(state.selectedCountry);
+      setStatus("✨ Football " + (cs.enabled ? "ACTIVÉ" : "DÉSACTIVÉ") + " pour " + activeMeta.name + ".");
+      return;
+    }
     if (e.target && e.target.id === "foot-form-country-select") {
       selectCountry(e.target.value);
       return;

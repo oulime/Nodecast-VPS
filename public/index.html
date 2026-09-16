@@ -6837,6 +6837,7 @@
             </div>
 
             <!-- Barre de sélection du Pays (Synchronisée avec l'onglet Pays) -->
+            <!-- Barre de sélection du Pays (Synchronisée avec l'onglet Pays) -->
             <div class="vel-foot-country-bar" id="foot-country-bar">
               <div class="vel-foot-country-bar-label">
                 <span>🌍</span>
@@ -6844,6 +6845,37 @@
               </div>
               <div class="vel-foot-country-pills" id="foot-country-pills">
                 <!-- Rempli dynamiquement avec les pays visibles configurés dans l'onglet Pays -->
+              </div>
+            </div>
+
+            <!-- Options & Activation du Football pour le pays actif -->
+            <div class="vel-foot-country-options-card" id="foot-country-options-card" style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: 0.85rem; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                <div style="display: flex; align-items: center; gap: 0.65rem;">
+                  <span id="foot-opt-country-flag" style="font-size: 1.4rem;">🇫🇷</span>
+                  <div>
+                    <strong id="foot-opt-country-name" style="font-size: 1.05rem; color: #f8fafc;">France</strong>
+                    <div style="font-size: 0.8rem; color: #94a3b8;">État et paramètres du module Football pour ce pays</div>
+                  </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                  <label for="foot-country-enabled-switch" style="display: inline-flex; align-items: center; gap: 0.6rem; cursor: pointer; font-weight: 700; font-size: 0.88rem; color: #fff;">
+                    <span>Activer le Football pour ce pays :</span>
+                    <input type="checkbox" id="foot-country-enabled-switch" style="width: 1.25rem; height: 1.25rem; accent-color: #10b981; cursor: pointer;" />
+                    <span id="foot-country-enabled-status-badge" style="font-size: 0.76rem; padding: 0.2rem 0.6rem; border-radius: 9999px; font-weight: 800; background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4);">🔴 Désactivé (Par défaut)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 0.4rem; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                  <label for="foot-country-ignored-channels-input" style="font-size: 0.8rem; font-weight: 700; color: #cbd5e1; text-transform: uppercase; letter-spacing: 0.04em;">
+                    🚫 Chaînes à ignorer pour ce pays (séparées par des virgules ou retours à la ligne)
+                  </label>
+                  <button type="button" id="foot-btn-save-country-options" class="vel-foot-btn vel-foot-btn-primary vel-foot-btn-sm" onclick="window.veloraFootballAdmin && window.veloraFootballAdmin.saveActiveCountryOptions()">💾 Enregistrer les options du pays</button>
+                </div>
+                <textarea id="foot-country-ignored-channels-input" class="vel-foot-textarea" rows="2" placeholder="ex: TOD, beIN Sports MAX 7, DAZN 2 (Ces chaînes ne seront pas prises en compte pour ce pays lors de la récupération des données de l'API)"></textarea>
+                <span style="font-size: 0.75rem; color: #94a3b8;">💡 Si une chaîne est listée ici, elle sera automatiquement ignorée et exclue des données API pour <span id="foot-opt-country-hint-name">ce pays</span>.</span>
               </div>
             </div>
 
@@ -18137,7 +18169,7 @@
   <script defer src="/assets/velora-live-wheel.js?v=20260915-logo-adaptive-colors-v6"></script>
   <link rel="stylesheet" href="/assets/velora-prime-carousel.css?v=20260914-exact-provider-order-v11" />
   <script defer src="/assets/velora-prime-carousels.js?v=20260914-random-packages-v1"></script>
-  <script defer src="/assets/velora-football-slider.js?v=20260915-foot-slider-pkg-channels-v2"></script>
+  <script defer src="/assets/velora-football-slider.js?v=20260916-foot-slider-v3"></script>
   <script>
     (() => {
       document.addEventListener("click", function (e) {
@@ -18190,7 +18222,7 @@
   <script defer src="/assets/velora-nav-controller.js?v=20260914-teardown-v7"></script>
   <link rel="stylesheet" href="/assets/velora-adult.css?v=20260912-hub-images-v3" />
   <script defer src="/assets/velora-adult.js?v=20260912-hub-images-v3"></script>
-  <script defer src="/assets/velora-football-admin.js?v=20260915-foot-admin-comp-matching-v8"></script>
+  <script defer src="/assets/velora-football-admin.js?v=20260916-foot-admin-options-v9"></script>
   <script defer src="/assets/tv-connect-bridge.js?v=20260915-instant-profile-v2"></script>
 </body>
 

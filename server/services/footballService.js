@@ -653,13 +653,32 @@ const MAJOR_TEAM_LOGOS = {
 
     // Belgique
     'club bruges': 'https://media.api-sports.io/football/teams/569.png',
-    'anderlecht': 'https://media.api-sports.io/football/teams/582.png',
+    'anderlecht': 'https://media.api-sports.io/football/teams/631.png',
+    'rsc anderlecht': 'https://media.api-sports.io/football/teams/631.png',
     'anvers': 'https://media.api-sports.io/football/teams/740.png',
     'antwerp': 'https://media.api-sports.io/football/teams/740.png',
     'genk': 'https://media.api-sports.io/football/teams/739.png',
     'gent': 'https://media.api-sports.io/football/teams/742.png',
     'la gantoise': 'https://media.api-sports.io/football/teams/742.png',
     'union sg': 'https://media.api-sports.io/football/teams/741.png',
+
+    // Grèce
+    'olympiakos': 'https://media.api-sports.io/football/teams/554.png',
+    'olympiacos': 'https://media.api-sports.io/football/teams/554.png',
+    'olympiakos lp': 'https://media.api-sports.io/football/teams/554.png',
+    'panathinaikos': 'https://media.api-sports.io/football/teams/555.png',
+    'paok': 'https://media.api-sports.io/football/teams/556.png',
+    'aek': 'https://media.api-sports.io/football/teams/557.png',
+    'aek athenes': 'https://media.api-sports.io/football/teams/557.png',
+
+    // Autriche & Pologne
+    'sturm graz': 'https://media.api-sports.io/football/teams/2026.png',
+    'salzburg': 'https://media.api-sports.io/football/teams/571.png',
+    'red bull salzburg': 'https://media.api-sports.io/football/teams/571.png',
+    'rapid vienne': 'https://media.api-sports.io/football/teams/572.png',
+    'jagiellonia': 'https://media.api-sports.io/football/teams/342.png',
+    'legia': 'https://media.api-sports.io/football/teams/344.png',
+    'legia varsovie': 'https://media.api-sports.io/football/teams/344.png',
 
     // Turquie
     'galatasaray': 'https://media.api-sports.io/football/teams/645.png',
@@ -792,6 +811,10 @@ function formatCompetitionName(rawComp) {
 /**
  * Étape B : Récupère le logo d'une équipe (Table HD ou TheSportsDB avec User-Agent)
  */
+function escapeRegex(s) {
+    return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 async function fetchTeamLogo(teamName) {
     if (!teamName) return DEFAULT_FOOTBALL_SHIELD_SVG;
     const clean = String(teamName).toLowerCase().replace(/\s+/g, ' ').trim();
@@ -802,21 +825,32 @@ async function fetchTeamLogo(teamName) {
         return teamLogoCache.get(clean);
     }
 
-    // 2. Recherche directe dans la table des logos HD officiels
+    // 2. Recherche directe dans la table des logos HD officiels (Correspondance exacte)
     if (MAJOR_TEAM_LOGOS[clean]) {
         const logo = MAJOR_TEAM_LOGOS[clean];
         teamLogoCache.set(clean, logo);
         return logo;
     }
 
+    // 3. Recherche avec correspondance par mot complet
     for (const [key, logoUrl] of Object.entries(MAJOR_TEAM_LOGOS)) {
-        if (clean === key || clean.includes(key) || key.includes(clean)) {
-            teamLogoCache.set(clean, logoUrl);
-            return logoUrl;
+        if (key.length <= 3) {
+            // Pour les abréviations courtes (ex: 'psg', 'om', 'ol'), mot complet obligatoire (évite 'ol' dans 'olympiakos')
+            const re = new RegExp(`(?:^|\\s)${escapeRegex(key)}(?:\\s|$)`, 'i');
+            if (re.test(clean)) {
+                teamLogoCache.set(clean, logoUrl);
+                return logoUrl;
+            }
+        } else {
+            // Pour les clés de 4 caractères ou plus
+            if (clean === key || clean.startsWith(key + ' ') || clean.endsWith(' ' + key) || clean.includes(' ' + key + ' ')) {
+                teamLogoCache.set(clean, logoUrl);
+                return logoUrl;
+            }
         }
     }
 
-    // 3. Appel API TheSportsDB avec User-Agent navigateur
+    // 4. Appel API TheSportsDB avec User-Agent navigateur
     try {
         const query = encodeURIComponent(clean.replace(/\s*fém.*$/i, '').replace(/\s*u\d+.*$/i, '').trim());
         const url = `https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${query}`;

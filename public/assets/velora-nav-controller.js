@@ -88,13 +88,34 @@
     }
 
     const navEl = e.target.closest(
-      ".nav-item, .nav-link, .sidebar-link, .vel-bottom-nav-item, [data-bottom-nav], [data-nav], .vel-nav-btn, .navbar, .header-nav, #btn-home, #btn-live, #btn-movies, #btn-series, #btn-favorites, #btn-adult, .vod-back-btn, .player-back-btn, [data-action='back'], [data-action='close-player']"
+      ".nav-item, .nav-link, .sidebar-link, .vel-bottom-nav-item, .vel-bottom-nav__button, [data-bottom-nav], [data-nav], [data-home-tab], .vel-nav-btn, .navbar, .header-nav, #btn-home, #btn-live, #btn-movies, #btn-series, #btn-favorites, #btn-adult, .vod-back-btn, .player-back-btn, [data-action='back'], [data-action='close-player']"
     );
 
     if (navEl) {
-      // Check if clicking the same active section tab (e.g. clicking Live while already on Live)
-      const bottomNavAction = navEl.getAttribute("data-bottom-nav");
+      const bottomNavAction = navEl.getAttribute("data-bottom-nav") || navEl.getAttribute("data-home-tab");
       const activeTab = document.body.dataset ? document.body.dataset.velActiveTab : "";
+      const isFromFootballOrSearch = Boolean(
+        (document.body.dataset && document.body.dataset.veloraReturnFavorites === "search") ||
+        (document.body.dataset && document.body.dataset.veloraSearchMediaOpen) ||
+        document.getElementById("vel-live-match-banner") ||
+        document.getElementById("velora-match-banner") ||
+        document.getElementById("vel-football-notice-modal")
+      );
+
+      // If currently in football match / search channel playback, clicking any nav tab (including TV) must forcefully stop playback and cleanup
+      if (isFromFootballOrSearch) {
+        delete document.body.dataset.veloraReturnHome;
+        delete document.body.dataset.veloraReturnFavorites;
+        delete window._veloraFavoriteReturnTab;
+        delete document.body.dataset.veloraSearchMediaOpen;
+        delete document.body.dataset.veloraReturnAdult;
+        const banner = document.getElementById("vel-live-match-banner") || document.getElementById("velora-match-banner");
+        if (banner) banner.remove();
+        cleanupAllActiveMediaAndSessions();
+        return;
+      }
+
+      // Check if clicking the same active section tab (e.g. clicking Live while already on Live)
       if (bottomNavAction && bottomNavAction === activeTab && activeTab !== "home") {
         // Already on this section tab, do not kill playing media
         return;

@@ -9047,7 +9047,7 @@
               homePage.setAttribute("aria-hidden", "false");
               homePage.style.removeProperty("display");
             }
-            ["content-view", "packages-view", "adult-view"].forEach(function (id) {
+            ["content-view", "packages-view", "adult-view", "player-container", "vod-player-container", "now-playing", "now-playing-vod"].forEach(function (id) {
               var view = document.getElementById(id);
               if (view) {
                 view.classList.add("hidden");
@@ -9063,7 +9063,10 @@
               "pkg-wheel-modal-open",
               "vel-vod-detail-active",
               "vel-netflix-modal-open",
-              "main--velora-series-detail-themed"
+              "main--velora-series-detail-themed",
+              "body--velora-live-package",
+              "vel-favorites-open",
+              "vel-favorites-player-active"
             );
             var pkgModal = document.getElementById("vel-pkg-modal");
             if (pkgModal) pkgModal.classList.remove("is-open");
@@ -9072,17 +9075,27 @@
             var dl = document.getElementById("dynamic-list");
             if (dl) dl.classList.remove("item-list--vod-film-detail");
 
+            var banner = document.getElementById("vel-live-match-banner") || document.getElementById("velora-match-banner");
+            if (banner) banner.remove();
+
+            if (typeof window.veloraStopAllPlayback === "function") {
+              try { window.veloraStopAllPlayback(); } catch (_) { }
+            }
+
             delete document.body.dataset.veloraReturnAdult;
             delete document.body.dataset.veloraReturnFavorites;
             delete window._veloraFavoriteReturnTab;
             delete document.body.dataset.veloraReturnHome;
+            delete document.body.dataset.veloraSearchMediaOpen;
             document.body.classList.add("vel-home-choice-picked");
             document.body.classList.add("vel-home-empty-active");
             var main = document.querySelector(".main--velora");
             if (main) {
               main.classList.remove("main--velora-in-package", "main--velora-live-package");
               main.scrollTop = 0;
+              main.style.overflow = "";
             }
+            document.body.style.overflow = "";
             window.scrollTo(0, 0);
             document.querySelectorAll("[data-bottom-nav]").forEach(function (button) {
               var active = button.getAttribute("data-bottom-nav") === "home";
@@ -9176,7 +9189,13 @@
               });
               var contextTitle = document.getElementById("vel-header-context-title-text");
               if (contextTitle) contextTitle.textContent = "";
-              if (typeof window.veloraStopAndReturnFavorites === "function") {
+              if (favoriteTab === "search") {
+                if (typeof window.veloraShowHome === "function") {
+                  window.veloraShowHome();
+                } else {
+                  document.dispatchEvent(new CustomEvent("velora-show-home"));
+                }
+              } else if (typeof window.veloraStopAndReturnFavorites === "function") {
                 window.veloraStopAndReturnFavorites(favoriteTab);
               } else {
                 document.dispatchEvent(new CustomEvent("velora-return-favorites", {
@@ -9218,7 +9237,13 @@
             delete window._veloraFavoriteReturnTab;
             delete document.body.dataset.veloraReturnAdult;
             delete document.body.dataset.veloraReturnHome;
-            if (typeof window.veloraStopAndReturnFavorites === "function") {
+            if (favoriteTab === "search") {
+              if (typeof window.veloraShowHome === "function") {
+                window.veloraShowHome();
+              } else {
+                document.dispatchEvent(new CustomEvent("velora-show-home"));
+              }
+            } else if (typeof window.veloraStopAndReturnFavorites === "function") {
               window.veloraStopAndReturnFavorites(favoriteTab);
             } else {
               document.dispatchEvent(new CustomEvent("velora-return-favorites", {
@@ -17540,10 +17565,19 @@
       window.veloraOpenTab = openTab;
 
       function stopHomeMedia() {
+        if (typeof window.veloraStopAllPlayback === "function") {
+          try { window.veloraStopAllPlayback(); } catch (error) { }
+        }
         ["video", "video-vod"].forEach(function (id) {
           var video = document.getElementById(id);
           if (!video) return;
-          try { video.pause(); } catch (error) { }
+          try {
+            video.pause();
+            if (video.hls && typeof video.hls.destroy === "function") {
+              try { video.hls.destroy(); } catch (_) {}
+              video.hls = null;
+            }
+          } catch (error) { }
         });
         ["player-container", "vod-player-container", "now-playing", "now-playing-vod"].forEach(function (id) {
           var element = document.getElementById(id);
@@ -17552,6 +17586,8 @@
             element.style.removeProperty("display");
           }
         });
+        var banner = document.getElementById("vel-live-match-banner") || document.getElementById("velora-match-banner");
+        if (banner) banner.remove();
         try {
           window.dispatchEvent(new CustomEvent("velora-home-media-stop"));
         } catch (error) { }
@@ -17575,15 +17611,26 @@
           "pkg-wheel-modal-open",
           "vel-vod-detail-active",
           "vel-netflix-modal-open",
-          "main--velora-series-detail-themed"
+          "main--velora-series-detail-themed",
+          "body--velora-live-package"
         );
         var pkgModal = document.getElementById("vel-pkg-modal");
         if (pkgModal) pkgModal.classList.remove("is-open");
         var cv = document.getElementById("content-view");
-        if (cv) cv.classList.remove("content-view--vod-film-detail");
+        if (cv) {
+          cv.classList.remove("content-view--vod-film-detail");
+          cv.classList.add("hidden");
+          cv.setAttribute("aria-hidden", "true");
+        }
         var dl = document.getElementById("dynamic-list");
         if (dl) dl.classList.remove("item-list--vod-film-detail");
 
+        var banner = document.getElementById("vel-live-match-banner") || document.getElementById("velora-match-banner");
+        if (banner) banner.remove();
+
+        if (typeof window.veloraStopAllPlayback === "function") {
+          try { window.veloraStopAllPlayback(); } catch (_) { }
+        }
         if (typeof window.veloraCloseFavoritesPage === "function") {
           try { window.veloraCloseFavoritesPage(false); } catch (_) { }
         }
@@ -17601,7 +17648,7 @@
           try { window.veloraSaveCurrentProgress(); } catch (_) { }
         }
         stopHomeMedia();
-        ["content-view", "packages-view", "adult-view"].forEach(function (id) {
+        ["content-view", "packages-view", "adult-view", "player-container", "vod-player-container", "now-playing", "now-playing-vod"].forEach(function (id) {
           var view = document.getElementById(id);
           if (view) {
             view.classList.add("hidden");
@@ -17618,7 +17665,9 @@
         if (main) {
           main.classList.remove("main--velora-in-package", "main--velora-live-package");
           main.scrollTop = 0;
+          main.style.overflow = "";
         }
+        document.body.style.overflow = "";
         window.scrollTo(0, 0);
         document.documentElement.scrollTop = 0;
         document.body.scrollTop = 0;
@@ -18292,7 +18341,7 @@
       }, true);
     })();
   </script>
-  <script defer src="/assets/velora-nav-controller.js?v=20260914-teardown-v7"></script>
+  <script defer src="/assets/velora-nav-controller.js?v=20260916-clean-scroll-v8"></script>
   <link rel="stylesheet" href="/assets/velora-adult.css?v=20260912-hub-images-v3" />
   <script defer src="/assets/velora-adult.js?v=20260912-hub-images-v3"></script>
   <script defer src="/assets/velora-football-admin.js?v=20260916-foot-admin-options-v10"></script>

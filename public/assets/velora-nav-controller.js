@@ -10,24 +10,7 @@
     try {
       var hasActiveMedia = false;
 
-      // 1. Forcefully abort all HTML5 <video> and <audio> elements in the document
-      document.querySelectorAll("video, audio").forEach(function (v) {
-        try {
-          if (v && (!v.paused || v.src || v.currentSrc)) {
-            hasActiveMedia = true;
-            v.pause();
-            if (v.hls && typeof v.hls.destroy === "function") {
-              try { v.hls.stopLoad(); } catch (_) {}
-              try { v.hls.destroy(); } catch (_) {}
-              v.hls = null;
-            }
-            v.removeAttribute("src");
-            try { v.load(); } catch (_) {}
-          }
-        } catch (_) {}
-      });
-
-      // 2. Native app bundle teardown
+      // 1. Native app bundle teardown FIRST so Hls.js instances are destroyed properly before touching DOM src
       if (typeof window.veloraStopAllPlayback === "function") {
         try { window.veloraStopAllPlayback(); } catch (_) {}
       }
@@ -41,18 +24,51 @@
         try { window.veloraStopAllStreams(); } catch (_) {}
       }
 
-      // 3. Adult player teardown
+      // 2. Forcefully abort all HTML5 <video> and <audio> elements in the document
+      document.querySelectorAll("video, audio").forEach(function (v) {
+        try {
+          if (v) {
+            if (!v.paused || v.src || v.currentSrc) {
+              hasActiveMedia = true;
+            }
+            v.pause();
+            if (v.hls && typeof v.hls.destroy === "function") {
+              try { v.hls.stopLoad(); } catch (_) {}
+              try { v.hls.destroy(); } catch (_) {}
+              v.hls = null;
+            }
+            v.removeAttribute("src");
+            try { v.load(); } catch (_) {}
+          }
+        } catch (_) {}
+      });
+
+      // 3. Hide all player containers
+      [
+        "player-container",
+        "vod-player-container",
+        "now-playing",
+        "now-playing-vod"
+      ].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) {
+          el.classList.add("hidden");
+          el.style.removeProperty("display");
+        }
+      });
+
+      // 4. Adult player teardown
       const isAdultActive = document.body.classList.contains("vel-adult-active") || (document.body.dataset && document.body.dataset.velActiveTab === "adult");
       if (isAdultActive && typeof window.veloraCloseAdultView === "function") {
         try { window.veloraCloseAdultView(false); } catch (_) {}
       }
 
-      // 4. Close active server-side transcode sessions
+      // 5. Close active server-side transcode sessions
       if (typeof window.veloraCloseActiveTranscodeSession === "function") {
         try { window.veloraCloseActiveTranscodeSession(); } catch (_) {}
       }
 
-      // 5. Fire instant stream stop beacon only if media was active
+      // 6. Fire instant stream stop beacon only if media was active
       if (hasActiveMedia || isAdultActive || (typeof window.__veloraActiveTranscodeSession !== "undefined" && window.__veloraActiveTranscodeSession)) {
         try {
           const stopUrl = "/api/proxy/stream/stop";
@@ -88,12 +104,28 @@
     }
 
     const navEl = e.target.closest(
-      ".nav-item, .nav-link, .sidebar-link, .vel-bottom-nav-item, .vel-bottom-nav__button, [data-bottom-nav], [data-nav], [data-home-tab], .vel-nav-btn, .navbar, .header-nav, #btn-home, #btn-live, #btn-movies, #btn-series, #btn-favorites, #btn-adult, .vod-back-btn, .player-back-btn, [data-action='back'], [data-action='close-player']"
+      ".nav-item, .nav-link, .sidebar-link, .vel-bottom-nav-item, .vel-bottom-nav__button, [data-bottom-nav], [data-nav], [data-home-tab], .vel-nav-btn, .navbar, .header-nav, #btn-home, #btn-live, #btn-movies, #btn-series, #btn-favorites, #btn-adult, #btn-logo-home, #btn-header-home, #btn-back-home, .vod-back-btn, .player-back-btn, #btn-close-player, #btn-close-vod-player, [data-action='back'], [data-action='close-player']"
     );
 
     if (navEl) {
       const bottomNavAction = navEl.getAttribute("data-bottom-nav") || navEl.getAttribute("data-home-tab");
       const activeTab = document.body.dataset ? document.body.dataset.velActiveTab : "";
+      const isHomeTarget =
+        bottomNavAction === "home" ||
+        navEl.id === "btn-home" ||
+        navEl.id === "btn-logo-home" ||
+        navEl.id === "btn-header-home" ||
+        navEl.id === "btn-back-home";
+
+      const isBackOrClose =
+        navEl.id === "btn-close-player" ||
+        navEl.id === "btn-close-vod-player" ||
+        navEl.id === "btn-back-home" ||
+        navEl.classList.contains("player-back-btn") ||
+        navEl.classList.contains("vod-back-btn") ||
+        navEl.getAttribute("data-action") === "back" ||
+        navEl.getAttribute("data-action") === "close-player";
+
       const isFromFootballOrSearch = Boolean(
         (document.body.dataset && document.body.dataset.veloraReturnFavorites === "search") ||
         (document.body.dataset && document.body.dataset.veloraSearchMediaOpen) ||
@@ -102,7 +134,7 @@
         document.getElementById("vel-football-notice-modal")
       );
 
-      // If currently in football match / search channel playback, clicking any nav tab (including TV) must forcefully stop playback and cleanup
+      // If currently in football match / search channel playback
       if (isFromFootballOrSearch) {
         delete document.body.dataset.veloraReturnHome;
         delete document.body.dataset.veloraReturnFavorites;
@@ -112,12 +144,24 @@
         const banner = document.getElementById("vel-live-match-banner") || document.getElementById("velora-match-banner");
         if (banner) banner.remove();
         cleanupAllActiveMediaAndSessions();
+
+        if (isHomeTarget || isBackOrClose) {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+          } catch (_) {}
+          if (typeof window.veloraShowHome === "function") {
+            window.veloraShowHome();
+          } else {
+            document.dispatchEvent(new CustomEvent("velora-show-home"));
+          }
+          return;
+        }
         return;
       }
 
       // Check if clicking the same active section tab (e.g. clicking Live while already on Live)
       if (bottomNavAction && bottomNavAction === activeTab && activeTab !== "home") {
-        // Already on this section tab, do not kill playing media
         return;
       }
       if (bottomNavAction && bottomNavAction !== "home") {

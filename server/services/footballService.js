@@ -627,6 +627,9 @@ const MAJOR_TEAM_LOGOS = {
     'montpellier': 'https://media.api-sports.io/football/teams/82.png',
     'auxerre': 'https://media.api-sports.io/football/teams/108.png',
     'saint-etienne': 'https://media.api-sports.io/football/teams/527.png',
+    'asse': 'https://media.api-sports.io/football/teams/527.png',
+    'lorient': 'https://media.api-sports.io/football/teams/97.png',
+    'clermont': 'https://media.api-sports.io/football/teams/99.png',
     'le mans': 'https://media.api-sports.io/football/teams/112.png',
     'troyes': 'https://media.api-sports.io/football/teams/110.png',
     'metz': 'https://media.api-sports.io/football/teams/111.png',
@@ -658,6 +661,9 @@ const MAJOR_TEAM_LOGOS = {
     'monza': 'https://media.api-sports.io/football/teams/1579.png',
     'parma': 'https://media.api-sports.io/football/teams/523.png',
     'como': 'https://media.api-sports.io/football/teams/895.png',
+    'udinese': 'https://media.api-sports.io/football/teams/494.png',
+    'empoli': 'https://media.api-sports.io/football/teams/511.png',
+    'venezia': 'https://media.api-sports.io/football/teams/517.png',
 
     // Allemagne
     'bayern': 'https://media.api-sports.io/football/teams/157.png',
@@ -683,6 +689,14 @@ const MAJOR_TEAM_LOGOS = {
     'holstein': 'https://media.api-sports.io/football/teams/191.png',
     'elversberg': 'https://media.api-sports.io/football/teams/185.png',
     'st. pauli': 'https://media.api-sports.io/football/teams/186.png',
+    'union berlin': 'https://media.api-sports.io/football/teams/182.png',
+    'freiburg': 'https://media.api-sports.io/football/teams/160.png',
+    'fribourg': 'https://media.api-sports.io/football/teams/160.png',
+    'hoffenheim': 'https://media.api-sports.io/football/teams/167.png',
+    'bochum': 'https://media.api-sports.io/football/teams/171.png',
+    'augsburg': 'https://media.api-sports.io/football/teams/170.png',
+    'mayence': 'https://media.api-sports.io/football/teams/164.png',
+    'mainz': 'https://media.api-sports.io/football/teams/164.png',
 
     // Portugal
     'benfica': 'https://media.api-sports.io/football/teams/211.png',
@@ -701,6 +715,8 @@ const MAJOR_TEAM_LOGOS = {
     'zwolle': 'https://media.api-sports.io/football/teams/204.png',
     'sparta rotterdam': 'https://media.api-sports.io/football/teams/208.png',
     'az alkmaar': 'https://media.api-sports.io/football/teams/201.png',
+    'twente': 'https://media.api-sports.io/football/teams/195.png',
+    'utrecht': 'https://media.api-sports.io/football/teams/200.png',
 
     // Belgique
     'club bruges': 'https://media.api-sports.io/football/teams/569.png',
@@ -712,6 +728,9 @@ const MAJOR_TEAM_LOGOS = {
     'gent': 'https://media.api-sports.io/football/teams/742.png',
     'la gantoise': 'https://media.api-sports.io/football/teams/742.png',
     'union sg': 'https://media.api-sports.io/football/teams/741.png',
+    'standard liege': 'https://media.api-sports.io/football/teams/734.png',
+    'standard': 'https://media.api-sports.io/football/teams/734.png',
+    'charleroi': 'https://media.api-sports.io/football/teams/738.png',
 
     // Grèce
     'olympiakos': 'https://media.api-sports.io/football/teams/554.png',
@@ -736,6 +755,7 @@ const MAJOR_TEAM_LOGOS = {
     'fenerbahce': 'https://media.api-sports.io/football/teams/611.png',
     'besiktas': 'https://media.api-sports.io/football/teams/553.png',
     'trabzonspor': 'https://media.api-sports.io/football/teams/607.png',
+    'basaksehir': 'https://media.api-sports.io/football/teams/550.png',
     'kocaeli': 'https://media.api-sports.io/football/teams/608.png',
 
     // Écosse
@@ -747,6 +767,8 @@ const MAJOR_TEAM_LOGOS = {
     'al nassr': 'https://media.api-sports.io/football/teams/2522.png',
     'al ittihad': 'https://media.api-sports.io/football/teams/2523.png',
     'al ahli': 'https://media.api-sports.io/football/teams/2521.png',
+    'al ettifaq': 'https://media.api-sports.io/football/teams/2525.png',
+    'al shabab': 'https://media.api-sports.io/football/teams/2526.png',
 
     // International / Sélections
     'france': 'https://media.api-sports.io/football/teams/2.png',
@@ -755,12 +777,24 @@ const MAJOR_TEAM_LOGOS = {
     'allemagne': 'https://media.api-sports.io/football/teams/25.png',
     'italie': 'https://media.api-sports.io/football/teams/768.png',
     'portugal': 'https://media.api-sports.io/football/teams/27.png',
+    'belgique': 'https://media.api-sports.io/football/teams/1.png',
+    'pays-bas': 'https://media.api-sports.io/football/teams/1118.png',
+    'croatie': 'https://media.api-sports.io/football/teams/3.png',
+    'suisse': 'https://media.api-sports.io/football/teams/13.png',
+    'danemark': 'https://media.api-sports.io/football/teams/21.png',
     'bresil': 'https://media.api-sports.io/football/teams/6.png',
     'argentine': 'https://media.api-sports.io/football/teams/26.png',
+    'uruguay': 'https://media.api-sports.io/football/teams/7.png',
+    'colombie': 'https://media.api-sports.io/football/teams/8.png',
+    'mexique': 'https://media.api-sports.io/football/teams/16.png',
     'maroc': 'https://media.api-sports.io/football/teams/31.png',
     'algerie': 'https://media.api-sports.io/football/teams/32.png',
     'tunisie': 'https://media.api-sports.io/football/teams/28.png',
-    'egypte': 'https://media.api-sports.io/football/teams/30.png'
+    'egypte': 'https://media.api-sports.io/football/teams/30.png',
+    'senegal': 'https://media.api-sports.io/football/teams/15.png',
+    'cameroun': 'https://media.api-sports.io/football/teams/1501.png',
+    'cote d\'ivoire': 'https://media.api-sports.io/football/teams/1504.png',
+    'japon': 'https://media.api-sports.io/football/teams/12.png'
 };
 
 /**

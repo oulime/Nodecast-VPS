@@ -3135,15 +3135,10 @@
       opacity: 1 !important;
     }
 
-    .player-buffering,
     #player-container .player-buffering,
-    #vod-player-container .player-buffering,
     #player-container:fullscreen .player-buffering,
-    #vod-player-container:fullscreen .player-buffering,
     #player-container:-webkit-full-screen .player-buffering,
-    #vod-player-container:-webkit-full-screen .player-buffering,
-    #player-container.player-container--live-fullscreen .player-buffering,
-    #vod-player-container.player-container--fullscreen .player-buffering {
+    #player-container.player-container--live-fullscreen .player-buffering {
       position: absolute !important;
       inset: 0 !important;
       z-index: 30 !important;
@@ -3161,13 +3156,11 @@
 
     .player-buffering.hidden,
     #player-container .player-buffering.hidden,
-    #vod-player-container .player-buffering.hidden,
     #player-container:fullscreen .player-buffering.hidden,
-    #vod-player-container:fullscreen .player-buffering.hidden,
     #player-container:-webkit-full-screen .player-buffering.hidden,
-    #vod-player-container:-webkit-full-screen .player-buffering.hidden,
     #player-container.player-container--live-fullscreen .player-buffering.hidden,
-    #vod-player-container.player-container--fullscreen .player-buffering.hidden {
+    #vod-player-buffering,
+    #vod-player-container .player-buffering {
       display: none !important;
     }
 
@@ -3686,31 +3679,14 @@
       }
     }
 
-    .vod-frame-freeze {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      pointer-events: none;
-      z-index: 2;
-      background: transparent;
-    }
-
-    .vod-frame-freeze.hidden {
+    .vod-frame-freeze,
+    #vod-player-buffering,
+    #vod-player-container .vod-frame-freeze,
+    #vod-player-container .player-buffering {
       display: none !important;
-    }
-
-    #vod-player-buffering {
-      display: none !important;
-    }
-
-    #vod-player-container:fullscreen .vod-frame-freeze,
-    #vod-player-container:-webkit-full-screen .vod-frame-freeze,
-    #vod-player-container.player-container--fullscreen .vod-frame-freeze {
-      width: 100vw !important;
-      height: 100vh !important;
-      object-fit: fill !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
     }
 
     .vel-vod-center-controls .vel-vod-skip-btn svg {
@@ -7425,12 +7401,9 @@
                 x5-video-player-fullscreen="false" x5-video-orientation="landscape"
                 controlslist="nofullscreen nodownload noremoteplayback" disablepictureinpicture disableremoteplayback
                 preload="auto" crossorigin="anonymous"></video>
-              <canvas id="vod-frame-freeze" class="vod-frame-freeze hidden" aria-hidden="true"></canvas>
+              <canvas id="vod-frame-freeze" class="vod-frame-freeze hidden" aria-hidden="true" style="display:none !important;"></canvas>
               <div id="vod-player-buffering" class="player-buffering hidden" aria-hidden="true" role="status"
-                aria-live="polite" aria-label="Chargement du film">
-                <div class="player-buffering__spinner" aria-hidden="true"></div>
-                <span class="player-buffering__label">Chargement…</span>
-              </div>
+                aria-live="polite" aria-label="Chargement du film" style="display:none !important;"></div>
               <div id="vod-center-controls" class="vel-vod-center-controls hidden" aria-hidden="true">
                 <button id="vod-ctl-back-10" type="button" class="vel-vod-center-btn vel-vod-skip-btn"
                   aria-label="Reculer de 10 secondes" title="−10 secondes" tabindex="0" data-tv-focusable="true">
@@ -13788,16 +13761,7 @@
         var freezeCanvas = document.getElementById("vod-frame-freeze");
 
         function freezeVodFrame() {
-          try {
-            if (!freezeCanvas || !video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return;
-            freezeCanvas.width = video.videoWidth;
-            freezeCanvas.height = video.videoHeight;
-            var ctx = freezeCanvas.getContext("2d");
-            if (ctx) {
-              ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-              freezeCanvas.classList.remove("hidden");
-            }
-          } catch (e) { }
+          return;
         }
 
         function unfreezeVodFrame() {

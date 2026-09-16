@@ -1358,6 +1358,32 @@
     }
   }
 
+  function getMatchEffectiveScore(match, timeInfo, originalIndex) {
+    var rawHype = (match && typeof match.hypeScore === 'number' && Number.isFinite(match.hypeScore))
+      ? match.hypeScore
+      : (10000 - ((originalIndex || 0) * 100));
+
+    var status = timeInfo ? timeInfo.status : 'upcoming';
+
+    if (status === 'expired') {
+      return -999999;
+    }
+    if (status === 'finished') {
+      return -100000 + (rawHype * 0.1);
+    }
+
+    // Les très grands matchs (Real Madrid, Barca, PSG, City, Arsenal, Liverpool, Man Utd, Bayern...)
+    // restent prioritaires en tête de slider même avant leur coup d'envoi.
+    var liveBoost = 0;
+    if (status === 'live') {
+      liveBoost = 2500;
+    } else if (status === 'starting_soon') {
+      liveBoost = 1000;
+    }
+
+    return rawHype + liveBoost;
+  }
+
   function sortFootballMatches(matches) {
     if (!Array.isArray(matches)) return [];
 
@@ -1368,20 +1394,16 @@
         valid.push({
           match: m,
           originalIndex: idx,
-          timeInfo: tInfo
+          timeInfo: tInfo,
+          score: getMatchEffectiveScore(m, tInfo, idx)
         });
       }
     });
 
     valid.sort(function (a, b) {
-      var rankMap = { live: 0, starting_soon: 1, upcoming: 2, finished: 3 };
-      var aRank = rankMap[a.timeInfo.status] != null ? rankMap[a.timeInfo.status] : 2;
-      var bRank = rankMap[b.timeInfo.status] != null ? rankMap[b.timeInfo.status] : 2;
-
-      if (aRank !== bRank) {
-        return aRank - bRank;
+      if (b.score !== a.score) {
+        return b.score - a.score;
       }
-
       return a.originalIndex - b.originalIndex;
     });
 
@@ -1984,11 +2006,10 @@
     });
 
     if (needsReorder) {
-      var rankMap = { live: 0, starting_soon: 1, upcoming: 2, finished: 3 };
       validCards.sort(function (a, b) {
-        var aRank = rankMap[a.status] != null ? rankMap[a.status] : 2;
-        var bRank = rankMap[b.status] != null ? rankMap[b.status] : 2;
-        if (aRank !== bRank) return aRank - bRank;
+        var scoreA = getMatchEffectiveScore(a.match, { status: a.status }, a.originalIndex);
+        var scoreB = getMatchEffectiveScore(b.match, { status: b.status }, b.originalIndex);
+        if (scoreB !== scoreA) return scoreB - scoreA;
         return a.originalIndex - b.originalIndex;
       });
 

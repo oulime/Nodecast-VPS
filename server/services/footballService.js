@@ -990,10 +990,45 @@ function cleanChannelName(rawAlt) {
 
 // SYSTÈME DE TIERS & POIDS DES CLUBS ET SÉLECTIONS NATIONALES
 const CONTEMPORARY_CLUB_TIERS = [
-    { weight: 200, keywords: ['real madrid', 'barcelon', 'barca', 'arsenal', 'manchester city', 'man city', 'liverpool', 'paris', 'psg', 'bayern', 'france', 'bresil', 'brazil', 'argentine', 'argentina', 'angleterre', 'england', 'espagne', 'spain', 'allemagne', 'germany'] },
-    { weight: 130, keywords: ['chelsea', 'manchester united', 'man united', 'man u', 'tottenham', 'spurs', 'atletico', 'atlético', 'leverkusen', 'italie', 'italy', 'portugal', 'pays-bas', 'netherlands', 'belgique', 'belgium', 'maroc', 'morocco', 'algerie', 'algeria', 'croatie', 'croatia', 'uruguay', 'senegal'] },
-    { weight: 80, keywords: ['inter', 'juventus', 'juve', 'milan', 'ac milan', 'napoli', 'naples', 'dortmund', 'marseille', 'om', 'monaco', 'aston villa', 'newcastle', 'cote d\'ivoire', 'tunisie', 'tunisia', 'egypte', 'egypt', 'cameroun', 'cameroon', 'nigeria', 'colombie', 'colombia', 'mexique', 'mexico', 'japon', 'japan', 'coree', 'usa', 'etats-unis'] },
-    { weight: 40, keywords: ['lyon', 'ol', 'lille', 'losc', 'atalanta', 'roma', 'lazio', 'bilbao', 'athletic', 'sociedad', 'seville', 'sevilla', 'leipzig', 'benfica', 'sporting', 'porto', 'ajax', 'psv', 'feyenoord', 'galatasaray', 'fenerbahce', 'rennes', 'lens', 'nice', 'mali', 'ghana', 'rd congo', 'guinee', 'suisse', 'danemark', 'autriche', 'turquie', 'serbie', 'ecosse', 'pologne', 'arabie saoudite', 'chili', 'perou'] }
+    {
+        weight: 200,
+        keywords: [
+            'real madrid', 'barcelon', 'barca', 'arsenal', 'manchester city', 'man city', 'liverpool', 'paris', 'psg', 'bayern',
+            'juventus', 'juve', 'inter', 'milan', 'ac milan',
+            'france', 'bresil', 'brazil', 'argentine', 'argentina', 'angleterre', 'england', 'espagne', 'spain', 'allemagne', 'germany', 'italie', 'italy'
+        ]
+    },
+    {
+        weight: 140,
+        keywords: [
+            'chelsea', 'manchester united', 'man united', 'man u', 'tottenham', 'spurs', 'atletico', 'atlético', 'leverkusen',
+            'dortmund', 'napoli', 'naples', 'roma', 'as roma', 'lazio', 'atalanta',
+            'benfica', 'sporting', 'porto', 'ajax', 'marseille', 'om', 'monaco', 'aston villa', 'newcastle',
+            'portugal', 'pays-bas', 'netherlands', 'belgique', 'belgium', 'maroc', 'morocco', 'algerie', 'algeria', 'croatie', 'croatia', 'uruguay', 'senegal', 'egypte', 'egypt', 'cote d\'ivoire', 'tunisie', 'tunisia'
+        ]
+    },
+    {
+        weight: 75,
+        keywords: [
+            'fiorentina', 'bologna', 'torino', 'lyon', 'ol', 'lille', 'losc', 'rennes', 'lens', 'nice',
+            'bilbao', 'athletic', 'sociedad', 'seville', 'sevilla', 'villarreal', 'valence', 'valencia', 'betis',
+            'leipzig', 'rb leipzig', 'eintracht', 'francfort', 'stuttgart', 'psv', 'feyenoord',
+            'galatasaray', 'fenerbahce', 'besiktas', 'al hilal', 'al nassr',
+            'cameroun', 'cameroon', 'nigeria', 'colombie', 'colombia', 'mexique', 'mexico', 'japon', 'japan', 'usa', 'etats-unis', 'suisse', 'danemark', 'autriche', 'turquie', 'serbie', 'ecosse', 'pologne', 'chili', 'perou'
+        ]
+    },
+    {
+        weight: 40,
+        keywords: [
+            'monza', 'como', 'genoa', 'cagliari', 'verona', 'parma', 'empoli', 'sassuolo',
+            'west ham', 'brighton', 'fulham', 'wolves', 'brentford', 'bournemouth', 'crystal palace', 'nottingham', 'everton',
+            'brest', 'strasbourg', 'toulouse', 'auxerre', 'angers', 'nantes', 'reims', 'saint-etienne', 'asse',
+            'mallorca', 'osasuna', 'celta', 'rayo', 'getafe', 'espanyol', 'las palmas', 'alaves', 'girona',
+            'hoffenheim', 'freiburg', 'mainz', 'augsburg', 'bochum', 'heidenheim', 'st. pauli', 'union berlin', 'werder', 'wolfsburg',
+            'braga', 'guimaraes', 'twente', 'utrecht', 'az alkmaar', 'alkmaar', 'anderlecht', 'club bruges', 'genk', 'gent', 'union sg',
+            'arabie saoudite', 'saudi', 'ghana', 'mali', 'rd congo', 'guinee'
+        ]
+    }
 ];
 
 function getClubWeight(teamName) {
@@ -1016,18 +1051,19 @@ function calculateMatchHypeScore(homeTeam, awayTeam, competition) {
     const lowerComp = String(competition || '').toLowerCase();
     if (lowerComp.includes('world cup') || lowerComp.includes('coupe du monde')) leagueBonus = 180;
     else if (lowerComp.includes('euro') && !lowerComp.includes('europa')) leagueBonus = 160;
-    else if (lowerComp.includes('champions league')) leagueBonus = 150;
+    else if (lowerComp.includes('champions league') || lowerComp.includes('ligue des champions')) leagueBonus = 150;
     else if (lowerComp.includes('can') || lowerComp.includes('afcon') || lowerComp.includes('coupe d\'afrique')) leagueBonus = 140;
     else if (lowerComp.includes('copa america') || lowerComp.includes('copa américa')) leagueBonus = 130;
-    else if (lowerComp.includes('nations league') || lowerComp.includes('ligue des nations')) leagueBonus = 100;
+    else if (lowerComp.includes('europa league') || lowerComp.includes('ligue europa')) leagueBonus = 100;
+    else if (lowerComp.includes('conference')) leagueBonus = 60;
+    else if (lowerComp.includes('nations league') || lowerComp.includes('ligue des nations')) leagueBonus = 90;
     else if (lowerComp.includes('qualif') || lowerComp.includes('elim') || lowerComp.includes('qualification') || lowerComp.includes('eliminatoire')) leagueBonus = 90;
-    else if (lowerComp.includes('premier league')) leagueBonus = 60;
-    else if (lowerComp.includes('carabao') || lowerComp.includes('league cup') || lowerComp.includes('fa cup') || lowerComp.includes('copa del rey') || lowerComp.includes('coupe de france') || lowerComp.includes('coppa italia') || lowerComp.includes('dfb-pokal')) leagueBonus = 45;
-    else if (lowerComp.includes('liga')) leagueBonus = 40;
-    else if (lowerComp.includes('ligue 1')) leagueBonus = 35;
-    else if (lowerComp.includes('serie a')) leagueBonus = 30;
-    else if (lowerComp.includes('bundesliga')) leagueBonus = 30;
-    else if (lowerComp.includes('europa league')) leagueBonus = 40;
+    else if (lowerComp.includes('premier league')) leagueBonus = 70;
+    else if (lowerComp.includes('serie a')) leagueBonus = 65;
+    else if (lowerComp.includes('liga') || lowerComp.includes('laliga')) leagueBonus = 65;
+    else if (lowerComp.includes('bundesliga')) leagueBonus = 55;
+    else if (lowerComp.includes('ligue 1')) leagueBonus = 50;
+    else if (lowerComp.includes('carabao') || lowerComp.includes('league cup') || lowerComp.includes('fa cup') || lowerComp.includes('copa del rey') || lowerComp.includes('coupe de france') || lowerComp.includes('coppa italia') || lowerComp.includes('dfb-pokal')) leagueBonus = 50;
     else if (lowerComp.includes('amical') || lowerComp.includes('friendly')) leagueBonus = 50;
 
     return (maxW * 100) + (minW * 25) + (w1 * w2 * 0.5) + leagueBonus;

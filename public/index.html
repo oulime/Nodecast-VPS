@@ -12115,8 +12115,14 @@
         }
 
         function setSearchLoading(loading) {
-          if (!status) return;
-          status.classList.toggle("is-loading", !!loading);
+          if (status) {
+            status.classList.toggle("is-loading", !!loading);
+          }
+          var submitBtn = form ? form.querySelector(".vel-global-search__submit") : null;
+          if (submitBtn) {
+            submitBtn.classList.toggle("is-loading", !!loading);
+            submitBtn.setAttribute("aria-busy", loading ? "true" : "false");
+          }
         }
 
         function updateSearchPlaceholder() {
@@ -12481,6 +12487,62 @@
           sliderEl.addEventListener("mousedown", onPointerDown);
           window.addEventListener("mousemove", onPointerMove);
           window.addEventListener("mouseup", onPointerUp);
+        }
+
+        function escapeSearchHtml(str) {
+          return String(str || "").replace(/[&<>"']/g, function (m) {
+            return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m];
+          });
+        }
+
+        function renderSearchLoading(query) {
+          results.replaceChildren();
+          if (filterTabs) filterTabs.classList.add("hidden");
+
+          var wrap = document.createElement("div");
+          wrap.className = "vel-global-search__loading-view";
+          wrap.setAttribute("role", "status");
+          wrap.setAttribute("aria-live", "polite");
+
+          var cleanQ = String(query || "").trim();
+
+          wrap.innerHTML =
+            '<div class="vel-search-loader">' +
+              '<div class="vel-search-loader__visual">' +
+                '<div class="vel-search-loader__halo"></div>' +
+                '<div class="vel-search-loader__spinner"></div>' +
+                '<div class="vel-search-loader__icon" aria-hidden="true">' +
+                  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+                    '<circle cx="11" cy="11" r="8"></circle>' +
+                    '<line x1="21" y1="21" x2="16.65" y2="16.65"></line>' +
+                  '</svg>' +
+                '</div>' +
+              '</div>' +
+              '<div class="vel-search-loader__text-wrap">' +
+                '<div class="vel-search-loader__badge">' +
+                  '<span class="vel-search-loader__pulse-dot"></span>' +
+                  '<span>EXPLORATION DU CATALOGUE</span>' +
+                '</div>' +
+                '<span class="vel-search-loader__label">' +
+                  'Recherche ' + (cleanQ ? 'de « <strong>' + escapeSearchHtml(cleanQ) + '</strong> »' : 'en cours') +
+                  '<span class="vel-search-loader__dots"><i></i><i></i><i></i></span>' +
+                '</span>' +
+                '<span class="vel-search-loader__sublabel">Scan en direct des films, séries et chaînes TV...</span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="vel-search-skeleton-grid" aria-hidden="true">' +
+              [0, 1, 2, 3, 4, 5, 6, 7].map(function () {
+                return '<div class="vel-search-skeleton-card">' +
+                  '<div class="vel-search-skeleton-poster"></div>' +
+                  '<div class="vel-search-skeleton-body">' +
+                    '<div class="vel-search-skeleton-line vel-search-skeleton-line--title"></div>' +
+                    '<div class="vel-search-skeleton-line vel-search-skeleton-line--meta"></div>' +
+                  '</div>' +
+                '</div>';
+              }).join("") +
+            '</div>';
+
+          results.appendChild(wrap);
         }
 
         function renderSuggestions() {
@@ -12938,6 +13000,7 @@
           }
           setStatus("Recherche en direct...", "RECHERCHE");
           setSearchLoading(true);
+          renderSearchLoading(query);
 
           function applyPayload(payload, loading) {
             if (thisRun !== runId) return;
@@ -12967,6 +13030,9 @@
             } else {
               setStatus(loading ? "Exploration du catalogue " + country + "..." : "Aucun résultat dans " + country, loading ? "SCAN" : "0");
             }
+            if (loading && totalCount === 0) {
+              return;
+            }
             if (loading && results.querySelector(".vel-global-search__result[data-search-result-id]")) {
               lastSearchPayload = filteredPayload;
               lastSearchQuery = query;
@@ -12987,7 +13053,7 @@
             if (thisRun !== runId) return;
             setSearchLoading(false);
             setStatus("Recherche momentanément indisponible.", "ERREUR");
-            clearResults("");
+            clearResults("Une erreur est survenue lors de la recherche. Veuillez réessayer.");
           });
         }
 
@@ -15612,6 +15678,16 @@
       box-shadow: 0 4px 16px rgba(124, 58, 237, 0.6);
     }
 
+    .vel-global-search__submit.is-loading {
+      background: linear-gradient(135deg, #0ea5e9 0%, #7c3aed 100%);
+      box-shadow: 0 0 16px rgba(14, 165, 233, 0.65);
+      cursor: wait;
+    }
+
+    .vel-global-search__submit.is-loading svg {
+      animation: velGlobalSearchSpin 0.75s linear infinite;
+    }
+
     .vel-global-search__submit svg {
       width: 1.15rem;
       height: 1.15rem;
@@ -15815,6 +15891,253 @@
 
     .vel-global-search__results::-webkit-scrollbar-thumb:hover {
       background: rgba(255, 255, 255, 0.26);
+    }
+
+    /* Search Loading State */
+    .vel-global-search__loading-view {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      padding: 0.6rem 0.2rem 1.2rem;
+      box-sizing: border-box;
+      animation: velGlobalSearchFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    @keyframes velGlobalSearchFadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .vel-search-loader {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      text-align: center;
+      width: 100%;
+    }
+
+    .vel-search-loader__visual {
+      position: relative;
+      width: 62px;
+      height: 62px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 0.15rem;
+    }
+
+    .vel-search-loader__halo {
+      position: absolute;
+      inset: -6px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.35) 0%, transparent 70%);
+      filter: blur(8px);
+      animation: velSearchHaloPulse 2s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    @keyframes velSearchHaloPulse {
+      0%, 100% { opacity: 0.45; transform: scale(0.92); }
+      50% { opacity: 0.95; transform: scale(1.12); }
+    }
+
+    .vel-search-loader__spinner {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2.5px solid transparent;
+      border-top-color: #a855f7;
+      border-right-color: #38bdf8;
+      border-bottom-color: rgba(168, 85, 247, 0.4);
+      box-shadow: 0 0 16px rgba(168, 85, 247, 0.4);
+      animation: velGlobalSearchSpin 0.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    .vel-search-loader__spinner::before {
+      content: "";
+      position: absolute;
+      inset: 4px;
+      border-radius: 50%;
+      border: 1.5px dashed rgba(224, 195, 255, 0.45);
+      animation: velGlobalSearchSpinReverse 2s linear infinite;
+    }
+
+    @keyframes velGlobalSearchSpinReverse {
+      to { transform: rotate(-360deg); }
+    }
+
+    .vel-search-loader__icon {
+      position: relative;
+      z-index: 2;
+      width: 22px;
+      height: 22px;
+      color: #f3f0ff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      filter: drop-shadow(0 0 6px rgba(192, 132, 252, 0.8));
+    }
+
+    .vel-search-loader__icon svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .vel-search-loader__text-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .vel-search-loader__badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.2rem 0.75rem;
+      border-radius: 999px;
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.22), rgba(14, 165, 233, 0.18));
+      border: 1px solid rgba(192, 132, 252, 0.4);
+      box-shadow: 0 0 14px rgba(168, 85, 247, 0.25);
+      color: #f5f3ff;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .vel-search-loader__pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #38bdf8;
+      box-shadow: 0 0 8px #38bdf8, 0 0 4px #fff;
+      animation: velSearchPulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes velSearchPulse {
+      0%, 100% { transform: scale(0.85); opacity: 0.6; }
+      50% { transform: scale(1.25); opacity: 1; }
+    }
+
+    .vel-search-loader__label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      color: #f3f0ff;
+      font-size: clamp(0.92rem, 2.5vw, 1.02rem);
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .vel-search-loader__label strong {
+      color: #c4b5fd;
+      font-weight: 800;
+    }
+
+    .vel-search-loader__dots {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .vel-search-loader__dots i {
+      display: inline-block;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #c084fc;
+      box-shadow: 0 0 6px rgba(192, 132, 252, 0.8);
+      animation: velSearchDot 0.9s ease-in-out infinite;
+    }
+
+    .vel-search-loader__dots i:nth-child(2) { animation-delay: 0.15s; }
+    .vel-search-loader__dots i:nth-child(3) { animation-delay: 0.3s; }
+
+    @keyframes velSearchDot {
+      0%, 100% { transform: translateY(0); opacity: 0.35; }
+      50% { transform: translateY(-4px); opacity: 1; }
+    }
+
+    .vel-search-loader__sublabel {
+      color: rgba(255, 255, 255, 0.48);
+      font-size: 0.78rem;
+      font-weight: 500;
+    }
+
+    /* Shimmer Skeleton Cards */
+    .vel-search-skeleton-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 0.9rem;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    @media (max-width: 640px) {
+      .vel-search-skeleton-grid {
+        grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+        gap: 0.65rem;
+      }
+    }
+
+    .vel-search-skeleton-card {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 0.5rem;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .vel-search-skeleton-card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      transform: translateX(-100%);
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+      animation: velSearchShimmer 1.5s infinite;
+    }
+
+    @keyframes velSearchShimmer {
+      100% { transform: translateX(100%); }
+    }
+
+    .vel-search-skeleton-poster {
+      width: 100%;
+      aspect-ratio: 2 / 3;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .vel-search-skeleton-body {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      padding: 0.2rem 0;
+    }
+
+    .vel-search-skeleton-line {
+      height: 10px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .vel-search-skeleton-line--title {
+      width: 82%;
+    }
+
+    .vel-search-skeleton-line--meta {
+      width: 48%;
+      height: 8px;
     }
 
     /* Suggestions & Popular searches */
@@ -16859,11 +17182,17 @@
     }
 
     body.vel-home-empty-active,
-    html:has(body.vel-home-empty-active) {
-      overflow-x: hidden !important;
+    body.vel-adult-active,
+    body.vel-adult-player-active,
+    html:has(body.vel-home-empty-active),
+    html:has(body.vel-adult-active),
+    html:has(body.vel-adult-player-active) {
+      overflow-x: clip !important;
       overflow-y: auto !important;
       height: auto !important;
       min-height: 100% !important;
+      -webkit-overflow-scrolling: touch !important;
+      touch-action: pan-y !important;
     }
 
     body.vel-home-empty-active .app,
@@ -16871,12 +17200,27 @@
     body.vel-home-empty-active .main--velora .vel-dashboard,
     body.vel-home-empty-active .main--velora .vel-body,
     body.vel-home-empty-active #vel-home-empty-page,
-    body.vel-home-empty-active .vel-home-sections {
+    body.vel-home-empty-active .vel-home-sections,
+    body.vel-adult-active .app,
+    body.vel-adult-player-active .app,
+    .app:has(#adult-view:not(.hidden)),
+    .app:has(.vel-adult-portal:not(.hidden)),
+    body.vel-adult-active .main--velora,
+    body.vel-adult-player-active .main--velora,
+    body.vel-adult-active .main--velora .vel-dashboard,
+    body.vel-adult-player-active .main--velora .vel-dashboard,
+    body.vel-adult-active .main--velora .vel-body,
+    body.vel-adult-player-active .main--velora .vel-body,
+    body.vel-adult-active #adult-view:not(.hidden),
+    body.vel-adult-player-active #adult-view:not(.hidden),
+    body.vel-adult-active #vel-adult-packages-container,
+    body.vel-adult-player-active #vel-adult-packages-container {
       height: auto !important;
       min-height: 100% !important;
       max-height: none !important;
       overflow-y: visible !important;
-      overflow-x: hidden !important;
+      overflow-x: visible !important;
+      overflow: visible !important;
     }
 
     body.vel-home-choice-loading .vel-bottom-nav,

@@ -848,6 +848,47 @@
   let currentAdultVodDuration = null;
   let currentAdultVodStartAt = 0;
   let currentAdultMovieMetadata = null;
+  let currentAdultVodSessionId = null;
+  let isAdultVodTranscode = false;
+  let adultVodSeekRestartInFlight = false;
+
+  async function startAdultVodTranscodeSession(url, options = {}) {
+    try {
+      const startAt = Number.isFinite(Number(options.startAt)) ? Math.max(0, Number(options.startAt)) : 0;
+      const res = await fetch("/api/transcode/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url,
+          mode: "vod",
+          startAt,
+          seekOffset: startAt,
+          duration: currentAdultVodDuration || options.duration || null,
+          metadata: currentAdultMovieMetadata || null
+        })
+      });
+      if (!res.ok) throw new Error("Transcode session failed");
+      const session = await res.json();
+      currentAdultVodSessionId = session.sessionId;
+      return session;
+    } catch (err) {
+      console.warn("[Adult VOD] Transcode session start notice:", err.message);
+      return null;
+    }
+  }
+
+  async function stopAdultVodTranscodeSession() {
+    if (currentAdultVodSessionId) {
+      const sid = currentAdultVodSessionId;
+      currentAdultVodSessionId = null;
+      try {
+        await fetch(`/api/transcode/${encodeURIComponent(sid)}`, {
+          method: "DELETE",
+          keepalive: true
+        });
+      } catch (_) {}
+    }
+  }
 
   let adultNetworkRetryCount = 0;
   let adultLastNetworkErrorTime = 0;
@@ -906,8 +947,9 @@
     };
   }
 
-  function seekAdultVod(targetSeconds) {
+  async function seekAdultVod(targetSeconds) {
     const video = document.getElementById("vel-adult-video");
+    const buffering = document.getElementById("vel-adult-player-buffering");
     if (!video) return;
 
     const totalDuration = (Number.isFinite(currentAdultVodDuration) && currentAdultVodDuration > 0)
@@ -916,14 +958,39 @@
 
     const clampedTarget = Math.max(0, Math.min(targetSeconds, totalDuration || targetSeconds));
 
-    if (video.hls) {
-      video.currentTime = clampedTarget;
-    } else if (Number.isFinite(video.duration) && video.duration > 0) {
-      video.currentTime = clampedTarget;
-    } else {
+    if (isAdultVodTranscode && currentAdultVodSourceUrl) {
+      if (adultVodSeekRestartInFlight) return;
+      adultVodSeekRestartInFlight = true;
       try {
+        if (buffering) buffering.classList.remove("hidden");
+        try { video.pause(); } catch (_) {}
+        await stopAdultVodTranscodeSession();
+        const session = await startAdultVodTranscodeSession(currentAdultVodSourceUrl, {
+          startAt: clampedTarget,
+          duration: totalDuration
+        });
+        if (session && session.playlistUrl) {
+          currentAdultVodStartAt = clampedTarget;
+          if (session.durationSeconds) currentAdultVodDuration = session.durationSeconds;
+          playAdultHlsStream(session.playlistUrl, false);
+        } else if (video.hls) {
+          video.currentTime = clampedTarget;
+        } else {
+          try { video.currentTime = clampedTarget; } catch (_) {}
+        }
+      } catch (e) {
+        console.warn("[Adult VOD] Seek error:", e);
+      } finally {
+        adultVodSeekRestartInFlight = false;
+      }
+    } else {
+      if (video.hls) {
         video.currentTime = clampedTarget;
-      } catch (_) {}
+      } else if (Number.isFinite(video.duration) && video.duration > 0) {
+        video.currentTime = clampedTarget;
+      } else {
+        try { video.currentTime = clampedTarget; } catch (_) {}
+      }
     }
   }
 
@@ -1402,48 +1469,6 @@
       }
     }
 
-    let controlsVisibleAtTapStart = null;
-    let revealOnlyTap = false;
-    let lastTapStart = 0;
-
-    function consumeTapEvent(e) {
-      if (e.cancelable) e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-    }
-
-    function rememberControlsAtTapStart(e) {
-      const touchLike = e.type === "touchstart" || e.pointerType === "touch" ||
-        e.pointerType === "pen" || (!e.pointerType && !usesHoverControls());
-      if (!touchLike) return;
-      if (!(e.target instanceof Element) || !e.target.closest("#vel-adult-player-container .vel-adult-video-wrapper")) return;
-      if (e.target.closest("button, [role='slider'], .vel-adult-center-btn, .vel-adult-tool-btn, .vel-adult-seek-track")) {
-        revealOnlyTap = false;
-        controlsVisibleAtTapStart = true;
-        return;
-      }
-      const now = Date.now();
-      if (now - lastTapStart < 80) {
-        if (revealOnlyTap) consumeTapEvent(e);
-        return;
-      }
-      lastTapStart = now;
-      controlsVisibleAtTapStart = controlsAreVisible();
-      revealOnlyTap = controlsVisibleAtTapStart !== true;
-      if (revealOnlyTap) {
-        if (video && video.muted) {
-          video.muted = false;
-          video.volume = 1;
-          syncVolumeUI();
-        }
-        showControls(true);
-        consumeTapEvent(e);
-      }
-    }
-
-    window.addEventListener("pointerdown", rememberControlsAtTapStart, true);
-    window.addEventListener("touchstart", rememberControlsAtTapStart, { capture: true, passive: false });
-
     const wrapper = container.querySelector(".vel-adult-video-wrapper");
     if (wrapper) {
       wrapper.addEventListener("mouseenter", () => {
@@ -1457,16 +1482,8 @@
       });
       wrapper.addEventListener("click", (e) => {
         if (e.target.closest("button, [role='slider'], .vel-adult-center-btn, .vel-adult-tool-btn, .vel-adult-seek-track")) {
-          revealOnlyTap = false;
           return;
         }
-        if (revealOnlyTap) {
-          revealOnlyTap = false;
-          controlsVisibleAtTapStart = null;
-          consumeTapEvent(e);
-          return;
-        }
-        e.preventDefault();
         e.stopPropagation();
         if (video && video.muted) {
           video.muted = false;
@@ -1477,10 +1494,12 @@
           showControls(true);
           return;
         }
-        const shouldHide = controlsVisibleAtTapStart === true;
-        controlsVisibleAtTapStart = null;
-        if (shouldHide) hideControls(); else showControls(true);
-      }, true);
+        if (controlsAreVisible()) {
+          hideControls();
+        } else {
+          showControls(true);
+        }
+      });
     }
 
     function togglePlay(e) {
@@ -1547,7 +1566,7 @@
       prevBtn.onclick = (e) => {
         e.stopPropagation();
         if (window._veloraAdultVodMovies && window._veloraAdultVodCurrentIndex > 0) {
-          playAdultMovieByIndex(window._veloraAdultVodCurrentIndex - 1);
+          playAdultMovieByIndex(window._veloraAdultVodCurrentIndex - 1, true);
         }
       };
     }
@@ -1556,7 +1575,7 @@
       nextBtn.onclick = (e) => {
         e.stopPropagation();
         if (window._veloraAdultVodMovies && window._veloraAdultVodCurrentIndex < window._veloraAdultVodMovies.length - 1) {
-          playAdultMovieByIndex(window._veloraAdultVodCurrentIndex + 1);
+          playAdultMovieByIndex(window._veloraAdultVodCurrentIndex + 1, true);
         }
       };
     }
@@ -1636,8 +1655,8 @@
       };
     }
 
+    let isSeeking = false;
     if (seekTrack) {
-      let isSeeking = false;
       const getPosFromEvent = (e) => {
         const rect = seekTrack.getBoundingClientRect();
         if (!rect.width) return 0;
@@ -1664,7 +1683,7 @@
         isSeeking = true;
         try { seekTrack.setPointerCapture(e.pointerId); } catch (_) {}
         const pos = getPosFromEvent(e);
-        applySeekPos(pos, true);
+        applySeekPos(pos, false);
         showControls();
       });
 
@@ -1727,6 +1746,7 @@
         if (buffering && video.currentTime > 0) {
           buffering.classList.add("hidden");
         }
+        if (isSeeking) return;
         if (!isLive && curTime && durTime && seekFill && seekHandle) {
           const displayedCurrent = currentAdultVodStartAt + (video.currentTime || 0);
           const totalDuration = (Number.isFinite(currentAdultVodDuration) && currentAdultVodDuration > 0)
@@ -1930,7 +1950,7 @@
     container.appendChild(itemsContainer);
   }
 
-  async function playAdultLiveChannelByIndex(index) {
+  async function playAdultLiveChannelByIndex(index, programmaticallyTriggered = false) {
     const list = window._veloraAdultLiveChannels;
     if (!list || index < 0 || index >= list.length) return;
 
@@ -1941,9 +1961,8 @@
     rows.forEach((row, idx) => {
       const isCurrent = idx === index;
       row.classList.toggle("vel-adult-channel-row--active", isCurrent);
-      row.classList.toggle("selected", isCurrent);
-      if (isCurrent && index > 0) {
-        row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      if (isCurrent && index > 0 && programmaticallyTriggered) {
+        try { row.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (_) {}
       }
     });
 
@@ -2141,7 +2160,7 @@
   }
 
   let activeVodPlayToken = 0;
-  async function playAdultMovieByIndex(index) {
+  async function playAdultMovieByIndex(index, programmaticallyTriggered = false) {
     const list = window._veloraAdultVodMovies;
     if (!list || index < 0 || index >= list.length) return;
 
@@ -2156,11 +2175,10 @@
     rows.forEach((row, idx) => {
       const isCurrent = idx === index;
       row.classList.toggle("vel-adult-movie-row--active", isCurrent);
-      row.classList.toggle("selected", isCurrent);
       const badge = row.querySelector(".vel-adult-movie-row__playing-badge");
       if (badge) badge.style.display = isCurrent ? "inline-flex" : "none";
-      if (isCurrent && index > 0) {
-        row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      if (isCurrent && index > 0 && programmaticallyTriggered) {
+        try { row.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (_) {}
       }
     });
 
@@ -2206,17 +2224,55 @@
       finalPlayUrl = `/api/proxy/stream?url=${encodeURIComponent(directSourceUrl)}`;
     }
 
-    // Step 2: Direct playback for VOD (matching normal Movies/VOD in VeloraVIP)
+    // Step 2: Playback matching normal VOD in VeloraVIP
     const isM3u8 = /\.m3u8(\?|#|&|$)/i.test(directSourceUrl) || /[?&]container=m3u8(?:\b|$)/i.test(directSourceUrl);
+    const isSafari = (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ||
+      (/Safari/i.test(navigator.userAgent) && !/Chrome|CriOS|Chromium|Android/i.test(navigator.userAgent))
+    );
+    const needsSafariTranscode = isSafari && !isM3u8 && /\.(mkv|webm|avi|mov|m4v)(\?|#|&|$)/i.test(directSourceUrl);
 
     if (video.hls && typeof video.hls.destroy === "function") {
       try { video.hls.destroy(); } catch (_) {}
       video.hls = null;
     }
 
+    await stopAdultVodTranscodeSession();
+    if (playToken !== activeVodPlayToken) return;
+
     if (isM3u8) {
+      isAdultVodTranscode = false;
+      currentAdultVodStartAt = 0;
       playAdultHlsStream(finalPlayUrl, false);
+    } else if (needsSafariTranscode) {
+      // Safari / iOS cannot play MKV natively -> start HLS transcode session
+      const session = await startAdultVodTranscodeSession(directSourceUrl, {
+        startAt: 0,
+        duration: currentAdultVodDuration
+      });
+      if (playToken !== activeVodPlayToken) return;
+      if (session && session.playlistUrl) {
+        isAdultVodTranscode = true;
+        currentAdultVodStartAt = 0;
+        if (session.durationSeconds) currentAdultVodDuration = session.durationSeconds;
+        playAdultHlsStream(session.playlistUrl, false);
+      } else {
+        isAdultVodTranscode = false;
+        video.src = finalPlayUrl;
+        video.load();
+        const p = video.play();
+        if (p && typeof p.catch === "function") {
+          p.catch(() => {
+            video.muted = true;
+            video.play().catch(e => console.warn("[Adult VOD] Autoplay fallback notice:", e));
+          });
+        }
+      }
     } else {
+      // Non-Apple devices (PC Chrome, Android, Firefox, Edge) & MP4: Direct playback matching normal VOD
+      isAdultVodTranscode = false;
+      currentAdultVodStartAt = 0;
       video.src = finalPlayUrl;
       video.load();
       const p = video.play();
@@ -3380,7 +3436,7 @@
 
   function stopAllActiveStreams() {
     try {
-      closeAdultTranscodeSession();
+      stopAdultVodTranscodeSession();
     } catch (_) {}
     try {
       const videos = document.querySelectorAll("video");

@@ -6,7 +6,19 @@ const { generateToken } = require('../auth');
 const jwt = require('jsonwebtoken');
 const paidUsersStore = require('../services/paidUsersStore');
 
+const crypto = require('crypto');
+
 const JWT_SECRET = process.env.JWT_SECRET || 'nodecast-tv-secret-key-change-in-production';
+
+function parseCookie(req, name) {
+    const raw = req.headers?.cookie || '';
+    const match = raw.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()[\]\\/+^])/g, '\\$1') + '=([^;]*)'));
+    return match ? decodeURIComponent(match[1]) : null;
+}
+
+function generateTvToken() {
+    return 'tv_tok_' + crypto.randomBytes(16).toString('hex');
+}
 
 function getLocalIp() {
     try {
@@ -74,6 +86,13 @@ function initTvDb() {
                 ip_address TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_user_tv_device_id ON user_tv_devices(device_id);
+
+            CREATE TABLE IF NOT EXISTS tv_tokens (
+                tv_token TEXT PRIMARY KEY,
+                device_id TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_tv_tokens_device_id ON tv_tokens(device_id);
         `);
 
         // Clean up legacy float strings ending in .0 (e.g. '11.0' -> '11')
@@ -160,14 +179,40 @@ function sendTvEvent(deviceId, eventData) {
  */
 router.get('/session', async (req, res) => {
     try {
+        const db = getDb();
+        let tvToken = String(req.query.tvToken || req.query.key || parseCookie(req, 'velora_tv_token') || '').trim();
         let deviceId = String(req.query.deviceId || '').trim();
         const deviceName = String(req.query.deviceName || 'Smart TV').trim();
 
-        if (!deviceId || deviceId.length < 8) {
+        // 1. If a valid tvToken was provided, resolve deviceId from DB
+        if (tvToken) {
+            const tokenRow = db.prepare('SELECT device_id FROM tv_tokens WHERE tv_token = ?').get(tvToken);
+            if (tokenRow && tokenRow.device_id) {
+                deviceId = tokenRow.device_id;
+            }
+        }
+
+        // 2. If deviceId is known, find or generate tvToken for it
+        if (deviceId && deviceId.length >= 8) {
+            if (!tvToken) {
+                const tokenRow = db.prepare('SELECT tv_token FROM tv_tokens WHERE device_id = ? LIMIT 1').get(deviceId);
+                if (tokenRow) {
+                    tvToken = tokenRow.tv_token;
+                }
+            }
+        } else {
             deviceId = 'tv_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
         }
 
-        const db = getDb();
+        // Ensure permanent tvToken exists in tv_tokens
+        if (!tvToken) {
+            tvToken = generateTvToken();
+        }
+        db.prepare('INSERT OR IGNORE INTO tv_tokens (tv_token, device_id) VALUES (?, ?)').run(tvToken, deviceId);
+
+        // Always set 10-year persistent cookie for the TV browser
+        res.setHeader('Set-Cookie', `velora_tv_token=${encodeURIComponent(tvToken)}; Path=/; Max-Age=315360000; SameSite=Lax`);
+
         const pairedRow = db.prepare('SELECT * FROM user_tv_devices WHERE device_id = ?').get(deviceId);
 
         // Always ensure a valid active 4-digit PIN exists for this device (for initial pairing or adding another account)
@@ -191,10 +236,11 @@ router.get('/session', async (req, res) => {
             if (user && !user.subscriptionBlocked) {
                 // Update last active
                 db.prepare("UPDATE user_tv_devices SET last_active_at = datetime('now') WHERE device_id = ?").run(deviceId);
-                const tvToken = generateToken(user);
+                const userAuthToken = generateToken(user);
                 return res.json({
                     ok: true,
                     deviceId,
+                    tvToken,
                     isLinked: true,
                     pin, // Always provide PIN so family members on another phone can pair to this same TV!
                     expiresIn: Math.max(0, Math.round((pinRegistry.get(pin).expiresAt - Date.now()) / 1000)),
@@ -203,7 +249,7 @@ router.get('/session', async (req, res) => {
                         username: user.username,
                         displayName: user.displayName || user.username
                     },
-                    token: tvToken
+                    token: userAuthToken
                 });
             } else {
                 // User expired or deleted, unlink TV
@@ -214,6 +260,7 @@ router.get('/session', async (req, res) => {
         return res.json({
             ok: true,
             deviceId,
+            tvToken,
             isLinked: false,
             pin,
             expiresIn: Math.max(0, Math.round((pinRegistry.get(pin).expiresAt - Date.now()) / 1000)),
@@ -242,12 +289,12 @@ router.get('/events', (req, res) => {
 
     res.write(`data: ${JSON.stringify({ type: 'CONNECTED', deviceId })}\n\n`);
 
-    // Setup keep-alive ping
+    // Setup keep-alive ping every 10s to keep reverse proxies / Nginx tunnels active
     const pingTimer = setInterval(() => {
         if (!res.writableEnded) {
             res.write(': ping\n\n');
         }
-    }, 15000);
+    }, 10000);
     pingTimer.unref?.();
 
     // Register TV client
@@ -255,7 +302,10 @@ router.get('/events', (req, res) => {
 
     req.on('close', () => {
         clearInterval(pingTimer);
-        tvClients.delete(deviceId);
+        const current = tvClients.get(deviceId);
+        if (current && current.res === res) {
+            tvClients.delete(deviceId);
+        }
     });
 });
 
@@ -360,6 +410,13 @@ router.post('/pair', tvRequireAuth, express.json(), async (req, res) => {
         pinRegistry.delete(pin);
         devicePins.delete(deviceId);
 
+        // Ensure permanent tvToken exists in tv_tokens for this device
+        let tokenRow = db.prepare('SELECT tv_token FROM tv_tokens WHERE device_id = ? LIMIT 1').get(deviceId);
+        let permanentTvToken = tokenRow ? tokenRow.tv_token : generateTvToken();
+        if (!tokenRow) {
+            db.prepare('INSERT OR IGNORE INTO tv_tokens (tv_token, device_id) VALUES (?, ?)').run(permanentTvToken, deviceId);
+        }
+
         // Notify TV via SSE
         const tvToken = generateToken(user);
         sendTvEvent(deviceId, {
@@ -368,6 +425,7 @@ router.post('/pair', tvRequireAuth, express.json(), async (req, res) => {
             username: user.username,
             displayName: user.displayName || user.username,
             deviceName,
+            tvToken: permanentTvToken,
             token: tvToken
         });
 
@@ -375,11 +433,39 @@ router.post('/pair', tvRequireAuth, express.json(), async (req, res) => {
             ok: true,
             deviceId,
             deviceName,
+            tvToken: permanentTvToken,
             message: 'TV associée avec succès'
         });
     } catch (error) {
         console.error('[TV Bridge] pair error:', error);
         res.status(500).json({ ok: false, error: 'Erreur jumelage TV' });
+    }
+});
+
+/**
+ * GET /api/tv/ping
+ * Fast, lightweight presence check for mobile.
+ */
+router.get('/ping', tvRequireAuth, (req, res) => {
+    try {
+        const db = getDb();
+        const userId = normalizeUserId(req.user.id);
+        const pairedRow = db.prepare('SELECT device_id, device_name FROM user_tv_devices WHERE user_id = ?').get(userId);
+
+        if (!pairedRow) {
+            return res.json({ ok: true, hasPairedTv: false, isOnline: false });
+        }
+
+        const isOnline = tvClients.has(pairedRow.device_id);
+        res.json({
+            ok: true,
+            hasPairedTv: true,
+            deviceId: pairedRow.device_id,
+            deviceName: pairedRow.device_name || 'Smart TV',
+            isOnline
+        });
+    } catch (error) {
+        res.status(500).json({ ok: false, error: 'Erreur ping TV' });
     }
 });
 

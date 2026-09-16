@@ -310,7 +310,8 @@
         var parsed = JSON.parse(raw);
         if (parsed && typeof parsed === "object") {
           tvState.hasPairedTv = Boolean(parsed.hasPairedTv);
-          tvState.isOnline = Boolean(parsed.isOnline);
+          // Never assume online from stale cache! Online state must be live.
+          tvState.isOnline = false;
           tvState.deviceId = parsed.deviceId || null;
           tvState.deviceName = parsed.deviceName || "Smart TV";
         }
@@ -335,6 +336,25 @@
     } catch (_) {}
   }
 
+  function showTvToast(msg) {
+    try {
+      var existing = document.getElementById("vel-tv-toast");
+      if (existing) existing.remove();
+
+      var toast = document.createElement("div");
+      toast.id = "vel-tv-toast";
+      toast.style.cssText = "position:fixed;top:24px;left:50%;transform:translateX(-50%);background:rgba(21,13,42,0.96);border:1px solid rgba(167,139,250,0.5);color:#fff;padding:12px 22px;border-radius:14px;font-size:14px;font-weight:500;box-shadow:0 10px 35px rgba(0,0,0,0.6);z-index:9999999;transition:all 0.3s cubic-bezier(0.16,1,0.3,1);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;align-items:center;gap:12px;pointer-events:none;max-width:90vw;text-align:center;";
+      toast.innerHTML = "<span style='font-size:18px;'>📺</span> <span>" + msg + "</span>";
+      document.body.appendChild(toast);
+
+      setTimeout(function () {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateX(-50%) translateY(-12px)";
+        setTimeout(function () { toast.remove(); }, 350);
+      }, 3500);
+    } catch (_) {}
+  }
+
   function updateTvBadgeOnly() {
     var badge = document.querySelector(".vel-profile-tv-status-badge");
     if (badge) {
@@ -355,6 +375,7 @@
       var data = await res.json();
       if (data.ok) {
         var prevPaired = tvState.hasPairedTv;
+        var prevOnline = tvState.isOnline;
         var prevName = tvState.deviceName;
         tvState.hasPairedTv = Boolean(data.hasPairedTv);
         tvState.isOnline = Boolean(data.isOnline);
@@ -366,7 +387,7 @@
         // If structure changed (e.g. unlinked or newly paired), re-render full card; otherwise just update badge
         if (prevPaired !== tvState.hasPairedTv || prevName !== tvState.deviceName) {
           renderTvSettingsSection();
-        } else {
+        } else if (prevOnline !== tvState.isOnline) {
           updateTvBadgeOnly();
         }
       }
@@ -652,10 +673,36 @@
       if (data.ok) {
         showActiveTvBar(media.title);
       } else {
-        window.alert(data.error || "Impossible de lancer la lecture sur la TV");
+        // TV is offline or in standby: update state gracefully
+        tvState.isOnline = false;
+        saveCachedTvStatus();
+        updateTvBadgeOnly();
+
+        // Restore mobile player containers
+        var liveContainer = document.getElementById("player-container");
+        if (liveContainer) liveContainer.classList.remove("hidden");
+        var vodContainer = document.getElementById("vod-player-container");
+        if (vodContainer) vodContainer.classList.remove("hidden");
+
+        // Show non-blocking toast notification instead of alert popup
+        showTvToast("La TV semble en veille — Lecture lancée sur votre téléphone");
+
+        // Fallback to local playback on mobile
+        var v = media.video || document.getElementById("video") || document.getElementById("video-vod");
+        if (v && v.paused) {
+          v.play().catch(function () {});
+        }
       }
     } catch (e) {
       console.error("[TV Bridge] sendToTv error:", e);
+      tvState.isOnline = false;
+      saveCachedTvStatus();
+      updateTvBadgeOnly();
+      showTvToast("Connexion TV interrompue — Lecture sur votre téléphone");
+      var v = media.video || document.getElementById("video") || document.getElementById("video-vod");
+      if (v && v.paused) {
+        v.play().catch(function () {});
+      }
     }
   }
 

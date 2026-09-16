@@ -59,27 +59,58 @@
     return (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
   }
 
+  // Cookie helper functions for long-term Smart TV persistence
+  function getCookie(name) {
+    var raw = document.cookie || "";
+    var match = raw.match(new RegExp("(?:^|; )" + name.replace(/([.$?*|{}()[\]\\/+^])/g, "\\$1") + "=([^;]*)"));
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+
+  function setCookie(name, value, days) {
+    var expires = "";
+    if (days) {
+      var d = new Date();
+      d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+      expires = "; expires=" + d.toUTCString();
+    }
+    document.cookie = name + "=" + encodeURIComponent(value) + expires + "; path=/; SameSite=Lax";
+  }
+
   // Pure JS lightweight QR Code generator (fallback/simple matrix representation)
   function renderQrCode(url) {
     if (!dom.qrcode) return;
-    // Use an SVG QR image via standard quick visual representation or API
     var encoded = encodeURIComponent(url);
     dom.qrcode.innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=4&data=' + encoded + '" alt="QR Code" style="width:100%;height:100%;border-radius:12px;" />';
   }
 
-  // Fetch or renew TV session
+  // Fetch or renew TV session with multi-layer permanent identity
   async function initSession() {
     try {
+      var urlParams = new URLSearchParams(window.location.search);
+      var keyParam = urlParams.get("key") || urlParams.get("token");
+      var storedToken = keyParam || getCookie("velora_tv_token") || localStorage.getItem("velora_tv_token");
       var storedId = localStorage.getItem("velora_tv_device_id");
-      var query = storedId ? "?deviceId=" + encodeURIComponent(storedId) : "";
-      var res = await fetch("/api/tv/session" + query, { cache: "no-store" });
+
+      var queryParts = [];
+      if (storedToken) queryParts.push("tvToken=" + encodeURIComponent(storedToken));
+      if (storedId) queryParts.push("deviceId=" + encodeURIComponent(storedId));
+      var queryString = queryParts.length ? "?" + queryParts.join("&") : "";
+
+      var res = await fetch("/api/tv/session" + queryString, { cache: "no-store" });
       var data = await res.json();
 
       if (!data.ok) throw new Error(data.error || "Erreur de session");
 
       state.deviceId = data.deviceId;
       state.currentPin = data.pin;
-      localStorage.setItem("velora_tv_device_id", data.deviceId);
+      state.tvToken = data.tvToken;
+
+      // Persist across all browser storage layers (survives TV power-off / reboots)
+      if (data.deviceId) localStorage.setItem("velora_tv_device_id", data.deviceId);
+      if (data.tvToken) {
+        localStorage.setItem("velora_tv_token", data.tvToken);
+        setCookie("velora_tv_token", data.tvToken, 3650); // 10 years
+      }
 
       if (data.isLinked) {
         state.isLinked = true;
@@ -97,7 +128,7 @@
     } catch (err) {
       console.error("[TV] Session init error:", err);
       if (dom.statusText) dom.statusText.textContent = "Erreur de connexion au serveur. Reconnexion…";
-      setTimeout(initSession, 4000);
+      setTimeout(initSession, 3000);
     }
   }
 
@@ -147,15 +178,30 @@
     };
 
     state.eventSource.onerror = function () {
-      console.warn("[TV] SSE connection lost. Reconnecting in 3s…");
+      console.warn("[TV] SSE connection lost. Reconnecting in 2s…");
       if (state.eventSource) {
         try { state.eventSource.close(); } catch (_) {}
         state.eventSource = null;
       }
       if (state.reconnectTimer) clearTimeout(state.reconnectTimer);
-      state.reconnectTimer = setTimeout(connectEvents, 3000);
+      state.reconnectTimer = setTimeout(connectEvents, 2000);
     };
   }
+
+  // Smart TV wake-from-sleep listeners: reconnect stream instantly when TV screen turns on
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible") {
+      if (!state.eventSource || state.eventSource.readyState === 2 /* CLOSED */) {
+        console.log("[TV] Screen woke up. Reconnecting SSE stream…");
+        connectEvents();
+      }
+    }
+  });
+  window.addEventListener("pageshow", function () {
+    if (!state.eventSource || state.eventSource.readyState === 2) {
+      connectEvents();
+    }
+  });
 
   function handleServerEvent(event) {
     if (!event || !event.type) return;
@@ -165,6 +211,11 @@
         state.isLinked = true;
         state.user = { username: event.username, displayName: event.displayName };
         if (event.token) localStorage.setItem("authToken", event.token);
+        if (event.tvToken) {
+          state.tvToken = event.tvToken;
+          localStorage.setItem("velora_tv_token", event.tvToken);
+          setCookie("velora_tv_token", event.tvToken, 3650);
+        }
         renderLinkedState(state.user, state.currentPin);
         break;
 

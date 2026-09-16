@@ -7564,7 +7564,7 @@
           <section id="vel-home-empty-page" class="vel-home-empty-page" aria-label="Accueil">
             <div class="vel-home-header">
               <div class="vel-home-brand" aria-label="VeloraVIP">
-                <img class="vel-home-brand__icon" src="/logos/android-chrome-192x192.png" alt="" width="52"
+                <img class="vel-home-brand__icon" src="/logos/velora-brand-icon.svg" alt="" width="52"
                   height="52" />
                 <span class="vel-home-brand__name">Velora<span>VIP</span></span>
               </div>
@@ -14765,20 +14765,34 @@
       align-items: center;
       justify-content: space-between;
       width: 100%;
-      margin: 0 0 0.85rem;
-      padding: max(0.45rem, env(safe-area-inset-top, 0px)) max(0.75rem, env(safe-area-inset-right, 0px)) 0 max(0.75rem, env(safe-area-inset-left, 0px));
+      margin: 0 0 0.55rem;
+      padding: max(0.35rem, env(safe-area-inset-top, 0px)) max(0.85rem, env(safe-area-inset-right, 0px)) 0 max(0.85rem, env(safe-area-inset-left, 0px));
       box-sizing: border-box;
     }
 
     .vel-home-header .vel-home-brand {
       margin: 0;
       padding: 0;
+      gap: 0.55rem;
+    }
+
+    .vel-home-header .vel-home-brand__icon {
+      width: clamp(2.1rem, 3.5vw, 2.6rem);
+      height: clamp(2.1rem, 3.5vw, 2.6rem);
+      border-radius: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      filter: drop-shadow(0 4px 14px rgba(168, 85, 247, 0.45));
+    }
+
+    .vel-home-header .vel-home-brand__name {
+      font-size: clamp(1.25rem, 2.5vw, 1.7rem);
     }
 
     .vel-home-header__actions {
       display: flex;
       align-items: center;
-      gap: 0.55rem;
+      gap: 0.5rem;
     }
 
     .vel-home-profile-trigger,
@@ -14786,8 +14800,8 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 34px;
-      height: 34px;
+      width: 33px;
+      height: 33px;
       padding: 0;
       border-radius: 9px;
       border: 1px solid rgba(168, 85, 247, 0.35);
@@ -14827,8 +14841,8 @@
     }
 
     .vel-home-profile-trigger__icon {
-      width: 17px;
-      height: 17px;
+      width: 16px;
+      height: 16px;
       fill: currentColor;
       pointer-events: none;
       filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.4));
@@ -14837,7 +14851,7 @@
     .vel-bottom-profile-menu {
       position: fixed;
       z-index: 2600;
-      top: max(3.8rem, calc(env(safe-area-inset-top, 0px) + 3.4rem));
+      top: max(3.4rem, calc(env(safe-area-inset-top, 0px) + 3.1rem));
       right: max(0.85rem, env(safe-area-inset-right, 0px));
       left: auto !important;
       bottom: auto !important;

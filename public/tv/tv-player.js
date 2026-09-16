@@ -78,13 +78,14 @@
       if (!data.ok) throw new Error(data.error || "Erreur de session");
 
       state.deviceId = data.deviceId;
+      state.currentPin = data.pin;
       localStorage.setItem("velora_tv_device_id", data.deviceId);
 
       if (data.isLinked) {
         state.isLinked = true;
         state.user = data.user;
         if (data.token) localStorage.setItem("authToken", data.token);
-        renderLinkedState(data.user);
+        renderLinkedState(data.user, data.pin);
       } else {
         state.isLinked = false;
         renderPin(data.pin);
@@ -114,19 +115,29 @@
     if (dom.linkedBox) dom.linkedBox.classList.add("hidden");
   }
 
-  function renderLinkedState(user) {
+  function renderLinkedState(user, pin) {
     if (dom.linkedBox) dom.linkedBox.classList.remove("hidden");
     if (dom.linkedUser) dom.linkedUser.textContent = "Compte : " + (user.displayName || user.username);
-    if (dom.statusText) dom.statusText.textContent = "🟢 Prêt à diffuser. Choisissez un contenu sur votre mobile.";
+    if (dom.statusText) {
+      dom.statusText.innerHTML = "🟢 Prêt à diffuser. " + (pin ? "<span style='margin-left:14px;opacity:0.85;font-size:15px;color:#c4b5fd;'>Lier un autre mobile : Code <strong>" + pin + "</strong></span>" : "");
+    }
   }
 
-  // Connect SSE real-time stream
+  // Connect SSE real-time stream with auto-reconnection
   function connectEvents() {
     if (state.eventSource) {
-      state.eventSource.close();
+      try { state.eventSource.close(); } catch (_) {}
+      state.eventSource = null;
     }
 
-    state.eventSource = new EventSource("/api/tv/events?deviceId=" + encodeURIComponent(state.deviceId));
+    if (!state.deviceId) return;
+
+    var sseUrl = "/api/tv/events?deviceId=" + encodeURIComponent(state.deviceId);
+    state.eventSource = new EventSource(sseUrl);
+
+    state.eventSource.onopen = function () {
+      console.log("[TV] SSE stream connected");
+    };
 
     state.eventSource.onmessage = function (event) {
       try {
@@ -136,7 +147,13 @@
     };
 
     state.eventSource.onerror = function () {
-      console.warn("[TV] SSE connection lost. Reconnecting…");
+      console.warn("[TV] SSE connection lost. Reconnecting in 3s…");
+      if (state.eventSource) {
+        try { state.eventSource.close(); } catch (_) {}
+        state.eventSource = null;
+      }
+      if (state.reconnectTimer) clearTimeout(state.reconnectTimer);
+      state.reconnectTimer = setTimeout(connectEvents, 3000);
     };
   }
 
@@ -148,7 +165,7 @@
         state.isLinked = true;
         state.user = { username: event.username, displayName: event.displayName };
         if (event.token) localStorage.setItem("authToken", event.token);
-        renderLinkedState(state.user);
+        renderLinkedState(state.user, state.currentPin);
         break;
 
       case "UNLINK":
@@ -160,6 +177,9 @@
         break;
 
       case "PLAY":
+        if (event.token) {
+          localStorage.setItem("authToken", event.token);
+        }
         if (event.media) {
           playMedia(event.media);
         }
@@ -312,9 +332,18 @@
 
     if (isHls && window.Hls && window.Hls.isSupported()) {
       var hls = new window.Hls({
-        enableWorker: true,
+        enableWorker: false, // Prevents thread starvation and cuts on Smart TV webOS / Tizen
         lowLatencyMode: false,
-        backBufferLength: 60
+        backBufferLength: 30,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        maxBufferSize: 60 * 1000 * 1000,
+        maxBufferHole: 0.5,
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 10,
+        fragLoadingTimeOut: 25000,
+        manifestLoadingTimeOut: 25000,
+        levelLoadingTimeOut: 25000
       });
       state.hls = hls;
       hls.loadSource(streamUrl);
@@ -350,15 +379,23 @@
       });
       hls.on(window.Hls.Events.ERROR, function (e, data) {
         if (data && data.fatal) {
-          console.error("[TV] Fatal Hls error", data);
+          console.warn("[TV] Fatal Hls error, recovering:", data.type);
           if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR) {
             hls.startLoad();
           } else if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
             hls.recoverMediaError();
           } else {
-            if (dom.buffering) {
-              dom.buffering.innerHTML = '<div style="color:#ef4444;font-size:22px;font-weight:700;">⚠️ Erreur de chargement du flux</div><div style="color:#94a3b8;font-size:16px;margin-top:8px;">Impossible de lire cette vidéo sur la TV</div>';
+            try {
+              hls.recoverMediaError();
+            } catch (_) {
+              if (dom.buffering) {
+                dom.buffering.innerHTML = '<div style="color:#ef4444;font-size:22px;font-weight:700;">⚠️ Erreur de chargement du flux</div><div style="color:#94a3b8;font-size:16px;margin-top:8px;">Impossible de lire cette vidéo sur la TV</div>';
+              }
             }
+          }
+        } else if (data && data.details === window.Hls.ErrorDetails.BUFFER_STALLED_ERROR) {
+          if (v && !v.paused && v.readyState >= 2) {
+            v.currentTime += 0.1;
           }
         }
       });

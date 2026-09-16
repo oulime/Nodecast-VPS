@@ -286,9 +286,26 @@
     document.head.appendChild(style);
   }
 
+  function getCurrentUserId() {
+    try {
+      var token = getAuthToken();
+      if (!token) return "guest";
+      var parts = token.split(".");
+      if (parts.length === 3) {
+        var payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+        if (payload && payload.id != null) {
+          var s = String(payload.id).trim();
+          return s.endsWith(".0") ? s.slice(0, -2) : s;
+        }
+      }
+    } catch (_) {}
+    return "default";
+  }
+
   function loadCachedTvStatus() {
     try {
-      var raw = localStorage.getItem("velora_tv_status_cache");
+      var uid = getCurrentUserId();
+      var raw = localStorage.getItem("velora_tv_status_cache_" + uid);
       if (raw) {
         var parsed = JSON.parse(raw);
         if (parsed && typeof parsed === "object") {
@@ -297,13 +314,19 @@
           tvState.deviceId = parsed.deviceId || null;
           tvState.deviceName = parsed.deviceName || "Smart TV";
         }
+      } else {
+        tvState.hasPairedTv = false;
+        tvState.isOnline = false;
+        tvState.deviceId = null;
+        tvState.deviceName = null;
       }
     } catch (_) {}
   }
 
   function saveCachedTvStatus() {
     try {
-      localStorage.setItem("velora_tv_status_cache", JSON.stringify({
+      var uid = getCurrentUserId();
+      localStorage.setItem("velora_tv_status_cache_" + uid, JSON.stringify({
         hasPairedTv: tvState.hasPairedTv,
         isOnline: tvState.isOnline,
         deviceId: tvState.deviceId,
@@ -593,11 +616,10 @@
       // This prevents the IPTV provider from returning HTTP 458 (Max simultaneous connections reached).
       await new Promise(function (resolve) { setTimeout(resolve, 400); });
 
-      // 5. Resolve best stream URL for the TV (prefer direct stream over transcode)
-      var targetUrl = media.sourceUrl || media.direct_source || media.castUrl || media.url;
-      if (targetUrl && /\/api\/transcode\/[^/]+\/stream\.m3u8/i.test(targetUrl) && media.sourceUrl) {
-        targetUrl = media.sourceUrl;
-      }
+      // 5. Resolve best stream URL for the TV:
+      // PRESERVE the exact working stream pipeline (media.url) used by the web player!
+      // Do NOT bypass working proxy or remux pipelines with raw unproxied media.sourceUrl!
+      var targetUrl = media.url || media.castUrl || media.direct_source || media.sourceUrl;
 
       // Ensure URL is absolute and never has localhost
       if (targetUrl) {
@@ -605,6 +627,14 @@
           targetUrl = window.location.origin + targetUrl;
         } else if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(targetUrl)) {
           targetUrl = targetUrl.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i, window.location.origin);
+        }
+
+        // Append user auth token if hitting authenticated proxy/remux routes
+        var token = getAuthToken();
+        if (token && (targetUrl.indexOf("/api/") !== -1 || targetUrl.indexOf("/proxy") !== -1)) {
+          if (targetUrl.indexOf("token=") === -1) {
+            targetUrl += (targetUrl.indexOf("?") === -1 ? "?" : "&") + "token=" + encodeURIComponent(token);
+          }
         }
       }
 

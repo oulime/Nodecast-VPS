@@ -22,6 +22,13 @@ function getLocalIp() {
     return '127.0.0.1';
 }
 
+function normalizeUserId(id) {
+    if (id == null) return '';
+    let s = String(id).trim();
+    if (s.endsWith('.0')) s = s.slice(0, -2);
+    return s;
+}
+
 function tvRequireAuth(req, res, next) {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -31,6 +38,7 @@ function tvRequireAuth(req, res, next) {
     try {
         const payload = jwt.verify(token, JWT_SECRET);
         req.user = payload;
+        if (req.user && req.user.id != null) req.user.id = normalizeUserId(req.user.id);
         return next();
     } catch (err) {
         // In local development or behind VPS proxy, token may be signed by upstream VPS secret
@@ -40,7 +48,7 @@ function tvRequireAuth(req, res, next) {
                 const now = Date.now();
                 if (!decoded.exp || decoded.exp * 1000 > now) {
                     req.user = {
-                        id: decoded.id,
+                        id: normalizeUserId(decoded.id),
                         username: decoded.username,
                         role: decoded.role || 'viewer'
                     };
@@ -67,6 +75,15 @@ function initTvDb() {
             );
             CREATE INDEX IF NOT EXISTS idx_user_tv_device_id ON user_tv_devices(device_id);
         `);
+
+        // Clean up legacy float strings ending in .0 (e.g. '11.0' -> '11')
+        try {
+            db.exec(`
+                UPDATE user_tv_devices 
+                SET user_id = SUBSTR(user_id, 1, LENGTH(user_id) - 2) 
+                WHERE user_id LIKE '%.0';
+            `);
+        } catch (_) {}
 
         const tableInfo = db.prepare("PRAGMA table_info(user_tv_devices)").all();
         const userIdCol = tableInfo.find(c => c.name === 'user_id');
@@ -153,6 +170,18 @@ router.get('/session', async (req, res) => {
         const db = getDb();
         const pairedRow = db.prepare('SELECT * FROM user_tv_devices WHERE device_id = ?').get(deviceId);
 
+        // Always ensure a valid active 4-digit PIN exists for this device (for initial pairing or adding another account)
+        let pin = devicePins.get(deviceId);
+        let pinEntry = pin ? pinRegistry.get(pin) : null;
+
+        if (!pinEntry || pinEntry.expiresAt <= Date.now()) {
+            if (pin) pinRegistry.delete(pin);
+            pin = generateUniquePin();
+            const expiresAt = Date.now() + 300000; // 5 minutes
+            pinRegistry.set(pin, { deviceId, expiresAt });
+            devicePins.set(deviceId, pin);
+        }
+
         if (pairedRow) {
             let user = await paidUsersStore.getById(pairedRow.user_id);
             if (!user) {
@@ -167,6 +196,8 @@ router.get('/session', async (req, res) => {
                     ok: true,
                     deviceId,
                     isLinked: true,
+                    pin, // Always provide PIN so family members on another phone can pair to this same TV!
+                    expiresIn: Math.max(0, Math.round((pinRegistry.get(pin).expiresAt - Date.now()) / 1000)),
                     deviceName: pairedRow.device_name || deviceName,
                     user: {
                         username: user.username,
@@ -178,18 +209,6 @@ router.get('/session', async (req, res) => {
                 // User expired or deleted, unlink TV
                 db.prepare('DELETE FROM user_tv_devices WHERE device_id = ?').run(deviceId);
             }
-        }
-
-        // Not linked: Provide or reuse 4-digit PIN
-        let pin = devicePins.get(deviceId);
-        let pinEntry = pin ? pinRegistry.get(pin) : null;
-
-        if (!pinEntry || pinEntry.expiresAt <= Date.now()) {
-            if (pin) pinRegistry.delete(pin);
-            pin = generateUniquePin();
-            const expiresAt = Date.now() + 300000; // 5 minutes
-            pinRegistry.set(pin, { deviceId, expiresAt });
-            devicePins.set(deviceId, pin);
         }
 
         return res.json({
@@ -272,7 +291,8 @@ router.post('/state', express.json(), (req, res) => {
 router.get('/status', tvRequireAuth, async (req, res) => {
     try {
         const db = getDb();
-        const pairedRow = db.prepare('SELECT * FROM user_tv_devices WHERE user_id = ?').get(req.user.id);
+        const userId = normalizeUserId(req.user.id);
+        const pairedRow = db.prepare('SELECT * FROM user_tv_devices WHERE user_id = ?').get(userId);
 
         if (!pairedRow) {
             return res.json({ ok: true, hasPairedTv: false });
@@ -316,7 +336,8 @@ router.post('/pair', tvRequireAuth, express.json(), async (req, res) => {
         }
 
         const deviceId = pinEntry.deviceId;
-        const user = (await paidUsersStore.getById(req.user.id)) || req.user;
+        const userId = normalizeUserId(req.user.id);
+        const user = (await paidUsersStore.getById(userId)) || req.user;
         if (!user) return res.status(404).json({ ok: false, error: 'Utilisateur introuvable' });
 
         const deviceName = customName || 'Smart TV Salon';
@@ -333,7 +354,7 @@ router.post('/pair', tvRequireAuth, express.json(), async (req, res) => {
                 last_active_at = excluded.last_active_at,
                 ip_address = excluded.ip_address
         `);
-        stmt.run(user.id, deviceId, deviceName, req.ip || '');
+        stmt.run(userId, deviceId, deviceName, req.ip || '');
 
         // Invalidate PIN
         pinRegistry.delete(pin);
@@ -343,7 +364,7 @@ router.post('/pair', tvRequireAuth, express.json(), async (req, res) => {
         const tvToken = generateToken(user);
         sendTvEvent(deviceId, {
             type: 'PAIRED',
-            userId: user.id,
+            userId: userId,
             username: user.username,
             displayName: user.displayName || user.username,
             deviceName,
@@ -369,13 +390,18 @@ router.post('/pair', tvRequireAuth, express.json(), async (req, res) => {
 router.post('/unlink', tvRequireAuth, (req, res) => {
     try {
         const db = getDb();
-        const pairedRow = db.prepare('SELECT device_id FROM user_tv_devices WHERE user_id = ?').get(req.user.id);
+        const userId = normalizeUserId(req.user.id);
+        const pairedRow = db.prepare('SELECT device_id FROM user_tv_devices WHERE user_id = ?').get(userId);
 
         if (pairedRow) {
-            db.prepare('DELETE FROM user_tv_devices WHERE user_id = ?').run(req.user.id);
-            // Notify TV to return to PIN standby screen
-            sendTvEvent(pairedRow.device_id, { type: 'UNLINK' });
-            activePlayback.delete(pairedRow.device_id);
+            db.prepare('DELETE FROM user_tv_devices WHERE user_id = ?').run(userId);
+            // Check if any other user is still paired to this device
+            const remaining = db.prepare('SELECT user_id FROM user_tv_devices WHERE device_id = ? LIMIT 1').get(pairedRow.device_id);
+            if (!remaining) {
+                // If no other user is linked to this TV, tell TV to show standby PIN screen
+                sendTvEvent(pairedRow.device_id, { type: 'UNLINK' });
+                activePlayback.delete(pairedRow.device_id);
+            }
         }
 
         res.json({ ok: true, message: 'TV dissociée avec succès' });
@@ -392,7 +418,8 @@ router.post('/unlink', tvRequireAuth, (req, res) => {
 router.post('/play', tvRequireAuth, express.json(), async (req, res) => {
     try {
         const db = getDb();
-        const pairedRow = db.prepare('SELECT device_id FROM user_tv_devices WHERE user_id = ?').get(req.user.id);
+        const userId = normalizeUserId(req.user.id);
+        const pairedRow = db.prepare('SELECT device_id FROM user_tv_devices WHERE user_id = ?').get(userId);
 
         if (!pairedRow) {
             return res.status(400).json({ ok: false, error: 'Aucune TV associée à votre compte. Associez votre TV dans Mon Profil.' });
@@ -420,7 +447,15 @@ router.post('/play', tvRequireAuth, express.json(), async (req, res) => {
             playUrl = playUrl.replace(/localhost(:\d+)?|127\.0\.0\.1(:\d+)?/g, targetHost);
         }
 
-        console.log(`[TV Bridge] Dispatched PLAY for "${media.title || 'media'}":`, playUrl);
+        const user = (await paidUsersStore.getById(userId)) || req.user;
+        const userToken = generateToken(user);
+        if (playUrl.includes('/api/') || playUrl.includes('/proxy')) {
+            if (!playUrl.includes('token=')) {
+                playUrl += (playUrl.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(userToken);
+            }
+        }
+
+        console.log(`[TV Bridge] Dispatched PLAY for "${media.title || 'media'}" to device ${deviceId}:`, playUrl);
 
         // Store active playback
         activePlayback.set(deviceId, {
@@ -430,9 +465,10 @@ router.post('/play', tvRequireAuth, express.json(), async (req, res) => {
             startedAt: Date.now()
         });
 
-        // Push PLAY command to TV
+        // Push PLAY command to TV along with user token so proxy segments authenticate
         const dispatched = sendTvEvent(deviceId, {
             type: 'PLAY',
+            token: userToken,
             media: {
                 url: playUrl,
                 title: media.title || 'Vidéo',

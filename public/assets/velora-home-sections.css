@@ -2257,17 +2257,17 @@
   isolation: isolate !important;
 }
 
-/* Filigrane d'ambiance de la compétition en arrière-plan */
+/* Filigrane d'ambiance de la compétition en arrière-plan centré & incliné */
 .vel-football-card__watermark {
   position: absolute !important;
-  right: -12px !important;
-  bottom: -15px !important;
-  width: 125px !important;
-  height: 125px !important;
-  opacity: 0.13 !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) rotate(-8deg) !important;
+  width: 140px !important;
+  height: 140px !important;
+  opacity: 0.16 !important;
   pointer-events: none !important;
   z-index: 0 !important;
-  transform: rotate(-8deg) !important;
   transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
   display: flex !important;
   align-items: center !important;
@@ -2279,12 +2279,12 @@
   width: 100% !important;
   height: 100% !important;
   object-fit: contain !important;
-  filter: drop-shadow(0 0 14px rgba(255, 255, 255, 0.2)) !important;
+  filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.25)) !important;
 }
 
 .vel-football-card:hover .vel-football-card__watermark {
-  opacity: 0.25 !important;
-  transform: rotate(-3deg) scale(1.1) !important;
+  opacity: 0.28 !important;
+  transform: translate(-50%, -50%) rotate(-3deg) scale(1.08) !important;
 }
 
 /* Lueur radiale supérieure */

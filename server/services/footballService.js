@@ -771,22 +771,40 @@ const MAJOR_TEAM_LOGOS = {
     'al shabab': 'https://media.api-sports.io/football/teams/2526.png',
 
     // International / Sélections
-    'france': 'https://media.api-sports.io/football/teams/2.png',
-    'espagne': 'https://media.api-sports.io/football/teams/9.png',
-    'angleterre': 'https://media.api-sports.io/football/teams/10.png',
-    'allemagne': 'https://media.api-sports.io/football/teams/25.png',
-    'italie': 'https://media.api-sports.io/football/teams/768.png',
-    'portugal': 'https://media.api-sports.io/football/teams/27.png',
-    'belgique': 'https://media.api-sports.io/football/teams/1.png',
-    'pays-bas': 'https://media.api-sports.io/football/teams/1118.png',
-    'croatie': 'https://media.api-sports.io/football/teams/3.png',
-    'suisse': 'https://media.api-sports.io/football/teams/13.png',
-    'danemark': 'https://media.api-sports.io/football/teams/21.png',
+    'france': 'https://flagcdn.com/w160/fr.png',
+    'canada': 'https://flagcdn.com/w160/ca.png',
+    'serbie': 'https://flagcdn.com/w160/rs.png',
+    'serbia': 'https://flagcdn.com/w160/rs.png',
+    'etats-unis': 'https://flagcdn.com/w160/us.png',
+    'usa': 'https://flagcdn.com/w160/us.png',
+    'mexique': 'https://flagcdn.com/w160/mx.png',
+    'mexico': 'https://flagcdn.com/w160/mx.png',
+    'espagne': 'https://flagcdn.com/w160/es.png',
+    'angleterre': 'https://flagcdn.com/w160/gb-eng.png',
+    'allemagne': 'https://flagcdn.com/w160/de.png',
+    'italie': 'https://flagcdn.com/w160/it.png',
+    'portugal': 'https://flagcdn.com/w160/pt.png',
+    'belgique': 'https://flagcdn.com/w160/be.png',
+    'pays-bas': 'https://flagcdn.com/w160/nl.png',
+    'croatie': 'https://flagcdn.com/w160/hr.png',
+    'suisse': 'https://flagcdn.com/w160/ch.png',
+    'danemark': 'https://flagcdn.com/w160/dk.png',
+    'suede': 'https://flagcdn.com/w160/se.png',
+    'suède': 'https://flagcdn.com/w160/se.png',
+    'norvege': 'https://flagcdn.com/w160/no.png',
+    'norvège': 'https://flagcdn.com/w160/no.png',
+    'pologne': 'https://flagcdn.com/w160/pl.png',
+    'autriche': 'https://media.api-sports.io/football/teams/772.png',
     'bresil': 'https://media.api-sports.io/football/teams/6.png',
     'argentine': 'https://media.api-sports.io/football/teams/26.png',
     'uruguay': 'https://media.api-sports.io/football/teams/7.png',
     'colombie': 'https://media.api-sports.io/football/teams/8.png',
-    'mexique': 'https://media.api-sports.io/football/teams/16.png',
+    'chili': 'https://media.api-sports.io/football/teams/5.png',
+    'perou': 'https://media.api-sports.io/football/teams/4.png',
+    'pérou': 'https://media.api-sports.io/football/teams/4.png',
+    'equateur': 'https://media.api-sports.io/football/teams/2382.png',
+    'équateur': 'https://media.api-sports.io/football/teams/2382.png',
+    'costa rica': 'https://media.api-sports.io/football/teams/29.png',
     'maroc': 'https://media.api-sports.io/football/teams/31.png',
     'algerie': 'https://media.api-sports.io/football/teams/32.png',
     'tunisie': 'https://media.api-sports.io/football/teams/28.png',
@@ -794,7 +812,18 @@ const MAJOR_TEAM_LOGOS = {
     'senegal': 'https://media.api-sports.io/football/teams/15.png',
     'cameroun': 'https://media.api-sports.io/football/teams/1501.png',
     'cote d\'ivoire': 'https://media.api-sports.io/football/teams/1504.png',
-    'japon': 'https://media.api-sports.io/football/teams/12.png'
+    'nigeria': 'https://media.api-sports.io/football/teams/19.png',
+    'ghana': 'https://media.api-sports.io/football/teams/1500.png',
+    'mali': 'https://media.api-sports.io/football/teams/1505.png',
+    'rd congo': 'https://media.api-sports.io/football/teams/1508.png',
+    'afrique du sud': 'https://media.api-sports.io/football/teams/1502.png',
+    'japon': 'https://media.api-sports.io/football/teams/12.png',
+    'coree du sud': 'https://media.api-sports.io/football/teams/18.png',
+    'corée du sud': 'https://media.api-sports.io/football/teams/18.png',
+    'arabie saoudite': 'https://media.api-sports.io/football/teams/23.png',
+    'australie': 'https://media.api-sports.io/football/teams/20.png',
+    'nouvelle-zelande': 'https://media.api-sports.io/football/teams/1531.png',
+    'nouvelle-zélande': 'https://media.api-sports.io/football/teams/1531.png'
 };
 
 /**
@@ -805,6 +834,19 @@ function cleanTeamName(raw) {
     let name = String(raw)
         .replace(/·/g, '')
         .replace(/\s+/g, ' ')
+        .trim();
+
+    // Nettoie les suffixes de catégorie pour un affichage propre et équilibré
+    name = name
+        .replace(/\s+f[eé]m\.?\s*u\d+/i, '')
+        .replace(/\s+u\d+\s*f[eé]m\.?/i, '')
+        .replace(/\s+f[eé]m\.?$/i, '')
+        .replace(/\s+f[eé]minine$/i, '')
+        .replace(/\s+\(f\)$/i, '')
+        .replace(/\s+u\d+$/i, '')
+        .replace(/\s+espoirs$/i, '')
+        .replace(/\s+u\d+\s*h$/i, '')
+        .replace(/\s+\(h\)$/i, '')
         .trim();
 
     const replacements = [
@@ -848,7 +890,46 @@ function formatCompetitionName(rawComp) {
         str = str.slice(0, halfLen).trim();
     }
 
-    const lower = str.toLowerCase();
+    const lower = str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    // 1. Compétitions Jeunes / Espoirs / Féminines spécifiques
+    if (lower.includes('u20') || lower.includes('u-20')) {
+        if (lower.includes('coupe du monde') || lower.includes('world cup') || lower.includes('cdm')) {
+            return lower.includes('fem') ? 'CdM U20 Féminine' : 'CdM U20';
+        }
+        return 'Tournoi U20';
+    }
+    if (lower.includes('u17') || lower.includes('u-17')) {
+        if (lower.includes('coupe du monde') || lower.includes('world cup') || lower.includes('cdm')) {
+            return lower.includes('fem') ? 'CdM U17 Féminine' : 'CdM U17';
+        }
+        return 'Tournoi U17';
+    }
+    if (lower.includes('u19') || lower.includes('u-19')) {
+        if (lower.includes('euro')) return 'Euro U19';
+        return 'Tournoi U19';
+    }
+    if (lower.includes('u21') || lower.includes('u-21') || lower.includes('espoir')) {
+        if (lower.includes('euro')) return 'Euro Espoirs (U21)';
+        return 'Tournoi U21';
+    }
+    if (lower.includes('u23') || lower.includes('u-23')) {
+        return 'Tournoi U23';
+    }
+    if (lower.includes('coupe du monde fem') || lower.includes('world cup fem') || lower.includes('women\'s world cup')) {
+        return 'Coupe du Monde Féminine';
+    }
+    if (lower.includes('euro fem') || lower.includes('women\'s euro')) {
+        return 'Euro Féminin';
+    }
+    if (lower.includes('champions league fem') || lower.includes('ligue des champions fem')) {
+        return 'Ligue des Champions Féminine';
+    }
+    if (lower.includes('d1 fem. angleterre') || lower.includes('wsl')) return 'Super League Féminine (ANG)';
+    if (lower.includes('d1 fem. allemagne') || lower.includes('frauen-bundesliga')) return 'Frauen-Bundesliga (ALL)';
+    if (lower.includes('d1 fem') || lower.includes('arkema') || lower.includes('première ligue') || (lower.includes('féminine') && !lower.includes('coupe du monde'))) return 'D1 Féminine';
+
+    // 2. Compétitions Majeures Senior
     if (lower.includes('champions league') || lower.includes('ligue des champions')) return 'UEFA Champions League';
     if (lower.includes('europa league') || lower.includes('ligue europa')) return 'UEFA Europa League';
     if (lower.includes('conference league') || lower.includes('conference')) return 'UEFA Conference League';
@@ -860,9 +941,6 @@ function formatCompetitionName(rawComp) {
     if (lower.includes('d1 pays-bas') || lower.includes('eredivisie')) return 'Eredivisie';
     if (lower.includes('d1 belgique') || lower.includes('pro league')) return 'Jupiler Pro League';
     if (lower.includes('d1 turquie') || lower.includes('super lig') || lower.includes('süper lig')) return 'Süper Lig';
-    if (lower.includes('d1 fem. angleterre') || lower.includes('wsl')) return 'Super League Féminine (ANG)';
-    if (lower.includes('d1 fem. allemagne')) return 'Frauen-Bundesliga (ALL)';
-    if (lower.includes('d1 fem') || lower.includes('féminine') || lower.includes('fem.')) return 'D1 Féminine';
     if (lower.includes('ligue 1')) return 'Ligue 1';
     if (lower.includes('ligue 2')) return 'Ligue 2';
     if (lower.includes('serie a')) return 'Serie A';
@@ -894,11 +972,31 @@ function formatCompetitionName(rawComp) {
 }
 
 /**
+ * Détecte si un match relève d'une catégorie jeune, féminine ou division secondaire
+ */
+function isMinorOrYouthMatch(compName, homeTeamName, awayTeamName) {
+    const text = `${compName || ''} ${homeTeamName || ''} ${awayTeamName || ''}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return /\b(u16|u17|u18|u19|u20|u21|u22|u23|espoir|espoirs|youth|junior|juniors|fem|feminine|women|frauen|d2|d3|ligue 2|serie b|2\. bundesliga|segunda|championship|national|national 2|national 3|r1|r2|reserve)\b/i.test(text);
+}
+
+/**
  * Étape B : Récupère le logo d'une équipe (Table HD ou TheSportsDB avec User-Agent)
  */
 function escapeRegex(s) {
     return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+const COUNTRY_FLAG_FALLBACKS = {
+    'france': 'fr', 'canada': 'ca', 'usa': 'us', 'etats-unis': 'us', 'mexique': 'mx', 'mexico': 'mx',
+    'espagne': 'es', 'angleterre': 'gb-eng', 'allemagne': 'de', 'italie': 'it', 'portugal': 'pt',
+    'belgique': 'be', 'pays-bas': 'nl', 'croatie': 'hr', 'suisse': 'ch', 'danemark': 'dk',
+    'suede': 'se', 'norvege': 'no', 'pologne': 'pl', 'autriche': 'at', 'bresil': 'br',
+    'argentine': 'ar', 'uruguay': 'uy', 'colombie': 'co', 'chili': 'cl', 'perou': 'pe',
+    'equateur': 'ec', 'costa rica': 'cr', 'maroc': 'ma', 'algerie': 'dz', 'tunisie': 'tn',
+    'egypte': 'eg', 'senegal': 'sn', 'cameroun': 'cm', 'cote d\'ivoire': 'ci', 'nigeria': 'ng',
+    'ghana': 'gh', 'mali': 'ml', 'japon': 'jp', 'coree du sud': 'kr', 'arabie saoudite': 'sa',
+    'australie': 'au', 'nouvelle-zelande': 'nz'
+};
 
 async function fetchTeamLogo(teamName) {
     if (!teamName) return DEFAULT_FOOTBALL_SHIELD_SVG;
@@ -910,17 +1008,21 @@ async function fetchTeamLogo(teamName) {
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '');
 
+    const baseClean = clean
+        .replace(/\s+f[eé]m.*$/i, '')
+        .replace(/\s+u\d+.*$/i, '')
+        .replace(/\s+espoirs.*$/i, '')
+        .replace(/\s+fc$/i, '')
+        .trim();
+
     // 1. Vérifier le cache mémoire
-    if (teamLogoCache.has(clean)) {
-        return teamLogoCache.get(clean);
-    }
-    if (teamLogoCache.has(rawClean)) {
-        return teamLogoCache.get(rawClean);
-    }
+    if (teamLogoCache.has(clean)) return teamLogoCache.get(clean);
+    if (teamLogoCache.has(rawClean)) return teamLogoCache.get(rawClean);
+    if (teamLogoCache.has(baseClean)) return teamLogoCache.get(baseClean);
 
     // 2. Recherche directe dans la table des logos HD officiels (Correspondance exacte)
-    if (MAJOR_TEAM_LOGOS[clean] || MAJOR_TEAM_LOGOS[rawClean]) {
-        const logo = MAJOR_TEAM_LOGOS[clean] || MAJOR_TEAM_LOGOS[rawClean];
+    if (MAJOR_TEAM_LOGOS[clean] || MAJOR_TEAM_LOGOS[rawClean] || MAJOR_TEAM_LOGOS[baseClean]) {
+        const logo = MAJOR_TEAM_LOGOS[clean] || MAJOR_TEAM_LOGOS[rawClean] || MAJOR_TEAM_LOGOS[baseClean];
         teamLogoCache.set(clean, logo);
         return logo;
     }
@@ -931,13 +1033,14 @@ async function fetchTeamLogo(teamName) {
         if (normKey.length <= 3) {
             // Pour les abréviations courtes (ex: 'psg', 'om', 'ol'), mot complet obligatoire (évite 'ol' dans 'olympiakos')
             const re = new RegExp(`(?:^|\\s)${escapeRegex(normKey)}(?:\\s|$)`, 'i');
-            if (re.test(clean) || re.test(rawClean)) {
+            if (re.test(clean) || re.test(rawClean) || re.test(baseClean)) {
                 teamLogoCache.set(clean, logoUrl);
                 return logoUrl;
             }
         } else {
             // Pour les clés de 4 caractères ou plus
             if (clean === normKey || clean.startsWith(normKey + ' ') || clean.endsWith(' ' + normKey) || clean.includes(' ' + normKey + ' ') ||
+                baseClean === normKey || baseClean.startsWith(normKey + ' ') || baseClean.endsWith(' ' + normKey) ||
                 rawClean === key || rawClean.startsWith(key + ' ') || rawClean.endsWith(' ' + key) || rawClean.includes(' ' + key + ' ')) {
                 teamLogoCache.set(clean, logoUrl);
                 return logoUrl;
@@ -945,9 +1048,17 @@ async function fetchTeamLogo(teamName) {
         }
     }
 
-    // 4. Appel API TheSportsDB avec User-Agent navigateur
+    // 4. Fallback drapeau national si sélection nationale
+    const flagCode = COUNTRY_FLAG_FALLBACKS[baseClean] || COUNTRY_FLAG_FALLBACKS[clean];
+    if (flagCode) {
+        const flagUrl = `https://flagcdn.com/w160/${flagCode}.png`;
+        teamLogoCache.set(clean, flagUrl);
+        return flagUrl;
+    }
+
+    // 5. Appel API TheSportsDB avec User-Agent navigateur
     try {
-        const query = encodeURIComponent(clean.replace(/\s*fém.*$/i, '').replace(/\s*u\d+.*$/i, '').replace(/\s*fc$/i, '').trim());
+        const query = encodeURIComponent(baseClean || clean);
         const url = `https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${query}`;
         const res = await fetch(url, {
             headers: {
@@ -1043,6 +1154,17 @@ function getClubWeight(teamName) {
 }
 
 function calculateMatchHypeScore(homeTeam, awayTeam, competition) {
+    const isMinor = isMinorOrYouthMatch(competition, homeTeam, awayTeam);
+    if (isMinor) {
+        // Score minoritaire pour reléguer ces matchs à la fin de la liste
+        let minorBonus = 50;
+        const lowerComp = String(competition || '').toLowerCase();
+        if (lowerComp.includes('world cup') || lowerComp.includes('coupe du monde') || lowerComp.includes('cdm')) minorBonus = 120;
+        else if (lowerComp.includes('euro')) minorBonus = 100;
+        else if (lowerComp.includes('champions league')) minorBonus = 90;
+        return minorBonus;
+    }
+
     const w1 = getClubWeight(homeTeam);
     const w2 = getClubWeight(awayTeam);
     const maxW = Math.max(w1, w2);
@@ -1613,24 +1735,21 @@ async function getTodayMatches(countryInput = 'france', forceRefresh = false, al
         try {
             const rawList = await scrapeTodayMatches();
 
-            // Mode Slider Accueil : Filtrage strict sur les grands chocs & top tiers
-            let targetMatches = rawList;
-            if (!allMatches) {
-                targetMatches = rawList.filter(m => {
-                    const compConfig = identifyTopStageCompetition(m.competition);
-                    if (!compConfig) return false;
-                    if (compConfig.allMatches) return true;
-                    return isBigClub(m.homeTeamName) || isBigClub(m.awayTeamName);
-                });
+            // Mode Slider Accueil / Catalogue : Tous les matchs du jour sont inclus
+            // mais ordonnés avec les chocs majeurs en tête et les matchs jeunes / secondaires strictement à la fin
+            let targetMatches = [...rawList];
 
-                // Tri par Hype Score décroissant pour l'accueil
-                targetMatches.sort((a, b) => {
-                    if (b.hypeScore !== a.hypeScore) {
-                        return b.hypeScore - a.hypeScore;
-                    }
-                    return a.time.localeCompare(b.time);
-                });
-            }
+            targetMatches.sort((a, b) => {
+                const aMinor = isMinorOrYouthMatch(a.competition, a.homeTeamName, a.awayTeamName);
+                const bMinor = isMinorOrYouthMatch(b.competition, b.homeTeamName, b.awayTeamName);
+                if (aMinor !== bMinor) {
+                    return aMinor ? 1 : -1;
+                }
+                if (b.hypeScore !== a.hypeScore) {
+                    return b.hypeScore - a.hypeScore;
+                }
+                return a.time.localeCompare(b.time);
+            });
 
             // Récupération des logos HD et diffuseurs TV adaptés au pays
             baseMatches = await Promise.all(targetMatches.map(async (m) => {

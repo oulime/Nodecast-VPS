@@ -8,8 +8,7 @@
     deviceName: null,
     currentMedia: null,
     lastChecked: 0,
-    checkInterval: null,
-    promptPending: null
+    checkInterval: null
   };
 
   function getAuthToken() {
@@ -27,7 +26,26 @@
     return h;
   }
 
-  // Inject scoped styles for TV settings, choice modal, and top active bar
+  function isAutoDiffuseOn() {
+    try {
+      var val = localStorage.getItem("velora_tv_auto_diffuse");
+      if (val === null) return true; // Default to ON when TV is connected
+      return val === "true" || val === "1";
+    } catch (_) {
+      return true;
+    }
+  }
+
+  function setAutoDiffuse(enabled) {
+    try {
+      localStorage.setItem("velora_tv_auto_diffuse", enabled ? "true" : "false");
+    } catch (_) {}
+    syncActiveTvBar();
+    renderTvSettingsSection();
+    showTvToast(enabled ? "📺 Mode TV activé (diffusion directe)" : "📱 Mode Téléphone activé (lecture locale)");
+  }
+
+  // Inject scoped styles for TV settings and top active bar
   function injectStyles() {
     if (document.getElementById("velora-tv-bridge-styles")) return;
     var style = document.createElement("style");
@@ -42,7 +60,7 @@
         padding: 16px 20px;
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 14px;
         text-align: left;
       }
       .vel-profile-tv-header {
@@ -74,12 +92,37 @@
         font-size: 13px;
         color: #94a3b8;
         line-height: 1.45;
+        margin: 0;
       }
       .vel-profile-tv-now-playing {
         display: inline-block;
         margin-top: 4px;
         color: #c084fc;
         font-weight: 600;
+      }
+      .vel-profile-tv-switch-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 14px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .vel-profile-tv-switch-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .vel-profile-tv-switch-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #ffffff;
+      }
+      .vel-profile-tv-switch-desc {
+        font-size: 11px;
+        color: #94a3b8;
       }
       .vel-profile-tv-pair-row {
         display: flex;
@@ -133,115 +176,6 @@
       }
       .vel-profile-tv-msg.is-error { color: #f87171; }
       .vel-profile-tv-msg.is-success { color: #4ade80; }
-
-      /* Destination Choice Modal */
-      .vel-tv-choice-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.75);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-        z-index: 999999;
-        display: flex;
-        align-items: flex-end;
-        justify-content: center;
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.25s ease;
-      }
-      @media (min-width: 600px) {
-        .vel-tv-choice-overlay {
-          align-items: center;
-        }
-      }
-      .vel-tv-choice-overlay.is-open {
-        opacity: 1;
-        pointer-events: auto;
-      }
-      .vel-tv-choice-sheet {
-        background: #150d2a;
-        border: 1px solid rgba(167, 139, 250, 0.3);
-        border-radius: 24px 24px 0 0;
-        padding: 24px;
-        max-width: 440px;
-        width: 100%;
-        box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6);
-        transform: translateY(40px);
-        transition: transform 0.25s ease;
-        text-align: center;
-      }
-      @media (min-width: 600px) {
-        .vel-tv-choice-sheet {
-          border-radius: 24px;
-          transform: scale(0.95);
-        }
-      }
-      .vel-tv-choice-overlay.is-open .vel-tv-choice-sheet {
-        transform: translateY(0) scale(1);
-      }
-      .vel-tv-choice-title {
-        font-size: 18px;
-        font-weight: 800;
-        color: #fff;
-        margin-bottom: 6px;
-      }
-      .vel-tv-choice-media {
-        font-size: 14px;
-        color: #a78bfa;
-        margin-bottom: 20px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .vel-tv-choice-options {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-      .vel-tv-choice-btn {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        padding: 14px 18px;
-        border-radius: 14px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        background: rgba(255, 255, 255, 0.05);
-        color: #fff;
-        font-size: 15px;
-        font-weight: 600;
-        cursor: pointer;
-        text-align: left;
-        transition: all 0.2s ease;
-      }
-      .vel-tv-choice-btn:hover {
-        background: rgba(139, 92, 246, 0.2);
-        border-color: #8b5cf6;
-      }
-      .vel-tv-choice-btn--tv {
-        background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(76, 29, 149, 0.3));
-        border-color: rgba(167, 139, 250, 0.4);
-      }
-      .vel-tv-choice-icon {
-        font-size: 24px;
-        width: 36px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      .vel-tv-choice-sub {
-        font-size: 12px;
-        color: #94a3b8;
-        font-weight: 400;
-        margin-top: 2px;
-      }
-      .vel-tv-choice-close {
-        margin-top: 14px;
-        background: transparent;
-        border: none;
-        color: #94a3b8;
-        font-size: 13px;
-        cursor: pointer;
-      }
 
       /* Upper TV Active Diffusion Bar */
       .vel-tv-active-bar {
@@ -302,6 +236,11 @@
         flex-shrink: 0;
         animation: velTvPulse 1.8s infinite ease-in-out;
       }
+      .vel-tv-active-bar__pulse-dot.is-off {
+        background: #94a3b8;
+        box-shadow: none;
+        animation: none;
+      }
       @keyframes velTvPulse {
         0%, 100% { transform: scale(1); opacity: 1; }
         50% { transform: scale(1.3); opacity: 0.6; }
@@ -330,6 +269,9 @@
         font-weight: 600;
         font-size: 10px;
       }
+      .vel-tv-active-bar__status.is-off {
+        color: #94a3b8;
+      }
       .vel-tv-active-bar__title {
         font-size: 12.5px;
         font-weight: 700;
@@ -340,6 +282,9 @@
         letter-spacing: 0.1px;
       }
       .vel-tv-active-bar__actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
         flex-shrink: 0;
       }
       .vel-tv-active-bar__btn {
@@ -349,7 +294,7 @@
         background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(185, 28, 28, 0.4));
         border: 1px solid rgba(248, 113, 113, 0.5);
         color: #fecaca;
-        padding: 5px 11px;
+        padding: 4px 10px;
         border-radius: 9px;
         font-size: 11.5px;
         font-weight: 700;
@@ -369,6 +314,57 @@
       .vel-tv-active-bar__btn.is-stopping {
         opacity: 0.6;
         pointer-events: none;
+      }
+
+      /* Diffusion Switch Pill Button */
+      .vel-tv-switch-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(167, 139, 250, 0.35);
+        border-radius: 20px;
+        padding: 3px 8px;
+        cursor: pointer;
+        user-select: none;
+        -webkit-user-select: none;
+        transition: all 0.2s ease;
+      }
+      .vel-tv-switch-pill:hover {
+        border-color: rgba(167, 139, 250, 0.7);
+        background: rgba(0, 0, 0, 0.6);
+      }
+      .vel-tv-switch-pill-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: #e2e8f0;
+      }
+      .vel-tv-switch-track {
+        width: 32px;
+        height: 17px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.2);
+        position: relative;
+        transition: background 0.2s ease;
+        display: inline-block;
+      }
+      .vel-tv-switch-track.is-on {
+        background: #8b5cf6;
+        box-shadow: 0 0 8px rgba(139, 92, 246, 0.6);
+      }
+      .vel-tv-switch-thumb {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        background: #ffffff;
+        transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+      }
+      .vel-tv-switch-track.is-on .vel-tv-switch-thumb {
+        transform: translateX(15px);
       }
     `;
     document.head.appendChild(style);
@@ -441,7 +437,7 @@
         toast.style.opacity = "0";
         toast.style.transform = "translateX(-50%) translateY(-12px)";
         setTimeout(function () { toast.remove(); }, 350);
-      }, 3500);
+      }, 3000);
     } catch (_) {}
   }
 
@@ -462,24 +458,62 @@
 
   // Synchronize the upper active diffusion bar
   function syncActiveTvBar() {
-    if (tvState.hasPairedTv && tvState.isOnline && tvState.currentMedia && tvState.currentMedia.state !== "stopped") {
-      showActiveTvBar(tvState.currentMedia.title || tvState.currentMedia.name || "Lecture sur TV");
+    if (tvState.hasPairedTv && tvState.isOnline) {
+      showActiveTvBar();
     } else {
       removeActiveTvBar();
     }
   }
 
-  // Upper bar showing active TV stream with "Arrêter"
-  function showActiveTvBar(title) {
-    var displayTitle = title || (tvState.currentMedia && (tvState.currentMedia.title || tvState.currentMedia.name)) || "Lecture sur TV";
+  // Upper bar showing TV status, diffusion switch, and active stream
+  function showActiveTvBar() {
+    var isPlaying = tvState.isOnline && tvState.currentMedia && tvState.currentMedia.state !== "stopped";
+    var activeTitle = isPlaying ? (tvState.currentMedia.title || tvState.currentMedia.name || "Lecture en cours") : null;
     var tvName = tvState.deviceName || "Smart TV";
-    var existing = document.getElementById("vel-tv-active-bar");
+    var isOn = isAutoDiffuseOn();
 
+    var statusText = isPlaying 
+      ? "● Diffusion en cours" 
+      : (isOn ? "● Diffuse sur TV" : "○ Mode Mobile");
+
+    var subTitleText = activeTitle || (isOn ? "Les vidéos seront lues sur votre TV" : "Les vidéos seront lues sur ce téléphone");
+
+    var existing = document.getElementById("vel-tv-active-bar");
     if (existing) {
+      var headingStatus = existing.querySelector(".vel-tv-active-bar__status");
+      if (headingStatus) {
+        headingStatus.textContent = statusText;
+        headingStatus.classList.toggle("is-off", !isOn && !isPlaying);
+      }
+      var dot = existing.querySelector(".vel-tv-active-bar__pulse-dot");
+      if (dot) dot.classList.toggle("is-off", !isOn && !isPlaying);
       var titleSpan = existing.querySelector(".vel-tv-active-bar__title");
-      if (titleSpan) titleSpan.textContent = displayTitle;
+      if (titleSpan) titleSpan.textContent = subTitleText;
       var targetSpan = existing.querySelector(".vel-tv-active-bar__target");
       if (targetSpan) targetSpan.textContent = tvName;
+
+      var switchTrack = existing.querySelector(".vel-tv-switch-track");
+      if (switchTrack) switchTrack.classList.toggle("is-on", isOn);
+      var switchLabel = existing.querySelector(".vel-tv-switch-pill-label");
+      if (switchLabel) switchLabel.textContent = isOn ? "Mode TV" : "Mode Tél";
+
+      var stopBtn = existing.querySelector("#vel-tv-stop-playback");
+      if (isPlaying && !stopBtn) {
+        var actions = existing.querySelector(".vel-tv-active-bar__actions");
+        if (actions) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.id = "vel-tv-stop-playback";
+          btn.className = "vel-tv-active-bar__btn";
+          btn.title = "Arrêter la diffusion sur la TV";
+          btn.innerHTML = '<span class="vel-tv-active-bar__btn-icon">⏹</span><span class="vel-tv-active-bar__btn-label">Arrêter</span>';
+          actions.prepend(btn);
+          attachStopBtnHandler(btn);
+        }
+      } else if (!isPlaying && stopBtn) {
+        stopBtn.remove();
+      }
+
       document.body.classList.add("vel-tv-active-bar-open");
       var h = existing.offsetHeight || 48;
       document.documentElement.style.setProperty("--vel-tv-bar-height", h + "px");
@@ -491,21 +525,29 @@
     bar.className = "vel-tv-active-bar";
     bar.innerHTML = `
       <div class="vel-tv-active-bar__left">
-        <div class="vel-tv-active-bar__pulse-dot" aria-hidden="true"></div>
+        <div class="vel-tv-active-bar__pulse-dot ${(isOn || isPlaying) ? "" : "is-off"}" aria-hidden="true"></div>
         <div class="vel-tv-active-bar__info">
           <div class="vel-tv-active-bar__heading">
             <span class="vel-tv-active-bar__icon">📺</span>
             <span class="vel-tv-active-bar__target">${tvName}</span>
-            <span class="vel-tv-active-bar__status">● Diffusion en cours</span>
+            <span class="vel-tv-active-bar__status ${(isOn || isPlaying) ? "" : "is-off"}">${statusText}</span>
           </div>
-          <span class="vel-tv-active-bar__title">${displayTitle}</span>
+          <span class="vel-tv-active-bar__title">${subTitleText}</span>
         </div>
       </div>
       <div class="vel-tv-active-bar__actions">
-        <button type="button" id="vel-tv-stop-playback" class="vel-tv-active-bar__btn" title="Arrêter la diffusion sur la TV">
-          <span class="vel-tv-active-bar__btn-icon">⏹</span>
-          <span class="vel-tv-active-bar__btn-label">Arrêter</span>
-        </button>
+        ${isPlaying ? `
+          <button type="button" id="vel-tv-stop-playback" class="vel-tv-active-bar__btn" title="Arrêter la diffusion sur la TV">
+            <span class="vel-tv-active-bar__btn-icon">⏹</span>
+            <span class="vel-tv-active-bar__btn-label">Arrêter</span>
+          </button>
+        ` : ""}
+        <div class="vel-tv-switch-pill" id="vel-tv-switch-pill" role="button" tabindex="0" title="Activer ou désactiver la diffusion automatique sur TV">
+          <span class="vel-tv-switch-pill-label">${isOn ? "Mode TV" : "Mode Tél"}</span>
+          <span class="vel-tv-switch-track ${isOn ? "is-on" : ""}">
+            <span class="vel-tv-switch-thumb"></span>
+          </span>
+        </div>
       </div>
     `;
     document.body.appendChild(bar);
@@ -516,29 +558,40 @@
       document.documentElement.style.setProperty("--vel-tv-bar-height", h + "px");
     });
 
-    var stopBtn = document.getElementById("vel-tv-stop-playback");
-    if (stopBtn) {
-      stopBtn.addEventListener("click", async function (e) {
+    var switchBtn = document.getElementById("vel-tv-switch-pill");
+    if (switchBtn) {
+      switchBtn.addEventListener("click", function (e) {
         e.preventDefault();
         e.stopPropagation();
-        stopBtn.disabled = true;
-        stopBtn.classList.add("is-stopping");
-        try {
-          await fetch("/api/tv/command", {
-            method: "POST",
-            headers: authHeaders(),
-            body: JSON.stringify({ action: "stop" })
-          });
-          tvState.currentMedia = null;
-          saveCachedTvStatus();
-          removeActiveTvBar();
-          renderTvSettingsSection();
-          showTvToast("Diffusion TV arrêtée");
-        } catch (_) {
-          removeActiveTvBar();
-        }
+        setAutoDiffuse(!isAutoDiffuseOn());
       });
     }
+
+    var stopBtn = document.getElementById("vel-tv-stop-playback");
+    if (stopBtn) attachStopBtnHandler(stopBtn);
+  }
+
+  function attachStopBtnHandler(stopBtn) {
+    stopBtn.addEventListener("click", async function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      stopBtn.disabled = true;
+      stopBtn.classList.add("is-stopping");
+      try {
+        await fetch("/api/tv/command", {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({ action: "stop" })
+        });
+        tvState.currentMedia = null;
+        saveCachedTvStatus();
+        syncActiveTvBar();
+        renderTvSettingsSection();
+        showTvToast("Diffusion TV arrêtée");
+      } catch (_) {
+        syncActiveTvBar();
+      }
+    });
   }
 
   // Check TV status and active playback from backend
@@ -573,7 +626,6 @@
           updateTvBadgeOnly();
         }
 
-        // Always sync the upper diffusion bar with current live TV media
         syncActiveTvBar();
       }
     } catch (_) {}
@@ -625,6 +677,7 @@
     if (tvState.hasPairedTv) {
       var isDiffusionActive = tvState.isOnline && tvState.currentMedia && tvState.currentMedia.state !== "stopped";
       var currentTitle = isDiffusionActive ? (tvState.currentMedia.title || tvState.currentMedia.name || "Média en cours") : "";
+      var isOn = isAutoDiffuseOn();
 
       section.innerHTML = `
         <div class="vel-profile-tv-header">
@@ -641,6 +694,20 @@
                 : "Prête pour la diffusion depuis votre mobile.") 
             : "Ouvrez <em>nodecast.veloravip.net/tv</em> sur votre TV pour diffuser."}
         </p>
+        ${tvState.isOnline ? `
+          <div class="vel-profile-tv-switch-row">
+            <div class="vel-profile-tv-switch-info">
+              <span class="vel-profile-tv-switch-title">Diffusion automatique</span>
+              <span class="vel-profile-tv-switch-desc">Lire directement les vidéos sur la TV</span>
+            </div>
+            <div class="vel-tv-switch-pill" id="vel-profile-tv-toggle-btn" role="button" tabindex="0">
+              <span class="vel-tv-switch-pill-label">${isOn ? "Mode TV" : "Mode Tél"}</span>
+              <span class="vel-tv-switch-track ${isOn ? "is-on" : ""}">
+                <span class="vel-tv-switch-thumb"></span>
+              </span>
+            </div>
+          </div>
+        ` : ""}
         <div style="display:flex; justify-content:flex-end;">
           <button type="button" id="vel-tv-unlink-btn" class="vel-profile-tv-btn vel-profile-tv-btn--danger">
             Dissocier cette TV
@@ -649,6 +716,15 @@
         <p id="vel-tv-pair-status" class="vel-profile-tv-msg"></p>
       `;
       card.appendChild(section);
+
+      var toggleBtn = document.getElementById("vel-profile-tv-toggle-btn");
+      if (toggleBtn) {
+        toggleBtn.addEventListener("click", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          setAutoDiffuse(!isAutoDiffuseOn());
+        });
+      }
 
       var unlinkBtn = document.getElementById("vel-tv-unlink-btn");
       if (unlinkBtn) {
@@ -743,53 +819,6 @@
     }
   }
 
-  // Create or get Choice Modal DOM
-  function ensureChoiceModal() {
-    var existing = document.getElementById("vel-tv-choice-overlay");
-    if (existing) return existing;
-
-    var overlay = document.createElement("div");
-    overlay.id = "vel-tv-choice-overlay";
-    overlay.className = "vel-tv-choice-overlay";
-    overlay.innerHTML = `
-      <div class="vel-tv-choice-sheet">
-        <h3 class="vel-tv-choice-title">Où souhaitez-vous regarder ?</h3>
-        <p id="vel-tv-choice-media" class="vel-tv-choice-media">Titre du média</p>
-        <div class="vel-tv-choice-options">
-          <button type="button" id="vel-choice-btn-tv" class="vel-tv-choice-btn vel-tv-choice-btn--tv">
-            <span class="vel-tv-choice-icon">📺</span>
-            <div>
-              <div>Diffuser sur Smart TV</div>
-              <div class="vel-tv-choice-sub" id="vel-choice-tv-sub">Salon TV • En ligne</div>
-            </div>
-          </button>
-          <button type="button" id="vel-choice-btn-phone" class="vel-tv-choice-btn">
-            <span class="vel-tv-choice-icon">📱</span>
-            <div>
-              <div>Regarder sur ce téléphone</div>
-              <div class="vel-tv-choice-sub">Lecture locale privée</div>
-            </div>
-          </button>
-        </div>
-        <button type="button" id="vel-choice-btn-close" class="vel-tv-choice-close">Annuler</button>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-
-    overlay.addEventListener("click", function (e) {
-      if (e.target === overlay) closeChoiceModal();
-    });
-    document.getElementById("vel-choice-btn-close").addEventListener("click", closeChoiceModal);
-
-    return overlay;
-  }
-
-  function closeChoiceModal() {
-    var overlay = document.getElementById("vel-tv-choice-overlay");
-    if (overlay) overlay.classList.remove("is-open");
-    tvState.promptPending = null;
-  }
-
   // Send media to play on TV
   async function sendToTv(media) {
     try {
@@ -865,7 +894,8 @@
         };
         saveCachedTvStatus();
         renderTvSettingsSection();
-        showActiveTvBar(media.title || media.name);
+        showActiveTvBar();
+        showTvToast("Lecture lancée sur " + (tvState.deviceName || "Smart TV"));
       } else {
         tvState.isOnline = false;
         saveCachedTvStatus();
@@ -898,35 +928,19 @@
     }
   }
 
-  // Hook into playback requests
+  // Hook into playback requests: direct seamless routing based on auto-diffuse switch!
   function interceptPlayback(mediaData) {
     if (tvState.hasPairedTv && tvState.isOnline) {
-      document.querySelectorAll("video").forEach(function (v) {
-        try { v.pause(); } catch (_) {}
-      });
-
-      var overlay = ensureChoiceModal();
-      var titleEl = document.getElementById("vel-tv-choice-media");
-      var subEl = document.getElementById("vel-choice-tv-sub");
-      if (titleEl) titleEl.textContent = mediaData.title || mediaData.name || "Vidéo";
-      if (subEl) subEl.textContent = (tvState.deviceName || "Smart TV") + " • Prête";
-
-      var tvBtn = document.getElementById("vel-choice-btn-tv");
-      var phoneBtn = document.getElementById("vel-choice-btn-phone");
-
-      tvBtn.onclick = function () {
-        closeChoiceModal();
+      if (isAutoDiffuseOn()) {
+        // Stop any local video element immediately
+        document.querySelectorAll("video").forEach(function (v) {
+          try { v.pause(); } catch (_) {}
+        });
         sendToTv(mediaData);
-      };
-
-      phoneBtn.onclick = function () {
-        closeChoiceModal();
-        var v = mediaData.video || document.getElementById("video") || document.getElementById("video-vod");
-        if (v && v.paused) v.play().catch(function () {});
-      };
-
-      overlay.classList.add("is-open");
-      return true;
+        return true; // Sent directly to TV!
+      }
+      // If auto-diffuse is OFF, play locally on mobile without interruption
+      return false;
     }
     return false;
   }
@@ -973,13 +987,6 @@
         }
       };
     }
-
-    window.addEventListener("velora-playback-started", function (e) {
-      var detail = e.detail;
-      if (detail && tvState.hasPairedTv && tvState.isOnline) {
-        // Optional hook
-      }
-    });
   }
 
   // Initialize

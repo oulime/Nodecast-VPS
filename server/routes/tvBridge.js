@@ -305,6 +305,7 @@ router.get('/events', (req, res) => {
         const current = tvClients.get(deviceId);
         if (current && current.res === res) {
             tvClients.delete(deviceId);
+            activePlayback.delete(deviceId);
         }
     });
 });
@@ -317,15 +318,19 @@ router.post('/state', express.json(), (req, res) => {
     const { deviceId, state, position, duration, error } = req.body || {};
     if (!deviceId) return res.status(400).json({ error: 'deviceId requis' });
 
-    const current = activePlayback.get(deviceId) || {};
-    activePlayback.set(deviceId, {
-        ...current,
-        state: state || current.state,
-        position: position ?? current.position,
-        duration: duration ?? current.duration,
-        error: error || null,
-        updatedAt: Date.now()
-    });
+    if (state === 'stopped' || state === 'idle' || state === 'ended') {
+        activePlayback.delete(deviceId);
+    } else {
+        const current = activePlayback.get(deviceId) || {};
+        activePlayback.set(deviceId, {
+            ...current,
+            state: state || current.state || 'playing',
+            position: position ?? current.position,
+            duration: duration ?? current.duration,
+            error: error || null,
+            updatedAt: Date.now()
+        });
+    }
 
     res.json({ ok: true });
 });
@@ -598,6 +603,10 @@ router.post('/command', tvRequireAuth, express.json(), (req, res) => {
 
         const { action, value } = req.body || {};
         if (!action) return res.status(400).json({ ok: false, error: 'Action requise' });
+
+        if (action === 'stop') {
+            activePlayback.delete(pairedRow.device_id);
+        }
 
         sendTvEvent(pairedRow.device_id, {
             type: 'COMMAND',

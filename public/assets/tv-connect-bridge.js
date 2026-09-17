@@ -27,7 +27,7 @@
     return h;
   }
 
-  // Inject scoped styles for TV settings and choice modal
+  // Inject scoped styles for TV settings, choice modal, and top active bar
   function injectStyles() {
     if (document.getElementById("velora-tv-bridge-styles")) return;
     var style = document.createElement("style");
@@ -73,7 +73,13 @@
       .vel-profile-tv-desc {
         font-size: 13px;
         color: #94a3b8;
-        line-height: 1.4;
+        line-height: 1.45;
+      }
+      .vel-profile-tv-now-playing {
+        display: inline-block;
+        margin-top: 4px;
+        color: #c084fc;
+        font-weight: 600;
       }
       .vel-profile-tv-pair-row {
         display: flex;
@@ -132,7 +138,7 @@
       .vel-tv-choice-overlay {
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, 0.7);
+        background: rgba(0, 0, 0, 0.75);
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
         z-index: 999999;
@@ -237,50 +243,132 @@
         cursor: pointer;
       }
 
-      /* Top TV Active Bar */
+      /* Upper TV Active Diffusion Bar */
       .vel-tv-active-bar {
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
-        background: rgba(18, 11, 38, 0.95);
-        border-bottom: 1px solid rgba(139, 92, 246, 0.3);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        padding: 8px 16px;
+        height: 48px;
+        box-sizing: border-box;
+        background: linear-gradient(135deg, rgba(20, 11, 44, 0.98), rgba(10, 6, 26, 0.98));
+        border-bottom: 1px solid rgba(167, 139, 250, 0.45);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6), 0 0 20px rgba(139, 92, 246, 0.25);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        padding: max(6px, env(safe-area-inset-top)) 14px 6px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        z-index: 99990;
-        font-size: 13px;
+        gap: 10px;
+        z-index: 999999;
+        font-family: inherit;
         color: #fff;
-        animation: velTvSlideDown 0.3s ease;
+        animation: velTvSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
       }
       @keyframes velTvSlideDown {
-        from { transform: translateY(-100%); }
-        to { transform: translateY(0); }
+        from { transform: translateY(-100%); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
       }
+
+      /* Push down page body and containers so nothing is covered by the top bar */
+      body.vel-tv-active-bar-open {
+        padding-top: var(--vel-tv-bar-height, 48px) !important;
+        box-sizing: border-box !important;
+      }
+      body.vel-tv-active-bar-open .main--velora {
+        height: calc(100dvh - var(--vel-tv-bar-height, 48px)) !important;
+        height: calc(100vh - var(--vel-tv-bar-height, 48px)) !important;
+      }
+      body.vel-tv-active-bar-open #vel-floating-search,
+      body.vel-tv-active-bar-open .vel-floating-search {
+        top: calc(12px + var(--vel-tv-bar-height, 48px)) !important;
+      }
+
       .vel-tv-active-bar__left {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 10px;
+        overflow: hidden;
+        min-width: 0;
+        flex: 1;
+      }
+      .vel-tv-active-bar__pulse-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #4ade80;
+        box-shadow: 0 0 8px #4ade80;
+        flex-shrink: 0;
+        animation: velTvPulse 1.8s infinite ease-in-out;
+      }
+      @keyframes velTvPulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.3); opacity: 0.6; }
+      }
+      .vel-tv-active-bar__info {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        min-width: 0;
         overflow: hidden;
       }
-      .vel-tv-active-bar__title {
+      .vel-tv-active-bar__heading {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 10.5px;
+        color: #cbd5e1;
+        white-space: nowrap;
+      }
+      .vel-tv-active-bar__target {
+        font-weight: 700;
+        color: #c084fc;
+      }
+      .vel-tv-active-bar__status {
+        color: #4ade80;
         font-weight: 600;
+        font-size: 10px;
+      }
+      .vel-tv-active-bar__title {
+        font-size: 12.5px;
+        font-weight: 700;
+        color: #ffffff;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        max-width: 200px;
+        letter-spacing: 0.1px;
+      }
+      .vel-tv-active-bar__actions {
+        flex-shrink: 0;
       }
       .vel-tv-active-bar__btn {
-        background: rgba(255, 255, 255, 0.1);
-        border: none;
-        color: #e2e8f0;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-size: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(185, 28, 28, 0.4));
+        border: 1px solid rgba(248, 113, 113, 0.5);
+        color: #fecaca;
+        padding: 5px 11px;
+        border-radius: 9px;
+        font-size: 11.5px;
+        font-weight: 700;
         cursor: pointer;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+      }
+      .vel-tv-active-bar__btn:hover {
+        background: rgba(239, 68, 68, 0.5);
+        border-color: #f87171;
+        color: #ffffff;
+        box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+      }
+      .vel-tv-active-bar__btn:active {
+        transform: scale(0.96);
+      }
+      .vel-tv-active-bar__btn.is-stopping {
+        opacity: 0.6;
+        pointer-events: none;
       }
     `;
     document.head.appendChild(style);
@@ -310,16 +398,17 @@
         var parsed = JSON.parse(raw);
         if (parsed && typeof parsed === "object") {
           tvState.hasPairedTv = Boolean(parsed.hasPairedTv);
-          // Never assume online from stale cache! Online state must be live.
           tvState.isOnline = false;
           tvState.deviceId = parsed.deviceId || null;
           tvState.deviceName = parsed.deviceName || "Smart TV";
+          tvState.currentMedia = parsed.currentMedia || null;
         }
       } else {
         tvState.hasPairedTv = false;
         tvState.isOnline = false;
         tvState.deviceId = null;
         tvState.deviceName = null;
+        tvState.currentMedia = null;
       }
     } catch (_) {}
   }
@@ -331,7 +420,8 @@
         hasPairedTv: tvState.hasPairedTv,
         isOnline: tvState.isOnline,
         deviceId: tvState.deviceId,
-        deviceName: tvState.deviceName
+        deviceName: tvState.deviceName,
+        currentMedia: tvState.currentMedia
       }));
     } catch (_) {}
   }
@@ -363,7 +453,95 @@
     }
   }
 
-  // Check TV status from backend
+  function removeActiveTvBar() {
+    var bar = document.getElementById("vel-tv-active-bar");
+    if (bar) bar.remove();
+    document.body.classList.remove("vel-tv-active-bar-open");
+    document.documentElement.style.removeProperty("--vel-tv-bar-height");
+  }
+
+  // Synchronize the upper active diffusion bar
+  function syncActiveTvBar() {
+    if (tvState.hasPairedTv && tvState.isOnline && tvState.currentMedia && tvState.currentMedia.state !== "stopped") {
+      showActiveTvBar(tvState.currentMedia.title || tvState.currentMedia.name || "Lecture sur TV");
+    } else {
+      removeActiveTvBar();
+    }
+  }
+
+  // Upper bar showing active TV stream with "Arrêter"
+  function showActiveTvBar(title) {
+    var displayTitle = title || (tvState.currentMedia && (tvState.currentMedia.title || tvState.currentMedia.name)) || "Lecture sur TV";
+    var tvName = tvState.deviceName || "Smart TV";
+    var existing = document.getElementById("vel-tv-active-bar");
+
+    if (existing) {
+      var titleSpan = existing.querySelector(".vel-tv-active-bar__title");
+      if (titleSpan) titleSpan.textContent = displayTitle;
+      var targetSpan = existing.querySelector(".vel-tv-active-bar__target");
+      if (targetSpan) targetSpan.textContent = tvName;
+      document.body.classList.add("vel-tv-active-bar-open");
+      var h = existing.offsetHeight || 48;
+      document.documentElement.style.setProperty("--vel-tv-bar-height", h + "px");
+      return;
+    }
+
+    var bar = document.createElement("div");
+    bar.id = "vel-tv-active-bar";
+    bar.className = "vel-tv-active-bar";
+    bar.innerHTML = `
+      <div class="vel-tv-active-bar__left">
+        <div class="vel-tv-active-bar__pulse-dot" aria-hidden="true"></div>
+        <div class="vel-tv-active-bar__info">
+          <div class="vel-tv-active-bar__heading">
+            <span class="vel-tv-active-bar__icon">📺</span>
+            <span class="vel-tv-active-bar__target">${tvName}</span>
+            <span class="vel-tv-active-bar__status">● Diffusion en cours</span>
+          </div>
+          <span class="vel-tv-active-bar__title">${displayTitle}</span>
+        </div>
+      </div>
+      <div class="vel-tv-active-bar__actions">
+        <button type="button" id="vel-tv-stop-playback" class="vel-tv-active-bar__btn" title="Arrêter la diffusion sur la TV">
+          <span class="vel-tv-active-bar__btn-icon">⏹</span>
+          <span class="vel-tv-active-bar__btn-label">Arrêter</span>
+        </button>
+      </div>
+    `;
+    document.body.appendChild(bar);
+    document.body.classList.add("vel-tv-active-bar-open");
+
+    requestAnimationFrame(function () {
+      var h = bar.offsetHeight || 48;
+      document.documentElement.style.setProperty("--vel-tv-bar-height", h + "px");
+    });
+
+    var stopBtn = document.getElementById("vel-tv-stop-playback");
+    if (stopBtn) {
+      stopBtn.addEventListener("click", async function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        stopBtn.disabled = true;
+        stopBtn.classList.add("is-stopping");
+        try {
+          await fetch("/api/tv/command", {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({ action: "stop" })
+          });
+          tvState.currentMedia = null;
+          saveCachedTvStatus();
+          removeActiveTvBar();
+          renderTvSettingsSection();
+          showTvToast("Diffusion TV arrêtée");
+        } catch (_) {
+          removeActiveTvBar();
+        }
+      });
+    }
+  }
+
+  // Check TV status and active playback from backend
   async function checkTvStatus() {
     if (!getAuthToken()) return;
     try {
@@ -377,19 +555,26 @@
         var prevPaired = tvState.hasPairedTv;
         var prevOnline = tvState.isOnline;
         var prevName = tvState.deviceName;
+        var prevMediaTitle = tvState.currentMedia ? (tvState.currentMedia.title || tvState.currentMedia.name) : null;
+
         tvState.hasPairedTv = Boolean(data.hasPairedTv);
         tvState.isOnline = Boolean(data.isOnline);
         tvState.deviceId = data.deviceId || null;
         tvState.deviceName = data.deviceName || "Smart TV";
+        tvState.currentMedia = (data.isOnline && data.currentMedia && data.currentMedia.state !== "stopped") ? data.currentMedia : null;
         tvState.lastChecked = Date.now();
         saveCachedTvStatus();
 
-        // If structure changed (e.g. unlinked or newly paired), re-render full card; otherwise just update badge
-        if (prevPaired !== tvState.hasPairedTv || prevName !== tvState.deviceName) {
+        var newMediaTitle = tvState.currentMedia ? (tvState.currentMedia.title || tvState.currentMedia.name) : null;
+
+        if (prevPaired !== tvState.hasPairedTv || prevName !== tvState.deviceName || prevMediaTitle !== newMediaTitle) {
           renderTvSettingsSection();
         } else if (prevOnline !== tvState.isOnline) {
           updateTvBadgeOnly();
         }
+
+        // Always sync the upper diffusion bar with current live TV media
+        syncActiveTvBar();
       }
     } catch (_) {}
   }
@@ -411,7 +596,6 @@
         window.alert("🎉 Votre Smart TV (" + (data.deviceName || "Salon") + ") a été connectée avec succès !");
         checkTvStatus();
       }
-      // Remove query param cleanly
       params.delete("tvPair");
       var newQuery = params.toString() ? "?" + params.toString() : "";
       window.history.replaceState({}, "", window.location.pathname + newQuery);
@@ -439,6 +623,9 @@
     section.className = "vel-profile-tv-card";
 
     if (tvState.hasPairedTv) {
+      var isDiffusionActive = tvState.isOnline && tvState.currentMedia && tvState.currentMedia.state !== "stopped";
+      var currentTitle = isDiffusionActive ? (tvState.currentMedia.title || tvState.currentMedia.name || "Média en cours") : "";
+
       section.innerHTML = `
         <div class="vel-profile-tv-header">
           <span class="vel-profile-tv-title">📺 Smart TV Connectée</span>
@@ -448,7 +635,11 @@
         </div>
         <p class="vel-profile-tv-desc">
           Appareil : <strong>${tvState.deviceName}</strong><br />
-          ${tvState.isOnline ? "Prête pour la diffusion depuis votre mobile." : "Ouvrez <em>nodecast.veloravip.net/tv</em> sur votre TV pour diffuser."}
+          ${tvState.isOnline 
+            ? (isDiffusionActive 
+                ? `Diffusion active : <strong class="vel-profile-tv-now-playing">${currentTitle}</strong>` 
+                : "Prête pour la diffusion depuis votre mobile.") 
+            : "Ouvrez <em>nodecast.veloravip.net/tv</em> sur votre TV pour diffuser."}
         </p>
         <div style="display:flex; justify-content:flex-end;">
           <button type="button" id="vel-tv-unlink-btn" class="vel-profile-tv-btn vel-profile-tv-btn--danger">
@@ -473,6 +664,8 @@
             if (data.ok) {
               tvState.hasPairedTv = false;
               tvState.isOnline = false;
+              tvState.currentMedia = null;
+              removeActiveTvBar();
               renderTvSettingsSection();
             }
           } catch (e) {
@@ -543,7 +736,6 @@
         pinInput.addEventListener("keydown", function (e) {
           if (e.key === "Enter") submitPin();
         });
-        // Auto submit when 4th digit entered
         pinInput.addEventListener("input", function () {
           if (pinInput.value.trim().length === 4) submitPin();
         });
@@ -633,16 +825,12 @@
       var vodContainer = document.getElementById("vod-player-container");
       if (vodContainer) vodContainer.classList.add("hidden");
 
-      // 4. Cool-down pause (400ms) to ensure previous TCP connection to IPTV provider is fully released
-      // This prevents the IPTV provider from returning HTTP 458 (Max simultaneous connections reached).
+      // 4. Cool-down pause (400ms)
       await new Promise(function (resolve) { setTimeout(resolve, 400); });
 
-      // 5. Resolve best stream URL for the TV:
-      // PRESERVE the exact working stream pipeline (media.url) used by the web player!
-      // Do NOT bypass working proxy or remux pipelines with raw unproxied media.sourceUrl!
+      // 5. Resolve best stream URL for the TV
       var targetUrl = media.url || media.castUrl || media.direct_source || media.sourceUrl;
 
-      // Ensure URL is absolute and never has localhost
       if (targetUrl) {
         if (targetUrl.indexOf("/") === 0) {
           targetUrl = window.location.origin + targetUrl;
@@ -650,7 +838,6 @@
           targetUrl = targetUrl.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i, window.location.origin);
         }
 
-        // Append user auth token if hitting authenticated proxy/remux routes
         var token = getAuthToken();
         if (token && (targetUrl.indexOf("/api/") !== -1 || targetUrl.indexOf("/proxy") !== -1)) {
           if (targetUrl.indexOf("token=") === -1) {
@@ -671,23 +858,27 @@
       });
       var data = await res.json();
       if (data.ok) {
-        showActiveTvBar(media.title);
+        tvState.currentMedia = {
+          ...media,
+          title: media.title || media.name || "Vidéo",
+          state: "playing"
+        };
+        saveCachedTvStatus();
+        renderTvSettingsSection();
+        showActiveTvBar(media.title || media.name);
       } else {
-        // TV is offline or in standby: update state gracefully
         tvState.isOnline = false;
         saveCachedTvStatus();
         updateTvBadgeOnly();
+        syncActiveTvBar();
 
-        // Restore mobile player containers
         var liveContainer = document.getElementById("player-container");
         if (liveContainer) liveContainer.classList.remove("hidden");
         var vodContainer = document.getElementById("vod-player-container");
         if (vodContainer) vodContainer.classList.remove("hidden");
 
-        // Show non-blocking toast notification instead of alert popup
         showTvToast("La TV semble en veille — Lecture lancée sur votre téléphone");
 
-        // Fallback to local playback on mobile
         var v = media.video || document.getElementById("video") || document.getElementById("video-vod");
         if (v && v.paused) {
           v.play().catch(function () {});
@@ -698,6 +889,7 @@
       tvState.isOnline = false;
       saveCachedTvStatus();
       updateTvBadgeOnly();
+      syncActiveTvBar();
       showTvToast("Connexion TV interrompue — Lecture sur votre téléphone");
       var v = media.video || document.getElementById("video") || document.getElementById("video-vod");
       if (v && v.paused) {
@@ -706,42 +898,9 @@
     }
   }
 
-  // Mini top bar showing active TV stream
-  function showActiveTvBar(title) {
-    var existing = document.getElementById("vel-tv-active-bar");
-    if (existing) existing.remove();
-
-    var bar = document.createElement("div");
-    bar.id = "vel-tv-active-bar";
-    bar.className = "vel-tv-active-bar";
-    bar.innerHTML = `
-      <div class="vel-tv-active-bar__left">
-        <span>📺</span>
-        <span class="vel-tv-active-bar__title">${title || "Lecture sur TV"}</span>
-      </div>
-      <button type="button" id="vel-tv-stop-playback" class="vel-tv-active-bar__btn">
-        Arrêter TV ⏹
-      </button>
-    `;
-    document.body.appendChild(bar);
-
-    document.getElementById("vel-tv-stop-playback").addEventListener("click", async function () {
-      try {
-        await fetch("/api/tv/command", {
-          method: "POST",
-          headers: authHeaders(),
-          body: JSON.stringify({ action: "stop" })
-        });
-        bar.remove();
-      } catch (_) {}
-    });
-  }
-
   // Hook into playback requests
   function interceptPlayback(mediaData) {
-    // If TV is paired and confirmed online, prompt the user!
     if (tvState.hasPairedTv && tvState.isOnline) {
-      // Pause mobile playback while user chooses destination
       document.querySelectorAll("video").forEach(function (v) {
         try { v.pause(); } catch (_) {}
       });
@@ -762,13 +921,12 @@
 
       phoneBtn.onclick = function () {
         closeChoiceModal();
-        // Allow mobile video to play normally
         var v = mediaData.video || document.getElementById("video") || document.getElementById("video-vod");
         if (v && v.paused) v.play().catch(function () {});
       };
 
       overlay.classList.add("is-open");
-      return true; // Prompt shown
+      return true;
     }
     return false;
   }
@@ -785,7 +943,6 @@
       }
     }
 
-    // 1. Direct click capture on profile buttons: triggers instant 0ms render
     document.addEventListener("click", function (e) {
       var btn = e.target && e.target.closest && e.target.closest("#vel-profile-account-open, [data-bottom-nav='profile']");
       if (btn) {
@@ -797,35 +954,30 @@
       }
     }, true);
 
-    // 2. Persistent observer watching for modal creation or unhiding
     var bodyObserver = new MutationObserver(function () {
       tryInstantRender();
     });
     bodyObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
 
-    // 3. Immediate check in case modal already exists in DOM
     tryInstantRender();
   }
 
   // Hook into unified Velora events
   function initPlaybackListeners() {
-    // Listen for VeloraCast setMedia calls
     var origSetMedia = window.VeloraCast && window.VeloraCast.setMedia;
     if (window.VeloraCast) {
       window.VeloraCast.setMedia = function (media) {
         if (origSetMedia) origSetMedia.call(window.VeloraCast, media);
         if (media && media.url) {
-          // If TV is online, we intercept and show choice
           interceptPlayback(media);
         }
       };
     }
 
-    // Listen for custom velora-playback-started event
     window.addEventListener("velora-playback-started", function (e) {
       var detail = e.detail;
       if (detail && tvState.hasPairedTv && tvState.isOnline) {
-        // Checked when user starts playback
+        // Optional hook
       }
     });
   }
@@ -839,8 +991,8 @@
     handleUrlPairing();
     checkTvStatus();
 
-    // Check TV online status every 30s
-    tvState.checkInterval = setInterval(checkTvStatus, 30000);
+    // Check TV online status and sync active broadcasting bar every 8s
+    tvState.checkInterval = setInterval(checkTvStatus, 8000);
   }
 
   if (document.readyState === "loading") {

@@ -423,6 +423,14 @@
     updatePlayPauseIcon();
     startTvStreamTracking();
 
+    if (state.deviceId) {
+      fetch("/api/tv/state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId: state.deviceId, state: "playing" })
+      }).catch(function () {});
+    }
+
     // Update OSD metadata
     if (dom.title) dom.title.textContent = media.title || "Lecture en cours";
     if (dom.subtitle) {
@@ -574,6 +582,14 @@
 
   function stopPlayback() {
     stopTvStreamTracking(true);
+    if (state.deviceId) {
+      fetch("/api/tv/state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId: state.deviceId, state: "stopped" }),
+        keepalive: true
+      }).catch(function () {});
+    }
     var v = dom.video;
     if (v) {
       v.pause();

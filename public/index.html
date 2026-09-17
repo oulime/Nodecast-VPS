@@ -1580,7 +1580,7 @@
   <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-54"></script>
   <script defer src="/assets/velora-home-sections.js?v=20260915-no-dark-pill-v2"></script>
   <script defer src="/assets/velora-home-cache-fallback.js?v=20260915-no-dark-pill-v2"></script>
-  <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=20260911-tab-click-guard-v1"></script>
+  <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=20260917-live-nav-sync-v2"></script>
   <script defer src="/assets/subscription-access-guard.js?v=stream-in-use-v20260917-1"></script>
   <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-54"></script>
   <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-54"></script>
@@ -9120,7 +9120,7 @@
             stopHomeMediaPlayback();
             homeChoiceRunId += 1;
             delete document.body.dataset.velTopLevel;
-            delete document.body.dataset.velActiveTab;
+            document.body.dataset.velActiveTab = "home";
             var homePage = document.getElementById("vel-home-empty-page");
             if (homePage) {
               homePage.classList.remove("hidden");
@@ -9146,7 +9146,8 @@
               "main--velora-series-detail-themed",
               "body--velora-live-package",
               "vel-favorites-open",
-              "vel-favorites-player-active"
+              "vel-favorites-player-active",
+              "is-locked"
             );
             var pkgModal = document.getElementById("vel-pkg-modal");
             if (pkgModal) pkgModal.classList.remove("is-open");
@@ -9158,8 +9159,17 @@
             var banner = document.getElementById("vel-live-match-banner") || document.getElementById("velora-match-banner");
             if (banner) banner.remove();
 
+            if (typeof window.veloraCleanupAllMedia === "function") {
+              try { window.veloraCleanupAllMedia(); } catch (_) { }
+            }
             if (typeof window.veloraStopAllPlayback === "function") {
               try { window.veloraStopAllPlayback(); } catch (_) { }
+            }
+            if (typeof window.veloraStopLive === "function") {
+              try { window.veloraStopLive(); } catch (_) { }
+            }
+            if (typeof window.veloraStopVod === "function") {
+              try { window.veloraStopVod(); } catch (_) { }
             }
 
             delete document.body.dataset.veloraReturnAdult;
@@ -9169,19 +9179,39 @@
             delete document.body.dataset.veloraSearchMediaOpen;
             document.body.classList.add("vel-home-choice-picked");
             document.body.classList.add("vel-home-empty-active");
+
+            document.documentElement.style.removeProperty("overflow");
+            document.documentElement.style.removeProperty("overflow-y");
+            document.documentElement.style.removeProperty("height");
+            document.body.style.removeProperty("overflow");
+            document.body.style.removeProperty("overflow-y");
+            document.body.style.removeProperty("height");
             var main = document.querySelector(".main--velora");
             if (main) {
-              main.classList.remove("main--velora-in-package", "main--velora-live-package");
+              main.classList.remove("main--velora-in-package", "main--velora-live-package", "main--velora-adult");
               main.scrollTop = 0;
-              main.style.overflow = "";
+              main.style.removeProperty("overflow");
+              main.style.removeProperty("overflow-y");
+              main.style.removeProperty("height");
             }
-            document.body.style.overflow = "";
+            var app = document.querySelector(".app");
+            if (app) {
+              app.scrollTop = 0;
+              app.style.removeProperty("overflow");
+              app.style.removeProperty("overflow-y");
+              app.style.removeProperty("height");
+            }
             window.scrollTo(0, 0);
+
             document.querySelectorAll("[data-bottom-nav]").forEach(function (button) {
               var active = button.getAttribute("data-bottom-nav") === "home";
               button.classList.toggle("is-active", active);
               if (active) button.setAttribute("aria-current", "page");
               else button.removeAttribute("aria-current");
+            });
+            document.querySelectorAll(".nav-item, .nav-link, [data-nav-view]").forEach(function (el) {
+              var isHome = el.id === "btn-header-home" || el.id === "btn-home" || el.getAttribute("data-nav-view") === "home";
+              el.classList.toggle("active", isHome);
             });
             try {
               document.dispatchEvent(new CustomEvent("velora-return-home"));
@@ -18371,7 +18401,7 @@
   <script defer src="/assets/velora-live-wheel.js?v=20260916-live-only-strict-v7"></script>
   <link rel="stylesheet" href="/assets/velora-prime-carousel.css?v=20260914-exact-provider-order-v11" />
   <script defer src="/assets/velora-prime-carousels.js?v=20260914-random-packages-v1"></script>
-  <script defer src="/assets/velora-football-slider.js?v=20260917-match-notice-modal-v7"></script>
+  <script defer src="/assets/velora-football-slider.js?v=20260917-match-nav-sync-v8"></script>
   <script>
     (() => {
       document.addEventListener("click", function (e) {
@@ -18421,7 +18451,7 @@
       }, true);
     })();
   </script>
-  <script defer src="/assets/velora-nav-controller.js?v=20260916-clean-scroll-v8"></script>
+  <script defer src="/assets/velora-nav-controller.js?v=20260917-clean-nav-v9"></script>
   <link rel="stylesheet" href="/assets/velora-adult.css?v=20260912-hub-images-v3" />
   <script defer src="/assets/velora-adult.js?v=20260912-hub-images-v3"></script>
   <script defer src="/assets/velora-football-admin.js?v=20260916-foot-admin-options-v10"></script>

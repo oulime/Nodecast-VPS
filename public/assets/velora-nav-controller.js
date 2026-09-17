@@ -157,7 +157,6 @@
           }
           return;
         }
-        return;
       }
 
       // Check if clicking the same active section tab (e.g. clicking Live while already on Live)

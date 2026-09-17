@@ -1238,6 +1238,18 @@
       var matchingChannels = await searchBroadcastingChannels(match, priorityChannel);
       if (matchingChannels && matchingChannels.length > 0) {
         hideFootballToast();
+        document.body.dataset.velActiveTab = 'live';
+        document.querySelectorAll('[data-bottom-nav]').forEach(function (button) {
+          var active = button.getAttribute('data-bottom-nav') === 'live';
+          button.classList.toggle('is-active', active);
+          if (active) button.setAttribute('aria-current', 'page');
+          else button.removeAttribute('aria-current');
+        });
+        document.querySelectorAll('.nav-item, .nav-link, [data-nav-view]').forEach(function (el) {
+          var isLive = el.id === 'btn-live' || el.getAttribute('data-nav-view') === 'live';
+          el.classList.toggle('active', isLive);
+        });
+
         if (typeof window.veloraOpenSearchChannelItem === 'function') {
           var ok = await window.veloraOpenSearchChannelItem(matchingChannels[0], matchingChannels, displayTitle);
           if (ok) {

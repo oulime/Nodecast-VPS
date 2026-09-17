@@ -224,75 +224,6 @@
   }
 
   let activeStreamSession = null;
-  let supersededMediaState = null;
-
-  function pausePlaybackForSupersede() {
-    let wasPlaying = false;
-    document.querySelectorAll("video, audio").forEach(function (media) {
-      if (!media.paused || Boolean(media.currentSrc) || Boolean(media.src)) {
-        wasPlaying = true;
-        supersededMediaState = {
-          mediaEl: media,
-          id: media.id || "",
-          src: media.currentSrc || media.src || "",
-          currentTime: media.currentTime || 0,
-          containerId: media.id === "video-vod" ? "vod-player-container" : "player-container",
-          streamId: activeStreamSession?.streamId || media.getAttribute("data-stream-id") || "",
-          streamTitle: activeStreamSession?.streamTitle || ""
-        };
-        try { media.pause(); } catch (_) {}
-      }
-    });
-    return wasPlaying;
-  }
-
-  async function resumePlaybackHere() {
-    hideSupersededModal();
-
-    // 1. Un-hide all player containers
-    ["player-container", "vod-player-container", "now-playing", "now-playing-vod"].forEach(function (id) {
-      const el = document.getElementById(id);
-      if (el) el.classList.remove("hidden");
-    });
-
-    // 2. Identify target video element
-    let video = supersededMediaState?.mediaEl
-      || (supersededMediaState?.id && document.getElementById(supersededMediaState.id))
-      || document.getElementById("video")
-      || document.getElementById("video-vod")
-      || document.querySelector("video");
-
-    if (video) {
-      // Re-register stream slot immediately with fresh session key
-      startStreamTracking(video);
-
-      // Attempt immediate playback
-      try {
-        const p = video.play();
-        if (p !== undefined) {
-          p.catch(function (err) {
-            console.warn("[Velora] Direct resume play warning, re-attaching source:", err);
-            if (supersededMediaState?.src && (!video.src || !video.currentSrc)) {
-              video.src = supersededMediaState.src;
-              video.load();
-              if (supersededMediaState.currentTime) {
-                try { video.currentTime = supersededMediaState.currentTime; } catch (_) {}
-              }
-              video.play().catch(function () {});
-            }
-          });
-        }
-      } catch (err) {
-        console.warn("[Velora] Resume exception:", err);
-      }
-    }
-
-    try {
-      window.dispatchEvent(new CustomEvent("velora-stream-resume-requested", {
-        detail: supersededMediaState || {}
-      }));
-    } catch (_) {}
-  }
 
   function ensureSupersededModal() {
     let modal = document.getElementById("vel-stream-superseded");
@@ -313,15 +244,15 @@
             <line x1="12" y1="17" x2="12" y2="21"></line>
           </svg>
         </div>
-        <p class="vel-stream-superseded__eyebrow">LECTURE MULTI-APPAREILS</p>
-        <h2 id="vel-stream-superseded-title">Lecture reprise sur un autre appareil</h2>
+        <p class="vel-stream-superseded__eyebrow">LIMITE D'ÉCRANS ATTEINTE</p>
+        <h2 id="vel-stream-superseded-title">Écran déjà en cours d'utilisation</h2>
         <p class="vel-stream-superseded__copy">
-          La lecture a été lancée sur un autre de vos appareils (ordinateur ou mobile).<br />
-          Votre compte autorise simultanément <strong>1 écran Machine</strong> (PC / Smartphone) et <strong>1 Smart TV</strong>.
+          Un flux est actuellement en cours de lecture sur un autre de vos appareils (ordinateur ou mobile).<br />
+          Votre compte autorise simultanément <strong>1 écran Machine</strong> (PC / Smartphone) et <strong>1 Smart TV</strong>.<br /><br />
+          Veuillez arrêter ou mettre en pause la lecture sur votre autre appareil pour pouvoir regarder ici.
         </p>
-        <div class="vel-stream-superseded__actions">
-          <button type="button" class="vel-stream-superseded__resume">Reprendre la lecture ici</button>
-          <button type="button" class="vel-stream-superseded__close">Fermer</button>
+        <div class="vel-stream-superseded__actions" style="justify-content:center;">
+          <button type="button" class="vel-stream-superseded__close" style="min-width:180px;">Fermer</button>
         </div>
       </div>`;
     document.body.appendChild(modal);
@@ -329,9 +260,6 @@
     modal.querySelector(".vel-stream-superseded__close").addEventListener("click", function () {
       hideSupersededModal();
       stopPlayback();
-    });
-    modal.querySelector(".vel-stream-superseded__resume").addEventListener("click", function () {
-      resumePlaybackHere();
     });
 
     return modal;
@@ -342,7 +270,7 @@
     modal.hidden = false;
     document.body.classList.add("vel-stream-superseded-locked");
     window.setTimeout(function () {
-      modal.querySelector(".vel-stream-superseded__resume")?.focus();
+      modal.querySelector(".vel-stream-superseded__close")?.focus();
     }, 0);
   }
 
@@ -378,7 +306,7 @@
       if (!res.ok) {
         if (res.status === 409) {
           const data = await res.json().catch(function () { return {}; });
-          return { ok: false, superseded: true, ...data };
+          return { ok: false, inUse: true, ...data };
         }
         return { ok: false };
       }
@@ -389,18 +317,18 @@
     }
   }
 
-  function onStreamSuperseded() {
-    pausePlaybackForSupersede();
-    stopStreamTracking(false);
-    showSupersededModal();
-  }
-
   function startStreamTracking(mediaEl) {
     const token = authToken();
     if (!token) return;
 
-    const sessionKey = "sk_" + Math.random().toString(36).slice(2, 11) + "_" + Date.now().toString(36);
     const streamId = mediaEl?.getAttribute("data-stream-id") || mediaEl?.currentSrc || mediaEl?.src || "active-stream";
+
+    // If already actively tracking this exact media element with an active heartbeat session, keep it
+    if (activeStreamSession && activeStreamSession.mediaEl === mediaEl && activeStreamSession.streamId === streamId && activeStreamSession.timer) {
+      return;
+    }
+
+    const sessionKey = "sk_" + Math.random().toString(36).slice(2, 11) + "_" + Date.now().toString(36);
     const streamTitle = document.querySelector("#now-playing .title, .media-title, .vel-vod-detail__title")?.textContent?.trim() || "";
 
     if (activeStreamSession && activeStreamSession.timer) {
@@ -415,26 +343,26 @@
       timer: null
     };
 
-    // Register immediately on start
+    // Register on start
     sendStreamHeartbeat("register", activeStreamSession).then(function (result) {
-      if (result && result.superseded) {
-        onStreamSuperseded();
+      if (result && (result.inUse || result.slotGranted === false)) {
+        // Slot is already in use by another device! Block playback here and show the in-use modal.
+        stopStreamTracking(false);
+        stopPlayback();
+        showSupersededModal();
       }
     });
 
-    // Heartbeat every 15s
+    // Heartbeat every 15s to keep the session alive
     activeStreamSession.timer = setInterval(async function () {
       if (!activeStreamSession) return;
       const v = activeStreamSession.mediaEl || document.querySelector("video");
       if (v && (v.paused || v.ended || !v.currentSrc)) {
-        stopStreamTracking(false);
+        stopStreamTracking(true);
         return;
       }
 
-      const res = await sendStreamHeartbeat("heartbeat", activeStreamSession);
-      if (res && res.superseded) {
-        onStreamSuperseded();
-      }
+      await sendStreamHeartbeat("heartbeat", activeStreamSession);
     }, 15000);
   }
 

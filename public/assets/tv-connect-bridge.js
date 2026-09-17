@@ -42,7 +42,7 @@
     } catch (_) {}
     syncActiveTvBar();
     renderTvSettingsSection();
-    showTvToast(enabled ? "📺 Diffusion vers la Smart TV activée" : "📱 Lecture locale sur téléphone activée");
+    showTvToast(enabled ? "Diffusion vers la Smart TV activée" : "Lecture locale sur téléphone activée");
   }
 
   // Inject scoped styles for TV settings, floating island bar, and controls
@@ -314,41 +314,48 @@
         flex-shrink: 0;
       }
 
-      /* Segmented Device Selector: [ 📱 | 📺 ] */
+      /* Segmented Device Selector: Simple monochrome minimalist [ Phone | TV ] */
       .vel-tv-segmented-switch {
         display: flex;
         align-items: center;
-        background: rgba(0, 0, 0, 0.45);
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.14);
         border-radius: 999px;
         padding: 2px;
         gap: 2px;
       }
 
       .vel-tv-segment-btn {
-        display: flex;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 30px;
-        height: 26px;
+        width: 32px;
+        height: 28px;
         border-radius: 999px;
         border: none;
         background: transparent;
-        color: #94a3b8;
-        font-size: 13px;
+        color: rgba(255, 255, 255, 0.4);
         cursor: pointer;
         transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
         padding: 0;
       }
 
+      .vel-tv-segment-btn svg {
+        display: block;
+        transition: transform 0.15s ease, stroke 0.2s ease;
+      }
+
       .vel-tv-segment-btn:hover {
-        color: #fff;
+        color: rgba(255, 255, 255, 0.85);
       }
 
       .vel-tv-segment-btn.is-active {
-        background: linear-gradient(135deg, #8b5cf6, #6366f1);
+        background: rgba(255, 255, 255, 0.18);
         color: #ffffff;
-        box-shadow: 0 2px 10px rgba(139, 92, 246, 0.5);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      }
+      .vel-tv-segment-btn.is-active svg {
+        stroke-width: 2.2;
       }
 
       /* Stop button */
@@ -444,7 +451,7 @@
       var toast = document.createElement("div");
       toast.id = "vel-tv-toast";
       toast.style.cssText = "position:fixed;top:24px;left:50%;transform:translateX(-50%);background:rgba(21,13,42,0.96);border:1px solid rgba(167,139,250,0.5);color:#fff;padding:12px 22px;border-radius:14px;font-size:14px;font-weight:500;box-shadow:0 10px 35px rgba(0,0,0,0.6);z-index:9999999;transition:all 0.3s cubic-bezier(0.16,1,0.3,1);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;align-items:center;gap:12px;pointer-events:none;max-width:90vw;text-align:center;";
-      toast.innerHTML = "<span style='font-size:18px;'>📺</span> <span>" + msg + "</span>";
+      toast.innerHTML = "<svg viewBox='0 0 24 24' width='16' height='16' fill='none' stroke='#a78bfa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M2 16.1A5 5 0 0 1 5.9 20M2 12.05A9 9 0 0 1 9.95 20M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6M2 20h.01'/></svg> <span>" + msg + "</span>";
       document.body.appendChild(toast);
 
       setTimeout(function () {
@@ -559,10 +566,10 @@
           ` : ""}
           <div class="vel-tv-segmented-switch" role="group" aria-label="Destination de lecture">
             <button type="button" class="vel-tv-segment-btn ${!isOn ? "is-active" : ""}" data-mode="phone" title="Regarder sur le téléphone">
-              📱
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="3" ry="3"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
             </button>
             <button type="button" class="vel-tv-segment-btn ${isOn ? "is-active" : ""}" data-mode="tv" title="Diffuser sur la Smart TV">
-              📺
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
             </button>
           </div>
         </div>
@@ -709,7 +716,7 @@
 
       section.innerHTML = `
         <div class="vel-profile-tv-header">
-          <span class="vel-profile-tv-title">📺 Smart TV Connectée</span>
+          <span class="vel-profile-tv-title">Smart TV Connectée</span>
           <span class="vel-profile-tv-status-badge ${tvState.isOnline ? "is-online" : ""}">
             ${tvState.isOnline ? "● En ligne" : "○ Hors ligne"}
           </span>
@@ -730,10 +737,10 @@
             </div>
             <div class="vel-tv-segmented-switch" role="group">
               <button type="button" class="vel-tv-segment-btn ${!isOn ? "is-active" : ""}" id="vel-profile-mode-phone" title="Téléphone">
-                📱
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="3" ry="3"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
               </button>
               <button type="button" class="vel-tv-segment-btn ${isOn ? "is-active" : ""}" id="vel-profile-mode-tv" title="Smart TV">
-                📺
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
               </button>
             </div>
           </div>

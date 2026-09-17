@@ -69,7 +69,8 @@ setInterval(() => {
 const activeStreamsStore = {
     /**
      * Register a new active stream for a user & deviceType ('machine' | 'tv').
-     * If another stream was playing on the same slot, it is superseded.
+     * If another device is already actively playing on this slot, the new device is rejected (inUse: true).
+     * If it is the same device switching streams or slot is free/expired, it is granted.
      */
     registerStream({ userId, deviceType = 'machine', deviceId, streamId = '', streamTitle = '', ipAddress = '', sessionKey }) {
         if (!userId) return { ok: false, error: 'User ID required' };
@@ -77,21 +78,30 @@ const activeStreamsStore = {
         const normType = deviceType === 'tv' ? 'tv' : 'machine';
         const key = `${normUserId}:${normType}`;
         const now = Date.now();
-        const effectiveKey = sessionKey || `sess_${Math.random().toString(36).slice(2, 10)}_${now}`;
+        const normDeviceId = String(deviceId || '').trim() || 'unknown';
 
         const previous = memoryStreams.get(key);
-        let superseded = false;
-        let supersededDeviceId = null;
+        const isStale = previous ? (now - previous.lastHeartbeat > STALE_TIMEOUT_MS) : true;
 
-        if (previous && (previous.deviceId !== deviceId || previous.sessionKey !== effectiveKey)) {
-            superseded = true;
-            supersededDeviceId = previous.deviceId;
+        // If another DIFFERENT device is currently streaming on this slot, reject the second device
+        if (previous && !isStale && previous.deviceId && normDeviceId !== 'unknown' && previous.deviceId !== normDeviceId) {
+            return {
+                ok: false,
+                slotGranted: false,
+                inUse: true,
+                activeDeviceId: previous.deviceId,
+                message: normType === 'tv'
+                    ? 'La lecture est déjà en cours sur un autre téléviseur.'
+                    : 'Un flux est actuellement en cours de lecture sur un autre appareil (ordinateur ou mobile).'
+            };
         }
+
+        const effectiveKey = sessionKey || `sess_${Math.random().toString(36).slice(2, 10)}_${now}`;
 
         const entry = {
             userId: normUserId,
             deviceType: normType,
-            deviceId: String(deviceId || '').trim() || 'unknown',
+            deviceId: normDeviceId,
             streamId: String(streamId || '').trim(),
             streamTitle: String(streamTitle || '').trim(),
             ipAddress: String(ipAddress || '').trim(),
@@ -131,16 +141,15 @@ const activeStreamsStore = {
 
         return {
             ok: true,
+            slotGranted: true,
             sessionKey: effectiveKey,
-            superseded,
-            supersededDeviceId
+            deviceType: normType
         };
     },
 
     /**
      * Heartbeat sent periodically (every 15-20s) while media is actively playing.
-     * Returns ok: true if this device is still the active player on its slot.
-     * Returns superseded: true if another device on the same slot has taken over.
+     * Keeps the active player's slot alive.
      */
     heartbeat({ userId, deviceType = 'machine', deviceId, sessionKey }) {
         if (!userId) return { ok: false, error: 'User ID required' };
@@ -156,39 +165,37 @@ const activeStreamsStore = {
             return this.registerStream({ userId, deviceType, deviceId, sessionKey });
         }
 
-        // Check if another device or session has superseded this one
-        if (sessionKey && current.sessionKey !== sessionKey) {
-            return {
-                ok: false,
-                superseded: true,
-                message: normType === 'tv'
-                    ? 'La lecture a démarré sur un autre téléviseur.'
-                    : 'La lecture a démarré sur un autre appareil (PC / Mobile).'
-            };
+        const normDeviceId = String(deviceId || '').trim();
+
+        // If this device is the one with the active stream session, keep it alive
+        if (sessionKey && current.sessionKey === sessionKey) {
+            current.lastHeartbeat = now;
+            try {
+                const db = getDb();
+                db.prepare(`
+                    UPDATE user_active_streams
+                    SET last_heartbeat = datetime('now')
+                    WHERE user_id = ? AND device_type = ?
+                `).run(normUserId, normType);
+            } catch (_) {}
+
+            return { ok: true, active: true };
         }
 
-        if (deviceId && current.deviceId && current.deviceId !== 'unknown' && current.deviceId !== deviceId) {
-            return {
-                ok: false,
-                superseded: true,
-                message: normType === 'tv'
-                    ? 'La lecture a démarré sur un autre téléviseur.'
-                    : 'La lecture a démarré sur un autre appareil (PC / Mobile).'
-            };
+        if (normDeviceId && current.deviceId === normDeviceId) {
+            current.lastHeartbeat = now;
+            return { ok: true, active: true };
         }
 
-        // Update heartbeat timestamp
-        current.lastHeartbeat = now;
-        try {
-            const db = getDb();
-            db.prepare(`
-                UPDATE user_active_streams
-                SET last_heartbeat = datetime('now')
-                WHERE user_id = ? AND device_type = ?
-            `).run(normUserId, normType);
-        } catch (_) {}
-
-        return { ok: true, active: true };
+        // Another device owns the slot
+        return {
+            ok: false,
+            active: false,
+            inUse: true,
+            message: normType === 'tv'
+                ? 'La lecture est en cours sur un autre téléviseur.'
+                : 'La lecture est en cours sur un autre appareil.'
+        };
     },
 
     /**

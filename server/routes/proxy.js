@@ -1434,12 +1434,25 @@ router.all('/stream/heartbeat', (req, res) => {
             ipAddress: req.ip || getClientIdentifier(req),
             sessionKey
         });
+
+        if (!reg.slotGranted) {
+            return res.status(409).json({
+                ok: false,
+                active: false,
+                slotGranted: false,
+                inUse: true,
+                message: reg.message || (deviceType === 'tv'
+                    ? 'La lecture est déjà en cours sur un autre téléviseur.'
+                    : 'Un flux est actuellement en cours de lecture sur un autre appareil.')
+            });
+        }
+
         return res.json({
             ok: true,
             active: true,
+            slotGranted: true,
             sessionKey: reg.sessionKey,
-            deviceType,
-            superseded: reg.superseded
+            deviceType
         });
     }
 
@@ -1454,7 +1467,7 @@ router.all('/stream/heartbeat', (req, res) => {
     return res.json({
         ok: result.ok,
         active: result.active,
-        superseded: result.superseded || false,
+        inUse: result.inUse || false,
         message: result.message || null,
         deviceType
     });

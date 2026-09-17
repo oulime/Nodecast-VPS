@@ -354,9 +354,10 @@
     }).then(function (res) {
       if (res.status === 409) {
         return res.json().then(function (data) {
-          if (data && data.superseded) {
-            console.warn("[TV] Stream superseded by another TV session");
+          if (data && (data.inUse || data.superseded)) {
+            console.warn("[TV] Stream rejected: another TV session is already active");
             stopPlayback();
+            if (dom.statusText) dom.statusText.textContent = data.message || "Lecture impossible : Une autre TV diffuse déjà sur ce compte.";
           }
         });
       }

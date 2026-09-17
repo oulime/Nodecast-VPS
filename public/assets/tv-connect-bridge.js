@@ -42,10 +42,10 @@
     } catch (_) {}
     syncActiveTvBar();
     renderTvSettingsSection();
-    showTvToast(enabled ? "📺 Mode TV activé (diffusion directe)" : "📱 Mode Téléphone activé (lecture locale)");
+    showTvToast(enabled ? "📺 Diffusion vers la Smart TV activée" : "📱 Lecture locale sur téléphone activée");
   }
 
-  // Inject scoped styles for TV settings and top active bar
+  // Inject scoped styles for TV settings, floating island bar, and controls
   function injectStyles() {
     if (document.getElementById("velora-tv-bridge-styles")) return;
     var style = document.createElement("style");
@@ -177,194 +177,208 @@
       .vel-profile-tv-msg.is-error { color: #f87171; }
       .vel-profile-tv-msg.is-success { color: #4ade80; }
 
-      /* Upper TV Active Diffusion Bar */
-      .vel-tv-active-bar {
+      /* Floating Luxury Capsule Bar */
+      .vel-tv-active-bar-wrap {
         position: fixed;
-        top: 0;
+        top: max(8px, env(safe-area-inset-top));
         left: 0;
         right: 0;
-        height: 48px;
-        box-sizing: border-box;
-        background: linear-gradient(135deg, rgba(20, 11, 44, 0.98), rgba(10, 6, 26, 0.98));
-        border-bottom: 1px solid rgba(167, 139, 250, 0.45);
-        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6), 0 0 20px rgba(139, 92, 246, 0.25);
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
-        padding: max(6px, env(safe-area-inset-top)) 14px 6px;
+        display: flex;
+        justify-content: center;
+        z-index: 999999;
+        pointer-events: none;
+        animation: velTvSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      @keyframes velTvSlideDown {
+        from { transform: translateY(-120%); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+
+      .vel-tv-active-bar {
+        pointer-events: auto;
+        width: calc(100% - 24px);
+        max-width: 520px;
+        min-height: 48px;
+        background: linear-gradient(135deg, rgba(25, 16, 48, 0.94), rgba(12, 8, 28, 0.97));
+        border: 1px solid rgba(167, 139, 250, 0.35);
+        border-radius: 999px;
+        padding: 5px 12px 5px 6px;
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 10px;
-        z-index: 999999;
-        font-family: inherit;
+        box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65), 0 0 24px rgba(139, 92, 246, 0.22);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
         color: #fff;
-        animation: velTvSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      }
-      @keyframes velTvSlideDown {
-        from { transform: translateY(-100%); opacity: 0; }
-        to { transform: translateY(0); opacity: 1; }
+        font-family: inherit;
+        box-sizing: border-box;
       }
 
-      /* Push down page body and containers so nothing is covered by the top bar */
+      /* Push down page body and containers smoothly */
       body.vel-tv-active-bar-open {
-        padding-top: var(--vel-tv-bar-height, 48px) !important;
+        padding-top: var(--vel-tv-bar-height, 62px) !important;
         box-sizing: border-box !important;
       }
       body.vel-tv-active-bar-open .main--velora {
-        height: calc(100dvh - var(--vel-tv-bar-height, 48px)) !important;
-        height: calc(100vh - var(--vel-tv-bar-height, 48px)) !important;
+        height: calc(100dvh - var(--vel-tv-bar-height, 62px)) !important;
+        height: calc(100vh - var(--vel-tv-bar-height, 62px)) !important;
       }
       body.vel-tv-active-bar-open #vel-floating-search,
       body.vel-tv-active-bar-open .vel-floating-search {
-        top: calc(12px + var(--vel-tv-bar-height, 48px)) !important;
+        top: calc(12px + var(--vel-tv-bar-height, 62px)) !important;
       }
 
-      .vel-tv-active-bar__left {
+      .vel-tv-capsule-left {
         display: flex;
         align-items: center;
-        gap: 10px;
-        overflow: hidden;
+        gap: 9px;
         min-width: 0;
         flex: 1;
       }
-      .vel-tv-active-bar__pulse-dot {
+
+      .vel-tv-capsule-icon-wrap {
+        width: 36px;
+        height: 36px;
+        flex-shrink: 0;
+        border-radius: 50%;
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.35), rgba(76, 29, 149, 0.5));
+        border: 1px solid rgba(167, 139, 250, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        color: #c4b5fd;
+      }
+
+      .vel-tv-capsule-icon-wrap.is-streaming {
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(16, 185, 129, 0.3));
+        border-color: rgba(52, 211, 153, 0.5);
+        color: #6ee7b7;
+      }
+
+      .vel-tv-live-beacon {
+        position: absolute;
+        bottom: 0;
+        right: 0;
         width: 9px;
         height: 9px;
         border-radius: 50%;
-        background: #4ade80;
-        box-shadow: 0 0 8px #4ade80;
-        flex-shrink: 0;
-        animation: velTvPulse 1.8s infinite ease-in-out;
+        background: #10b981;
+        border: 2px solid #0f0b21;
+        box-shadow: 0 0 6px #10b981;
+        animation: velTvBeaconPulse 2s infinite ease-in-out;
       }
-      .vel-tv-active-bar__pulse-dot.is-off {
-        background: #94a3b8;
-        box-shadow: none;
-        animation: none;
-      }
-      @keyframes velTvPulse {
+      @keyframes velTvBeaconPulse {
         0%, 100% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.3); opacity: 0.6; }
+        50% { transform: scale(1.25); opacity: 0.6; }
       }
-      .vel-tv-active-bar__info {
+
+      .vel-tv-capsule-meta {
         display: flex;
         flex-direction: column;
         gap: 1px;
         min-width: 0;
         overflow: hidden;
       }
-      .vel-tv-active-bar__heading {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        font-size: 10.5px;
-        color: #cbd5e1;
-        white-space: nowrap;
-      }
-      .vel-tv-active-bar__target {
-        font-weight: 700;
-        color: #c084fc;
-      }
-      .vel-tv-active-bar__status {
-        color: #4ade80;
-        font-weight: 600;
-        font-size: 10px;
-      }
-      .vel-tv-active-bar__status.is-off {
-        color: #94a3b8;
-      }
-      .vel-tv-active-bar__title {
-        font-size: 12.5px;
-        font-weight: 700;
+
+      .vel-tv-capsule-title {
+        font-size: 13.5px;
+        font-weight: 800;
         color: #ffffff;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        letter-spacing: 0.1px;
-      }
-      .vel-tv-active-bar__actions {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-shrink: 0;
-      }
-      .vel-tv-active-bar__btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(185, 28, 28, 0.4));
-        border: 1px solid rgba(248, 113, 113, 0.5);
-        color: #fecaca;
-        padding: 4px 10px;
-        border-radius: 9px;
-        font-size: 11.5px;
-        font-weight: 700;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        white-space: nowrap;
-      }
-      .vel-tv-active-bar__btn:hover {
-        background: rgba(239, 68, 68, 0.5);
-        border-color: #f87171;
-        color: #ffffff;
-        box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
-      }
-      .vel-tv-active-bar__btn:active {
-        transform: scale(0.96);
-      }
-      .vel-tv-active-bar__btn.is-stopping {
-        opacity: 0.6;
-        pointer-events: none;
+        letter-spacing: -0.01em;
       }
 
-      /* Diffusion Switch Pill Button */
-      .vel-tv-switch-pill {
-        display: inline-flex;
+      .vel-tv-capsule-sub {
+        font-size: 11px;
+        font-weight: 600;
+        color: #a78bfa;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .vel-tv-capsule-sub.is-idle {
+        color: #94a3b8;
+      }
+
+      .vel-tv-capsule-actions {
+        display: flex;
         align-items: center;
         gap: 6px;
-        background: rgba(0, 0, 0, 0.4);
-        border: 1px solid rgba(167, 139, 250, 0.35);
-        border-radius: 20px;
-        padding: 3px 8px;
+        flex-shrink: 0;
+      }
+
+      /* Segmented Device Selector: [ 📱 | 📺 ] */
+      .vel-tv-segmented-switch {
+        display: flex;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.45);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        padding: 2px;
+        gap: 2px;
+      }
+
+      .vel-tv-segment-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 26px;
+        border-radius: 999px;
+        border: none;
+        background: transparent;
+        color: #94a3b8;
+        font-size: 13px;
         cursor: pointer;
-        user-select: none;
-        -webkit-user-select: none;
-        transition: all 0.2s ease;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        padding: 0;
       }
-      .vel-tv-switch-pill:hover {
-        border-color: rgba(167, 139, 250, 0.7);
-        background: rgba(0, 0, 0, 0.6);
+
+      .vel-tv-segment-btn:hover {
+        color: #fff;
       }
-      .vel-tv-switch-pill-label {
-        font-size: 11px;
-        font-weight: 700;
-        color: #e2e8f0;
+
+      .vel-tv-segment-btn.is-active {
+        background: linear-gradient(135deg, #8b5cf6, #6366f1);
+        color: #ffffff;
+        box-shadow: 0 2px 10px rgba(139, 92, 246, 0.5);
       }
-      .vel-tv-switch-track {
-        width: 32px;
-        height: 17px;
-        border-radius: 10px;
-        background: rgba(255, 255, 255, 0.2);
-        position: relative;
-        transition: background 0.2s ease;
-        display: inline-block;
-      }
-      .vel-tv-switch-track.is-on {
-        background: #8b5cf6;
-        box-shadow: 0 0 8px rgba(139, 92, 246, 0.6);
-      }
-      .vel-tv-switch-thumb {
-        position: absolute;
-        top: 2px;
-        left: 2px;
-        width: 13px;
-        height: 13px;
+
+      /* Stop button */
+      .vel-tv-stop-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
         border-radius: 50%;
-        background: #ffffff;
-        transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-        box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        background: rgba(239, 68, 68, 0.18);
+        border: 1px solid rgba(239, 68, 68, 0.45);
+        color: #fca5a5;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        padding: 0;
       }
-      .vel-tv-switch-track.is-on .vel-tv-switch-thumb {
-        transform: translateX(15px);
+      .vel-tv-stop-btn:hover {
+        background: rgba(239, 68, 68, 0.4);
+        border-color: #ef4444;
+        color: #ffffff;
+        box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+        transform: scale(1.06);
+      }
+      .vel-tv-stop-btn:active {
+        transform: scale(0.92);
+      }
+      .vel-tv-stop-btn.is-stopping {
+        opacity: 0.4;
+        pointer-events: none;
       }
     `;
     document.head.appendChild(style);
@@ -450,8 +464,8 @@
   }
 
   function removeActiveTvBar() {
-    var bar = document.getElementById("vel-tv-active-bar");
-    if (bar) bar.remove();
+    var wrap = document.getElementById("vel-tv-active-bar-wrap");
+    if (wrap) wrap.remove();
     document.body.classList.remove("vel-tv-active-bar-open");
     document.documentElement.style.removeProperty("--vel-tv-bar-height");
   }
@@ -472,41 +486,38 @@
     var tvName = tvState.deviceName || "Smart TV";
     var isOn = isAutoDiffuseOn();
 
-    var statusText = isPlaying 
-      ? "● Diffusion en cours" 
-      : (isOn ? "● Diffuse sur TV" : "○ Mode Mobile");
+    var titleText = activeTitle || tvName;
+    var subText = isPlaying ? tvName : (isOn ? "Prête pour diffusion" : "Mode téléphone actif");
 
-    var subTitleText = activeTitle || (isOn ? "Les vidéos seront lues sur votre TV" : "Les vidéos seront lues sur ce téléphone");
+    var existingWrap = document.getElementById("vel-tv-active-bar-wrap");
+    if (existingWrap) {
+      var iconWrap = existingWrap.querySelector(".vel-tv-capsule-icon-wrap");
+      if (iconWrap) iconWrap.classList.toggle("is-streaming", isPlaying);
 
-    var existing = document.getElementById("vel-tv-active-bar");
-    if (existing) {
-      var headingStatus = existing.querySelector(".vel-tv-active-bar__status");
-      if (headingStatus) {
-        headingStatus.textContent = statusText;
-        headingStatus.classList.toggle("is-off", !isOn && !isPlaying);
+      var titleSpan = existingWrap.querySelector(".vel-tv-capsule-title");
+      if (titleSpan) titleSpan.textContent = titleText;
+
+      var subSpan = existingWrap.querySelector(".vel-tv-capsule-sub");
+      if (subSpan) {
+        subSpan.textContent = subText;
+        subSpan.classList.toggle("is-idle", !isPlaying && !isOn);
       }
-      var dot = existing.querySelector(".vel-tv-active-bar__pulse-dot");
-      if (dot) dot.classList.toggle("is-off", !isOn && !isPlaying);
-      var titleSpan = existing.querySelector(".vel-tv-active-bar__title");
-      if (titleSpan) titleSpan.textContent = subTitleText;
-      var targetSpan = existing.querySelector(".vel-tv-active-bar__target");
-      if (targetSpan) targetSpan.textContent = tvName;
 
-      var switchTrack = existing.querySelector(".vel-tv-switch-track");
-      if (switchTrack) switchTrack.classList.toggle("is-on", isOn);
-      var switchLabel = existing.querySelector(".vel-tv-switch-pill-label");
-      if (switchLabel) switchLabel.textContent = isOn ? "Mode TV" : "Mode Tél";
+      var phoneBtn = existingWrap.querySelector(".vel-tv-segment-btn[data-mode='phone']");
+      var tvBtn = existingWrap.querySelector(".vel-tv-segment-btn[data-mode='tv']");
+      if (phoneBtn) phoneBtn.classList.toggle("is-active", !isOn);
+      if (tvBtn) tvBtn.classList.toggle("is-active", isOn);
 
-      var stopBtn = existing.querySelector("#vel-tv-stop-playback");
+      var stopBtn = existingWrap.querySelector("#vel-tv-stop-playback");
       if (isPlaying && !stopBtn) {
-        var actions = existing.querySelector(".vel-tv-active-bar__actions");
+        var actions = existingWrap.querySelector(".vel-tv-capsule-actions");
         if (actions) {
           var btn = document.createElement("button");
           btn.type = "button";
           btn.id = "vel-tv-stop-playback";
-          btn.className = "vel-tv-active-bar__btn";
+          btn.className = "vel-tv-stop-btn";
           btn.title = "Arrêter la diffusion sur la TV";
-          btn.innerHTML = '<span class="vel-tv-active-bar__btn-icon">⏹</span><span class="vel-tv-active-bar__btn-label">Arrêter</span>';
+          btn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg>';
           actions.prepend(btn);
           attachStopBtnHandler(btn);
         }
@@ -515,55 +526,72 @@
       }
 
       document.body.classList.add("vel-tv-active-bar-open");
-      var h = existing.offsetHeight || 48;
+      var barEl = existingWrap.querySelector(".vel-tv-active-bar");
+      var h = (barEl ? barEl.offsetHeight : 48) + 14;
       document.documentElement.style.setProperty("--vel-tv-bar-height", h + "px");
       return;
     }
 
-    var bar = document.createElement("div");
-    bar.id = "vel-tv-active-bar";
-    bar.className = "vel-tv-active-bar";
-    bar.innerHTML = `
-      <div class="vel-tv-active-bar__left">
-        <div class="vel-tv-active-bar__pulse-dot ${(isOn || isPlaying) ? "" : "is-off"}" aria-hidden="true"></div>
-        <div class="vel-tv-active-bar__info">
-          <div class="vel-tv-active-bar__heading">
-            <span class="vel-tv-active-bar__icon">📺</span>
-            <span class="vel-tv-active-bar__target">${tvName}</span>
-            <span class="vel-tv-active-bar__status ${(isOn || isPlaying) ? "" : "is-off"}">${statusText}</span>
+    var wrap = document.createElement("div");
+    wrap.id = "vel-tv-active-bar-wrap";
+    wrap.className = "vel-tv-active-bar-wrap";
+    wrap.innerHTML = `
+      <div class="vel-tv-active-bar">
+        <div class="vel-tv-capsule-left">
+          <div class="vel-tv-capsule-icon-wrap ${isPlaying ? "is-streaming" : ""}">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 16.1A5 5 0 0 1 5.9 20M2 12.05A9 9 0 0 1 9.95 20M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6M2 20h.01"/>
+            </svg>
+            ${isPlaying ? '<span class="vel-tv-live-beacon"></span>' : ''}
           </div>
-          <span class="vel-tv-active-bar__title">${subTitleText}</span>
+          <div class="vel-tv-capsule-meta">
+            <span class="vel-tv-capsule-title">${titleText}</span>
+            <span class="vel-tv-capsule-sub ${(!isPlaying && !isOn) ? "is-idle" : ""}">${subText}</span>
+          </div>
         </div>
-      </div>
-      <div class="vel-tv-active-bar__actions">
-        ${isPlaying ? `
-          <button type="button" id="vel-tv-stop-playback" class="vel-tv-active-bar__btn" title="Arrêter la diffusion sur la TV">
-            <span class="vel-tv-active-bar__btn-icon">⏹</span>
-            <span class="vel-tv-active-bar__btn-label">Arrêter</span>
-          </button>
-        ` : ""}
-        <div class="vel-tv-switch-pill" id="vel-tv-switch-pill" role="button" tabindex="0" title="Activer ou désactiver la diffusion automatique sur TV">
-          <span class="vel-tv-switch-pill-label">${isOn ? "Mode TV" : "Mode Tél"}</span>
-          <span class="vel-tv-switch-track ${isOn ? "is-on" : ""}">
-            <span class="vel-tv-switch-thumb"></span>
-          </span>
+        <div class="vel-tv-capsule-actions">
+          ${isPlaying ? `
+            <button type="button" id="vel-tv-stop-playback" class="vel-tv-stop-btn" title="Arrêter la diffusion sur la TV">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+                <rect x="5" y="5" width="14" height="14" rx="2.5"/>
+              </svg>
+            </button>
+          ` : ""}
+          <div class="vel-tv-segmented-switch" role="group" aria-label="Destination de lecture">
+            <button type="button" class="vel-tv-segment-btn ${!isOn ? "is-active" : ""}" data-mode="phone" title="Regarder sur le téléphone">
+              📱
+            </button>
+            <button type="button" class="vel-tv-segment-btn ${isOn ? "is-active" : ""}" data-mode="tv" title="Diffuser sur la Smart TV">
+              📺
+            </button>
+          </div>
         </div>
       </div>
     `;
-    document.body.appendChild(bar);
+    document.body.appendChild(wrap);
     document.body.classList.add("vel-tv-active-bar-open");
 
     requestAnimationFrame(function () {
-      var h = bar.offsetHeight || 48;
+      var barEl = wrap.querySelector(".vel-tv-active-bar");
+      var h = (barEl ? barEl.offsetHeight : 48) + 14;
       document.documentElement.style.setProperty("--vel-tv-bar-height", h + "px");
     });
 
-    var switchBtn = document.getElementById("vel-tv-switch-pill");
-    if (switchBtn) {
-      switchBtn.addEventListener("click", function (e) {
+    var phoneBtn = wrap.querySelector(".vel-tv-segment-btn[data-mode='phone']");
+    if (phoneBtn) {
+      phoneBtn.addEventListener("click", function (e) {
         e.preventDefault();
         e.stopPropagation();
-        setAutoDiffuse(!isAutoDiffuseOn());
+        setAutoDiffuse(false);
+      });
+    }
+
+    var tvBtn = wrap.querySelector(".vel-tv-segment-btn[data-mode='tv']");
+    if (tvBtn) {
+      tvBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        setAutoDiffuse(true);
       });
     }
 
@@ -697,14 +725,16 @@
         ${tvState.isOnline ? `
           <div class="vel-profile-tv-switch-row">
             <div class="vel-profile-tv-switch-info">
-              <span class="vel-profile-tv-switch-title">Diffusion automatique</span>
-              <span class="vel-profile-tv-switch-desc">Lire directement les vidéos sur la TV</span>
+              <span class="vel-profile-tv-switch-title">Destination de lecture</span>
+              <span class="vel-profile-tv-switch-desc">${isOn ? "Diffusion automatique vers la TV" : "Lecture locale sur le téléphone"}</span>
             </div>
-            <div class="vel-tv-switch-pill" id="vel-profile-tv-toggle-btn" role="button" tabindex="0">
-              <span class="vel-tv-switch-pill-label">${isOn ? "Mode TV" : "Mode Tél"}</span>
-              <span class="vel-tv-switch-track ${isOn ? "is-on" : ""}">
-                <span class="vel-tv-switch-thumb"></span>
-              </span>
+            <div class="vel-tv-segmented-switch" role="group">
+              <button type="button" class="vel-tv-segment-btn ${!isOn ? "is-active" : ""}" id="vel-profile-mode-phone" title="Téléphone">
+                📱
+              </button>
+              <button type="button" class="vel-tv-segment-btn ${isOn ? "is-active" : ""}" id="vel-profile-mode-tv" title="Smart TV">
+                📺
+              </button>
             </div>
           </div>
         ` : ""}
@@ -717,12 +747,21 @@
       `;
       card.appendChild(section);
 
-      var toggleBtn = document.getElementById("vel-profile-tv-toggle-btn");
-      if (toggleBtn) {
-        toggleBtn.addEventListener("click", function (e) {
+      var phoneBtn = document.getElementById("vel-profile-mode-phone");
+      if (phoneBtn) {
+        phoneBtn.addEventListener("click", function (e) {
           e.preventDefault();
           e.stopPropagation();
-          setAutoDiffuse(!isAutoDiffuseOn());
+          setAutoDiffuse(false);
+        });
+      }
+
+      var tvBtn = document.getElementById("vel-profile-mode-tv");
+      if (tvBtn) {
+        tvBtn.addEventListener("click", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          setAutoDiffuse(true);
         });
       }
 
@@ -928,18 +967,16 @@
     }
   }
 
-  // Hook into playback requests: direct seamless routing based on auto-diffuse switch!
+  // Direct seamless routing based on auto-diffuse switch!
   function interceptPlayback(mediaData) {
     if (tvState.hasPairedTv && tvState.isOnline) {
       if (isAutoDiffuseOn()) {
-        // Stop any local video element immediately
         document.querySelectorAll("video").forEach(function (v) {
           try { v.pause(); } catch (_) {}
         });
         sendToTv(mediaData);
-        return true; // Sent directly to TV!
+        return true;
       }
-      // If auto-diffuse is OFF, play locally on mobile without interruption
       return false;
     }
     return false;

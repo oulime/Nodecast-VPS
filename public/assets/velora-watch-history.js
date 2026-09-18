@@ -5,6 +5,7 @@
   var MIN_WATCH_SECONDS = 2;
   var FINISHED_WATCH_PERCENT = 90;
   var state = {
+    currentUserKey: null,
     currentPlaying: null,
     cachedHistory: null,
     lastDiskSaveTimestamp: 0,
@@ -468,9 +469,13 @@
   }
 
   // --- Tombstones (Deleted History Registry) ---
+  function getTombstoneKey() {
+    return "velora_deleted_history_tombstones_" + getActiveUserKey();
+  }
+
   function getTombstones() {
     try {
-      var raw = localStorage.getItem("velora_deleted_history_tombstones");
+      var raw = localStorage.getItem(getTombstoneKey());
       if (raw) {
         var list = JSON.parse(raw);
         if (Array.isArray(list)) return list;
@@ -500,7 +505,7 @@
       list.push(entry);
       var cutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
       list = list.filter(function (t) { return t && t.timestamp > cutoff; }).slice(-200);
-      localStorage.setItem("velora_deleted_history_tombstones", JSON.stringify(list));
+      localStorage.setItem(getTombstoneKey(), JSON.stringify(list));
     } catch (_) {}
   }
 
@@ -518,7 +523,7 @@
         if (norm && t.normTitle && t.normTitle === norm) return false;
         return true;
       });
-      localStorage.setItem("velora_deleted_history_tombstones", JSON.stringify(filtered));
+      localStorage.setItem(getTombstoneKey(), JSON.stringify(filtered));
     } catch (_) {}
   }
 
@@ -548,11 +553,15 @@
   }
 
   function getLocalHistory() {
+    var activeKey = getActiveUserKey();
+    if (state.currentUserKey !== activeKey) {
+      state.currentUserKey = activeKey;
+      state.cachedHistory = null;
+    }
     if (state.cachedHistory && Array.isArray(state.cachedHistory)) {
       return state.cachedHistory.filter(function (it) { return !isItemTombstoned(it); });
     }
     try {
-      var activeKey = getActiveUserKey();
       var raw = localStorage.getItem(activeKey);
       if (raw) {
         var items = JSON.parse(raw);
@@ -560,26 +569,6 @@
           var validOnly = items.filter(isValidMediaEntry).filter(function (it) { return !isItemTombstoned(it); });
           state.cachedHistory = validOnly;
           return validOnly;
-        }
-      }
-
-      // Seamlessly scan legacy keys
-      for (var i = 0; i < localStorage.length; i++) {
-        var k = localStorage.key(i);
-        if (k && k.startsWith("velora_resume_") && k !== activeKey) {
-          try {
-            var legacyRaw = localStorage.getItem(k);
-            if (legacyRaw) {
-              var legItems = JSON.parse(legacyRaw);
-              if (Array.isArray(legItems) && legItems.length > 0) {
-                var validLeg = legItems.filter(isValidMediaEntry).filter(function (it) { return !isItemTombstoned(it); });
-                if (validLeg.length > 0) {
-                  localStorage.setItem(activeKey, JSON.stringify(validLeg));
-                  return validLeg;
-                }
-              }
-            }
-          } catch (_) {}
         }
       }
       return [];
@@ -672,21 +661,15 @@
       }
     }
 
-    // 4. Clean from ALL localStorage keys immediately so it is never resurrected on reload
+    // 4. Clean from active user's localStorage key
     try {
-      for (var i = 0; i < localStorage.length; i++) {
-        var k = localStorage.key(i);
-        if (k && k.startsWith("velora_resume_")) {
-          try {
-            var raw = localStorage.getItem(k);
-            if (raw) {
-              var parsed = JSON.parse(raw);
-              if (Array.isArray(parsed)) {
-                var filtered = filterHistoryList(parsed, item);
-                localStorage.setItem(k, JSON.stringify(filtered));
-              }
-            }
-          } catch (_) {}
+      var activeKey = getActiveUserKey();
+      var raw = localStorage.getItem(activeKey);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          var filtered = filterHistoryList(parsed, item);
+          localStorage.setItem(activeKey, JSON.stringify(filtered));
         }
       }
     } catch (_) {}
@@ -942,12 +925,14 @@
     var token = authToken();
     if (!token || state.dbSyncInProgress) return;
     state.dbSyncInProgress = true;
+    var userKeyAtStart = getActiveUserKey();
     try {
       var res = await fetch("/api/history?limit=40", {
         headers: { Authorization: "Bearer " + token }
       });
       if (res.ok) {
         var rows = await res.json();
+        if (getActiveUserKey() !== userKeyAtStart) return;
         if (Array.isArray(rows) && rows.length > 0) {
           var serverItems = rows.map(function (r) {
             var d = r.data || {};
@@ -966,6 +951,8 @@
           }).filter(isValidMediaEntry).filter(function (it) {
             return !isItemTombstoned(it);
           });
+
+          if (getActiveUserKey() !== userKeyAtStart) return;
 
           var local = getLocalHistory();
           var mergedMap = new Map();
@@ -2709,10 +2696,26 @@
     loadHistoryFromDatabase();
     syncResumeMinWatchSetting();
 
-    document.addEventListener("velora-user-logged-in", function () {
+    function handleUserSessionChange() {
+      var newKey = getActiveUserKey();
+      if (state.currentUserKey !== newKey) {
+        state.currentUserKey = newKey;
+      }
       state.cachedHistory = null;
+      state.currentPlaying = null;
       loadHistoryFromDatabase();
       syncResumeMinWatchSetting();
+      injectResumeSectionDirectly();
+      requestDecorateEpisodes();
+    }
+
+    document.addEventListener("velora-user-logged-in", handleUserSessionChange);
+    document.addEventListener("velora-user-logged-out", handleUserSessionChange);
+    document.addEventListener("velora-user-changed", handleUserSessionChange);
+    window.addEventListener("storage", function (e) {
+      if (!e || !e.key || e.key === "authToken" || e.key === "velora_user" || e.key === "user") {
+        handleUserSessionChange();
+      }
     });
 
     document.addEventListener("velora-resume-settings-changed", injectResumeSectionDirectly);

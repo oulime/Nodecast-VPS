@@ -7,6 +7,7 @@
     deviceId: null,
     deviceName: null,
     currentMedia: null,
+    lastPhoneMedia: null,
     lastChecked: 0,
     checkInterval: null
   };
@@ -48,21 +49,116 @@
     return !!(el.closest && (el.closest("#player-container") || el.closest("#vod-player-container") || el.closest(".video-wrapper")));
   }
 
+  function textFrom(selectors) {
+    for (var i = 0; i < selectors.length; i += 1) {
+      var node = document.querySelector(selectors[i]);
+      var text = node && String(node.textContent || "").trim();
+      if (text) return text;
+    }
+    return "";
+  }
+
+  function getPageMediaTitle(v) {
+    return textFrom([
+      "#watch-title",
+      "#watch-content-title",
+      "#player-channel-name",
+      "#now-playing-vod",
+      "#now-playing",
+      ".vel-player-title",
+      ".vel-media-title",
+      ".channel-name",
+      ".program-title"
+    ]) || (v && v.getAttribute("aria-label")) || (v && v.getAttribute("data-title")) || document.title || "Vidéo";
+  }
+
+  function getPageMediaPoster(v) {
+    var candidates = [
+      v && v.getAttribute("poster"),
+      v && v.getAttribute("data-poster"),
+      document.getElementById("watch-poster") && document.getElementById("watch-poster").getAttribute("src"),
+      document.querySelector(".movie-poster img") && document.querySelector(".movie-poster img").getAttribute("src"),
+      document.querySelector(".series-poster img") && document.querySelector(".series-poster img").getAttribute("src"),
+      document.querySelector(".vel-vod-detail img") && document.querySelector(".vel-vod-detail img").getAttribute("src")
+    ];
+    for (var i = 0; i < candidates.length; i += 1) {
+      var url = candidates[i];
+      if (url && typeof url === "string" && url.trim() && !/^data:/i.test(url)) {
+        if (url.indexOf("/") === 0) return window.location.origin + url;
+        return url;
+      }
+    }
+    return "";
+  }
+
+  function extractActiveMobileMedia(overrideVideo) {
+    var vodContainer = document.getElementById("vod-player-container");
+    var liveContainer = document.getElementById("player-container");
+    var isVodVisible = vodContainer && !vodContainer.classList.contains("hidden");
+    var isLiveVisible = liveContainer && !liveContainer.classList.contains("hidden");
+
+    var v = overrideVideo;
+    if (!v) {
+      var allVideos = Array.prototype.slice.call(document.querySelectorAll("video"));
+      v = allVideos.find(function (el) {
+        return el && !el.paused && !el.ended && (el.currentTime > 0 || el.readyState > 0);
+      });
+      if (!v && isVodVisible) v = document.getElementById("video-vod");
+      if (!v && isLiveVisible) v = document.getElementById("video");
+      if (!v && allVideos.length) v = allVideos[0];
+    }
+
+    var app = window.app || {};
+    var appUrl = (app.pages && app.pages.watch && app.pages.watch.currentUrl) || (app.player && app.player.currentUrl);
+
+    var rawUrl = (
+      (v && v.__veloraCastUrl) ||
+      (v && v.hls && v.hls.url) ||
+      (window.hls && window.hls.url) ||
+      window.__veloraCurrentStreamUrl ||
+      appUrl ||
+      (v && v.currentSrc && !/^(blob:|data:|about:|mediastream:)/i.test(v.currentSrc) ? v.currentSrc : "") ||
+      (v && v.src && !/^(blob:|data:|about:|mediastream:)/i.test(v.src) ? v.src : "") ||
+      (tvState.lastPhoneMedia && tvState.lastPhoneMedia.url)
+    );
+
+    if (!rawUrl || typeof rawUrl !== "string" || !rawUrl.trim() || /^(blob:|data:|about:|mediastream:)/i.test(rawUrl)) {
+      return tvState.lastPhoneMedia || null;
+    }
+
+    var fullUrl = rawUrl.trim();
+    if (fullUrl.indexOf("/") === 0) fullUrl = window.location.origin + fullUrl;
+
+    var title = getPageMediaTitle(v) || (tvState.lastPhoneMedia && tvState.lastPhoneMedia.title) || "Vidéo";
+    var poster = getPageMediaPoster(v) || (tvState.lastPhoneMedia && tvState.lastPhoneMedia.poster) || "";
+    var isLive = isLiveVisible || (v && v.id === "video") || /\.m3u8/i.test(fullUrl) && !/\.(mp4|mkv|mov|avi)/i.test(fullUrl);
+    var position = (v && Number.isFinite(v.currentTime) && v.currentTime > 0) ? v.currentTime : 0;
+    var duration = (v && Number.isFinite(v.duration) && v.duration > 0) ? v.duration : 0;
+
+    var media = {
+      url: fullUrl,
+      title: title,
+      name: title,
+      poster: poster,
+      isLive: isLive,
+      type: isLive ? "live" : "vod",
+      position: isLive ? 0 : position,
+      duration: isLive ? 0 : duration,
+      streamId: (v && v.dataset && (v.dataset.streamId || v.dataset.id)) || (tvState.lastPhoneMedia && tvState.lastPhoneMedia.streamId) || null,
+      seriesId: (v && v.dataset && v.dataset.seriesId) || (tvState.lastPhoneMedia && tvState.lastPhoneMedia.seriesId) || null,
+      episodeStreamId: (v && v.dataset && v.dataset.episodeStreamId) || (tvState.lastPhoneMedia && tvState.lastPhoneMedia.episodeStreamId) || null
+    };
+
+    tvState.lastPhoneMedia = media;
+    return media;
+  }
+
   function haltMobilePlayers() {
     try {
       if (typeof window.veloraCloseActiveTranscodeSession === "function") {
         window.veloraCloseActiveTranscodeSession();
       }
     } catch (_) {}
-
-    var closeVodBtn = document.getElementById("btn-close-vod-player");
-    if (closeVodBtn) {
-      try { closeVodBtn.click(); } catch (_) {}
-    }
-    var closeLiveBtn = document.getElementById("btn-close-player");
-    if (closeLiveBtn) {
-      try { closeLiveBtn.click(); } catch (_) {}
-    }
 
     var liveContainer = document.getElementById("player-container");
     if (liveContainer) liveContainer.classList.add("hidden");
@@ -96,10 +192,14 @@
     HTMLMediaElement.prototype.play = function () {
       if (shouldSuppressMobilePlayback() && isMobilePlayerElement(this)) {
         try {
+          var activeMedia = extractActiveMobileMedia(this);
           this.pause();
           this.muted = true;
           this.removeAttribute("src");
           this.load();
+          if (activeMedia && activeMedia.url) {
+            sendToTv(activeMedia);
+          }
         } catch (_) {}
         return Promise.resolve();
       }
@@ -115,10 +215,30 @@
             return srcDesc.get.call(this);
           },
           set: function (val) {
+            if (val && typeof val === "string" && !/^(blob:|data:|about:|mediastream:)/i.test(val)) {
+              window.__veloraCurrentStreamUrl = val;
+              tvState.lastPhoneMedia = {
+                url: val,
+                title: getPageMediaTitle(this),
+                poster: getPageMediaPoster(this),
+                type: (this && this.id === "video") ? "live" : "vod",
+                isLive: (this && this.id === "video"),
+                position: (this && Number.isFinite(this.currentTime)) ? this.currentTime : 0
+              };
+            }
             if (shouldSuppressMobilePlayback() && isMobilePlayerElement(this) && val) {
               try {
                 this.pause();
                 this.muted = true;
+                var mediaToDiffuse = {
+                  url: val,
+                  title: getPageMediaTitle(this),
+                  poster: getPageMediaPoster(this),
+                  type: (this && this.id === "video") ? "live" : "vod",
+                  isLive: (this && this.id === "video"),
+                  position: (this && Number.isFinite(this.currentTime)) ? this.currentTime : 0
+                };
+                sendToTv(mediaToDiffuse);
               } catch (_) {}
               return;
             }
@@ -134,10 +254,22 @@
     try {
       var origSetAttr = Element.prototype.setAttribute;
       Element.prototype.setAttribute = function (name, value) {
+        if (name && String(name).toLowerCase() === "src" && value && typeof value === "string" && !/^(blob:|data:|about:|mediastream:)/i.test(value)) {
+          window.__veloraCurrentStreamUrl = value;
+        }
         if (name && String(name).toLowerCase() === "src" && shouldSuppressMobilePlayback() && isMobilePlayerElement(this) && value) {
           try {
             this.pause();
             this.muted = true;
+            var mediaToDiffuse = {
+              url: value,
+              title: getPageMediaTitle(this),
+              poster: getPageMediaPoster(this),
+              type: (this && this.id === "video") ? "live" : "vod",
+              isLive: (this && this.id === "video"),
+              position: (this && Number.isFinite(this.currentTime)) ? this.currentTime : 0
+            };
+            sendToTv(mediaToDiffuse);
           } catch (_) {}
           return;
         }
@@ -149,28 +281,68 @@
     var captureMediaEvents = ["play", "playing", "loadstart", "loadeddata", "canplay"];
     captureMediaEvents.forEach(function (evt) {
       window.addEventListener(evt, function (e) {
+        if (e.target && isMobilePlayerElement(e.target)) {
+          var targetEl = e.target;
+          var curSrc = targetEl.currentSrc || targetEl.src || targetEl.__veloraCastUrl;
+          if (curSrc && !/^(blob:|data:|about:|mediastream:)/i.test(curSrc)) {
+            window.__veloraCurrentStreamUrl = curSrc;
+            tvState.lastPhoneMedia = {
+              url: curSrc,
+              title: getPageMediaTitle(targetEl),
+              poster: getPageMediaPoster(targetEl),
+              type: (targetEl.id === "video") ? "live" : "vod",
+              isLive: (targetEl.id === "video"),
+              position: targetEl.currentTime || 0
+            };
+          }
+        }
         if (shouldSuppressMobilePlayback() && isMobilePlayerElement(e.target)) {
           try {
+            var m = extractActiveMobileMedia(e.target);
             e.target.pause();
             e.target.muted = true;
             e.target.removeAttribute("src");
             e.target.load();
+            if (m && m.url && (!tvState.currentMedia || tvState.currentMedia.url !== m.url)) {
+              sendToTv(m);
+            }
           } catch (_) {}
         }
       }, true);
     });
   }
 
-  function setAutoDiffuse(enabled) {
+  async function setAutoDiffuse(enabled) {
     try {
       localStorage.setItem("velora_tv_auto_diffuse", enabled ? "true" : "false");
     } catch (_) {}
+
+    // Instantly visually toggle all segmented buttons in DOM
+    document.querySelectorAll(".vel-tv-segment-btn[data-mode='phone'], #vel-profile-mode-phone").forEach(function (el) {
+      el.classList.toggle("is-active", !enabled);
+    });
+    document.querySelectorAll(".vel-tv-segment-btn[data-mode='tv'], #vel-profile-mode-tv").forEach(function (el) {
+      el.classList.toggle("is-active", enabled);
+    });
+
     if (enabled) {
-      haltMobilePlayers();
+      // Switched to TV: Extract what is currently running on the phone and send to TV
+      var activeMedia = extractActiveMobileMedia();
+      if (activeMedia && activeMedia.url && tvState.hasPairedTv && tvState.isOnline) {
+        haltMobilePlayers();
+        showTvToast("Diffusion vers la Smart TV…");
+        await sendToTv(activeMedia);
+      } else {
+        haltMobilePlayers();
+        showTvToast("Diffusion vers la Smart TV activée");
+      }
+    } else {
+      // Switched to Phone: Keep TV streaming uninterrupted in the background, route future mobile playback locally
+      showTvToast("Lecture locale sur téléphone activée");
     }
+
     syncActiveTvBar();
     renderTvSettingsSection();
-    showTvToast(enabled ? "Diffusion vers la Smart TV activée" : "Lecture locale sur téléphone activée");
   }
 
   // Export stop TV diffusion function so Cast can stop paired TV playback
@@ -465,12 +637,12 @@
         flex-shrink: 0;
       }
 
-      /* Segmented Device Selector: Simple monochrome minimalist [ Phone | TV ] */
+      /* Segmented Device Selector: High-contrast distinct [ Phone | TV ] */
       .vel-tv-segmented-switch {
         display: flex;
         align-items: center;
-        background: rgba(255, 255, 255, 0.07);
-        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(167, 139, 250, 0.3);
         border-radius: 999px;
         padding: 2px;
         gap: 2px;
@@ -480,15 +652,17 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 32px;
+        width: 34px;
         height: 28px;
         border-radius: 999px;
         border: none;
         background: transparent;
-        color: rgba(255, 255, 255, 0.4);
+        color: rgba(255, 255, 255, 0.45);
         cursor: pointer;
         transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
         padding: 0;
+        user-select: none;
+        -webkit-user-select: none;
       }
 
       .vel-tv-segment-btn svg {
@@ -497,16 +671,23 @@
       }
 
       .vel-tv-segment-btn:hover {
-        color: rgba(255, 255, 255, 0.85);
+        color: rgba(255, 255, 255, 0.9);
       }
 
       .vel-tv-segment-btn.is-active {
-        background: rgba(255, 255, 255, 0.18);
-        color: #ffffff;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        background: linear-gradient(135deg, #8b5cf6, #7c3aed) !important;
+        color: #ffffff !important;
+        box-shadow: 0 2px 10px rgba(139, 92, 246, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+        transform: scale(1.05);
+      }
+      .vel-tv-segment-btn[data-mode="phone"].is-active,
+      .vel-tv-segment-btn#vel-profile-mode-phone.is-active {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.18)) !important;
+        color: #ffffff !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
       }
       .vel-tv-segment-btn.is-active svg {
-        stroke-width: 2.2;
+        stroke-width: 2.3;
       }
 
       /* Stop button */
@@ -558,6 +739,19 @@
     return "default";
   }
 
+  function isGoogleCastOrAirPlayActive() {
+    try {
+      if (window.VeloraCast && typeof window.VeloraCast.__origIsConnected === "function") {
+        return window.VeloraCast.__origIsConnected();
+      }
+      if (window.VeloraCast && typeof window.VeloraCast.getState === "function") {
+        var st = window.VeloraCast.getState();
+        return Boolean(st && st.connected && (st.castState === "CONNECTED" || st.airPlayConnected));
+      }
+    } catch (_) {}
+    return false;
+  }
+
   function loadCachedTvStatus() {
     try {
       var uid = getCurrentUserId();
@@ -566,7 +760,7 @@
         var parsed = JSON.parse(raw);
         if (parsed && typeof parsed === "object") {
           tvState.hasPairedTv = Boolean(parsed.hasPairedTv);
-          tvState.isOnline = false;
+          tvState.isOnline = Boolean(parsed.isOnline);
           tvState.deviceId = parsed.deviceId || null;
           tvState.deviceName = parsed.deviceName || "Smart TV";
           tvState.currentMedia = parsed.currentMedia || null;
@@ -637,7 +831,7 @@
   function removeActiveTvBar() {
     var wrap = document.getElementById("vel-tv-active-bar-wrap");
     if (wrap) {
-      if (wrap.dataset.source === "cast" && window.VeloraCast && typeof window.VeloraCast.isConnected === "function" && window.VeloraCast.isConnected()) {
+      if (wrap.dataset.source === "cast" && isGoogleCastOrAirPlayActive()) {
         return;
       }
       wrap.remove();
@@ -652,7 +846,7 @@
 
   // Synchronize the upper active diffusion bar
   function syncActiveTvBar() {
-    if (window.VeloraCast && typeof window.VeloraCast.isConnected === "function" && window.VeloraCast.isConnected()) {
+    if (isGoogleCastOrAirPlayActive()) {
       return; // Cast is currently active and manages the top bar
     }
     if (tvState.hasPairedTv && tvState.isOnline) {
@@ -664,7 +858,7 @@
 
   // Upper bar showing TV status, diffusion switch, and active stream
   function showActiveTvBar() {
-    if (window.VeloraCast && typeof window.VeloraCast.isConnected === "function" && window.VeloraCast.isConnected()) {
+    if (isGoogleCastOrAirPlayActive()) {
       return;
     }
     var isPlaying = tvState.isOnline && tvState.currentMedia && tvState.currentMedia.state !== "stopped";
@@ -860,17 +1054,37 @@
                   if (curDur > 0) list[foundIdx].duration = curDur;
                   if (curDur > 0) list[foundIdx].progressPercent = Math.min(100, Math.max(0, (curPos / curDur) * 100));
                   list[foundIdx].updatedAt = Date.now();
-                  localStorage.setItem(histKey, JSON.stringify(list));
-                  document.dispatchEvent(new CustomEvent("velora-watch-history-updated", { detail: { items: list } }));
-                  if (typeof window.veloraRenderResumeSection === "function") {
-                    var rootEl = document.getElementById("vel-home-sections");
-                    if (rootEl) {
-                      var exEl = rootEl.querySelector(".vel-home-section--resume");
-                      var freshBlock = window.veloraRenderResumeSection();
-                      if (freshBlock) {
-                        if (exEl) exEl.replaceWith(freshBlock);
-                        else rootEl.prepend(freshBlock);
-                      }
+                } else {
+                  var newEntry = {
+                    id: cmId || ("tv_" + Date.now()),
+                    streamId: data.currentMedia.streamId || cmId || null,
+                    seriesId: data.currentMedia.seriesId || null,
+                    episodeStreamId: data.currentMedia.episodeStreamId || null,
+                    name: data.currentMedia.title || data.currentMedia.name || "Vidéo",
+                    title: data.currentMedia.title || data.currentMedia.name || "Vidéo",
+                    poster: data.currentMedia.poster || "",
+                    backdropUrl: data.currentMedia.poster || "",
+                    thumbUrl: data.currentMedia.poster || "",
+                    currentTime: curPos,
+                    duration: curDur,
+                    progressPercent: curDur > 0 ? Math.min(100, Math.max(0, (curPos / curDur) * 100)) : 0,
+                    type: data.currentMedia.type || "vod",
+                    url: data.currentMedia.url || "",
+                    updatedAt: Date.now()
+                  };
+                  list.unshift(newEntry);
+                }
+
+                localStorage.setItem(histKey, JSON.stringify(list.slice(0, 60)));
+                document.dispatchEvent(new CustomEvent("velora-watch-history-updated", { detail: { items: list } }));
+                if (typeof window.veloraRenderResumeSection === "function") {
+                  var rootEl = document.getElementById("vel-home-sections");
+                  if (rootEl) {
+                    var exEl = rootEl.querySelector(".vel-home-section--resume");
+                    var freshBlock = window.veloraRenderResumeSection();
+                    if (freshBlock) {
+                      if (exEl) exEl.replaceWith(freshBlock);
+                      else rootEl.prepend(freshBlock);
                     }
                   }
                 }
@@ -1168,8 +1382,27 @@
     updateTvTabDot();
   };
 
+  var lastSentTvMediaUrl = "";
+  var lastSentTvMediaTime = 0;
+  var isSendingTvMedia = false;
+
   // Send media to play on TV
   async function sendToTv(media) {
+    if (!media || !media.url) return;
+
+    var rawUrl = String(media.url || "").trim();
+    var now = Date.now();
+    if (lastSentTvMediaUrl === rawUrl && (now - lastSentTvMediaTime < 2500)) {
+      return;
+    }
+    if (isSendingTvMedia && lastSentTvMediaUrl === rawUrl) {
+      return;
+    }
+
+    lastSentTvMediaUrl = rawUrl;
+    lastSentTvMediaTime = now;
+    isSendingTvMedia = true;
+
     try {
       // 1. Close mobile transcode session if running
       try {
@@ -1181,17 +1414,12 @@
       // 2. Immediately halt mobile players on phone
       haltMobilePlayers();
 
-      // Schedule staggered suppression sweeps to neutralize delayed async player invocations
-      [50, 150, 300, 600, 1200, 2000].forEach(function (delay) {
-        setTimeout(function () {
-          if (shouldSuppressMobilePlayback()) {
-            haltMobilePlayers();
-          }
-        }, delay);
-      });
-
-      // 2. Cool-down pause (400ms)
-      await new Promise(function (resolve) { setTimeout(resolve, 400); });
+      // Lightweight single delayed safety check
+      setTimeout(function () {
+        if (shouldSuppressMobilePlayback()) {
+          haltMobilePlayers();
+        }
+      }, 150);
 
       // 3. Resolve best stream URL for the TV
       var targetUrl = media.url || media.castUrl || media.direct_source || media.sourceUrl;
@@ -1306,6 +1534,8 @@
         }
         v.play().catch(function () {});
       }
+    } finally {
+      isSendingTvMedia = false;
     }
   }
 
@@ -1380,6 +1610,9 @@
         };
 
         var origIsConnected = window.VeloraCast.isConnected;
+        window.VeloraCast.__origIsConnected = function () {
+          return origIsConnected ? origIsConnected.call(window.VeloraCast) : false;
+        };
         window.VeloraCast.isConnected = function () {
           if (shouldSuppressMobilePlayback()) {
             return true;
@@ -1394,13 +1627,28 @@
     setTimeout(attachHooks, 2000);
   }
 
+  function initGlobalSwitchListeners() {
+    document.addEventListener("click", function (e) {
+      var btn = e.target && e.target.closest && e.target.closest(".vel-tv-segment-btn, #vel-profile-mode-phone, #vel-profile-mode-tv");
+      if (!btn) return;
+      var mode = btn.getAttribute("data-mode") || (btn.id === "vel-profile-mode-tv" ? "tv" : (btn.id === "vel-profile-mode-phone" ? "phone" : null));
+      if (!mode) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setAutoDiffuse(mode === "tv");
+    }, true);
+  }
+
   // Initialize
   function init() {
     loadCachedTvStatus();
     installPlaybackProtections();
     injectStyles();
+    initGlobalSwitchListeners();
     observeProfileModal();
     initPlaybackListeners();
+    updateTvTabDot();
+    syncActiveTvBar();
     handleUrlPairing();
     checkTvStatus();
 

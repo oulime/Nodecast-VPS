@@ -223,6 +223,13 @@
           localStorage.setItem("authToken", event.token);
         }
         if (event.media) {
+          var newUrl = String(event.media.url || "").trim();
+          var curUrl = state.currentMedia ? String(state.currentMedia.url || "").trim() : "";
+          if (newUrl && curUrl === newUrl && state.lastPlayTime && (Date.now() - state.lastPlayTime < 2500)) {
+            console.log("[TV] Duplicate PLAY event ignored within 2.5s window");
+            break;
+          }
+          state.lastPlayTime = Date.now();
           playMedia(event.media);
         }
         break;

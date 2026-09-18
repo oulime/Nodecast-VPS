@@ -104,9 +104,14 @@ function getUserAgent(settings) {
   return USER_AGENT_PRESETS[settings.userAgentPreset] || USER_AGENT_PRESETS.chrome;
 }
 
-function getUpstreamProxy(settings = {}) {
+function getUpstreamProxy(settings = {}, targetUrl = '') {
   if (settings.upstreamProxy && String(settings.upstreamProxy).trim()) {
     return String(settings.upstreamProxy).trim();
+  }
+  const urlLower = String(targetUrl || '').toLowerCase();
+  const isDino = urlLower.includes('playmodx') || urlLower.includes('185.245.') || urlLower.includes('103.176.90.');
+  if (isDino) {
+    return process.env.DINO_PROXY || process.env.UPSTREAM_PROXY || 'http://127.0.0.1:8118';
   }
   return process.env.UPSTREAM_PROXY || process.env.HTTP_PROXY || process.env.http_proxy || null;
 }

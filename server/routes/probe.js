@@ -243,7 +243,7 @@ router.get('/', async (req, res) => {
         console.warn('[Probe] Failed to load settings, using defaults:', err.message);
     }
     const userAgent = resolveUserAgent(ua, settings);
-    const upstreamProxy = db.getUpstreamProxy(settings);
+    const upstreamProxy = db.getUpstreamProxy(settings, url);
     const cacheTtlSeconds = Number(settings.probeCacheTTL);
     const cacheTtlMs = Number.isFinite(cacheTtlSeconds) && cacheTtlSeconds > 0
         ? cacheTtlSeconds * 1000

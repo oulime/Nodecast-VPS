@@ -48,7 +48,7 @@ router.get('/', async (req, res) => {
     // Get User-Agent from settings
     const settings = await db.settings.get();
     const userAgent = db.getUserAgent(settings);
-    const upstreamProxy = db.getUpstreamProxy(settings);
+    const upstreamProxy = db.getUpstreamProxy(settings, url);
     const streamUrl = db.resolveStreamUrl(url);
 
     console.log(`[Remux] Starting remux for: ${url}`);

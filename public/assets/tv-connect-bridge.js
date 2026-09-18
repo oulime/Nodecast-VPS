@@ -831,7 +831,8 @@
   function removeActiveTvBar() {
     var wrap = document.getElementById("vel-tv-active-bar-wrap");
     if (wrap) {
-      if (wrap.dataset.source === "cast" && isGoogleCastOrAirPlayActive()) {
+      var src = (wrap.getAttribute && wrap.getAttribute("data-source")) || (wrap.dataset && wrap.dataset.source);
+      if (src === "cast" && isGoogleCastOrAirPlayActive()) {
         return;
       }
       wrap.remove();
@@ -871,7 +872,7 @@
 
     var existingWrap = document.getElementById("vel-tv-active-bar-wrap");
     if (existingWrap) {
-      existingWrap.dataset.source = "tv-bridge";
+      if (existingWrap.setAttribute) existingWrap.setAttribute("data-source", "tv-bridge");
       var iconWrap = existingWrap.querySelector(".vel-tv-capsule-icon-wrap");
       if (iconWrap) iconWrap.classList.toggle("is-streaming", isPlaying);
 
@@ -919,7 +920,7 @@
 
     var wrap = document.createElement("div");
     wrap.id = "vel-tv-active-bar-wrap";
-    wrap.dataset.source = "tv-bridge";
+    wrap.setAttribute("data-source", "tv-bridge");
     wrap.className = "vel-tv-active-bar-wrap";
     wrap.innerHTML = `
       <div class="vel-tv-active-bar">
@@ -1541,7 +1542,7 @@
 
   // Direct seamless routing based on auto-diffuse switch!
   function interceptPlayback(mediaData) {
-    if (window.VeloraCast && typeof window.VeloraCast.isConnected === "function" && window.VeloraCast.isConnected()) {
+    if (isGoogleCastOrAirPlayActive()) {
       return false;
     }
     if (tvState.hasPairedTv && tvState.isOnline) {

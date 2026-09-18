@@ -80,10 +80,12 @@ class TranscodeSession extends EventEmitter {
         this.durationSeconds = Number(options.duration || options.durationSeconds) || null;
         this.startTime = Date.now();
         this.lastAccess = Date.now();
+        const streamTarget = String(url || options.url || '');
+        const isDino = streamTarget.toLowerCase().includes('playmodx') || streamTarget.includes('185.245.') || streamTarget.includes('103.176.90.');
         this.options = {
             ffmpegPath: options.ffmpegPath || 'ffmpeg',
-            userAgent: options.userAgent || 'Mozilla/5.0',
-            upstreamProxy: options.upstreamProxy || (String(options.url || '').toLowerCase().includes('playmodx') ? (process.env.DINO_PROXY || process.env.UPSTREAM_PROXY || 'http://127.0.0.1:8118') : null),
+            userAgent: options.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+            upstreamProxy: options.upstreamProxy || (isDino ? (process.env.DINO_PROXY || process.env.UPSTREAM_PROXY || 'http://127.0.0.1:8118') : null),
             seekOffset: options.seekOffset || 0,
             hwEncoder: options.hwEncoder || 'software',
             maxResolution: options.maxResolution || '1080p',

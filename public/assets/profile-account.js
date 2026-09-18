@@ -40,15 +40,16 @@
   function formatDate(value) {
     const date = value ? new Date(value) : null;
     if (!date || !Number.isFinite(date.getTime())) return "Sans expiration";
-    return date.toLocaleString("fr-FR", {
-      weekday: "short", day: "2-digit", month: "short", year: "numeric",
-      hour: "2-digit", minute: "2-digit", second: "2-digit"
+    return date.toLocaleDateString("fr-FR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
     });
   }
 
   function remainingLabel(value) {
     const end = value ? new Date(value) : null;
-    if (!end || !Number.isFinite(end.getTime())) return "Accès sans limite";
+    if (!end || !Number.isFinite(end.getTime())) return "Accès permanent";
     let seconds = Math.max(0, Math.ceil((end.getTime() - Date.now()) / 1000));
     if (!seconds) return "Abonnement expiré";
     const days = Math.floor(seconds / 86400);
@@ -56,13 +57,11 @@
     const hours = Math.floor(seconds / 3600);
     seconds -= hours * 3600;
     const minutes = Math.floor(seconds / 60);
-    seconds -= minutes * 60;
-    const parts = [];
-    if (days) parts.push(`${days} j`);
-    if (hours || days) parts.push(`${hours} h`);
-    parts.push(`${minutes} min`);
-    if (!days) parts.push(`${seconds} s`);
-    return `Expire dans ${parts.join(" ")}`;
+
+    if (days > 1) return `Expire dans ${days} jours`;
+    if (days === 1) return `Expire demain (${hours}h restantes)`;
+    if (hours > 0) return `Expire dans ${hours}h ${minutes}min`;
+    return `Expire dans ${minutes} min`;
   }
 
   function statusDetails(user) {
@@ -78,7 +77,7 @@
     const remaining = $("vel-profile-remaining");
     const badge = $("vel-profile-status");
     const status = statusDetails(state.user);
-    if (remaining) remaining.textContent = state.user.role === "admin" ? "Accès administrateur — sans expiration" : remainingLabel(state.user.subscriptionEnd);
+    if (remaining) remaining.textContent = state.user.role === "admin" ? "Accès permanent" : remainingLabel(state.user.subscriptionEnd);
     if (badge) {
       badge.textContent = status.label;
       badge.dataset.status = status.key;
@@ -183,19 +182,62 @@
         </div>
 
         <div id="vel-panel-profile" class="vel-profile-panel is-active" role="tabpanel" aria-labelledby="vel-tab-btn-profile">
-          <div class="vel-profile-account__avatar" aria-hidden="true">V</div>
-          <p class="vel-profile-account__eyebrow">MON COMPTE</p>
-          <h2 id="vel-profile-account-title"><span id="vel-profile-display-name">Profil</span></h2>
-          <span id="vel-profile-status" class="vel-profile-account__badge" data-status="active">Actif</span>
-          <div class="vel-profile-account__details">
-            <div><span>Nom d'utilisateur</span><strong id="vel-profile-username">—</strong></div>
-            <div><span>Date d'expiration</span><strong id="vel-profile-expiration">—</strong><small id="vel-profile-remaining">Vérification…</small></div>
+          <div class="vel-profile-avatar-wrap">
+            <div class="vel-profile-avatar-icon">
+              <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            </div>
           </div>
-          <button id="vel-profile-password-open" type="button" class="vel-profile-account__primary" data-tv-focusable="true">Modifier mon mot de passe</button>
+          <h2 id="vel-profile-account-title" class="vel-profile-title"><span id="vel-profile-display-name">Profil</span></h2>
+          <div class="vel-profile-badge-wrap">
+            <span id="vel-profile-status" class="vel-profile-account__badge" data-status="active">Actif</span>
+          </div>
+
+          <div class="vel-profile-info-card">
+            <div class="vel-profile-info-row">
+              <div class="vel-profile-info-label">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <span>Nom de compte</span>
+              </div>
+              <strong id="vel-profile-username" class="vel-profile-info-val">—</strong>
+            </div>
+
+            <div class="vel-profile-info-divider"></div>
+
+            <div class="vel-profile-info-row">
+              <div class="vel-profile-info-label">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="16" y1="2" x2="16" y2="6"></line>
+                  <line x1="8" y1="2" x2="8" y2="6"></line>
+                  <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+                <span>Expiration</span>
+              </div>
+              <div class="vel-profile-exp-wrap">
+                <strong id="vel-profile-expiration" class="vel-profile-info-val">—</strong>
+                <small id="vel-profile-remaining" class="vel-profile-info-sub">Vérification…</small>
+              </div>
+            </div>
+          </div>
+
+          <button id="vel-profile-password-open" type="button" class="vel-profile-password-btn" data-tv-focusable="true">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            <span>Modifier le mot de passe</span>
+          </button>
+
           <form id="vel-profile-password-form" class="vel-profile-account__password" hidden>
             <label>Mot de passe actuel<input id="vel-profile-current-password" type="password" required autocomplete="current-password" /></label>
             <label>Nouveau mot de passe<input id="vel-profile-new-password" type="password" required minlength="6" autocomplete="new-password" /></label>
-            <label>Confirmer le nouveau mot de passe<input id="vel-profile-confirm-password" type="password" required minlength="6" autocomplete="new-password" /></label>
+            <label>Confirmer le mot de passe<input id="vel-profile-confirm-password" type="password" required minlength="6" autocomplete="new-password" /></label>
             <p id="vel-profile-password-status" class="vel-profile-account__status" aria-live="polite"></p>
             <div class="vel-profile-account__password-actions">
               <button type="button" class="vel-profile-account__secondary" data-profile-password-cancel>Annuler</button>

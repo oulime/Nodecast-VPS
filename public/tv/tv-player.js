@@ -22,9 +22,6 @@
     video: document.getElementById("tv-video"),
     buffering: document.getElementById("tv-buffering"),
     osd: document.getElementById("tv-osd"),
-    title: document.getElementById("tv-media-title"),
-    subtitle: document.getElementById("tv-media-subtitle"),
-    liveBadge: document.getElementById("tv-live-badge"),
     timeCurrent: document.getElementById("tv-time-current"),
     timeTotal: document.getElementById("tv-time-total"),
     progressBar: document.getElementById("tv-progress-bar"),
@@ -42,7 +39,6 @@
     statusText: document.getElementById("tv-status-text"),
     linkedBox: document.getElementById("tv-linked-box"),
     linkedUser: document.getElementById("tv-linked-username"),
-    qrcode: document.getElementById("tv-qrcode"),
     nextCard: document.getElementById("tv-next-card"),
     nextTitle: document.getElementById("tv-next-title"),
     nextSeconds: document.getElementById("tv-next-seconds"),
@@ -58,9 +54,7 @@
     var s = Math.floor(seconds % 60);
     if (h > 0) {
       return (
-        (h < 10 ? "0" : "") + h + ":" +
-        (m < 10 ? "0" : "") + m + ":" +
-        (s < 10 ? "0" : "") + s
+        h + ":" + (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s
       );
     }
     return (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
@@ -68,9 +62,8 @@
 
   // Cookie helper functions for long-term Smart TV persistence
   function getCookie(name) {
-    var raw = document.cookie || "";
-    var match = raw.match(new RegExp("(?:^|; )" + name.replace(/([.$?*|{}()[\]\\/+^])/g, "\\$1") + "=([^;]*)"));
-    return match ? decodeURIComponent(match[1]) : null;
+    var match = document.cookie.match(new RegExp("(^|;\\s*)(" + name + ")=([^;]*)"));
+    return match ? decodeURIComponent(match[3]) : null;
   }
 
   function setCookie(name, value, days) {
@@ -81,13 +74,6 @@
       expires = "; expires=" + d.toUTCString();
     }
     document.cookie = name + "=" + encodeURIComponent(value) + expires + "; path=/; SameSite=Lax";
-  }
-
-  // Pure JS lightweight QR Code generator (fallback/simple matrix representation)
-  function renderQrCode(url) {
-    if (!dom.qrcode) return;
-    var encoded = encodeURIComponent(url);
-    dom.qrcode.innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=4&data=' + encoded + '" alt="QR Code" style="width:100%;height:100%;border-radius:12px;" />';
   }
 
   // Fetch or renew TV session with multi-layer permanent identity
@@ -127,8 +113,6 @@
       } else {
         state.isLinked = false;
         renderPin(data.pin);
-        var pairUrl = window.location.origin + "/login?tvPair=" + data.pin;
-        renderQrCode(pairUrl);
       }
 
       connectEvents();
@@ -279,16 +263,64 @@
     }
   }
 
+  function updateMuteButton() {}
+
   function unmuteAudio() {
     var v = dom.video;
     if (!v) return;
     v.muted = false;
     v.volume = 1;
-    var banner = document.getElementById("tv-unmute-banner");
-    if (banner) banner.classList.add("hidden");
-    var btn = document.getElementById("tv-btn-mute");
-    if (btn) btn.textContent = "🔊 Son";
   }
+
+  function attemptPlayMedia() {
+    var v = dom.video;
+    if (!v) return;
+
+    function onPlaySuccess() {
+      if (dom.buffering) dom.buffering.classList.add("hidden");
+      updatePlayPauseIcon();
+      wakeOsd();
+      reportTvState("playing");
+    }
+
+    // Try unmuted play first
+    v.muted = false;
+    v.volume = 1;
+    var p = v.play();
+    if (p !== undefined) {
+      p.then(onPlaySuccess).catch(function (err) {
+        console.warn("[TV] Unmuted autoplay blocked by browser policy, fallback to muted:", err);
+        // Muted playback is allowed by 100% of TV/mobile/desktop browsers without gestures!
+        v.muted = true;
+        var p2 = v.play();
+        if (p2 !== undefined) {
+          p2.then(function () {
+            onPlaySuccess();
+          }).catch(function (err2) {
+            console.warn("[TV] Muted play error:", err2);
+          });
+        }
+      });
+    }
+  }
+
+  // Universal passive TV audio unlock on first user remote button or click
+  function unlockTvAudio() {
+    if (dom.video && dom.video.muted) {
+      dom.video.muted = false;
+      dom.video.volume = 1;
+    }
+    try {
+      var AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        var actx = new AudioContextClass();
+        if (actx.state === "suspended") actx.resume();
+      }
+    } catch (_) {}
+  }
+  window.addEventListener("keydown", unlockTvAudio, { capture: true, passive: true });
+  window.addEventListener("click", unlockTvAudio, { capture: true, passive: true });
+  window.addEventListener("pointerdown", unlockTvAudio, { capture: true, passive: true });
 
   function triggerTvFullscreen(forceEnterOnly) {
     try {
@@ -421,34 +453,6 @@
     triggerTvFullscreen(true);
     initAspectRatio();
     updatePlayPauseIcon();
-    startTvStreamTracking();
-
-    if (state.deviceId) {
-      fetch("/api/tv/state", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deviceId: state.deviceId, state: "playing" })
-      }).catch(function () {});
-    }
-
-    // Update OSD metadata
-    if (dom.title) dom.title.textContent = media.title || "Lecture en cours";
-    if (dom.subtitle) {
-      var sub = "";
-      if (media.seasonNumber && media.episodeNumber) {
-        sub = "Saison " + media.seasonNumber + " • Épisode " + media.episodeNumber;
-      }
-      if (media.episodeTitle) {
-        sub += (sub ? " : " : "") + media.episodeTitle;
-      }
-      dom.subtitle.textContent = sub;
-      dom.subtitle.classList.toggle("hidden", !sub);
-    }
-
-    if (dom.liveBadge) {
-      dom.liveBadge.classList.toggle("hidden", !media.isLive);
-    }
-
     // Clean up previous HLS instance
     if (state.hls) {
       state.hls.destroy();
@@ -461,15 +465,9 @@
     v.muted = false;
     v.volume = 1;
 
-    var unmuteBanner = document.getElementById("tv-unmute-banner");
-    if (unmuteBanner) unmuteBanner.classList.add("hidden");
-    var btnMute = document.getElementById("tv-btn-mute");
-    if (btnMute) btnMute.textContent = "🔊 Son";
-
     var streamUrl = String(media.url || "").trim();
 
     // CRITICAL FIX: Rewrite localhost or 127.0.0.1 to the TV's own window origin!
-    // The TV browser cannot reach 'localhost' because on the TV, localhost is the TV itself.
     if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(streamUrl)) {
       streamUrl = streamUrl.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i, window.location.origin);
     } else if (streamUrl.indexOf("/") === 0) {
@@ -483,6 +481,7 @@
     }
 
     var isHls = /\.m3u8(?:[?#]|$)/i.test(streamUrl) || /\/stream\.m3u8/i.test(streamUrl);
+    var resumePos = Number(media.position ?? media.currentTime) || 0;
 
     if (isHls && window.Hls && window.Hls.isSupported()) {
       var hls = new window.Hls({
@@ -512,23 +511,14 @@
       });
 
       hls.on(window.Hls.Events.MANIFEST_PARSED, function () {
-        if (media.position && Number.isFinite(media.position)) {
-          v.currentTime = media.position;
+        if (resumePos > 0) {
+          try { v.currentTime = resumePos; } catch (_) {}
         }
-        var p = v.play();
-        if (p !== undefined) {
-          p.then(function () {
-            if (v.muted) {
-              if (unmuteBanner) unmuteBanner.classList.remove("hidden");
-              if (btnMute) btnMute.textContent = "🔇 Activer son";
-            }
-          }).catch(function (err) {
-            console.warn("[TV] Autoplay blocked, trying muted:", err);
-            v.muted = true;
-            if (unmuteBanner) unmuteBanner.classList.remove("hidden");
-            if (btnMute) btnMute.textContent = "🔇 Activer son";
-            v.play().catch(function () {});
-          });
+        attemptPlayMedia();
+      });
+      hls.on(window.Hls.Events.FRAG_LOADED, function () {
+        if (v && v.paused && state.currentMedia) {
+          attemptPlayMedia();
         }
       });
       hls.on(window.Hls.Events.ERROR, function (e, data) {
@@ -555,41 +545,114 @@
       });
     } else {
       v.autoplay = true;
+      v.playsInline = true;
       v.src = streamUrl;
       v.load();
-      if (media.position && Number.isFinite(media.position)) {
-        v.currentTime = media.position;
-      }
-      var p = v.play();
-      if (p !== undefined) {
-        p.then(function () {
-          if (v.muted) {
-            if (unmuteBanner) unmuteBanner.classList.remove("hidden");
-            if (btnMute) btnMute.textContent = "🔇 Activer son";
-          }
-        }).catch(function (err) {
-          console.warn("[TV] Direct play error, trying muted:", err);
-          v.muted = true;
-          if (unmuteBanner) unmuteBanner.classList.remove("hidden");
-          if (btnMute) btnMute.textContent = "🔇 Activer son";
-          v.play().catch(function () {});
-        });
+
+      if (resumePos > 0) {
+        var didApplyResume = false;
+        var applyResumeAndStart = function () {
+          if (didApplyResume) return;
+          didApplyResume = true;
+          try {
+            v.currentTime = resumePos;
+          } catch (_) {}
+
+          var onSeekDone = function () {
+            attemptPlayMedia();
+          };
+          v.addEventListener("seeked", onSeekDone, { once: true });
+          v.addEventListener("canplay", onSeekDone, { once: true });
+
+          // Fallback timeout in case seeked fired synchronously or was delayed
+          setTimeout(function () {
+            if (v && v.paused && state.currentMedia) {
+              attemptPlayMedia();
+            }
+          }, 350);
+        };
+
+        v.addEventListener("loadedmetadata", applyResumeAndStart, { once: true });
+        v.addEventListener("canplay", function () {
+          if (!didApplyResume) applyResumeAndStart();
+        }, { once: true });
+      } else {
+        var onDirectReady = function () {
+          attemptPlayMedia();
+        };
+        v.addEventListener("loadedmetadata", onDirectReady, { once: true });
+        v.addEventListener("canplay", onDirectReady, { once: true });
+        attemptPlayMedia();
       }
     }
 
     wakeOsd();
   }
 
+  var lastReportedTime = 0;
+  function reportTvState(playbackState) {
+    if (!state.deviceId) return;
+    var v = dom.video;
+    var cur = (v && Number.isFinite(v.currentTime)) ? v.currentTime : 0;
+    var dur = (v && Number.isFinite(v.duration)) ? v.duration : 0;
+    var m = state.currentMedia || {};
+    var mId = m.id || m.streamId || m.stream_id || null;
+    var mTitle = m.title || m.name || null;
+    var mType = m.type || (m.seasonNumber ? "series" : "vod");
+
+    fetch("/api/tv/state", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        deviceId: state.deviceId,
+        state: playbackState || (v && v.paused ? "paused" : "playing"),
+        position: cur,
+        duration: dur,
+        mediaId: mId,
+        mediaTitle: mTitle,
+        mediaType: mType
+      }),
+      keepalive: playbackState === "stopped"
+    }).catch(function () {});
+  }
+
+  function flashButton(btn) {
+    if (!btn) return;
+    btn.classList.add("is-active-flash");
+    setTimeout(function () {
+      btn.classList.remove("is-active-flash");
+    }, 320);
+  }
+
+  function seekBy(seconds) {
+    var v = dom.video;
+    if (!v) return;
+    var dur = Number.isFinite(v.duration) ? v.duration : 0;
+    var cur = (Number.isFinite(v.currentTime) ? v.currentTime : 0) + seconds;
+    var newTime = dur > 0 ? Math.max(0, Math.min(dur, cur)) : Math.max(0, cur);
+
+    try {
+      v.currentTime = newTime;
+    } catch (_) {}
+
+    if (dom.progressBar && dur > 0) {
+      dom.progressBar.style.width = ((newTime / dur) * 100) + "%";
+    }
+    if (dom.timeCurrent) {
+      dom.timeCurrent.textContent = formatTime(newTime);
+    }
+    if (seconds < 0 && dom.btnRw) {
+      flashButton(dom.btnRw);
+    } else if (seconds > 0 && dom.btnFf) {
+      flashButton(dom.btnFf);
+    }
+    wakeOsd();
+    reportTvState(v.paused ? "paused" : "playing");
+  }
+
   function stopPlayback() {
     stopTvStreamTracking(true);
-    if (state.deviceId) {
-      fetch("/api/tv/state", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deviceId: state.deviceId, state: "stopped" }),
-        keepalive: true
-      }).catch(function () {});
-    }
+    reportTvState("stopped");
     var v = dom.video;
     if (v) {
       v.pause();
@@ -603,7 +666,11 @@
     cancelNextCountdown();
     state.currentMedia = null;
 
-    if (dom.playerWrap) dom.playerWrap.classList.add("hidden");
+    if (dom.playerWrap) {
+      dom.playerWrap.classList.add("hidden");
+      dom.playerWrap.classList.remove("is-idle");
+    }
+    document.body.classList.remove("is-idle");
     if (dom.standby) dom.standby.classList.remove("hidden");
   }
 
@@ -612,11 +679,13 @@
     if (!dom.osd) return;
     dom.osd.classList.remove("tv-osd--hidden");
     if (dom.playerWrap) dom.playerWrap.classList.remove("is-idle");
+    document.body.classList.remove("is-idle");
     if (state.osdTimer) clearTimeout(state.osdTimer);
     state.osdTimer = setTimeout(function () {
       if (dom.video && !dom.video.paused) {
         dom.osd.classList.add("tv-osd--hidden");
         if (dom.playerWrap) dom.playerWrap.classList.add("is-idle");
+        document.body.classList.add("is-idle");
       }
     }, 3500);
   }
@@ -625,7 +694,11 @@
     var v = dom.video;
     if (!v) return;
     if (dom.playPauseIcon) {
-      dom.playPauseIcon.textContent = v.paused ? "▶" : "❚❚";
+      if (v.paused) {
+        dom.playPauseIcon.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7.5 5.5c0-.9 1-1.5 1.8-1l9.2 5.8c.8.5.8 1.5 0 2l-9.2 5.8c-.8.5-1.8 0-1.8-1V5.5z"/></svg>';
+      } else {
+        dom.playPauseIcon.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg>';
+      }
     }
     if (dom.btnPlayPause) {
       dom.btnPlayPause.classList.toggle("is-paused", v.paused);
@@ -634,9 +707,9 @@
   }
 
   var ASPECT_MODES = [
-    { mode: "contain", label: "📐 Format d'origine" },
-    { mode: "fill", label: "⛶ Remplir l'écran" },
-    { mode: "cover", label: "🔍 Zoom 16:9" }
+    { mode: "contain", label: "Format : Original" },
+    { mode: "fill", label: "Format : Remplir" },
+    { mode: "cover", label: "Format : 16:9" }
   ];
   var currentAspectIndex = 0;
 
@@ -646,7 +719,10 @@
     v.classList.remove("tv-fit-contain", "tv-fit-fill", "tv-fit-cover");
     v.classList.add("tv-fit-" + mode);
     var found = ASPECT_MODES.find(function (a) { return a.mode === mode; });
-    if (dom.btnAspect && found) {
+    var aspectText = document.getElementById("tv-btn-aspect-text");
+    if (aspectText && found) {
+      aspectText.textContent = found.label;
+    } else if (dom.btnAspect && found) {
       dom.btnAspect.textContent = found.label;
     }
     localStorage.setItem("velora_tv_aspect", mode);
@@ -677,6 +753,7 @@
     if (dom.progressBar) dom.progressBar.style.width = (ratio * 100) + "%";
     if (dom.timeCurrent) dom.timeCurrent.textContent = formatTime(v.currentTime);
     wakeOsd();
+    reportTvState(v.paused ? "paused" : "playing");
   }
 
   // Autoplay countdown for series next episode
@@ -709,51 +786,117 @@
 
   // Remote Control Key Handler (Physical TV Remote / Keyboard)
   function handleRemoteKey(e) {
+    primeAudioContext();
     unmuteAudio();
     wakeOsd();
 
     var key = e.key;
     var code = e.keyCode;
 
-    // Play / Pause (Space, Enter, MediaPlayPause, keycode 179)
-    if (key === " " || key === "Enter" || key === "MediaPlayPause" || code === 179 || code === 13) {
+    // Play / Pause (Space, Enter, MediaPlayPause, keycodes 179, 13, 32, 415, 19, 10252)
+    if (
+      key === " " ||
+      key === "Enter" ||
+      key === "MediaPlayPause" ||
+      key === "MediaPlay" ||
+      key === "MediaPause" ||
+      key === "Play" ||
+      key === "Pause" ||
+      code === 179 ||
+      code === 13 ||
+      code === 32 ||
+      code === 415 ||
+      code === 19 ||
+      code === 10252
+    ) {
       e.preventDefault();
+      e.stopPropagation();
+      // If on standby screen, pressing Enter/OK activates audio context for the session
+      if (dom.playerWrap && dom.playerWrap.classList.contains("hidden")) {
+        primeAudioContext();
+        if (dom.statusText) {
+          dom.statusText.innerHTML = "🟢 TV prête • Son direct déverrouillé !";
+        }
+        return;
+      }
+
       // If next episode card is visible, Enter means "Play Next Episode"
-      if (state.nextCountdownTimer && state.currentMedia && state.currentMedia.nextEpisode) {
+      if (state.nextCountdownTimer && state.currentMedia && state.currentMedia.nextEpisode && (key === "Enter" || code === 13)) {
         var next = state.currentMedia.nextEpisode;
         cancelNextCountdown();
         playMedia(next);
         return;
       }
-      if (dom.video.paused) dom.video.play().catch(function () {});
-      else dom.video.pause();
+      var v = dom.video;
+      if (v) {
+        if (v.paused) {
+          v.play().catch(function () {});
+          reportTvState("playing");
+        } else {
+          v.pause();
+          reportTvState("paused");
+        }
+        flashButton(dom.btnPlayPause);
+        updatePlayPauseIcon();
+      }
       return;
     }
 
-    // Seek Backward (Left arrow, keycode 37)
-    if (key === "ArrowLeft" || code === 37) {
+    // Seek Backward (Left arrow, Rewind, keycodes 37, 412, 10232, 227)
+    if (
+      key === "ArrowLeft" ||
+      key === "Left" ||
+      key === "MediaRewind" ||
+      key === "Rewind" ||
+      code === 37 ||
+      code === 412 ||
+      code === 10232 ||
+      code === 227
+    ) {
       e.preventDefault();
-      dom.video.currentTime = Math.max(0, dom.video.currentTime - 10);
+      e.stopPropagation();
+      seekBy(-10);
       return;
     }
 
-    // Seek Forward (Right arrow, keycode 39)
-    if (key === "ArrowRight" || code === 39) {
+    // Seek Forward (Right arrow, FastForward, keycodes 39, 417, 10233, 228)
+    if (
+      key === "ArrowRight" ||
+      key === "Right" ||
+      key === "MediaFastForward" ||
+      key === "FastForward" ||
+      code === 39 ||
+      code === 417 ||
+      code === 10233 ||
+      code === 228
+    ) {
       e.preventDefault();
-      dom.video.currentTime = Math.min(dom.video.duration || 0, dom.video.currentTime + 10);
+      e.stopPropagation();
+      seekBy(10);
       return;
     }
 
     // Fullscreen toggle ('f' or 'F')
     if (key === "f" || key === "F") {
       e.preventDefault();
+      e.stopPropagation();
       triggerTvFullscreen(false);
       return;
     }
 
-    // Back / Return (Escape, Back, Tizen 10009, WebOS 461)
-    if (key === "Escape" || key === "Back" || code === 27 || code === 10009 || code === 461) {
+    // Aspect ratio toggle ('a' or 'A')
+    if (key === "a" || key === "A") {
       e.preventDefault();
+      e.stopPropagation();
+      currentAspectIndex = (currentAspectIndex + 1) % ASPECT_MODES.length;
+      applyAspectRatio(ASPECT_MODES[currentAspectIndex].mode);
+      return;
+    }
+
+    // Back / Return (Escape, Back, Tizen 10009, WebOS 461, Android 8, Samsung 10071)
+    if (key === "Escape" || key === "Back" || code === 27 || code === 10009 || code === 461 || code === 8 || code === 10071) {
+      e.preventDefault();
+      e.stopPropagation();
       var isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
       if (isFs) {
         if (document.exitFullscreen) document.exitFullscreen().catch(function () {});
@@ -784,26 +927,35 @@
       if (dom.buffering) dom.buffering.classList.add("hidden");
       updatePlayPauseIcon();
       wakeOsd();
+      reportTvState("playing");
     });
 
     v.addEventListener("pause", function () {
       updatePlayPauseIcon();
       wakeOsd();
       stopTvStreamTracking(true);
+      reportTvState("paused");
     });
 
     v.addEventListener("play", function () {
       updatePlayPauseIcon();
       wakeOsd();
       startTvStreamTracking();
+      reportTvState("playing");
     });
 
     v.addEventListener("canplay", function () {
       if (dom.buffering) dom.buffering.classList.add("hidden");
+      if (v.paused && state.currentMedia) {
+        attemptPlayMedia();
+      }
     });
 
     v.addEventListener("loadeddata", function () {
       if (dom.buffering) dom.buffering.classList.add("hidden");
+      if (v.paused && state.currentMedia) {
+        attemptPlayMedia();
+      }
     });
 
     v.addEventListener("error", function () {
@@ -835,6 +987,12 @@
       if (dom.progressBuffered && v.buffered.length > 0 && dur > 0) {
         var end = v.buffered.end(v.buffered.length - 1);
         dom.progressBuffered.style.width = (end / dur) * 100 + "%";
+      }
+
+      var now = Date.now();
+      if (!v.paused && now - lastReportedTime >= 5000) {
+        lastReportedTime = now;
+        reportTvState("playing");
       }
 
       // Check if series next episode countdown should trigger (in last 15s)
@@ -886,11 +1044,7 @@
   if (dom.btnRw) {
     dom.btnRw.addEventListener("click", function (e) {
       e.stopPropagation();
-      var v = dom.video;
-      if (v) {
-        v.currentTime = Math.max(0, v.currentTime - 10);
-        wakeOsd();
-      }
+      seekBy(-10);
     });
   }
 
@@ -900,8 +1054,14 @@
       e.stopPropagation();
       var v = dom.video;
       if (v) {
-        if (v.paused) v.play().catch(function () {});
-        else v.pause();
+        if (v.paused) {
+          v.play().catch(function () {});
+          reportTvState("playing");
+        } else {
+          v.pause();
+          reportTvState("paused");
+        }
+        flashButton(dom.btnPlayPause);
         updatePlayPauseIcon();
         wakeOsd();
       }
@@ -912,11 +1072,7 @@
   if (dom.btnFf) {
     dom.btnFf.addEventListener("click", function (e) {
       e.stopPropagation();
-      var v = dom.video;
-      if (v) {
-        v.currentTime = Math.min(v.duration || 0, v.currentTime + 10);
-        wakeOsd();
-      }
+      seekBy(10);
     });
   }
 
@@ -926,62 +1082,6 @@
   }
   if (dom.progressRow) {
     dom.progressRow.addEventListener("click", handleProgressSeek);
-  }
-
-  // Fullscreen button
-  var btnFs = document.getElementById("tv-btn-fullscreen");
-  if (btnFs) {
-    btnFs.addEventListener("click", function (e) {
-      e.stopPropagation();
-      triggerTvFullscreen(false);
-    });
-  }
-
-  // Standby Fullscreen button
-  var btnStandbyFs = document.getElementById("tv-standby-fs-btn");
-  if (btnStandbyFs) {
-    btnStandbyFs.addEventListener("click", function (e) {
-      e.stopPropagation();
-      triggerTvFullscreen(false);
-    });
-  }
-
-  // Fullscreen hint banner
-  var fsHintBanner = document.getElementById("tv-fs-hint-banner");
-  if (fsHintBanner) {
-    fsHintBanner.addEventListener("click", function (e) {
-      e.stopPropagation();
-      triggerTvFullscreen(true);
-      fsHintBanner.classList.add("is-hidden");
-    });
-  }
-
-  // Mute / Unmute toggle button
-  var btnMute = document.getElementById("tv-btn-mute");
-  if (btnMute) {
-    btnMute.addEventListener("click", function (e) {
-      e.stopPropagation();
-      var v = dom.video;
-      if (!v) return;
-      if (v.muted) {
-        unmuteAudio();
-      } else {
-        v.muted = true;
-        btnMute.textContent = "🔇 Activer son";
-        var banner = document.getElementById("tv-unmute-banner");
-        if (banner) banner.classList.remove("hidden");
-      }
-    });
-  }
-
-  // TV Unmute Banner click
-  var unmuteBannerEl = document.getElementById("tv-unmute-banner");
-  if (unmuteBannerEl) {
-    unmuteBannerEl.addEventListener("click", function (e) {
-      e.stopPropagation();
-      unmuteAudio();
-      triggerTvFullscreen(true);
-    });
   }
 
   // Player click handling:
@@ -997,7 +1097,7 @@
         e.target.closest(".tv-center-btn") ||
         e.target.closest("#tv-progress-track") ||
         e.target.closest("#tv-progress-row") ||
-        e.target.closest(".tv-fs-btn")
+        e.target.closest(".tv-aspect-btn")
       )) {
         return;
       }
@@ -1019,21 +1119,21 @@
         clickDebounceTimer = setTimeout(function () {
           clickDebounceTimer = null;
           wakeOsd();
-          // Enter fullscreen only if not in fullscreen (will never exit fullscreen)
           triggerTvFullscreen(true);
         }, 280);
       }
     });
   }
 
-  // Dismiss hint banner when entering fullscreen
+  // Check fullscreen state and update button label
   function checkFullscreenState() {
     var isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
     if (dom.playerWrap) {
       dom.playerWrap.classList.toggle("is-fullscreen", isFs);
     }
-    if (fsHintBanner) {
-      if (isFs) fsHintBanner.classList.add("is-hidden");
+    var fsText = document.getElementById("tv-fs-text");
+    if (fsText) {
+      fsText.textContent = isFs ? "Quitter plein écran" : "Plein écran";
     }
   }
   document.addEventListener("fullscreenchange", checkFullscreenState);
@@ -1049,8 +1149,29 @@
     }
   });
 
+  // Pre-prime AudioContext on first TV interaction
+  function primeAudioContext() {
+    try {
+      var AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        var ctx = new AudioCtx();
+        if (ctx.state === "suspended") {
+          ctx.resume().catch(function () {});
+        }
+        var buf = ctx.createBuffer(1, 1, 22050);
+        var src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        src.start(0);
+      }
+    } catch (_) {}
+  }
+  ["click", "keydown", "touchstart", "pointerdown"].forEach(function (evt) {
+    window.addEventListener(evt, primeAudioContext, { once: true, capture: true });
+  });
+
   // Init listeners
-  window.addEventListener("keydown", handleRemoteKey);
+  window.addEventListener("keydown", handleRemoteKey, true);
   window.addEventListener("mousemove", wakeOsd);
   window.addEventListener("pointermove", wakeOsd);
   window.addEventListener("pagehide", function () { stopTvStreamTracking(true); });

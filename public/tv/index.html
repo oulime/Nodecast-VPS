@@ -20,7 +20,7 @@
     </div>
 
     <div class="tv-card">
-      <div class="tv-card__left">
+      <div class="tv-card__content">
         <p class="tv-card__eyebrow">DIFFUSION SUR GRAND ÉCRAN</p>
         <h1 id="tv-title" class="tv-card__title">Connectez votre Smart TV</h1>
         <p class="tv-card__instructions">
@@ -49,24 +49,10 @@
           </div>
         </div>
       </div>
-
-      <div class="tv-card__divider">
-        <span>OU</span>
-      </div>
-
-      <div class="tv-card__right">
-        <div class="tv-qr-container">
-          <div id="tv-qrcode" class="tv-qr-box"></div>
-          <p class="tv-qr-caption">Scannez avec votre appareil photo</p>
-        </div>
-      </div>
     </div>
 
     <div class="tv-footer-hints">
-      <span>💡 Choisissez un film ou une chaîne sur votre téléphone pour lancer la lecture ici.</span>
-      <button type="button" id="tv-standby-fs-btn" class="tv-fs-btn" style="margin-left:24px;font-size:18px;padding:12px 24px;">
-        ⛶ Activer le Plein Écran
-      </button>
+      <span>💡 Choisissez un film ou une série sur votre téléphone pour lancer la lecture ici.</span>
     </div>
   </div>
 
@@ -80,51 +66,40 @@
       <span class="tv-buffering__text">Chargement du flux…</span>
     </div>
 
-    <!-- TV Fullscreen Floating Reminder -->
-    <div id="tv-fs-hint-banner" class="tv-fs-hint-banner">
-      <span class="tv-fs-icon">⛶</span>
-      <span>Appuyez sur <strong>OK</strong> ou cliquez pour le <strong>Plein Écran</strong></span>
-    </div>
-
-    <!-- TV Unmute Reminder (Shown if TV browser policy muted audio) -->
-    <div id="tv-unmute-banner" class="tv-unmute-banner hidden">
-      <span class="tv-unmute-icon">🔇</span>
-      <span>Son coupé par la TV — <strong>Appuyez sur OK ou cliquez pour le son 🔊</strong></span>
-    </div>
-
     <!-- TV On-Screen Display (OSD) -->
     <div id="tv-osd" class="tv-osd">
       <div class="tv-osd__top">
-        <div class="tv-media-meta">
-          <span id="tv-live-badge" class="tv-live-badge hidden">● EN DIRECT</span>
-          <h2 id="tv-media-title" class="tv-media-title">Titre de la vidéo</h2>
-          <p id="tv-media-subtitle" class="tv-media-subtitle"></p>
-        </div>
         <div class="tv-osd__top-actions">
-          <button type="button" id="tv-btn-aspect" class="tv-fs-btn" aria-label="Format d'affichage" style="font-size:18px;padding:14px 22px;background:rgba(255,255,255,0.18);">
-            📐 Format d'origine
-          </button>
-          <button type="button" id="tv-btn-mute" class="tv-fs-btn" aria-label="Son" style="font-size:18px;padding:14px 22px;background:rgba(255,255,255,0.18);">
-            🔊 Son
-          </button>
-          <button type="button" id="tv-btn-fullscreen" class="tv-fs-btn" aria-label="Plein écran">
-            ⛶ Plein écran
+          <button type="button" id="tv-btn-aspect" class="tv-aspect-btn" aria-label="Format d'affichage" title="Format d'image (Touche A)">
+            <svg class="tv-aspect-btn__icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="5" width="18" height="14" rx="3"></rect>
+              <path d="M7 15h2M15 9h2"></path>
+            </svg>
+            <span id="tv-btn-aspect-text">Format : Original</span>
           </button>
         </div>
       </div>
 
-      <!-- Big Center Controls (-10s, Play/Pause, +10s) -->
+      <!-- Center Controls (-10s, Play/Pause, +10s) with Responsive Original Player Icons -->
       <div id="tv-center-controls" class="tv-center-controls">
-        <button type="button" id="tv-btn-rw" class="tv-center-btn" title="Reculer 10s">
-          <svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.2 3.16-1.98 5.12-1.98 3.86 0 7.07 2.76 7.79 6.41l2.42-.48C21.75 11.45 17.58 8 12.5 8z"/><text x="12" y="15" font-size="7.5" font-weight="bold" text-anchor="middle" fill="currentColor">10</text></svg>
-          <span>−10s</span>
+        <button type="button" id="tv-btn-rw" class="tv-center-btn tv-skip-btn" title="Reculer 10s" aria-label="Reculer de 10 secondes">
+          <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+            <path class="tv-skip-btn__arc" d="M10 13.5A17 17 0 1 1 7.5 30"></path>
+            <path class="tv-skip-btn__head" d="M14 5.5 4 12l10 6.5Z"></path>
+            <text x="24" y="25">10</text>
+          </svg>
         </button>
-        <button type="button" id="tv-btn-playpause" class="tv-center-btn tv-center-btn--play" title="Lecture / Pause">
-          <span id="tv-playpause-icon">❚❚</span>
+        <button type="button" id="tv-btn-playpause" class="tv-center-btn tv-center-btn--play" title="Lecture / Pause" aria-label="Lecture / Pause">
+          <span id="tv-playpause-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7.5 5.5c0-.9 1-1.5 1.8-1l9.2 5.8c.8.5.8 1.5 0 2l-9.2 5.8c-.8.5-1.8 0-1.8-1V5.5z"/></svg>
+          </span>
         </button>
-        <button type="button" id="tv-btn-ff" class="tv-center-btn" title="Avancer 10s">
-          <svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor"><path d="M11.5 8c2.65 0 5.05.99 6.9 2.6L22 7v9h-9l3.62-3.62c-1.39-1.2-3.16-1.98-5.12-1.98-3.86 0-7.07 2.76-7.79 6.41l-2.42-.48C2.25 11.45 6.42 8 11.5 8z"/><text x="12" y="15" font-size="7.5" font-weight="bold" text-anchor="middle" fill="currentColor">10</text></svg>
-          <span>+10s</span>
+        <button type="button" id="tv-btn-ff" class="tv-center-btn tv-skip-btn" title="Avancer 10s" aria-label="Avancer de 10 secondes">
+          <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+            <path class="tv-skip-btn__arc" d="M38 13.5A17 17 0 1 0 40.5 30"></path>
+            <path class="tv-skip-btn__head" d="M34 5.5 44 12l-10 6.5Z"></path>
+            <text x="24" y="25">10</text>
+          </svg>
         </button>
       </div>
 

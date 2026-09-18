@@ -12,6 +12,7 @@
         "test:search": "node scripts/test-search.js",
         "test:matches": "node scripts/test-matches.js",
         "test:ios-fullscreen": "node scripts/test-ios-native-fullscreen.js",
+        "test:tv-cast": "node scripts/test-tv-cast-simulation.js",
         "clean:transcode-cache": "node scripts/clean-transcode-cache.js"
     },
     "dependencies": {

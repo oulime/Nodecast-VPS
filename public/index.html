@@ -1991,22 +1991,34 @@
       text-align: center
     }
 
+    .vel-profile-modal-top {
+      display: flex;
+      align-items: stretch;
+      gap: 10px;
+      margin-bottom: 22px;
+      width: 100%;
+    }
+
     .vel-profile-account__close {
-      position: absolute;
-      top: 14px;
-      right: 14px;
+      position: static;
+      flex-shrink: 0;
       display: grid;
       place-items: center;
-      width: 38px;
-      height: 38px;
+      width: 44px;
       padding: 0;
-      border: 1px solid rgba(255, 255, 255, .12);
-      border-radius: 12px;
-      background: rgba(255, 255, 255, .06);
-      color: #fff;
-      font-size: 24px;
-      line-height: 1;
-      cursor: pointer
+      border: 1px solid rgba(255, 255, 255, .1);
+      border-radius: 13px;
+      background: rgba(255, 255, 255, .05);
+      color: rgba(255, 255, 255, .6);
+      cursor: pointer;
+      transition: all .2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .vel-profile-account__close:hover {
+      background: rgba(239, 68, 68, .18);
+      border-color: rgba(239, 68, 68, .35);
+      color: #fca5a5;
+      transform: scale(1.04);
     }
 
     .vel-profile-account__avatar {
@@ -2163,6 +2175,296 @@
 
     .vel-profile-account__status.is-error {
       color: #fca5a5
+    }
+
+    /* Modal Top Tabs */
+    .vel-profile-tabs {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      background: rgba(255, 255, 255, .04);
+      border: 1px solid rgba(255, 255, 255, .09);
+      border-radius: 13px;
+      padding: 3px;
+      gap: 3px;
+      margin: 0;
+    }
+
+    .vel-profile-tab {
+      flex: 1;
+      min-width: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 9px 8px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: rgba(255, 255, 255, .55);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: .15px;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all .2s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+    }
+
+    .vel-profile-tab span {
+      white-space: nowrap;
+    }
+
+    .vel-profile-tab svg {
+      flex-shrink: 0;
+      opacity: .75;
+      transition: opacity .2s ease;
+    }
+
+    .vel-profile-tab:hover {
+      color: rgba(255, 255, 255, .9);
+      background: rgba(255, 255, 255, .04);
+    }
+
+    .vel-profile-tab:hover svg {
+      opacity: 1;
+    }
+
+    .vel-profile-tab.is-active {
+      background: linear-gradient(135deg, #7c3aed, #6366f1);
+      border-color: rgba(255, 255, 255, .15);
+      color: #fff;
+      font-weight: 700;
+      box-shadow: 0 4px 14px rgba(124, 58, 237, .42);
+    }
+
+    .vel-profile-tab.is-active svg {
+      opacity: 1;
+    }
+
+    .vel-profile-tab-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #4ade80;
+      box-shadow: 0 0 8px #4ade80;
+      display: inline-block;
+      margin-left: 2px;
+    }
+    .vel-profile-tab-dot.hidden {
+      display: none !important;
+    }
+
+    .vel-profile-panel {
+      display: block;
+      width: 100%;
+      animation: velTabFadeIn .2s ease;
+    }
+    .vel-profile-panel[hidden] {
+      display: none !important;
+    }
+    @keyframes velTabFadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Smart TV Tab Content */
+    .vel-tv-tab-box {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      text-align: center;
+      padding: 4px 0 2px;
+    }
+
+    .vel-tv-tab-hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .vel-tv-tab-icon-wrap {
+      width: 58px;
+      height: 58px;
+      border-radius: 19px;
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(99, 102, 241, 0.25));
+      border: 1px solid rgba(167, 139, 250, 0.35);
+      display: grid;
+      place-items: center;
+      color: #c4b5fd;
+      box-shadow: 0 10px 25px rgba(124, 58, 237, 0.2);
+    }
+
+    .vel-tv-tab-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: #ffffff;
+      margin: 0;
+    }
+
+    .vel-tv-instructions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 16px;
+      text-align: left;
+    }
+
+    .vel-tv-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .vel-tv-step-num {
+      width: 24px;
+      height: 24px;
+      flex-shrink: 0;
+      border-radius: 50%;
+      background: #8b5cf6;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      display: grid;
+      place-items: center;
+      margin-top: 1px;
+    }
+
+    .vel-tv-step-text {
+      font-size: 13.5px;
+      color: #cbd5e1;
+      line-height: 1.45;
+    }
+
+    .vel-tv-url-pill {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(99, 102, 241, 0.15));
+      border: 1px solid rgba(167, 139, 250, 0.4);
+      color: #a78bfa;
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+    }
+
+    .vel-tv-pin-entry {
+      display: flex;
+      justify-content: center;
+      margin-top: 4px;
+    }
+
+    .vel-tv-pin-input {
+      width: 190px;
+      letter-spacing: 12px;
+      font-size: 32px;
+      font-weight: 800;
+      text-align: center;
+      padding: 10px 14px;
+      border-radius: 14px;
+      background: rgba(0, 0, 0, 0.45);
+      border: 2px solid rgba(167, 139, 250, 0.4);
+      color: #fff;
+      outline: none;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .vel-tv-pin-input:focus {
+      border-color: #a855f7;
+      box-shadow: 0 0 16px rgba(168, 85, 247, 0.45);
+      background: rgba(0, 0, 0, 0.6);
+    }
+
+    /* Connected Card */
+    .vel-tv-connected-card {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(167, 139, 250, 0.25);
+      border-radius: 18px;
+      padding: 20px;
+      text-align: left;
+    }
+
+    .vel-tv-connected-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .vel-tv-connected-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      color: #4ade80;
+    }
+
+    .vel-tv-connected-meta {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .vel-tv-connected-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 3px;
+    }
+
+    .vel-tv-connected-title {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .vel-tv-connected-device {
+      margin: 0;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    .vel-tv-connected-status-desc {
+      font-size: 13px;
+      color: #cbd5e1;
+      line-height: 1.45;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 10px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .vel-tv-connected-actions {
+      display: flex;
+      justify-content: stretch;
+      margin-top: 4px;
+    }
+
+    .vel-tv-connected-actions .vel-profile-tv-btn--danger {
+      width: 100%;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      border-radius: 12px;
     }
 
     @media(max-width:520px) {
@@ -9362,7 +9664,6 @@
             }
           }
         }, true);
-      }
 
       var headerContextTitle = document.getElementById("vel-header-context-title");
       var headerContextTitleText = document.getElementById("vel-header-context-title-text");

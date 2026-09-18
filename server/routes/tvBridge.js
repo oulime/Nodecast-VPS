@@ -315,7 +315,7 @@ router.get('/events', (req, res) => {
  * TV updates its current playback state (e.g. playing, paused, position).
  */
 router.post('/state', express.json(), (req, res) => {
-    const { deviceId, state, position, duration, error } = req.body || {};
+    const { deviceId, state, position, duration, error, mediaId, mediaTitle, mediaType } = req.body || {};
     if (!deviceId) return res.status(400).json({ error: 'deviceId requis' });
 
     if (state === 'stopped' || state === 'idle' || state === 'ended') {
@@ -325,8 +325,11 @@ router.post('/state', express.json(), (req, res) => {
         activePlayback.set(deviceId, {
             ...current,
             state: state || current.state || 'playing',
-            position: position ?? current.position,
-            duration: duration ?? current.duration,
+            position: position !== undefined ? Number(position) : current.position,
+            duration: duration !== undefined ? Number(duration) : current.duration,
+            id: mediaId || current.id || current.streamId || null,
+            title: mediaTitle || current.title || 'Vidéo',
+            type: mediaType || current.type || 'vod',
             error: error || null,
             updatedAt: Date.now()
         });
@@ -548,12 +551,16 @@ router.post('/play', tvRequireAuth, express.json(), async (req, res) => {
 
         console.log(`[TV Bridge] Dispatched PLAY for "${media.title || 'media'}" to device ${deviceId}:`, playUrl);
 
+        const startPos = Number(media.position ?? media.currentTime) || 0;
+
         // Store active playback
         activePlayback.set(deviceId, {
             ...media,
             url: playUrl,
             state: 'playing',
-            startedAt: Date.now()
+            position: startPos,
+            startedAt: Date.now(),
+            updatedAt: Date.now()
         });
 
         // Push PLAY command to TV along with user token so proxy segments authenticate
@@ -561,12 +568,13 @@ router.post('/play', tvRequireAuth, express.json(), async (req, res) => {
             type: 'PLAY',
             token: userToken,
             media: {
+                id: media.id || media.streamId || media.stream_id || null,
                 url: playUrl,
                 title: media.title || 'Vidéo',
                 poster: media.poster || '',
                 isLive: Boolean(media.isLive),
                 type: media.type || 'vod',
-                position: Number(media.position) || 0,
+                position: startPos,
                 episodeTitle: media.episodeTitle || null,
                 seasonNumber: media.seasonNumber || null,
                 episodeNumber: media.episodeNumber || null,

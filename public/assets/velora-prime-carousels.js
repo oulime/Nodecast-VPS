@@ -9,7 +9,15 @@
   let isRendering = false;
   let lastFeedKey = "";
   const feedCache = new Map(); // key: `${countryId}:${tab}` -> feedData
-  const packageFullItemsCache = new Map(); // key: `${tab}:${pkgId}` -> items array
+  function shuffleArray(arr) {
+    if (!Array.isArray(arr) || arr.length <= 1) return Array.isArray(arr) ? arr.slice() : [];
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
 
   function activeTab() {
     if (document.body.classList.contains("vel-home-empty-active")) return "home";
@@ -986,7 +994,7 @@
   // Build and populate an active row
   function buildRow(tab, pkg) {
     const pkgTitle = formatPackageTitle(pkg.name);
-    const items = Array.isArray(pkg.items) ? pkg.items : [];
+    const items = shuffleArray(Array.isArray(pkg.items) ? pkg.items : []);
     const isHome = activeTab() === "home";
 
     const wrapper = document.createElement("div");
@@ -1079,15 +1087,6 @@
   let lastHomeCountry = null;
   let homeFeedInitialized = false;
 
-  function shuffleArray(arr) {
-    const a = arr.slice();
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-  }
-
   function getHomeFeedContainer() {
     let container = document.getElementById("vel-home-prime-feed");
     if (!container) {
@@ -1144,9 +1143,9 @@
             const rawList = streamMap.get(pkg.id) || streamMap.get(String(pkg.id)) || (pkg.category_id ? streamMap.get(String(pkg.category_id)) : null);
             if (Array.isArray(rawList) && rawList.length > 0) {
               cloned.totalCount = Math.max(cloned.totalCount || 0, rawList.length);
-              const sortedRawList = rawList.slice().sort((a, b) => getItemRecencyScore(b) - getItemRecencyScore(a));
+              const shuffledRawList = shuffleArray(rawList);
 
-              cloned.items = sortedRawList.slice(0, 20).map((it, idx) => {
+              cloned.items = shuffledRawList.slice(0, 20).map((it, idx) => {
                 const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? idx;
                 const { poster, backdrop } = extractMediaImages(it);
                 return {
@@ -1167,7 +1166,11 @@
                   packageId: cloned.id
                 };
               });
+            } else if (Array.isArray(cloned.items) && cloned.items.length > 0) {
+              cloned.items = shuffleArray(cloned.items);
             }
+          } else if (Array.isArray(cloned.items) && cloned.items.length > 0) {
+            cloned.items = shuffleArray(cloned.items);
           }
           return cloned;
         }).filter(p => !adultPackageIds.has(String(p.id)) && Array.isArray(p.items) && p.items.length >= 3);
@@ -1283,49 +1286,45 @@
             const rawList = streamMap.get(pkg.id) || streamMap.get(String(pkg.id)) || (pkg.category_id ? streamMap.get(String(pkg.category_id)) : null);
             if (Array.isArray(rawList) && rawList.length > 0) {
               pkg.totalCount = Math.max(pkg.totalCount || 0, rawList.length);
-
-              if (Array.isArray(pkg.items) && pkg.items.length > 0) {
-                // Server feed already gave us the items in provider order. Just enrich artwork if missing
-                const streamById = new Map();
-                rawList.forEach(it => {
-                  const rawId = String(it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? '');
-                  if (rawId) streamById.set(rawId, it);
-                });
-                pkg.items.forEach(it => {
-                  const raw = streamById.get(String(it.streamId || ''));
-                  if (raw) {
-                    const { poster, backdrop } = extractMediaImages(raw);
-                    if (poster && !it.posterUrl) { it.posterUrl = poster; it.thumbUrl = poster; }
-                    if (backdrop && !it.backdropUrl) it.backdropUrl = backdrop;
-                  }
-                });
-              } else {
-                // Fallback: populate from rawList preserving provider_order
-                pkg.items = rawList.slice(0, 20).map((it, idx) => {
-                  const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? idx;
-                  const { poster, backdrop } = extractMediaImages(it);
-                  return {
-                    id: `feed:${pkg.id}:${rawId}`,
-                    name: stripTitle(it.name || it.title || it.series_name || ""),
-                    rawName: it.name || it.title || it.series_name || "",
-                    thumbUrl: poster,
-                    posterUrl: poster,
-                    backdropUrl: backdrop,
-                    rating: it.rating || it.rating_5based || it.score || "",
-                    year: it.year || it.releaseDate || "",
-                    plot: it.plot || it.description || it.overview || "",
-                    streamId: rawId,
-                    sourceId: it.nodecast_source_id ?? it.source_id ?? pkg.source_id,
-                    globalStreamId: it.nodecast_global_stream_id ?? it.global_stream_id ?? rawId,
-                    containerExtension: it.container_extension || "",
-                    contentType: tab,
-                    packageId: pkg.id
-                  };
-                });
-              }
+              const shuffledRawList = shuffleArray(rawList);
+              pkg.items = shuffledRawList.slice(0, 20).map((it, idx) => {
+                const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? idx;
+                const { poster, backdrop } = extractMediaImages(it);
+                return {
+                  id: `feed:${pkg.id}:${rawId}`,
+                  name: stripTitle(it.name || it.title || it.series_name || ""),
+                  rawName: it.name || it.title || it.series_name || "",
+                  thumbUrl: poster,
+                  posterUrl: poster,
+                  backdropUrl: backdrop,
+                  rating: it.rating || it.rating_5based || it.score || "",
+                  year: it.year || it.releaseDate || "",
+                  plot: it.plot || it.description || it.overview || "",
+                  streamId: rawId,
+                  sourceId: it.nodecast_source_id ?? it.source_id ?? pkg.source_id,
+                  globalStreamId: it.nodecast_global_stream_id ?? it.global_stream_id ?? rawId,
+                  containerExtension: it.container_extension || "",
+                  contentType: tab,
+                  packageId: pkg.id
+                };
+              });
+            } else if (Array.isArray(pkg.items) && pkg.items.length > 0) {
+              pkg.items = shuffleArray(pkg.items);
+            }
+          });
+        } else {
+          packages.forEach(pkg => {
+            if (Array.isArray(pkg.items) && pkg.items.length > 0) {
+              pkg.items = shuffleArray(pkg.items);
             }
           });
         }
+      } else {
+        packages.forEach(pkg => {
+          if (Array.isArray(pkg.items) && pkg.items.length > 0) {
+            pkg.items = shuffleArray(pkg.items);
+          }
+        });
       }
 
       // Filter packages that have preview items and are not assigned to adult (at least 3 items)

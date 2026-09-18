@@ -850,6 +850,16 @@ function cleanTeamName(raw) {
         .trim();
 
     const replacements = [
+        { regex: /^Union B\.?$/i, replace: 'Union Berlin' },
+        { regex: /^1\.?\s*FC Union Berlin$/i, replace: 'Union Berlin' },
+        { regex: /^1\.?\s*FC Heidenheim$/i, replace: 'Heidenheim' },
+        { regex: /^1\.?\s*FC Köln$/i, replace: 'FC Cologne' },
+        { regex: /^1\.?\s*FC Koln$/i, replace: 'FC Cologne' },
+        { regex: /^1\.?\s*FSV Mainz\s*05$/i, replace: 'Mainz 05' },
+        { regex: /^TSG\s*1899\s*Hoffenheim$/i, replace: 'Hoffenheim' },
+        { regex: /^Bayer\s*04\s*Leverkusen$/i, replace: 'Bayer Leverkusen' },
+        { regex: /^Borussia\s*M['']gladbach$/i, replace: 'Mönchengladbach' },
+        { regex: /^Borussia\s*Dortmund$/i, replace: 'Borussia Dortmund' },
         { regex: /^Manchester U\.?$/i, replace: 'Manchester United' },
         { regex: /^Manchester C\.?$/i, replace: 'Manchester City' },
         { regex: /^Man United$/i, replace: 'Manchester United' },

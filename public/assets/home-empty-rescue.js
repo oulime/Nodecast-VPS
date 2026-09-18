@@ -5,6 +5,18 @@
   var timer = null;
   var renderedCountry = null;
 
+  function shuffleHomeCards(array) {
+    if (!Array.isArray(array) || array.length <= 1) return Array.isArray(array) ? array.slice() : [];
+    var copy = array.slice();
+    for (var i = copy.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var temp = copy[i];
+      copy[i] = copy[j];
+      copy[j] = temp;
+    }
+    return copy;
+  }
+
   function sectionsForCountry(data) {
     var countrySelect = document.getElementById("country-select") || document.getElementById("home-country-select");
     var country = String(countrySelect?.value || "").toLowerCase().trim();
@@ -184,10 +196,11 @@
       rail.dataset.testid = "card-container-list";
       railWrap.appendChild(rail);
 
-      var entries = Array.isArray(section.entries) ? section.entries : [];
+      var entries = Array.isArray(section.entries) && section.entries.length ? section.entries : (Array.isArray(section.custom_entries) ? section.custom_entries : []);
       if (typeof window.veloraApplyHomeChannelRules === "function") entries = window.veloraApplyHomeChannelRules(section, entries);
+      entries = shuffleHomeCards(entries);
       if (entries.length < 3) return;
-      entries.forEach(function (entry) {
+      entries.slice(0, 20).forEach(function (entry) {
         rail.appendChild(card(section, entry));
       });
       block.append(headerSec, railWrap);

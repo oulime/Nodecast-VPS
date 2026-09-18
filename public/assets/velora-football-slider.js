@@ -1464,6 +1464,22 @@
     }
   }
 
+  function formatTeamDisplayName(name) {
+    if (!name) return '';
+    var str = String(name).trim();
+    if (/^Union B\.?$/i.test(str)) return 'Union Berlin';
+    if (/^1\.?\s*FC Union Berlin$/i.test(str)) return 'Union Berlin';
+    if (/^1\.?\s*FC Heidenheim$/i.test(str)) return 'Heidenheim';
+    if (/^1\.?\s*FC K[oö]ln$/i.test(str)) return 'FC Cologne';
+    if (/^1\.?\s*FSV Mainz\s*05$/i.test(str)) return 'Mainz 05';
+    if (/^Bayer\s*04\s*Leverkusen$/i.test(str)) return 'Bayer Leverkusen';
+    if (/^Borussia\s*Dortmund$/i.test(str)) return 'Borussia Dortmund';
+    if (/^Borussia\s*M['']gladbach$/i.test(str)) return 'Mönchengladbach';
+    if (/^Man United$/i.test(str)) return 'Manchester United';
+    if (/^Man City$/i.test(str)) return 'Manchester City';
+    return str;
+  }
+
   var COMPETITION_LOGOS = {
     'champions league': 'https://media.api-sports.io/football/leagues/2.png',
     'europa league': 'https://media.api-sports.io/football/leagues/3.png',
@@ -1475,17 +1491,20 @@
     'efl': 'https://media.api-sports.io/football/leagues/48.png',
     'fa cup': 'https://media.api-sports.io/football/leagues/45.png',
     'championship': 'https://media.api-sports.io/football/leagues/40.png',
+    'bundesliga': 'https://media.api-sports.io/football/leagues/78.png',
+    '2. bundesliga': 'https://media.api-sports.io/football/leagues/79.png',
+    'dfb-pokal': 'https://media.api-sports.io/football/leagues/81.png',
     'la liga': 'https://media.api-sports.io/football/leagues/140.png',
     'laliga': 'https://media.api-sports.io/football/leagues/140.png',
-    'liga': 'https://media.api-sports.io/football/leagues/140.png',
+    'liga ea sports': 'https://media.api-sports.io/football/leagues/140.png',
+    'primera division': 'https://media.api-sports.io/football/leagues/140.png',
     'copa del rey': 'https://media.api-sports.io/football/leagues/143.png',
     'ligue 1': 'https://media.api-sports.io/football/leagues/61.png',
     'coupe de france': 'https://media.api-sports.io/football/leagues/66.png',
     'ligue 2': 'https://media.api-sports.io/football/leagues/62.png',
     'serie a': 'https://media.api-sports.io/football/leagues/135.png',
+    'serie b': 'https://media.api-sports.io/football/leagues/136.png',
     'coppa italia': 'https://media.api-sports.io/football/leagues/137.png',
-    'bundesliga': 'https://media.api-sports.io/football/leagues/78.png',
-    'dfb-pokal': 'https://media.api-sports.io/football/leagues/81.png',
     'portugal': 'https://media.api-sports.io/football/leagues/94.png',
     'eredivisie': 'https://media.api-sports.io/football/leagues/88.png',
     'pays-bas': 'https://media.api-sports.io/football/leagues/88.png',
@@ -1540,7 +1559,7 @@
     },
     'premier league': {
       color: '#f472b6',
-      glow: 'rgba(236, 72, 153, 0.32)',
+      glow: 'rgba(236, 72, 153, 0.38)',
       bg: 'linear-gradient(135deg, rgba(44, 12, 48, 0.95) 0%, rgba(18, 6, 22, 0.98) 100%)',
       border: 'rgba(236, 72, 153, 0.28)',
       pillBg: 'rgba(236, 72, 153, 0.14)',
@@ -1580,7 +1599,7 @@
     },
     'ligue 1': {
       color: '#38bdf8',
-      glow: 'rgba(56, 189, 248, 0.32)',
+      glow: 'rgba(56, 189, 248, 0.38)',
       bg: 'linear-gradient(135deg, rgba(14, 30, 58, 0.95) 0%, rgba(8, 14, 28, 0.98) 100%)',
       border: 'rgba(56, 189, 248, 0.28)',
       pillBg: 'rgba(56, 189, 248, 0.12)',
@@ -1670,8 +1689,23 @@
 
   function getCompetitionLogo(compName) {
     if (!compName) return '';
-    var lower = String(compName).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    for (var key in COMPETITION_LOGOS) {
+    var lower = String(compName).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    if (lower.includes('2. bundesliga') || lower.includes('d2 allemagne')) return COMPETITION_LOGOS['2. bundesliga'] || COMPETITION_LOGOS['bundesliga'];
+    if (lower.includes('bundesliga')) return COMPETITION_LOGOS['bundesliga'];
+    if (lower.includes('premier league') || lower.includes('epl')) return COMPETITION_LOGOS['premier league'];
+    if (lower.includes('ligue 1')) return COMPETITION_LOGOS['ligue 1'];
+    if (lower.includes('ligue 2')) return COMPETITION_LOGOS['ligue 2'];
+    if (lower.includes('serie a')) return COMPETITION_LOGOS['serie a'];
+    if (lower.includes('serie b')) return COMPETITION_LOGOS['serie b'] || COMPETITION_LOGOS['serie a'];
+    if (lower.includes('champions league') || lower.includes('ucl')) return COMPETITION_LOGOS['champions league'];
+    if (lower.includes('europa league') || lower.includes('uel')) return COMPETITION_LOGOS['europa league'];
+    if (lower.includes('conference')) return COMPETITION_LOGOS['conference'];
+    if (lower.includes('copa del rey')) return COMPETITION_LOGOS['copa del rey'];
+    if (lower.includes('la liga') || lower.includes('laliga') || lower.includes('primera division')) return COMPETITION_LOGOS['la liga'];
+
+    var sortedKeys = Object.keys(COMPETITION_LOGOS).sort(function (a, b) { return b.length - a.length; });
+    for (var i = 0; i < sortedKeys.length; i++) {
+      var key = sortedKeys[i];
       if (lower.includes(key)) {
         return COMPETITION_LOGOS[key];
       }
@@ -1689,8 +1723,18 @@
       pillBorder: 'rgba(255, 255, 255, 0.14)'
     };
     if (!compName) return defaultTheme;
-    var lower = String(compName).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    for (var key in COMPETITION_THEMES) {
+    var lower = String(compName).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    if (lower.includes('bundesliga')) return COMPETITION_THEMES['bundesliga'];
+    if (lower.includes('premier league')) return COMPETITION_THEMES['premier league'];
+    if (lower.includes('ligue 1')) return COMPETITION_THEMES['ligue 1'];
+    if (lower.includes('serie a')) return COMPETITION_THEMES['serie a'];
+    if (lower.includes('champions league')) return COMPETITION_THEMES['champions league'];
+    if (lower.includes('europa league')) return COMPETITION_THEMES['europa league'];
+    if (lower.includes('la liga') || lower.includes('laliga')) return COMPETITION_THEMES['la liga'];
+
+    var sortedKeys = Object.keys(COMPETITION_THEMES).sort(function (a, b) { return b.length - a.length; });
+    for (var i = 0; i < sortedKeys.length; i++) {
+      var key = sortedKeys[i];
       if (lower.includes(key)) {
         return COMPETITION_THEMES[key];
       }
@@ -1737,8 +1781,12 @@
 
     var timeBadgeHtml = buildTimeBadgeHtml(timeInfo.status, displayTime, match.minute);
     var middleHtml = buildScoreOrVsHtml(match, timeInfo);
-    var homeInitial = (match.homeTeam?.name || 'H').charAt(0).toUpperCase();
-    var awayInitial = (match.awayTeam?.name || 'A').charAt(0).toUpperCase();
+    var rawHomeName = match.homeTeam?.name || '';
+    var rawAwayName = match.awayTeam?.name || '';
+    var homeDisplayName = formatTeamDisplayName(rawHomeName);
+    var awayDisplayName = formatTeamDisplayName(rawAwayName);
+    var homeInitial = (homeDisplayName || rawHomeName || 'H').charAt(0).toUpperCase();
+    var awayInitial = (awayDisplayName || rawAwayName || 'A').charAt(0).toUpperCase();
 
     var compLogo = getCompetitionLogo(match.competition);
     var compLogoHtml = compLogo
@@ -1764,16 +1812,16 @@
       '<div class="vel-football-card__match">' +
         '<div class="vel-football-card__team vel-football-card__team--home">' +
           '<div class="vel-football-card__logo-wrap">' +
-            '<img class="vel-football-card__logo" src="' + escapeHtml(match.homeTeam?.logoUrl || '') + '" alt="' + escapeHtml(match.homeTeam?.name || '') + '" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML=\'<span class=\\\'vel-football-card__fallback-logo\\\'>' + homeInitial + '</span>\'">' +
+            '<img class="vel-football-card__logo" src="' + escapeHtml(match.homeTeam?.logoUrl || '') + '" alt="' + escapeHtml(homeDisplayName) + '" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML=\'<span class=\\\'vel-football-card__fallback-logo\\\'>' + homeInitial + '</span>\'">' +
           '</div>' +
-          '<span class="vel-football-card__team-name">' + escapeHtml(match.homeTeam?.name || '') + '</span>' +
+          '<span class="vel-football-card__team-name">' + escapeHtml(homeDisplayName) + '</span>' +
         '</div>' +
         middleHtml +
         '<div class="vel-football-card__team vel-football-card__team--away">' +
           '<div class="vel-football-card__logo-wrap">' +
-            '<img class="vel-football-card__logo" src="' + escapeHtml(match.awayTeam?.logoUrl || '') + '" alt="' + escapeHtml(match.awayTeam?.name || '') + '" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML=\'<span class=\\\'vel-football-card__fallback-logo\\\'>' + awayInitial + '</span>\'">' +
+            '<img class="vel-football-card__logo" src="' + escapeHtml(match.awayTeam?.logoUrl || '') + '" alt="' + escapeHtml(awayDisplayName) + '" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML=\'<span class=\\\'vel-football-card__fallback-logo\\\'>' + awayInitial + '</span>\'">' +
           '</div>' +
-          '<span class="vel-football-card__team-name">' + escapeHtml(match.awayTeam?.name || '') + '</span>' +
+          '<span class="vel-football-card__team-name">' + escapeHtml(awayDisplayName) + '</span>' +
         '</div>' +
       '</div>';
 
@@ -1784,8 +1832,8 @@
       if (!matchObj) return;
       timeStatusInfo = timeStatusInfo || getMatchTimeDetails(matchObj.time, matchObj);
 
-      var homeName = matchObj.homeTeam?.name || 'Équipe 1';
-      var awayName = matchObj.awayTeam?.name || 'Équipe 2';
+      var homeName = formatTeamDisplayName(matchObj.homeTeam?.name) || matchObj.homeTeam?.name || 'Équipe 1';
+      var awayName = formatTeamDisplayName(matchObj.awayTeam?.name) || matchObj.awayTeam?.name || 'Équipe 2';
       var homeInitial = homeName.charAt(0).toUpperCase();
       var awayInitial = awayName.charAt(0).toUpperCase();
 
@@ -2619,7 +2667,7 @@
       '  bottom: -25px;',
       '  width: 220px;',
       '  height: 220px;',
-      '  opacity: 0.12;',
+      '  opacity: 0.25;',
       '  pointer-events: none;',
       '  z-index: 0;',
       '  display: flex;',
@@ -2630,7 +2678,7 @@
       '  width: 100%;',
       '  height: 100%;',
       '  object-fit: contain;',
-      '  filter: grayscale(20%) brightness(1.2);',
+      '  filter: brightness(1.65) contrast(1.15) drop-shadow(0 0 16px var(--comp-theme-glow, rgba(255, 255, 255, 0.35)));',
       '}',
       '.vel-football-modal__glow {',
       '  position: absolute;',

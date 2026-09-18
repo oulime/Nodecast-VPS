@@ -2317,7 +2317,7 @@
   transform: translate(-50%, -50%) rotate(-8deg) !important;
   width: 140px !important;
   height: 140px !important;
-  opacity: 0.16 !important;
+  opacity: 0.32 !important;
   pointer-events: none !important;
   z-index: 0 !important;
   transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
@@ -2331,11 +2331,11 @@
   width: 100% !important;
   height: 100% !important;
   object-fit: contain !important;
-  filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.25)) !important;
+  filter: brightness(1.75) contrast(1.15) drop-shadow(0 0 14px var(--comp-theme-glow, rgba(255, 255, 255, 0.4))) !important;
 }
 
 .vel-football-card:hover .vel-football-card__watermark {
-  opacity: 0.28 !important;
+  opacity: 0.5 !important;
   transform: translate(-50%, -50%) rotate(-3deg) scale(1.08) !important;
 }
 

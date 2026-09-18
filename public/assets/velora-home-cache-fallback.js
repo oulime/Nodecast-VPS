@@ -16,6 +16,18 @@
   var renderVersion = 0;
   var railPageSize = 20;
 
+  function shuffleHomeCards(array) {
+    if (!Array.isArray(array) || array.length <= 1) return Array.isArray(array) ? array.slice() : [];
+    var copy = array.slice();
+    for (var i = copy.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var temp = copy[i];
+      copy[i] = copy[j];
+      copy[j] = temp;
+    }
+    return copy;
+  }
+
   function activateDirectTouch(card, payload) {
     var now = Date.now();
     if (card === lastDirectTouchCard && now - lastDirectTouchAt < 650) return;
@@ -622,6 +634,7 @@
       var filteredEntries = entries.filter(function (entry) {
         return !dominantSource || String(entry.sourceId || "") === dominantSource;
       });
+      filteredEntries = shuffleHomeCards(filteredEntries);
       if (filteredEntries.length < 3) return;
       appendRailPage(rail, section, filteredEntries, 0);
       block.append(headerSec, railWrap);

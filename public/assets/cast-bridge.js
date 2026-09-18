@@ -398,6 +398,75 @@
     };
   }
 
+  function syncFromRemoteSession(castSession) {
+    if (!castSession) return;
+    try {
+      var remoteMedia = castSession.getMediaSession();
+      if (remoteMedia && remoteMedia.media) {
+        var rm = remoteMedia.media;
+        var meta = rm.metadata || {};
+        var title = meta.title || (meta.getString && meta.getString(window.chrome.cast.media.MetadataKey.TITLE)) || "";
+        var img = (meta.images && meta.images[0] && meta.images[0].url) || "";
+        var isLive = rm.streamType === (window.chrome && window.chrome.cast && window.chrome.cast.media ? window.chrome.cast.media.StreamType.LIVE : "LIVE");
+
+        if (title || rm.contentId) {
+          state.currentMedia = {
+            title: title || "Vidéo TV",
+            name: title || "Vidéo TV",
+            url: rm.contentId || "",
+            castUrl: rm.contentId || "",
+            poster: img,
+            isLive: isLive,
+            contentType: rm.contentType || contentTypeFor(rm.contentId),
+            castContentType: rm.contentType || contentTypeFor(rm.contentId),
+            position: remoteMedia.currentTime || 0,
+            duration: rm.duration || 0,
+            explicit: true
+          };
+
+          var wrap = document.getElementById("vel-cast-active-bar-wrap");
+          if (wrap) {
+            var titleSpan = wrap.querySelector(".vel-cast-capsule-title");
+            if (titleSpan && title) titleSpan.textContent = title;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[VeloraCast] syncFromRemoteSession error", err);
+    }
+  }
+
+  function attachRemoteMediaListeners(castSession) {
+    if (!castSession || castSession.__veloraMediaAttached) return;
+    castSession.__veloraMediaAttached = true;
+    try {
+      castSession.addMediaListener(function (mediaSession) {
+        if (mediaSession) {
+          syncFromRemoteSession(castSession);
+          mediaSession.addUpdateListener(function () {
+            syncFromRemoteSession(castSession);
+          });
+        }
+      });
+      var currentMedia = castSession.getMediaSession();
+      if (currentMedia) {
+        currentMedia.addUpdateListener(function () {
+          syncFromRemoteSession(castSession);
+        });
+      }
+    } catch (_) {}
+  }
+
+  function scheduleRemoteSync(castSession) {
+    if (!castSession) return;
+    [100, 350, 800, 1800].forEach(function (delay) {
+      setTimeout(function () {
+        syncFromRemoteSession(castSession);
+        showCastActiveBar();
+      }, delay);
+    });
+  }
+
   // Dedicated Cast luxury top floating capsule bar
   function showCastActiveBar() {
     var isConnected = (typeof session === "function" && !!session()) || state.airPlayConnected;
@@ -406,13 +475,18 @@
       return;
     }
 
+    var castSess = session();
+    if (castSess && (!state.currentMedia || !state.currentMedia.title)) {
+      syncFromRemoteSession(castSess);
+    }
+
     // Stop paired TV association diffusion so both cannot run at the same time
     if (typeof window.veloraStopTvAssociationDiffusion === "function") {
       try { window.veloraStopTvAssociationDiffusion(); } catch (_) {}
     }
 
     var media = state.currentMedia || normalizeMedia({});
-    var activeTitle = media ? (media.title || media.name || "Vidéo") : "Diffusion TV";
+    var activeTitle = media ? (media.title || media.name || "Diffusion TV") : "Diffusion TV";
     var deviceName = getCastDeviceName();
     var isTvMode = isCastAutoDiffuseOn();
 
@@ -430,7 +504,7 @@
       }
 
       var titleSpan = existingWrap.querySelector(".vel-cast-capsule-title");
-      if (titleSpan) titleSpan.textContent = activeTitle;
+      if (titleSpan && activeTitle) titleSpan.textContent = activeTitle;
 
       var subSpan = existingWrap.querySelector(".vel-cast-capsule-sub");
       if (subSpan) {
@@ -576,6 +650,7 @@
     if (!canUseGoogleCast()) return false;
     var castSession = session();
     if (!castSession) return false;
+    if (!media) return false;
     
     var castUrl = resolveFullPublicUrl(media.castUrl || media.url);
     if (!castUrl) {
@@ -674,14 +749,7 @@
     var video = activeVideo();
     var media = state.currentMedia || normalizeMedia({});
 
-    // 1. If active Cast session is running -> stop it
-    if (session()) {
-      stopCast(true);
-      showCastToast("Diffusion Cast arrêtée");
-      return;
-    }
-
-    // 2. iPhone / iPad / Safari: Native WebKit AirPlay Target Picker
+    // 1. iPhone / iPad / Safari: Native WebKit AirPlay Target Picker
     if (isIosOrSafari() || (video && typeof video.webkitShowPlaybackTargetPicker === "function")) {
       if (video && typeof video.webkitShowPlaybackTargetPicker === "function") {
         try {
@@ -703,20 +771,27 @@
       return;
     }
 
-    // 3. Google Cast Sender Framework if available
+    // 2. Google Cast Sender Framework if available
     if (canUseGoogleCast()) {
       return requestGoogleCast();
     }
 
-    // 4. Try initializing CastContext if cast object already injected
+    // 3. Try initializing CastContext if cast object already injected
     if (window.cast && window.cast.framework && initCastContext()) {
       return requestGoogleCast();
     }
 
-    // 5. If Paired Smart TV is connected via /api/tv, diffuse to it!
+    // 4. If Paired Smart TV is connected via /api/tv, diffuse to it!
     if (typeof window.veloraSendToPairedTv === "function" && media) {
       var sent = window.veloraSendToPairedTv(media);
       if (sent) return;
+    }
+
+    // 5. If Google Cast SDK is loading
+    if (state.sdkLoading) {
+      state.pendingCastClick = true;
+      showCastToast("Initialisation de Google Cast en cours…");
+      return;
     }
 
     // 6. If no video is active
@@ -725,14 +800,7 @@
       return;
     }
 
-    // 7. If Google Cast SDK is loading
-    if (state.sdkLoading) {
-      state.pendingCastClick = true;
-      showCastToast("Initialisation de Google Cast en cours…");
-      return;
-    }
-
-    // 8. Otherwise inform the user of options
+    // 7. Otherwise inform the user of options
     window.alert(
       "Diffusion TV (Cast & AirPlay) :\n\n" +
       "• Utilisez Google Chrome sur PC/Android pour caster directement sur Chromecast ou TV Android.\n" +
@@ -751,56 +819,69 @@
       }
     }
 
-    var selectedMedia = state.currentMedia || normalizeMedia({});
-    if (!selectedMedia) {
-      showCastToast("Lancez d'abord une vidéo pour la diffuser.");
+    var context = window.cast.framework.CastContext.getInstance();
+    var castSession = context.getCurrentSession();
+    var currentLocalMedia = normalizeMedia({});
+
+    // If session is already connected
+    if (castSession) {
+      attachRemoteMediaListeners(castSession);
+      // If a local video was active/selected, diffuse it to TV
+      if (currentLocalMedia && currentLocalMedia.url) {
+        haltMobilePlayersForCast();
+        showCastToast("Diffusion vers " + getCastDeviceName() + "…");
+        await loadMediaOnCast(currentLocalMedia, { force: true });
+        return;
+      }
+      // Otherwise sync existing playback from TV and ensure bar is visible
+      syncFromRemoteSession(castSession);
+      showCastActiveBar();
+      showCastToast("Connecté à " + getCastDeviceName());
       return;
     }
 
-    try {
-      var context = window.cast.framework.CastContext.getInstance();
-      var castSession = context.getCurrentSession();
-      if (!castSession) {
-        state.requestPending = true;
-        state.pendingInitialMedia = selectedMedia;
-        var token = ++state.pendingInitialToken;
-        syncButton();
-        setPhase("CONNECTING");
-        try {
-          await context.requestSession();
-        } catch (error) {
-          clearLocalCastSessionState();
-          syncButton();
-          console.warn("[VeloraCast] requestSession cancelled or failed", error);
-          return;
-        }
-        castSession = context.getCurrentSession();
-        state.requestPending = false;
-        syncButton();
-        if (!castSession || token !== state.pendingInitialToken) {
-          clearLocalCastSessionState();
-          syncButton();
-          return;
-        }
-        var mediaToLoad = state.pendingInitialMedia;
-        state.pendingInitialMedia = null;
-        haltMobilePlayersForCast();
-        if (!(await loadMediaOnCast(mediaToLoad, { force: true }))) {
-          window.alert("Session Cast connectée, mais la vidéo n'a pas pu être chargée sur la TV.");
-        }
-        return;
-      }
+    // No session connected yet: request session via Chrome Cast prompt
+    var selectedMedia = currentLocalMedia || state.currentMedia;
+    state.requestPending = true;
+    state.pendingInitialMedia = selectedMedia;
+    var token = ++state.pendingInitialToken;
+    syncButton();
+    setPhase("CONNECTING");
 
-      haltMobilePlayersForCast();
-      if (!(await loadMediaOnCast(selectedMedia, { force: true }))) {
-        window.alert("Session Cast connectée, mais la vidéo n'a pas pu être chargée sur la TV.");
-      }
+    try {
+      await context.requestSession();
     } catch (error) {
-      console.warn("[VeloraCast] loadMedia error", error);
-      window.alert("La vidéo n'a pas pu être diffusée sur la TV.");
-    } finally {
-      state.requestPending = false;
+      clearLocalCastSessionState();
       syncButton();
+      console.warn("[VeloraCast] requestSession cancelled or failed", error);
+      return;
+    }
+
+    castSession = context.getCurrentSession();
+    state.requestPending = false;
+    syncButton();
+
+    if (!castSession || token !== state.pendingInitialToken) {
+      clearLocalCastSessionState();
+      syncButton();
+      return;
+    }
+
+    attachRemoteMediaListeners(castSession);
+    scheduleRemoteSync(castSession);
+
+    var mediaToLoad = state.pendingInitialMedia || normalizeMedia({});
+    state.pendingInitialMedia = null;
+
+    if (mediaToLoad && mediaToLoad.url) {
+      haltMobilePlayersForCast();
+      if (!(await loadMediaOnCast(mediaToLoad, { force: true }))) {
+        showCastToast("Connecté à la TV. Erreur de chargement du flux.");
+      }
+    } else {
+      syncFromRemoteSession(castSession);
+      showCastActiveBar();
+      showCastToast("Connecté à " + getCastDeviceName());
     }
   }
 
@@ -831,6 +912,11 @@
         ) {
           rememberSessionActive(true);
           setPhase("CONNECTED");
+          var sess = context.getCurrentSession();
+          if (sess) {
+            attachRemoteMediaListeners(sess);
+            scheduleRemoteSync(sess);
+          }
           showCastActiveBar();
         }
         if (
@@ -847,6 +933,17 @@
       state.sdkInitialized = true;
       state.sdkLoading = false;
       syncButton();
+
+      // Check if session was already resumed on init
+      var activeSess = context.getCurrentSession();
+      if (activeSess) {
+        rememberSessionActive(true);
+        setPhase("CONNECTED");
+        attachRemoteMediaListeners(activeSess);
+        scheduleRemoteSync(activeSess);
+        showCastActiveBar();
+      }
+
       return true;
     } catch (e) {
       console.warn("[VeloraCast] initCastContext error:", e);

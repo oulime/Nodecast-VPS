@@ -37,7 +37,7 @@ const COUNTRY_CONFIGS = {
             'pays-bas': ['DAZN'],
             'belgique': ['DAZN'],
             'turquie': ['beIN Sports MAX 6'],
-            'coupe de france': ['France 3', 'beIN Sports 1', 'YouTube'],
+            'coupe de france': ['France 3', 'beIN Sports 1'],
             'fa cup': ['beIN Sports 1', 'beIN Sports 2'],
             'carabao': ['beIN Sports 1', 'beIN Sports 2', 'Canal+'],
             'copa del rey': ['L\'Équipe'],
@@ -68,8 +68,8 @@ const COUNTRY_CONFIGS = {
             'pays-bas': ['TrillerTV+'],
             'belgique': ['TrillerTV+'],
             'turquie': ['TrillerTV+'],
-            'super league': ['BBC Two', 'Sky Sports Football', 'YouTube'],
-            'd1 fem': ['BBC Two', 'Sky Sports Football', 'YouTube'],
+            'super league': ['BBC Two', 'Sky Sports Football'],
+            'd1 fem': ['BBC Two', 'Sky Sports Football'],
             'world cup': ['BBC One', 'ITV1', 'STV'],
             'euro': ['BBC One', 'ITV1'],
             'nations league': ['ITV1', 'Viaplay'],
@@ -1109,6 +1109,15 @@ function cleanChannelName(rawAlt) {
         .trim();
 }
 
+/**
+ * Détecte si un diffuseur est un flux exclusivement web/streaming non-TV (YouTube, Twitch, TikTok, etc.)
+ */
+function isWebOnlyStream(channelName) {
+    if (!channelName) return false;
+    const str = String(channelName).trim().toLowerCase();
+    return /youtube|twitch|tiktok|dailymotion|facebook\s*live/i.test(str);
+}
+
 // SYSTÈME DE TIERS & POIDS DES CLUBS ET SÉLECTIONS NATIONALES
 const CONTEMPORARY_CLUB_TIERS = [
     {
@@ -1334,14 +1343,23 @@ async function scrapeTodayMatches() {
             const homeTeam = cleanTeamName(homeRaw);
             const awayTeam = cleanTeamName(awayRaw);
 
+            const rawBroadcasters = [];
             const tvChannels = [];
             $(el).find('img.im').each((_, img) => {
                 const alt = $(img).attr('alt') || '';
                 const cleaned = cleanChannelName(alt);
-                if (cleaned && !tvChannels.includes(cleaned)) {
-                    tvChannels.push(cleaned);
+                if (cleaned && !rawBroadcasters.includes(cleaned)) {
+                    rawBroadcasters.push(cleaned);
+                    if (!isWebOnlyStream(cleaned)) {
+                        tvChannels.push(cleaned);
+                    }
                 }
             });
+
+            // Si le match n'est annoncé QUE sur YouTube / stream web exclusif (sans aucune chaîne TV)
+            if (rawBroadcasters.length > 0 && tvChannels.length === 0) {
+                return; // Exclure le match car non diffusable sur les chaînes TV IPTV
+            }
 
             if (tvChannels.length === 0) {
                 tvChannels.push('Chaîne à confirmer');
@@ -1380,8 +1398,11 @@ async function scrapeTodayMatches() {
  */
 function getBroadcastersForCountry(compName, scrapedChannels, countryConfig) {
     if (countryConfig.id === 'france') {
-        if (Array.isArray(scrapedChannels) && scrapedChannels.length > 0 && !scrapedChannels.includes('Chaîne à confirmer')) {
-            return scrapedChannels;
+        const cleanScraped = Array.isArray(scrapedChannels)
+            ? scrapedChannels.filter(ch => ch && !isWebOnlyStream(ch))
+            : [];
+        if (cleanScraped.length > 0 && !cleanScraped.includes('Chaîne à confirmer')) {
+            return cleanScraped;
         }
         return ['Canal+', 'beIN Sports', 'DAZN'];
     }
@@ -1389,7 +1410,8 @@ function getBroadcastersForCountry(compName, scrapedChannels, countryConfig) {
     const compLower = String(compName || '').toLowerCase();
     for (const [key, channels] of Object.entries(countryConfig.broadcasters || {})) {
         if (compLower.includes(key)) {
-            return channels;
+            const valid = (channels || []).filter(ch => !isWebOnlyStream(ch));
+            if (valid.length > 0) return valid;
         }
     }
 
@@ -1745,9 +1767,16 @@ async function getTodayMatches(countryInput = 'france', forceRefresh = false, al
         try {
             const rawList = await scrapeTodayMatches();
 
-            // Mode Slider Accueil / Catalogue : Tous les matchs du jour sont inclus
-            // mais ordonnés avec les chocs majeurs en tête et les matchs jeunes / secondaires strictement à la fin
-            let targetMatches = [...rawList];
+            // Filtrer tous les matchs dont les chaînes sont uniquement web / streaming
+            let targetMatches = rawList.filter(m => {
+                if (!m) return false;
+                const chs = Array.isArray(m.tvChannels) ? m.tvChannels : [];
+                if (chs.length > 0) {
+                    const validTv = chs.filter(ch => ch && !isWebOnlyStream(ch));
+                    return validTv.length > 0;
+                }
+                return true;
+            });
 
             targetMatches.sort((a, b) => {
                 const aMinor = isMinorOrYouthMatch(a.competition, a.homeTeamName, a.awayTeamName);
@@ -1762,7 +1791,7 @@ async function getTodayMatches(countryInput = 'france', forceRefresh = false, al
             });
 
             // Récupération des logos HD et diffuseurs TV adaptés au pays
-            baseMatches = await Promise.all(targetMatches.map(async (m) => {
+            const mappedMatches = await Promise.all(targetMatches.map(async (m) => {
                 const [homeLogo, awayLogo] = await Promise.all([
                     fetchTeamLogo(m.homeTeamName),
                     fetchTeamLogo(m.awayTeamName)
@@ -1770,9 +1799,12 @@ async function getTodayMatches(countryInput = 'france', forceRefresh = false, al
 
                 let tvChannels = getBroadcastersForCountry(m.competition, m.tvChannels, countryConfig);
 
-                // Filtrage des chaînes ignorées pour ce pays
-                if (Array.isArray(tvChannels) && ignoredChannels.length > 0) {
-                    tvChannels = tvChannels.filter(ch => !isChannelIgnored(ch, ignoredChannels));
+                // Filtrage des chaînes web (YouTube etc.) et des chaînes ignorées pour ce pays
+                if (Array.isArray(tvChannels)) {
+                    tvChannels = tvChannels.filter(ch => ch && !isWebOnlyStream(ch));
+                    if (ignoredChannels.length > 0) {
+                        tvChannels = tvChannels.filter(ch => !isChannelIgnored(ch, ignoredChannels));
+                    }
                     if (tvChannels.length === 0) {
                         tvChannels = ['Chaîne à confirmer'];
                     }
@@ -1795,6 +1827,12 @@ async function getTodayMatches(countryInput = 'france', forceRefresh = false, al
                     hypeScore: m.hypeScore
                 };
             }));
+
+            // S'assurer qu'aucun match web exclusif ne subsiste
+            baseMatches = mappedMatches.filter(m => {
+                if (!m || !Array.isArray(m.tvChannels) || m.tvChannels.length === 0) return false;
+                return m.tvChannels.some(ch => ch && !isWebOnlyStream(ch));
+            });
 
             countryCaches.set(cacheScopeKey, {
                 data: baseMatches,

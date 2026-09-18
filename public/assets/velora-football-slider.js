@@ -235,6 +235,22 @@
     return { title: 'Football aujourd\'hui', seeMore: 'Tout voir' };
   }
 
+  function isWebOnlyStreamName(channelName) {
+    if (!channelName) return false;
+    var str = String(channelName).trim().toLowerCase();
+    return /youtube|twitch|tiktok|dailymotion|facebook\s*live/i.test(str);
+  }
+
+  function isWebOnlyStreamMatch(match) {
+    if (!match) return true;
+    var chs = Array.isArray(match.tvChannels) ? match.tvChannels : [];
+    if (chs.length === 0) return false;
+    var hasRealTv = chs.some(function (ch) {
+      return ch && !isWebOnlyStreamName(ch);
+    });
+    return !hasRealTv;
+  }
+
   async function fetchTodayMatches(country, forceRefresh) {
     // Si le module football est désactivé pour ce pays, ne rien récupérer et vider le cache
     if (!isCountryFootballEnabled(country)) {
@@ -255,7 +271,18 @@
       var res = await fetch(url, { headers: { 'Accept': 'application/json' } });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       var data = await res.json();
-      var list = Array.isArray(data) ? data : [];
+      var rawList = Array.isArray(data) ? data : [];
+      var list = rawList.filter(function (m) {
+        if (!m || isWebOnlyStreamMatch(m)) return false;
+        if (Array.isArray(m.tvChannels)) {
+          var filteredChs = m.tvChannels.filter(function (c) { return !isWebOnlyStreamName(c); });
+          if (filteredChs.length > 0) {
+            m.tvChannels = filteredChs;
+          }
+        }
+        return true;
+      });
+
       cachedMatchesByCountry.set(country, {
         matches: list,
         expiresAt: Date.now() + (30 * 60 * 1000)
@@ -882,11 +909,13 @@
     if (!countryId) countryId = rawCountry;
 
     var rawChannels = Array.isArray(match.tvChannels)
-      ? match.tvChannels.map(cleanChannelSearchName).filter(Boolean)
+      ? match.tvChannels.map(cleanChannelSearchName).filter(function (ch) {
+          return ch && !isWebOnlyStreamName(ch);
+        })
       : [];
     if (priorityChannel) {
       var cleanPriority = cleanChannelSearchName(priorityChannel);
-      if (cleanPriority) {
+      if (cleanPriority && !isWebOnlyStreamName(cleanPriority)) {
         rawChannels = [cleanPriority].concat(rawChannels.filter(function (c) { return c !== cleanPriority; }));
       }
     }
@@ -1264,8 +1293,9 @@
         }
       } else {
         var plannedChs = (Array.isArray(match.tvChannels) && match.tvChannels.length > 0)
-          ? match.tvChannels.join(', ')
+          ? match.tvChannels.filter(function (c) { return !isWebOnlyStreamName(c); }).join(', ')
           : 'non renseignées';
+        if (!plannedChs) plannedChs = 'non renseignées';
         showFootballToast('Aucune chaîne disponible dans votre bouquet pour « ' + matchTitle + ' » (Chaînes prévues : ' + plannedChs + ')', 'warning', 4500);
       }
     } catch (err) {
@@ -1416,6 +1446,7 @@
 
     var valid = [];
     matches.forEach(function (m, idx) {
+      if (isWebOnlyStreamMatch(m)) return;
       var tInfo = getMatchTimeDetails(m.time, m);
       if (tInfo.status !== 'expired') {
         valid.push({

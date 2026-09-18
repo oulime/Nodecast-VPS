@@ -40,10 +40,32 @@
     try {
       localStorage.setItem("velora_tv_auto_diffuse", enabled ? "true" : "false");
     } catch (_) {}
+    if (enabled && window.VeloraCast && typeof window.VeloraCast.isConnected === "function" && window.VeloraCast.isConnected()) {
+      if (typeof window.VeloraCast.stop === "function") {
+        window.VeloraCast.stop(false);
+      }
+    }
     syncActiveTvBar();
     renderTvSettingsSection();
     showTvToast(enabled ? "Diffusion vers la Smart TV activée" : "Lecture locale sur téléphone activée");
   }
+
+  // Export stop TV diffusion function so Cast can stop paired TV playback
+  window.veloraStopTvAssociationDiffusion = async function () {
+    if (tvState.currentMedia && tvState.currentMedia.state !== "stopped") {
+      try {
+        await fetch("/api/tv/command", {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({ action: "stop" })
+        });
+      } catch (_) {}
+      tvState.currentMedia = null;
+      saveCachedTvStatus();
+      syncActiveTvBar();
+      renderTvSettingsSection();
+    }
+  };
 
   // Inject scoped styles for TV settings, floating island bar, and controls
   function injectStyles() {
@@ -472,13 +494,21 @@
 
   function removeActiveTvBar() {
     var wrap = document.getElementById("vel-tv-active-bar-wrap");
-    if (wrap) wrap.remove();
+    if (wrap) {
+      if (wrap.dataset.source === "cast" && window.VeloraCast && typeof window.VeloraCast.isConnected === "function" && window.VeloraCast.isConnected()) {
+        return;
+      }
+      wrap.remove();
+    }
     document.body.classList.remove("vel-tv-active-bar-open");
     document.documentElement.style.removeProperty("--vel-tv-bar-height");
   }
 
   // Synchronize the upper active diffusion bar
   function syncActiveTvBar() {
+    if (window.VeloraCast && typeof window.VeloraCast.isConnected === "function" && window.VeloraCast.isConnected()) {
+      return; // Cast is currently active and manages the top bar
+    }
     if (tvState.hasPairedTv && tvState.isOnline) {
       showActiveTvBar();
     } else {
@@ -488,6 +518,9 @@
 
   // Upper bar showing TV status, diffusion switch, and active stream
   function showActiveTvBar() {
+    if (window.VeloraCast && typeof window.VeloraCast.isConnected === "function" && window.VeloraCast.isConnected()) {
+      return;
+    }
     var isPlaying = tvState.isOnline && tvState.currentMedia && tvState.currentMedia.state !== "stopped";
     var activeTitle = isPlaying ? (tvState.currentMedia.title || tvState.currentMedia.name || "Lecture en cours") : null;
     var tvName = tvState.deviceName || "Smart TV";
@@ -498,6 +531,7 @@
 
     var existingWrap = document.getElementById("vel-tv-active-bar-wrap");
     if (existingWrap) {
+      existingWrap.dataset.source = "tv-bridge";
       var iconWrap = existingWrap.querySelector(".vel-tv-capsule-icon-wrap");
       if (iconWrap) iconWrap.classList.toggle("is-streaming", isPlaying);
 
@@ -515,7 +549,7 @@
       if (phoneBtn) phoneBtn.classList.toggle("is-active", !isOn);
       if (tvBtn) tvBtn.classList.toggle("is-active", isOn);
 
-      var stopBtn = existingWrap.querySelector("#vel-tv-stop-playback");
+      var stopBtn = existingWrap.querySelector("#vel-tv-stop-playback, #vel-cast-stop-playback");
       if (isPlaying && !stopBtn) {
         var actions = existingWrap.querySelector(".vel-tv-capsule-actions");
         if (actions) {
@@ -528,6 +562,10 @@
           actions.prepend(btn);
           attachStopBtnHandler(btn);
         }
+      } else if (isPlaying && stopBtn) {
+        stopBtn.id = "vel-tv-stop-playback";
+        stopBtn.title = "Arrêter la diffusion sur la TV";
+        attachStopBtnHandler(stopBtn);
       } else if (!isPlaying && stopBtn) {
         stopBtn.remove();
       }
@@ -541,6 +579,7 @@
 
     var wrap = document.createElement("div");
     wrap.id = "vel-tv-active-bar-wrap";
+    wrap.dataset.source = "tv-bridge";
     wrap.className = "vel-tv-active-bar-wrap";
     wrap.innerHTML = `
       <div class="vel-tv-active-bar">
@@ -868,6 +907,13 @@
   // Send media to play on TV
   async function sendToTv(media) {
     try {
+      // 0. Stop Google Cast / AirPlay if currently active
+      if (window.VeloraCast && typeof window.VeloraCast.isConnected === "function" && window.VeloraCast.isConnected()) {
+        if (typeof window.VeloraCast.stop === "function") {
+          window.VeloraCast.stop(false);
+        }
+      }
+
       // 1. Close mobile transcode session if running
       try {
         if (typeof window.veloraCloseActiveTranscodeSession === "function") {
@@ -976,6 +1022,9 @@
 
   // Direct seamless routing based on auto-diffuse switch!
   function interceptPlayback(mediaData) {
+    if (window.VeloraCast && typeof window.VeloraCast.isConnected === "function" && window.VeloraCast.isConnected()) {
+      return false;
+    }
     if (tvState.hasPairedTv && tvState.isOnline) {
       if (isAutoDiffuseOn()) {
         document.querySelectorAll("video").forEach(function (v) {
@@ -1019,6 +1068,15 @@
 
     tryInstantRender();
   }
+
+  // Expose direct diffusion to paired TV
+  window.veloraSendToPairedTv = function (media) {
+    if (tvState.hasPairedTv && tvState.isOnline) {
+      sendToTv(media);
+      return true;
+    }
+    return false;
+  };
 
   // Hook into unified Velora events
   function initPlaybackListeners() {

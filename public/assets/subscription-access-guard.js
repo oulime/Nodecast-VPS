@@ -206,13 +206,226 @@
     });
   }
 
+  /* =========================================================================
+     STREAM SLOT ENFORCEMENT & CONCURRENT STREAM GUARD (1 Machine + 1 TV)
+     ========================================================================= */
+
+  function getMachineDeviceId() {
+    try {
+      let id = localStorage.getItem("velora_machine_id");
+      if (!id) {
+        id = "m_" + Math.random().toString(36).slice(2, 11) + "_" + Date.now().toString(36);
+        localStorage.setItem("velora_machine_id", id);
+      }
+      return id;
+    } catch (_) {
+      return "m_temp_" + Date.now().toString(36);
+    }
+  }
+
+  let activeStreamSession = null;
+
+  function ensureSupersededModal() {
+    let modal = document.getElementById("vel-stream-superseded");
+    if (modal) return modal;
+    modal = document.createElement("div");
+    modal.id = "vel-stream-superseded";
+    modal.className = "vel-stream-superseded";
+    modal.hidden = true;
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-labelledby", "vel-stream-superseded-title");
+    modal.innerHTML = `
+      <div class="vel-stream-superseded__card">
+        <div class="vel-stream-superseded__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+        </div>
+        <p class="vel-stream-superseded__eyebrow">LIMITE D'ÉCRANS ATTEINTE</p>
+        <h2 id="vel-stream-superseded-title">Écran déjà en cours d'utilisation</h2>
+        <p class="vel-stream-superseded__copy">
+          Un flux est actuellement en cours de lecture sur un autre de vos appareils (ordinateur ou mobile).<br />
+          Votre compte autorise simultanément <strong>1 écran Machine</strong> (PC / Smartphone) et <strong>1 Smart TV</strong>.<br /><br />
+          Veuillez arrêter ou mettre en pause la lecture sur votre autre appareil pour pouvoir regarder ici.
+        </p>
+        <div class="vel-stream-superseded__actions" style="justify-content:center;">
+          <button type="button" class="vel-stream-superseded__close" style="min-width:180px;">Fermer</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    modal.querySelector(".vel-stream-superseded__close").addEventListener("click", function () {
+      hideSupersededModal();
+      stopPlayback();
+    });
+
+    return modal;
+  }
+
+  function showSupersededModal() {
+    const modal = ensureSupersededModal();
+    modal.hidden = false;
+    document.body.classList.add("vel-stream-superseded-locked");
+    window.setTimeout(function () {
+      modal.querySelector(".vel-stream-superseded__close")?.focus();
+    }, 0);
+  }
+
+  function hideSupersededModal() {
+    const modal = document.getElementById("vel-stream-superseded");
+    if (modal) modal.hidden = true;
+    document.body.classList.remove("vel-stream-superseded-locked");
+  }
+
+  async function sendStreamHeartbeat(action, streamInfo) {
+    const token = authToken();
+    if (!token) return { ok: false };
+    const deviceId = getMachineDeviceId();
+
+    try {
+      const res = await fetch("/api/proxy/stream/heartbeat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action: action,
+          deviceType: "machine",
+          deviceId: deviceId,
+          streamId: streamInfo?.streamId || activeStreamSession?.streamId || "machine-stream",
+          streamTitle: streamInfo?.streamTitle || activeStreamSession?.streamTitle || "",
+          sessionKey: streamInfo?.sessionKey || activeStreamSession?.sessionKey || ""
+        }),
+        keepalive: action === "stop"
+      });
+
+      if (!res.ok) {
+        if (res.status === 409) {
+          const data = await res.json().catch(function () { return {}; });
+          return { ok: false, inUse: true, ...data };
+        }
+        return { ok: false };
+      }
+
+      return await res.json();
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  }
+
+  function startStreamTracking(mediaEl) {
+    const token = authToken();
+    if (!token) return;
+
+    const streamId = mediaEl?.getAttribute("data-stream-id") || mediaEl?.currentSrc || mediaEl?.src || "active-stream";
+
+    // If already actively tracking this exact media element with an active heartbeat session, keep it
+    if (activeStreamSession && activeStreamSession.mediaEl === mediaEl && activeStreamSession.streamId === streamId && activeStreamSession.timer) {
+      return;
+    }
+
+    const sessionKey = "sk_" + Math.random().toString(36).slice(2, 11) + "_" + Date.now().toString(36);
+    const streamTitle = document.querySelector("#now-playing .title, .media-title, .vel-vod-detail__title")?.textContent?.trim() || "";
+
+    if (activeStreamSession && activeStreamSession.timer) {
+      clearInterval(activeStreamSession.timer);
+    }
+
+    activeStreamSession = {
+      sessionKey: sessionKey,
+      streamId: streamId,
+      streamTitle: streamTitle,
+      mediaEl: mediaEl,
+      timer: null
+    };
+
+    // Register on start
+    sendStreamHeartbeat("register", activeStreamSession).then(function (result) {
+      if (result && (result.inUse || result.slotGranted === false)) {
+        // Slot is already in use by another device! Block playback here and show the in-use modal.
+        stopStreamTracking(false);
+        stopPlayback();
+        showSupersededModal();
+      }
+    });
+
+    // Heartbeat every 15s to keep the session alive
+    activeStreamSession.timer = setInterval(async function () {
+      if (!activeStreamSession) return;
+      const v = activeStreamSession.mediaEl || document.querySelector("video");
+      if (v && (v.paused || v.ended || !v.currentSrc)) {
+        stopStreamTracking(true);
+        return;
+      }
+
+      await sendStreamHeartbeat("heartbeat", activeStreamSession);
+    }, 15000);
+  }
+
+  function stopStreamTracking(sendStopBeacon) {
+    if (sendStopBeacon === undefined) sendStopBeacon = true;
+    if (!activeStreamSession) return;
+
+    if (activeStreamSession.timer) {
+      clearInterval(activeStreamSession.timer);
+      activeStreamSession.timer = null;
+    }
+
+    if (sendStopBeacon) {
+      sendStreamHeartbeat("stop", activeStreamSession);
+    }
+
+    activeStreamSession = null;
+  }
+
+  /* Listen to media lifecycle events */
   document.addEventListener("click", guardWatchAttempt, true);
+
   document.addEventListener("play", function (event) {
-    if (state.access === "active") return;
-    try { event.target.pause(); } catch (_) {}
-    stopPlayback();
-    showModal();
+    if (state.access !== "active") {
+      try { event.target.pause(); } catch (_) {}
+      stopPlayback();
+      showModal();
+      return;
+    }
+
+    if (event.target && (event.target.tagName === "VIDEO" || event.target.tagName === "AUDIO")) {
+      hideSupersededModal();
+      startStreamTracking(event.target);
+    }
   }, true);
+
+  document.addEventListener("pause", function (event) {
+    if (event.target && (event.target.tagName === "VIDEO" || event.target.tagName === "AUDIO")) {
+      setTimeout(function () {
+        const anyPlaying = Array.from(document.querySelectorAll("video, audio")).some(function (m) {
+          return !m.paused && (m.currentSrc || m.src);
+        });
+        if (!anyPlaying) {
+          stopStreamTracking(true);
+        }
+      }, 250);
+    }
+  }, true);
+
+  document.addEventListener("ended", function (event) {
+    if (event.target && (event.target.tagName === "VIDEO" || event.target.tagName === "AUDIO")) {
+      stopStreamTracking(true);
+    }
+  }, true);
+
+  window.addEventListener("pagehide", function () {
+    stopStreamTracking(true);
+  });
+
+  window.addEventListener("beforeunload", function () {
+    stopStreamTracking(true);
+  });
+
   document.addEventListener("visibilitychange", function () {
     if (!document.hidden) void refreshAccess(true);
   });

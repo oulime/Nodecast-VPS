@@ -418,6 +418,13 @@
   }, true);
 
   const observer = new MutationObserver(() => { enhanceForm(); enhanceCards(); refreshAppLogos(); });
-  function start() { enhanceForm(); enhanceCards(); observer.observe(document.documentElement, { childList: true, subtree: true }); load().then(enhanceCards).catch(() => {}); }
+  function start() {
+    enhanceForm();
+    enhanceCards();
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+    setTimeout(() => {
+      load().then(enhanceCards).catch(() => {});
+    }, 2500);
+  }
   document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", start, { once: true }) : start();
 })();

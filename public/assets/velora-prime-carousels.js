@@ -8,8 +8,19 @@
   const MEDIA_TABS = new Set(["movies", "series"]);
   let isRendering = false;
   let lastFeedKey = "";
+  let lastRenderedTab = "";
+  let lastRenderedCountry = "";
   const feedCache = new Map(); // key: `${countryId}:${tab}` -> feedData
-  const packageFullItemsCache = new Map(); // key: `${tab}:${pkgId}` -> items array
+  const packageFullItemsCache = new Map(); // key: `${tab}:${pkgId}` -> full item array
+  function shuffleArray(arr) {
+    if (!Array.isArray(arr) || arr.length <= 1) return Array.isArray(arr) ? arr.slice() : [];
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
 
   function activeTab() {
     if (document.body.classList.contains("vel-home-empty-active")) return "home";
@@ -25,11 +36,22 @@
     }
     const select = document.getElementById("country-select") || document.getElementById("home-country-select");
     if (select && select.value) return String(select.value);
+    try {
+      const saved = localStorage.getItem("lumina_selected_country_id") || sessionStorage.getItem("lumina_selected_country_id");
+      if (saved) return String(saved);
+    } catch (_) {}
     return "country_france";
   }
 
   let cachedPrefixes = [];
   let cachedSuffixes = [];
+
+  try {
+    const pCached = JSON.parse(localStorage.getItem("velora_cached_channel_prefixes") || "[]");
+    if (Array.isArray(pCached) && pCached.length) cachedPrefixes = pCached;
+    const sCached = JSON.parse(localStorage.getItem("velora_cached_channel_suffixes") || "[]");
+    if (Array.isArray(sCached) && sCached.length) cachedSuffixes = sCached;
+  } catch (_) {}
 
   async function loadPrefixAndSuffixRules() {
     try {
@@ -42,6 +64,7 @@
         if (Array.isArray(pRows)) {
           cachedPrefixes = [...new Set(pRows.map(r => String(r.prefix || "").trim()).filter(Boolean))]
             .sort((a, b) => b.length - a.length);
+          try { localStorage.setItem("velora_cached_channel_prefixes", JSON.stringify(cachedPrefixes)); } catch (_) {}
         }
       }
       if (sRes.ok) {
@@ -49,12 +72,15 @@
         if (Array.isArray(sRows)) {
           cachedSuffixes = [...new Set(sRows.map(r => String(r.suffix || "").trim()).filter(Boolean))]
             .sort((a, b) => b.length - a.length);
+          try { localStorage.setItem("velora_cached_channel_suffixes", JSON.stringify(cachedSuffixes)); } catch (_) {}
         }
       }
     } catch (_) {}
   }
 
-  loadPrefixAndSuffixRules();
+  // Defer network fetch so startup is instantaneous from localStorage
+  setTimeout(loadPrefixAndSuffixRules, 2500);
+
   document.addEventListener("velora-channel-prefixes-changed", () => {
     loadPrefixAndSuffixRules().then(() => {
       lastFeedKey = "";
@@ -69,6 +95,20 @@
   });
 
   let adultPackageIds = new Set();
+  try {
+    const cached = localStorage.getItem("velora_admin_adult_packages");
+    if (cached) {
+      const list = JSON.parse(cached);
+      if (Array.isArray(list)) {
+        adultPackageIds = new Set(list.flatMap(r => [
+          String(r.package_id),
+          String(r.id),
+          `${r.kind}:${r.source_id}:${r.category_id}`
+        ]).filter(Boolean));
+      }
+    }
+  } catch (_) {}
+
   async function loadAdultPackageRules() {
     try {
       const res = await fetch("/api/velora-db/rest/v1/admin_settings?key=eq.adult_packages", { cache: "no-store" });
@@ -82,30 +122,49 @@
               String(r.id),
               `${r.kind}:${r.source_id}:${r.category_id}`
             ]).filter(Boolean));
+            try { localStorage.setItem("velora_admin_adult_packages", JSON.stringify(list)); } catch (_) {}
             return;
           }
         }
       }
-      const cached = localStorage.getItem("velora_admin_adult_packages");
-      if (cached) {
-        const list = JSON.parse(cached);
-        if (Array.isArray(list)) {
-          adultPackageIds = new Set(list.flatMap(r => [
-            String(r.package_id),
-            String(r.id),
-            `${r.kind}:${r.source_id}:${r.category_id}`
-          ]).filter(Boolean));
-        }
-      }
     } catch (_) {}
   }
-  loadAdultPackageRules();
+  setTimeout(loadAdultPackageRules, 3000);
   document.addEventListener("velora-adult-packages-changed", () => {
     loadAdultPackageRules().then(() => {
       lastFeedKey = "";
       render();
     });
   });
+
+  function getItemRecencyScore(it) {
+    if (!it) return 0;
+    if (it.added || it.added_at) {
+      const val = it.added || it.added_at;
+      const num = Number(val);
+      if (Number.isFinite(num) && num > 0) return num;
+      const parsed = Date.parse(val);
+      if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed / 1000);
+    }
+    if (it.last_modified || it.lastModified) {
+      const val = it.last_modified || it.lastModified;
+      const num = Number(val);
+      if (Number.isFinite(num) && num > 0) return num;
+      const parsed = Date.parse(val);
+      if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed / 1000);
+    }
+    const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? it.streamId ?? it.seriesId ?? it.id;
+    const numId = Number(rawId);
+    if (Number.isFinite(numId) && numId > 0) {
+      return numId;
+    }
+    const yrStr = String(it.releaseDate || it.release_date || it.year || "").trim();
+    const yrMatch = yrStr.match(/\b(19\d\d|20\d\d)\b/);
+    if (yrMatch) {
+      return parseInt(yrMatch[1], 10) * 1000;
+    }
+    return 0;
+  }
 
   function stripTitle(name) {
     let clean = String(name || "").trim();
@@ -171,7 +230,7 @@
     // 3. Strip bracketed / parenthesized language suffixes and tags
     clean = clean
       .replace(/\s*([\[\(][A-Z0-9\+\-\s]{1,12}[\]\)]|\b(HD|FHD|UHD|4K|VF|VOSTFR|VO|FR|AR|EN|UK|US|ES|DE|IT|PT|TR|NL|RU|PL|RO|MULTI|TRUEFRENCH|FRENCH|ARABIC)\b)$/i, "")
-      .replace(/\s*[-:|•]\s*$/g, "")
+      .replace(/\s*[-:|•\s]*$/g, "")
       .trim();
 
     // 4. Strip bracketed or delimiter-separated prefix tags (e.g. [FR] -, FR -, AR :)
@@ -181,7 +240,13 @@
       .replace(/^[A-Z0-9]{1,6}-[A-Z0-9]{1,6}\s*[-:|•]\s*/i, "")
       .trim();
 
-    // 5. Apply sentence casing (only first letter capital)
+    // 5. Clean unicode noise, subscripts, superscripts (⁴ᴷ ³⁸⁴⁰ᴾ etc.) & resolution noise
+    clean = clean
+      .replace(/[\u00B2\u00B3\u00B9\u2070-\u207F\u2080-\u208F\u1D2C-\u1D6A\u1DA0-\u1DCF]+/g, " ")
+      .replace(/\b(3840p|2160p|1080p|720p|480p|4k|8k|uhd|fhd|hd|hevc|h265|x265|h264|x264)\b/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
     return toSentenceCase(clean || title || "Catalogue");
   }
 
@@ -189,9 +254,8 @@
     if (!str) return "";
     const s = String(str).trim();
     if (!s) return "";
-    const lower = s.toLowerCase();
     let capitalized = false;
-    return lower.replace(/[a-zA-ZÀ-ÿ]/, (char) => {
+    return s.toLowerCase().replace(/\p{L}/u, (char) => {
       if (!capitalized) {
         capitalized = true;
         return char.toUpperCase();
@@ -307,42 +371,31 @@
     return { poster: finalPoster, backdrop: finalBackdrop };
   }
 
-  // Fetch full items of a package for the "Voir tout" popup
+  // Fetch full items of a package for the "Voir plus" popup
   async function fetchPackageFullItems(tab, pkg) {
-    const cacheKey = `${tab}:${pkg.id || pkg.name}`;
+    if (!pkg) return [];
+
+    const rawTab = tab || pkg.contentType || pkg._tab || pkg.kind || "movies";
+    const effectiveTab = (rawTab === "series" || pkg.contentType === "series" || pkg.kind === "series")
+      ? "series"
+      : ((rawTab === "live" || pkg.contentType === "live" || pkg.kind === "live") ? "live" : "movies");
+    const effectiveKind = effectiveTab === "movies" ? "vod" : (effectiveTab === "series" ? "series" : "live");
+
+    const pkgId = pkg.id || pkg.package_id || pkg.packageId || "";
+    const catId = pkg.category_id ?? pkg.categoryId;
+    const srcId = pkg.source_id ?? pkg.sourceId;
+    const pkgName = pkg.name || pkg.title || "";
+    const cleanPkgName = stripTitle(pkgName).trim().toLowerCase();
+
+    const cacheKey = `${effectiveTab}:${pkgId || catId || cleanPkgName}`;
     if (packageFullItemsCache.has(cacheKey)) {
-      return packageFullItemsCache.get(cacheKey);
+      const cached = packageFullItemsCache.get(cacheKey);
+      if (Array.isArray(cached) && cached.length > 0) return cached;
     }
 
-    // 1. If explicit custom items were provided (e.g. from an Accueil custom section or package items)
-    if (Array.isArray(pkg.customItems) && pkg.customItems.length > 0) {
-      const items = pkg.customItems.map((it, idx) => {
-        const rawId = it.stream_id || it.streamId || it.id || idx;
-        const { poster, backdrop } = extractMediaImages(it);
-        const name = it.name || it.title || it.series_name || "";
-        return {
-          id: it.id || `custom:${pkg.id || "sec"}:${rawId}`,
-          name: stripTitle(name),
-          rawName: name,
-          thumbUrl: poster || it.thumbUrl || it.horizontal_thumb || "",
-          posterUrl: poster || it.posterUrl || it.thumbUrl || "",
-          backdropUrl: backdrop || it.backdropUrl || it.horizontal_thumb || it.thumbUrl || "",
-          rating: it.rating || it.rating_5based || it.score || "",
-          year: it.year || it.releaseDate || "",
-          plot: it.plot || it.description || it.overview || "",
-          streamId: rawId,
-          sourceId: it.nodecast_source_id ?? it.sourceId ?? it.source_id ?? pkg.source_id,
-          globalStreamId: it.nodecast_global_stream_id ?? it.globalStreamId ?? it.global_stream_id ?? rawId,
-          containerExtension: it.containerExtension || it.container_extension || "",
-          contentType: it.contentType || tab || "movies",
-          packageId: it.packageId || pkg.id
-        };
-      });
-      packageFullItemsCache.set(cacheKey, items);
-      return items;
-    }
+    const isUuid = (val) => typeof val === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
 
-    // 2. Auto-connect player catalog if not ready
+    // 1. Auto-connect player catalog if not ready
     if (typeof window.veloraForceAutoconnect === "function") {
       try {
         if (!window.veloraHomeCatalogReady || !window.veloraHomeCatalogReady()) {
@@ -351,142 +404,154 @@
       } catch (_) {}
     }
 
+    // 2. Collect candidate category IDs and package IDs
+    const candidateCatIds = [];
+    const candidatePkgIds = [];
+
+    if (catId != null && String(catId).trim()) {
+      const s = String(catId).trim();
+      if (!isUuid(s)) candidateCatIds.push(s);
+      else candidatePkgIds.push(s);
+    }
+    if (pkgId && String(pkgId).trim()) {
+      const s = String(pkgId).trim();
+      if (!isUuid(s)) {
+        if (!candidateCatIds.includes(s)) candidateCatIds.push(s);
+      } else {
+        if (!candidatePkgIds.includes(s)) candidatePkgIds.push(s);
+      }
+    }
+
+    // Match in home packages state
+    if (window.veloraHomeSectionsState && Array.isArray(window.veloraHomeSectionsState.packages)) {
+      const allPkgs = window.veloraHomeSectionsState.packages;
+      const matched = allPkgs.filter(p => 
+        (pkgId && String(p.id) === String(pkgId)) ||
+        (catId != null && String(p.category_id) === String(catId)) ||
+        (cleanPkgName && stripTitle(p.name || "").trim().toLowerCase() === cleanPkgName) ||
+        (pkgName && String(p.name || "").trim().toLowerCase() === String(pkgName).trim().toLowerCase())
+      );
+      for (const p of matched) {
+        if (p.id && !candidatePkgIds.includes(String(p.id))) candidatePkgIds.push(String(p.id));
+        if (p.category_id && !candidateCatIds.includes(String(p.category_id))) candidateCatIds.push(String(p.category_id));
+      }
+    }
+
+    // Match in appState categories
     const appState = typeof window.veloraGetState === "function" ? window.veloraGetState() : null;
     if (appState) {
-      const streamMap = tab === "movies" ? appState.vodStreamsByCat : appState.seriesStreamsByCat;
-      const catList = tab === "movies" ? appState.vodCategories : appState.seriesCategories;
-      if (streamMap) {
-        let rawList = (pkg.id ? (streamMap.get(pkg.id) || streamMap.get(String(pkg.id))) : null) ||
-                      (pkg.category_id ? (streamMap.get(pkg.category_id) || streamMap.get(String(pkg.category_id))) : null);
-        if ((!rawList || !rawList.length) && Array.isArray(catList) && pkg.name) {
-          const normName = String(pkg.name).trim().toLowerCase();
-          const matchedCat = catList.find(c => String(c.category_name || c.name || "").trim().toLowerCase() === normName);
-          if (matchedCat) {
-            rawList = streamMap.get(matchedCat.category_id) || streamMap.get(String(matchedCat.category_id));
+      const catList = effectiveTab === "movies" ? appState.vodCategories : (effectiveTab === "series" ? appState.seriesCategories : appState.liveCategories);
+      if (Array.isArray(catList)) {
+        for (const c of catList) {
+          const cId = String(c.category_id ?? c.id ?? "").trim();
+          const cName = String(c.category_name ?? c.name ?? "").trim();
+          const cleanCName = stripTitle(cName).trim().toLowerCase();
+          if (!cId) continue;
+          if (
+            (catId != null && cId === String(catId)) ||
+            (pkgId && cId === String(pkgId)) ||
+            (cleanPkgName && cleanCName === cleanPkgName) ||
+            (pkgName && cName.toLowerCase() === String(pkgName).trim().toLowerCase()) ||
+            (cleanPkgName && cleanPkgName.length >= 4 && (cleanCName.includes(cleanPkgName) || cleanPkgName.includes(cleanCName)))
+          ) {
+            if (!candidateCatIds.includes(cId)) candidateCatIds.push(cId);
           }
-        }
-        if (Array.isArray(rawList) && rawList.length > 0) {
-          const items = rawList.map((it, idx) => {
-            const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? idx;
-            const { poster, backdrop } = extractMediaImages(it);
-            return {
-              id: `feed:${pkg.id || "cat"}:${rawId}`,
-              name: stripTitle(it.name || it.title || it.series_name || ""),
-              rawName: it.name || it.title || it.series_name || "",
-              thumbUrl: poster,
-              posterUrl: poster,
-              backdropUrl: backdrop,
-              rating: it.rating || it.rating_5based || it.score || "",
-              year: it.year || it.releaseDate || "",
-              plot: it.plot || it.description || it.overview || "",
-              streamId: rawId,
-              sourceId: it.nodecast_source_id ?? it.source_id ?? pkg.source_id,
-              globalStreamId: it.nodecast_global_stream_id ?? it.global_stream_id ?? rawId,
-              containerExtension: it.container_extension || "",
-              contentType: tab,
-              packageId: pkg.id || pkg.category_id
-            };
-          });
-          packageFullItemsCache.set(cacheKey, items);
-          return items;
         }
       }
     }
 
-    const isUuid = (val) => typeof val === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
+    // 3. Resolve via live Xtream / appState (fetches full stream catalog if needed)
+    if (appState || typeof window.veloraGetHomeSectionContent === "function") {
+      const streamMap = appState ? (effectiveTab === "movies" ? appState.vodStreamsByCat : (effectiveTab === "series" ? appState.seriesStreamsByCat : appState.streamsByCatAll)) : null;
 
-    // 3. Fetch from backend package-media-items API for Admin Packages
-    const candidatePkgIds = [pkg.id, pkg.package_id, pkg.category_id].filter(Boolean);
-    if (window.veloraHomeSectionsState && Array.isArray(window.veloraHomeSectionsState.packages) && pkg.name) {
-      const pMatch = window.veloraHomeSectionsState.packages.find(p => String(p.name || "").trim().toLowerCase() === String(pkg.name).trim().toLowerCase());
-      if (pMatch && pMatch.id && !candidatePkgIds.includes(pMatch.id)) candidatePkgIds.push(pMatch.id);
+      for (const targetCatId of candidateCatIds) {
+        // Trigger background fetch if not loaded or if app provides veloraGetHomeSectionContent
+        if (typeof window.veloraGetHomeSectionContent === "function") {
+          try {
+            await window.veloraGetHomeSectionContent(effectiveTab, targetCatId, false);
+          } catch (_) {}
+        }
+
+        if (streamMap && streamMap.size > 0) {
+          let rawList = streamMap.get(targetCatId) || streamMap.get(String(targetCatId)) || (Number.isFinite(Number(targetCatId)) ? streamMap.get(Number(targetCatId)) : null);
+          if (Array.isArray(rawList) && rawList.length > 0) {
+            const sortedRawList = rawList.slice().sort((a, b) => getItemRecencyScore(b) - getItemRecencyScore(a));
+            const items = sortedRawList.map((it, idx) => {
+              const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? it.id ?? idx;
+              const { poster, backdrop } = extractMediaImages(it);
+              const name = it.name || it.title || it.series_name || "";
+              return {
+                id: `feed:${pkgId || targetCatId}:${rawId}`,
+                name: stripTitle(name),
+                rawName: name,
+                thumbUrl: poster || it.thumbUrl || "",
+                posterUrl: poster || it.posterUrl || it.thumbUrl || "",
+                backdropUrl: backdrop || it.backdropUrl || "",
+                rating: it.rating || it.rating_5based || it.score || "",
+                year: it.year || it.releaseDate || "",
+                plot: it.plot || it.description || it.overview || "",
+                streamId: rawId,
+                sourceId: it.nodecast_source_id ?? it.source_id ?? srcId,
+                globalStreamId: it.nodecast_global_stream_id ?? it.global_stream_id ?? rawId,
+                containerExtension: it.container_extension || it.containerExtension || "",
+                contentType: effectiveTab,
+                packageId: pkgId || targetCatId
+              };
+            });
+            if (items.length > 0) {
+              packageFullItemsCache.set(cacheKey, items);
+              return items;
+            }
+          }
+        }
+      }
     }
 
-    for (const targetPkgId of candidatePkgIds) {
+    // 4. Resolve via backend /admin/package-media-items API (for SQLite backend catalog & curations)
+    const allBackendTargets = [...new Set([...candidatePkgIds, ...candidateCatIds])];
+    const countryId = pkg.country_id || pkg.countryId || getActiveCountryId();
+    for (const targetId of allBackendTargets) {
       try {
-        const countryId = getActiveCountryId();
-        const kind = tab === "movies" ? "vod" : "series";
-        const res = await fetch(`/api/velora-db/admin/package-media-items?countryId=${encodeURIComponent(countryId)}&packageId=${encodeURIComponent(targetPkgId)}&kind=${encodeURIComponent(kind)}`);
+        const res = await fetch(`/api/velora-db/admin/package-media-items?countryId=${encodeURIComponent(countryId)}&packageId=${encodeURIComponent(targetId)}&kind=${encodeURIComponent(effectiveKind)}`);
         if (res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data.items) && data.items.length > 0) {
             const items = data.items.map(it => {
               const rawId = it.stream_id || it.id;
               const { poster, backdrop } = extractMediaImages(it);
+              const name = it.name || it.title || it.series_name || "";
               return {
-                id: `feed:${targetPkgId}:${rawId}`,
-                name: stripTitle(it.name || it.title || ""),
-                rawName: it.name || it.title || "",
-                thumbUrl: poster,
-                posterUrl: poster,
-                backdropUrl: backdrop,
-                rating: it.rating || "",
-                year: it.year || "",
-                plot: it.plot || it.description || "",
+                id: `feed:${targetId}:${rawId}`,
+                name: stripTitle(name),
+                rawName: name,
+                thumbUrl: poster || it.thumbUrl || "",
+                posterUrl: poster || it.posterUrl || it.thumbUrl || "",
+                backdropUrl: backdrop || it.backdropUrl || "",
+                rating: it.rating || it.rating_5based || it.score || "",
+                year: it.year || it.releaseDate || "",
+                plot: it.plot || it.description || it.overview || "",
                 streamId: rawId,
-                sourceId: it.source_id || pkg.source_id,
-                globalStreamId: it.globalStreamId || rawId,
+                sourceId: it.source_id || srcId,
+                globalStreamId: it.globalStreamId || it.global_stream_id || rawId,
                 containerExtension: it.container_extension || it.containerExtension || "",
-                contentType: tab,
-                packageId: targetPkgId
+                contentType: effectiveTab,
+                packageId: targetId
               };
             });
-            packageFullItemsCache.set(cacheKey, items);
-            return items;
+            if (items.length > 0) {
+              packageFullItemsCache.set(cacheKey, items);
+              return items;
+            }
           }
         }
       } catch (err) {
-        console.warn("[Velora Prime] Could not fetch package items from API for " + targetPkgId + ":", err.message);
+        console.warn("[Velora Prime] Package media items API error for " + targetId + ":", err.message);
       }
     }
 
-    // 4. Direct live Xtream catalog resolution (kw & Dh) via window.veloraGetHomeSectionContent (only for non-UUID category IDs)
-    if (typeof window.veloraGetHomeSectionContent === "function") {
-      const targetIdsToTry = [pkg.category_id, pkg.id].filter(id => id && !isUuid(id));
-      if (window.veloraHomeSectionsState && Array.isArray(window.veloraHomeSectionsState.packages) && pkg.name) {
-        const pMatch = window.veloraHomeSectionsState.packages.find(p => String(p.name || "").trim().toLowerCase() === String(pkg.name).trim().toLowerCase());
-        if (pMatch && pMatch.category_id && !isUuid(pMatch.category_id) && !targetIdsToTry.includes(pMatch.category_id)) {
-          targetIdsToTry.push(pMatch.category_id);
-        }
-      }
-
-      for (const targetId of targetIdsToTry) {
-        try {
-          const fullContent = await window.veloraGetHomeSectionContent(tab, targetId, false);
-          if (Array.isArray(fullContent) && fullContent.length > 0) {
-            const items = fullContent.map(it => {
-              const rawId = it.streamId || it.id;
-              const { poster, backdrop } = extractMediaImages(it);
-              return {
-                id: it.id || `feed:${pkg.id || targetId}:${rawId}`,
-                name: stripTitle(it.name || it.title || ""),
-                rawName: it.name || it.title || "",
-                thumbUrl: poster || it.thumbUrl || it.posterUrl || "",
-                posterUrl: poster || it.posterUrl || it.thumbUrl || "",
-                backdropUrl: backdrop || it.backdropUrl || "",
-                rating: it.rating || "",
-                year: it.year || "",
-                plot: it.plot || it.description || "",
-                streamId: rawId,
-                sourceId: it.sourceId || pkg.source_id,
-                globalStreamId: it.globalStreamId || rawId,
-                containerExtension: it.containerExtension || "",
-                contentType: it.contentType || tab,
-                packageId: it.packageId || targetId
-              };
-            });
-            packageFullItemsCache.set(cacheKey, items);
-            return items;
-          }
-        } catch (err) {
-          console.warn("[Velora Prime] Direct catalog fetch failed for " + targetId + ":", err);
-        }
-      }
-    }
-
-    // 5. Look up custom curated entries in admin_home_sections
-    if (typeof window.veloraGetHomeSectionByNodeOrTitle === "function") {
-      const secObj = window.veloraGetHomeSectionByNodeOrTitle(null, pkg.name);
+    // 5. Look up custom curated entries in admin_home_sections (if manual curation exists)
+    if (typeof window.veloraGetHomeSectionByNodeOrTitle === "function" && pkgName) {
+      const secObj = window.veloraGetHomeSectionByNodeOrTitle(null, pkgName);
       if (secObj && Array.isArray(secObj.custom_entries) && secObj.custom_entries.length > 0) {
         const items = secObj.custom_entries.map((it, idx) => {
           const rawId = it.stream_id || it.streamId || it.id || idx;
@@ -503,39 +568,77 @@
             year: it.year || it.releaseDate || "",
             plot: it.plot || it.description || "",
             streamId: rawId,
-            sourceId: it.nodecast_source_id ?? it.sourceId ?? it.source_id ?? pkg.source_id,
+            sourceId: it.nodecast_source_id ?? it.sourceId ?? it.source_id ?? srcId,
             globalStreamId: it.nodecast_global_stream_id ?? it.globalStreamId ?? it.global_stream_id ?? rawId,
             containerExtension: it.containerExtension || it.container_extension || "",
-            contentType: it.contentType || tab || "movies",
-            packageId: it.packageId || secObj.package_id || pkg.id
+            contentType: it.contentType || effectiveTab,
+            packageId: it.packageId || secObj.package_id || pkgId
           };
         });
-        packageFullItemsCache.set(cacheKey, items);
-        return items;
+        if (items.length > 0) {
+          packageFullItemsCache.set(cacheKey, items);
+          return items;
+        }
       }
     }
 
-    if (Array.isArray(pkg.items) && pkg.items.length) {
-      return pkg.items.map(it => {
+    // 6. Custom items pool fallback if passed explicitly
+    const customPool = (Array.isArray(pkg.customItems) && pkg.customItems.length > 0)
+      ? pkg.customItems
+      : ((Array.isArray(pkg.custom_entries) && pkg.custom_entries.length > 0) ? pkg.custom_entries : null);
+
+    if (customPool && customPool.length > 0) {
+      const items = customPool.map((it, idx) => {
+        const rawId = it.stream_id || it.streamId || it.id || idx;
         const { poster, backdrop } = extractMediaImages(it);
+        const name = it.name || it.title || it.series_name || "";
         return {
-          id: it.id || it.streamId,
-          name: stripTitle(it.name || it.title || ""),
-          rawName: it.name || it.title || "",
+          id: it.id || `custom:${pkgId || "sec"}:${rawId}`,
+          name: stripTitle(name),
+          rawName: name,
+          thumbUrl: poster || it.thumbUrl || it.horizontal_thumb || "",
+          posterUrl: poster || it.posterUrl || it.thumbUrl || "",
+          backdropUrl: backdrop || it.backdropUrl || it.horizontal_thumb || it.thumbUrl || "",
+          rating: it.rating || it.rating_5based || it.score || "",
+          year: it.year || it.releaseDate || "",
+          plot: it.plot || it.description || it.overview || "",
+          streamId: rawId,
+          sourceId: it.nodecast_source_id ?? it.sourceId ?? it.source_id ?? srcId,
+          globalStreamId: it.nodecast_global_stream_id ?? it.globalStreamId ?? it.global_stream_id ?? rawId,
+          containerExtension: it.containerExtension || it.container_extension || "",
+          contentType: effectiveTab,
+          packageId: pkgId || it.packageId
+        };
+      });
+      packageFullItemsCache.set(cacheKey, items);
+      return items;
+    }
+
+    // 7. Preview list fallback
+    if (Array.isArray(pkg.items) && pkg.items.length > 0) {
+      const items = pkg.items.map(it => {
+        const { poster, backdrop } = extractMediaImages(it);
+        const name = it.name || it.title || it.series_name || "";
+        const rawId = it.streamId ?? it.stream_id ?? it.seriesId ?? it.series_id ?? it.id;
+        return {
+          id: it.id || `feed:${pkgId || "pkg"}:${rawId}`,
+          name: stripTitle(name),
+          rawName: name,
           thumbUrl: poster || it.thumbUrl || "",
           posterUrl: poster || it.posterUrl || "",
           backdropUrl: backdrop || it.backdropUrl || "",
-          rating: it.rating || "",
-          year: it.year || "",
+          rating: it.rating || it.rating_5based || it.score || "",
+          year: it.year || it.releaseDate || "",
           plot: it.plot || it.description || "",
-          streamId: it.streamId || it.id,
-          sourceId: it.sourceId || pkg.source_id,
-          globalStreamId: it.globalStreamId || it.streamId,
-          containerExtension: it.containerExtension || "",
-          contentType: tab || it.contentType || "movies",
-          packageId: pkg.id
+          streamId: rawId,
+          sourceId: it.sourceId || it.source_id || srcId,
+          globalStreamId: it.globalStreamId || it.global_stream_id || rawId,
+          containerExtension: it.containerExtension || it.container_extension || "",
+          contentType: effectiveTab,
+          packageId: pkgId
         };
       });
+      return items;
     }
 
     return [];
@@ -550,7 +653,14 @@
 
   // Open Full Package Content Modal (Popup)
   async function openPackageModal(tab, pkg) {
+    if (!pkg) return;
     window.veloraOpenPrimePackageModal = openPackageModal;
+
+    const rawTab = tab || pkg.contentType || pkg._tab || pkg.kind || "movies";
+    const effectiveTab = (rawTab === "series" || pkg.contentType === "series" || pkg.kind === "series")
+      ? "series"
+      : ((rawTab === "live" || pkg.contentType === "live" || pkg.kind === "live") ? "live" : "movies");
+
     let modal = document.getElementById("vel-pkg-modal");
     if (!modal) {
       modal = document.createElement("div");
@@ -621,32 +731,56 @@
 
     resetModalScroll();
 
-    const pkgTitle = formatPackageTitle(pkg.name);
-    const initialCount = pkg.totalCount || (Array.isArray(pkg.customItems) ? pkg.customItems.length : (Array.isArray(pkg.items) ? pkg.items.length : 0));
+    const pkgTitle = formatPackageTitle(pkg.name || pkg.title || "Catalogue");
+    const rawPreviewItems = (Array.isArray(pkg.customItems) && pkg.customItems.length > 0)
+      ? pkg.customItems
+      : ((Array.isArray(pkg.items) && pkg.items.length > 0) ? pkg.items : []);
+
+    const previewItems = rawPreviewItems.map(it => {
+      const { poster, backdrop } = extractMediaImages(it);
+      const name = it.name || it.title || it.series_name || "";
+      const rawId = it.streamId ?? it.stream_id ?? it.seriesId ?? it.series_id ?? it.id;
+      return {
+        id: it.id || `feed:${pkg.id || "pkg"}:${rawId}`,
+        name: stripTitle(name),
+        rawName: name,
+        thumbUrl: poster || it.thumbUrl || "",
+        posterUrl: poster || it.posterUrl || it.thumbUrl || "",
+        backdropUrl: backdrop || it.backdropUrl || "",
+        rating: it.rating || it.rating_5based || it.score || "",
+        year: it.year || it.releaseDate || "",
+        plot: it.plot || it.description || "",
+        streamId: rawId,
+        sourceId: it.sourceId || it.source_id || pkg.sourceId || pkg.source_id,
+        globalStreamId: it.globalStreamId || it.global_stream_id || rawId,
+        containerExtension: it.containerExtension || it.container_extension || "",
+        contentType: effectiveTab,
+        packageId: pkg.id || pkg.package_id
+      };
+    });
+
+    const initialCount = pkg.totalCount || previewItems.length || 0;
     titleEl.textContent = pkgTitle;
-    countEl.textContent = getCountLabel(initialCount, tab);
+    countEl.textContent = initialCount > 0 ? getCountLabel(initialCount, effectiveTab) : "Chargement...";
     searchInput.value = "";
 
-    bodyEl.innerHTML = `
-      <div class="vel-pkg-modal__loader">
-        <div class="vel-pkg-modal__spinner"></div>
-        <span>Chargement du catalogue complet...</span>
-      </div>
-    `;
+    let currentItems = previewItems.slice();
 
-    modal.classList.add("is-open");
-    document.body.classList.add("vel-modal-active");
-    resetModalScroll();
-
-    const allItems = await fetchPackageFullItems(tab, pkg);
-    countEl.textContent = getCountLabel(allItems.length, tab);
-
-    function renderGrid(filterText = "") {
+    function renderGrid(itemsToRender, filterText = "") {
       const q = filterText.trim().toLowerCase();
-      const filtered = q ? allItems.filter(it => (it.name || "").toLowerCase().includes(q) || (it.rawName || "").toLowerCase().includes(q)) : allItems;
+      const filtered = q ? itemsToRender.filter(it => (it.name || "").toLowerCase().includes(q) || (it.rawName || "").toLowerCase().includes(q)) : itemsToRender;
 
       if (!filtered.length) {
-        bodyEl.innerHTML = `<div class="vel-pkg-modal__empty">Aucun résultat trouvé pour « ${filterText} ».</div>`;
+        if (!itemsToRender.length) {
+          bodyEl.innerHTML = `
+            <div class="vel-pkg-modal__loader">
+              <div class="vel-pkg-modal__spinner"></div>
+              <span>Chargement du catalogue complet...</span>
+            </div>
+          `;
+        } else {
+          bodyEl.innerHTML = `<div class="vel-pkg-modal__empty">Aucun résultat trouvé pour « ${filterText} ».</div>`;
+        }
         resetModalScroll();
         return;
       }
@@ -656,7 +790,7 @@
       const grid = document.createElement("div");
       grid.className = "vel-pkg-modal__grid";
 
-      filtered.forEach((item, idx) => {
+      filtered.forEach((item) => {
         const card = document.createElement("div");
         card.className = "vel-pkg-modal__card";
         card.setAttribute("role", "button");
@@ -683,6 +817,19 @@
         overlay.className = "vel-pkg-modal__card-overlay";
         overlay.innerHTML = '<div class="U6kOYF"><svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg></div>';
 
+        const rawR = item.rating || item.vod_rating || item.vote_average || item.score || item.rating_5based;
+        if (rawR != null && rawR !== "") {
+          const numR = typeof rawR === "number" ? rawR : parseFloat(String(rawR).replace(",", "."));
+          if (Number.isFinite(numR) && numR > 0) {
+            const dispR = numR <= 5 ? (numR * 2).toFixed(1) : numR.toFixed(1);
+            const ratingBadge = document.createElement("span");
+            ratingBadge.className = "vel-prime-rating-badge vel-media-rating-badge";
+            ratingBadge.textContent = `★ ${dispR}`;
+            ratingBadge.setAttribute("aria-label", `Note ${dispR}`);
+            thumbWrap.appendChild(ratingBadge);
+          }
+        }
+
         thumbWrap.append(overlay);
         card.appendChild(thumbWrap);
 
@@ -691,7 +838,7 @@
           modal.classList.remove("is-open");
           document.body.classList.remove("vel-modal-active");
           resetModalScroll();
-          openItem(tab, pkg, item, card);
+          openItem(effectiveTab, pkg, item, card);
         };
 
         card.addEventListener("click", playAction);
@@ -707,11 +854,39 @@
       requestAnimationFrame(resetModalScroll);
     }
 
-    renderGrid();
+    // Render instant preview items if available, or spinner
+    renderGrid(currentItems, "");
+
+    modal.classList.add("is-open");
+    document.body.classList.add("vel-modal-active");
+    resetModalScroll();
 
     searchInput.oninput = (e) => {
-      renderGrid(e.target.value);
+      renderGrid(currentItems, e.target.value);
     };
+
+    // Asynchronously resolve complete catalogue
+    try {
+      const allItems = await fetchPackageFullItems(effectiveTab, pkg);
+      if (Array.isArray(allItems) && allItems.length > 0) {
+        currentItems = allItems;
+        countEl.textContent = getCountLabel(allItems.length, effectiveTab);
+        renderGrid(currentItems, searchInput.value);
+      } else if (currentItems.length > 0) {
+        countEl.textContent = getCountLabel(currentItems.length, effectiveTab);
+      } else {
+        countEl.textContent = getCountLabel(0, effectiveTab);
+        bodyEl.innerHTML = `<div class="vel-pkg-modal__empty">Aucun contenu disponible pour cette catégorie.</div>`;
+      }
+    } catch (err) {
+      console.warn("[Velora Prime] Modal catalog fetch error:", err);
+      if (currentItems.length > 0) {
+        countEl.textContent = getCountLabel(currentItems.length, effectiveTab);
+      } else {
+        countEl.textContent = getCountLabel(0, effectiveTab);
+        bodyEl.innerHTML = `<div class="vel-pkg-modal__empty">Impossible de charger le catalogue.</div>`;
+      }
+    }
   }
 
   window.veloraOpenPrimePackageModal = openPackageModal;
@@ -747,10 +922,13 @@
     return openPackageModal(finalKind, {
       id: packageId || (matchedPkg && matchedPkg.id) || secObj?.id || sectionTitle,
       name: sectionTitle,
-      category_id: matchedPkg?.category_id,
-      source_id: matchedPkg?.source_id,
+      category_id: matchedPkg?.category_id || secObj?.category_id,
+      categoryId: matchedPkg?.category_id || secObj?.category_id,
+      source_id: matchedPkg?.source_id || secObj?.source_id,
+      sourceId: matchedPkg?.source_id || secObj?.source_id,
       country_id: matchedPkg?.country_id || secObj?.country_id,
-      customItems: customList || undefined
+      customItems: customList || undefined,
+      items: Array.isArray(secObj?.entries) && secObj.entries.length > 0 ? secObj.entries : undefined
     });
   };
 
@@ -911,6 +1089,19 @@
     overlay.className = "MaQfAR OhaBAC";
     overlay.innerHTML = '<div class="U6kOYF"><svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg></div>';
 
+    const rawR = item.rating || item.vod_rating || item.vote_average || item.score || item.rating_5based;
+    if (rawR != null && rawR !== "") {
+      const numR = typeof rawR === "number" ? rawR : parseFloat(String(rawR).replace(",", "."));
+      if (Number.isFinite(numR) && numR > 0) {
+        const dispR = numR <= 5 ? (numR * 2).toFixed(1) : numR.toFixed(1);
+        const ratingBadge = document.createElement("span");
+        ratingBadge.className = "vel-prime-rating-badge vel-media-rating-badge";
+        ratingBadge.textContent = `★ ${dispR}`;
+        ratingBadge.setAttribute("aria-label", `Note ${dispR}`);
+        packshot.appendChild(ratingBadge);
+      }
+    }
+
     packshot.append(btn, lz, overlay);
     section.appendChild(packshot);
     article.appendChild(section);
@@ -921,7 +1112,7 @@
   // Build and populate an active row
   function buildRow(tab, pkg) {
     const pkgTitle = formatPackageTitle(pkg.name);
-    const items = Array.isArray(pkg.items) ? pkg.items : [];
+    const items = shuffleArray(Array.isArray(pkg.items) ? pkg.items : []);
     const isHome = activeTab() === "home";
 
     const wrapper = document.createElement("div");
@@ -940,12 +1131,7 @@
 
     const h2 = document.createElement("h2");
     h2.className = "qwttco";
-    const typeBadge = isHome
-      ? (tab === "movies"
-          ? '<span class="vel-home-row-badge vel-home-row-badge--movies" aria-hidden="true">🎬</span>'
-          : '<span class="vel-home-row-badge vel-home-row-badge--series" aria-hidden="true">🍿</span>')
-      : "";
-    h2.innerHTML = `<span data-testid="carousel-title" class="">${typeBadge}<span>${pkgTitle}</span></span>`;
+    h2.innerHTML = `<span data-testid="carousel-title" class=""><span>${pkgTitle}</span></span>`;
     h2.style.cursor = "pointer";
 
     const seeMore = document.createElement("a");
@@ -1019,15 +1205,6 @@
   let lastHomeCountry = null;
   let homeFeedInitialized = false;
 
-  function shuffleArray(arr) {
-    const a = arr.slice();
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-  }
-
   function getHomeFeedContainer() {
     let container = document.getElementById("vel-home-prime-feed");
     if (!container) {
@@ -1084,48 +1261,37 @@
             const rawList = streamMap.get(pkg.id) || streamMap.get(String(pkg.id)) || (pkg.category_id ? streamMap.get(String(pkg.category_id)) : null);
             if (Array.isArray(rawList) && rawList.length > 0) {
               cloned.totalCount = Math.max(cloned.totalCount || 0, rawList.length);
-              const streamById = new Map();
-              rawList.forEach(it => {
-                const rawId = String(it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? '');
-                if (rawId) streamById.set(rawId, it);
-              });
+              const shuffledRawList = shuffleArray(rawList);
 
-              if (Array.isArray(cloned.items) && cloned.items.length > 0) {
-                cloned.items.forEach(it => {
-                  const raw = streamById.get(String(it.streamId || ''));
-                  if (raw) {
-                    const { poster, backdrop } = extractMediaImages(raw);
-                    if (poster) { cloned.posterUrl = poster; it.posterUrl = poster; it.thumbUrl = poster; }
-                    if (backdrop) it.backdropUrl = backdrop;
-                  }
-                });
-              } else {
-                cloned.items = rawList.slice(0, 20).map((it, idx) => {
-                  const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? idx;
-                  const { poster, backdrop } = extractMediaImages(it);
-                  return {
-                    id: `feed:${cloned.id}:${rawId}`,
-                    name: stripTitle(it.name || it.title || it.series_name || ""),
-                    rawName: it.name || it.title || it.series_name || "",
-                    thumbUrl: poster,
-                    posterUrl: poster,
-                    backdropUrl: backdrop,
-                    rating: it.rating || it.rating_5based || it.score || "",
-                    year: it.year || it.releaseDate || "",
-                    plot: it.plot || it.description || it.overview || "",
-                    streamId: rawId,
-                    sourceId: it.nodecast_source_id ?? it.source_id,
-                    globalStreamId: it.nodecast_global_stream_id ?? it.global_stream_id ?? rawId,
-                    containerExtension: it.container_extension || "",
-                    contentType: t,
-                    packageId: cloned.id
-                  };
-                });
-              }
+              cloned.items = shuffledRawList.slice(0, 20).map((it, idx) => {
+                const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? idx;
+                const { poster, backdrop } = extractMediaImages(it);
+                return {
+                  id: `feed:${cloned.id}:${rawId}`,
+                  name: stripTitle(it.name || it.title || it.series_name || ""),
+                  rawName: it.name || it.title || it.series_name || "",
+                  thumbUrl: poster,
+                  posterUrl: poster,
+                  backdropUrl: backdrop,
+                  rating: it.rating || it.rating_5based || it.score || "",
+                  year: it.year || it.releaseDate || "",
+                  plot: it.plot || it.description || it.overview || "",
+                  streamId: rawId,
+                  sourceId: it.nodecast_source_id ?? it.source_id,
+                  globalStreamId: it.nodecast_global_stream_id ?? it.global_stream_id ?? rawId,
+                  containerExtension: it.container_extension || "",
+                  contentType: t,
+                  packageId: cloned.id
+                };
+              });
+            } else if (Array.isArray(cloned.items) && cloned.items.length > 0) {
+              cloned.items = shuffleArray(cloned.items);
             }
+          } else if (Array.isArray(cloned.items) && cloned.items.length > 0) {
+            cloned.items = shuffleArray(cloned.items);
           }
           return cloned;
-        }).filter(p => !adultPackageIds.has(String(p.id)) && Array.isArray(p.items) && p.items.length > 0);
+        }).filter(p => !adultPackageIds.has(String(p.id)) && Array.isArray(p.items) && p.items.length >= 3);
       }
 
       const validMovies = processPackages(movieFeed?.packages, "movies");
@@ -1136,6 +1302,11 @@
 
       // Render initial 4 rows
       renderNextHomeChunk(4);
+
+      document.dispatchEvent(new CustomEvent("velora-prime-feed-rendered"));
+      if (typeof window.veloraCheckInitialHomeReady === "function") {
+        window.veloraCheckInitialHomeReady();
+      }
 
       // Attach scroll observer for lazy loading remaining rows
       setupHomeScrollSentinel(container);
@@ -1206,7 +1377,19 @@
 
     if (tab === "home") {
       container.style.setProperty("display", "none", "important");
-      initHomeMixedFeed(force);
+      const hasTopSections = !!document.querySelector("#vel-home-sections .vel-home-section__card");
+      if (hasTopSections || force) {
+        initHomeMixedFeed(force);
+      } else {
+        // Strict top-to-bottom loading: let Hero Slider and top Home curated rails finish first
+        const onHomeRendered = () => {
+          document.removeEventListener("velora-home-country-rendered", onHomeRendered);
+          clearTimeout(fallbackTimer);
+          initHomeMixedFeed(force);
+        };
+        const fallbackTimer = setTimeout(onHomeRendered, 300);
+        document.addEventListener("velora-home-country-rendered", onHomeRendered, { once: true });
+      }
       return;
     }
 
@@ -1218,7 +1401,7 @@
     container.style.removeProperty("display");
 
     const feedKey = `${country}:${tab}`;
-    if (!force && feedKey === lastFeedKey && container.children.length > 0) {
+    if (!force && (feedKey === lastFeedKey || (lastRenderedTab === tab && lastRenderedCountry === country)) && container.children.length > 0) {
       return;
     }
 
@@ -1238,59 +1421,49 @@
             const rawList = streamMap.get(pkg.id) || streamMap.get(String(pkg.id)) || (pkg.category_id ? streamMap.get(String(pkg.category_id)) : null);
             if (Array.isArray(rawList) && rawList.length > 0) {
               pkg.totalCount = Math.max(pkg.totalCount || 0, rawList.length);
-
-              const streamById = new Map();
-              rawList.forEach(it => {
-                const rawId = String(it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? '');
-                if (rawId) streamById.set(rawId, it);
+              const shuffledRawList = shuffleArray(rawList);
+              pkg.items = shuffledRawList.slice(0, 20).map((it, idx) => {
+                const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? idx;
+                const { poster, backdrop } = extractMediaImages(it);
+                return {
+                  id: `feed:${pkg.id}:${rawId}`,
+                  name: stripTitle(it.name || it.title || it.series_name || ""),
+                  rawName: it.name || it.title || it.series_name || "",
+                  thumbUrl: poster,
+                  posterUrl: poster,
+                  backdropUrl: backdrop,
+                  rating: it.rating || it.rating_5based || it.score || "",
+                  year: it.year || it.releaseDate || "",
+                  plot: it.plot || it.description || it.overview || "",
+                  streamId: rawId,
+                  sourceId: it.nodecast_source_id ?? it.source_id ?? pkg.source_id,
+                  globalStreamId: it.nodecast_global_stream_id ?? it.global_stream_id ?? rawId,
+                  containerExtension: it.container_extension || "",
+                  contentType: tab,
+                  packageId: pkg.id
+                };
               });
-
-              if (Array.isArray(pkg.items) && pkg.items.length > 0) {
-                // Enrich existing preview items with real vertical poster from appState
-                pkg.items.forEach(it => {
-                  const raw = streamById.get(String(it.streamId || ''));
-                  if (raw) {
-                    const { poster, backdrop } = extractMediaImages(raw);
-                    if (poster) {
-                      it.posterUrl = poster;
-                      it.thumbUrl = poster;
-                    }
-                    if (backdrop) {
-                      it.backdropUrl = backdrop;
-                    }
-                  }
-                });
-              } else {
-                // Populate preview items if empty
-                pkg.items = rawList.slice(0, 20).map((it, idx) => {
-                  const rawId = it.raw_stream_id ?? it.raw_series_id ?? it.stream_id ?? it.series_id ?? idx;
-                  const { poster, backdrop } = extractMediaImages(it);
-                  return {
-                    id: `feed:${pkg.id}:${rawId}`,
-                    name: stripTitle(it.name || it.title || it.series_name || ""),
-                    rawName: it.name || it.title || it.series_name || "",
-                    thumbUrl: poster,
-                    posterUrl: poster,
-                    backdropUrl: backdrop,
-                    rating: it.rating || it.rating_5based || it.score || "",
-                    year: it.year || it.releaseDate || "",
-                    plot: it.plot || it.description || it.overview || "",
-                    streamId: rawId,
-                    sourceId: it.nodecast_source_id ?? it.source_id,
-                    globalStreamId: it.nodecast_global_stream_id ?? it.global_stream_id ?? rawId,
-                    containerExtension: it.container_extension || "",
-                    contentType: tab,
-                    packageId: pkg.id
-                  };
-                });
-              }
+            } else if (Array.isArray(pkg.items) && pkg.items.length > 0) {
+              pkg.items = shuffleArray(pkg.items);
+            }
+          });
+        } else {
+          packages.forEach(pkg => {
+            if (Array.isArray(pkg.items) && pkg.items.length > 0) {
+              pkg.items = shuffleArray(pkg.items);
             }
           });
         }
+      } else {
+        packages.forEach(pkg => {
+          if (Array.isArray(pkg.items) && pkg.items.length > 0) {
+            pkg.items = shuffleArray(pkg.items);
+          }
+        });
       }
 
-      // Filter packages that have preview items and are not assigned to adult
-      const validPackages = packages.filter(p => !adultPackageIds.has(String(p.id)) && Array.isArray(p.items) && p.items.length > 0);
+      // Filter packages that have preview items and are not assigned to adult (at least 3 items)
+      const validPackages = packages.filter(p => !adultPackageIds.has(String(p.id)) && Array.isArray(p.items) && p.items.length >= 3);
 
       if (!validPackages.length) {
         container.style.display = "none";
@@ -1298,10 +1471,15 @@
       }
 
       lastFeedKey = feedKey;
+      lastRenderedTab = tab;
+      lastRenderedCountry = country;
       container.innerHTML = "";
 
-      // 1. Create top Hero Spotlight Banner (randomized across packages on each visit)
-      const candidatePackages = validPackages.filter(p => Array.isArray(p.items) && p.items.length > 0);
+      // 1. Randomize package order on each visit across Movies & Series pages
+      const shuffledPackages = shuffleArray(validPackages);
+
+      // 2. Create top Hero Spotlight Banner (randomized across packages on each visit)
+      const candidatePackages = shuffledPackages.filter(p => Array.isArray(p.items) && p.items.length > 0);
       if (candidatePackages.length > 0) {
         const samplePool = candidatePackages.slice(0, Math.min(candidatePackages.length, 12));
         const randPkg = samplePool[Math.floor(Math.random() * samplePool.length)];
@@ -1316,8 +1494,8 @@
         }
       }
 
-      // 2. Render horizontal carousel rows (vertical cards)
-      validPackages.forEach(pkg => {
+      // 3. Render horizontal carousel rows in randomized package order
+      shuffledPackages.forEach(pkg => {
         const rowEl = buildRow(tab, pkg);
         container.appendChild(rowEl);
       });
@@ -1341,14 +1519,6 @@
     let primeSearchBtn = document.getElementById("vel-prime-search-btn");
     const globalSearch = document.getElementById("vel-global-search");
     const primeContainer = document.getElementById("vel-prime-carousels-container");
-
-    if (isHome) {
-      if (primeContainer) primeContainer.style.setProperty("display", "none", "important");
-      if (primeSearchBtn) primeSearchBtn.style.setProperty("display", "none", "important");
-      if (velHeader) velHeader.style.setProperty("display", "none", "important");
-      if (stickyTop && !isDetailOrPlayerOpen) stickyTop.style.setProperty("display", "none", "important");
-      return;
-    }
 
     if (isMedia && !isDetailOrPlayerOpen) {
       if (primeContainer) primeContainer.style.removeProperty("display");
@@ -1428,52 +1598,58 @@
   }
 
   // Listeners & Lifecycle
-  document.addEventListener("velora-home-tab", () => {
-    lastFeedKey = "";
+  document.addEventListener("velora-home-tab", (e) => {
+    const tab = (e && e.detail && e.detail.tab) || activeTab();
     syncHeaderForMediaTabs();
-    setTimeout(() => render(false), 30);
+    if (MEDIA_TABS.has(tab)) {
+      render(false);
+    }
   });
 
-  document.addEventListener("velora-country-change", () => {
+  // When background catalog completes loading, do NOT destroy and re-shuffle already rendered carousels
+  window.addEventListener("velora-vod-ready", () => {
+    const tab = activeTab();
+    if (tab !== "movies") return;
+    const container = getContainer();
+    if (container && container.children.length > 0) return; // Already rendered cleanly, do not reload!
+    syncHeaderForMediaTabs();
+    render(false);
+  });
+  window.addEventListener("velora-series-ready", () => {
+    const tab = activeTab();
+    if (tab !== "series") return;
+    const container = getContainer();
+    if (container && container.children.length > 0) return; // Already rendered cleanly, do not reload!
+    syncHeaderForMediaTabs();
+    render(false);
+  });
+
+  function onCountryChanged(force = false) {
+    const currentCountry = getActiveCountryId();
+    if (!force && lastRenderedCountry && currentCountry === lastRenderedCountry) {
+      return; // Same country, ignore startup/watchdog re-triggers
+    }
+    lastRenderedCountry = currentCountry;
     lastFeedKey = "";
     lastHomeCountry = null;
     homeFeedInitialized = false;
     feedCache.clear();
     packageFullItemsCache.clear();
     syncHeaderForMediaTabs();
-    setTimeout(() => render(true), 30);
-  });
-
-  // When Xtream catalog data finishes loading in background, refresh posters if needed
-  window.addEventListener("velora-vod-ready", () => {
-    if (activeTab() === "home") {
-      return;
-    }
-    lastFeedKey = "";
-    syncHeaderForMediaTabs();
-    render();
-  });
-  window.addEventListener("velora-series-ready", () => {
-    if (activeTab() === "home") {
-      return;
-    }
-    lastFeedKey = "";
-    syncHeaderForMediaTabs();
-    render();
-  });
-
-  const countrySelect = document.getElementById("country-select");
-  if (countrySelect) {
-    countrySelect.addEventListener("change", () => {
-      lastFeedKey = "";
-      lastHomeCountry = null;
-      homeFeedInitialized = false;
-      feedCache.clear();
-      packageFullItemsCache.clear();
-      syncHeaderForMediaTabs();
-      setTimeout(() => render(true), 30);
-    });
+    render(true);
   }
+
+  document.addEventListener("change", (e) => {
+    if (e.target && (e.target.id === "country-select" || e.target.id === "home-country-select")) {
+      onCountryChanged(true);
+    }
+  }, true);
+
+  document.addEventListener("velora-country-change", () => onCountryChanged(false));
+  document.addEventListener("velora-country-changed", () => onCountryChanged(false));
+  document.addEventListener("velora-countries-ready", () => onCountryChanged(false));
+  window.addEventListener("velora-country-change", () => onCountryChanged(false));
+  window.addEventListener("velora-countries-ready", () => onCountryChanged(false));
 
   document.addEventListener("velora-return-home", () => {
     setTimeout(() => initHomeMixedFeed(false), 50);
@@ -1485,10 +1661,9 @@
     const tabChanged = tab !== prevObservedTab;
     if (tabChanged) {
       prevObservedTab = tab;
-      lastFeedKey = "";
       syncHeaderForMediaTabs();
       if (MEDIA_TABS.has(tab)) {
-        render();
+        render(false);
       } else if (tab === "home") {
         const c = document.getElementById("vel-prime-carousels-container");
         if (c) c.style.display = "none";

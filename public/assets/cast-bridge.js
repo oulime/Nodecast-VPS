@@ -6,11 +6,11 @@
   var CAST_SDK_SRC = "https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1";
 
   var state = {
-
     sdkReady: false,
     sdkLoading: false,
     castState: "NO_DEVICES_AVAILABLE",
     sessionState: "NO_SESSION",
+    destinationMode: "tv", // 'tv' (diffuse to TV) | 'phone' (play locally on phone, keep cast running)
     currentMedia: null,
     lastLoadedKey: "",
     pendingCastClick: false,
@@ -23,7 +23,8 @@
     phase: "DISCONNECTED",
     activeVideo: null,
     airPlayAvailable: false,
-    airPlayConnected: false
+    airPlayConnected: false,
+    timeTicker: null
   };
 
   function isIosOrSafari() {
@@ -37,16 +38,112 @@
     return document.getElementById(id);
   }
 
-  function usableUrl(url) {
-    return !!url && !/^(blob:|data:|about:|mediastream:)/i.test(String(url));
-  }
-
-  function absoluteUrl(url) {
-    if (!usableUrl(url)) return "";
+  function getAuthToken() {
     try {
-      return new URL(url, window.location.href).href;
+      return localStorage.getItem("authToken") || "";
     } catch (_) {
       return "";
+    }
+  }
+
+  function getSavedDestinationMode() {
+    try {
+      var saved = localStorage.getItem("velora_cast_destination");
+      return saved === "phone" ? "phone" : "tv";
+    } catch (_) {
+      return "tv";
+    }
+  }
+
+  state.destinationMode = getSavedDestinationMode();
+
+  function isCastAutoDiffuseOn() {
+    return state.destinationMode === "tv";
+  }
+
+  function setCastDestination(mode) {
+    state.destinationMode = mode === "phone" ? "phone" : "tv";
+    try {
+      localStorage.setItem("velora_cast_destination", state.destinationMode);
+    } catch (_) {}
+
+    var wrap = document.getElementById("vel-cast-active-bar-wrap");
+    if (wrap) {
+      var phoneBtn = wrap.querySelector(".vel-cast-segment-btn[data-mode='phone']");
+      var tvBtn = wrap.querySelector(".vel-cast-segment-btn[data-mode='tv']");
+      var subSpan = wrap.querySelector(".vel-cast-capsule-sub");
+      var deviceName = getCastDeviceName();
+
+      if (phoneBtn) phoneBtn.classList.toggle("is-active", state.destinationMode === "phone");
+      if (tvBtn) tvBtn.classList.toggle("is-active", state.destinationMode === "tv");
+
+      if (subSpan) {
+        subSpan.textContent = state.destinationMode === "tv"
+          ? deviceName
+          : deviceName + " · Mode téléphone";
+        subSpan.classList.toggle("is-idle", state.destinationMode === "phone");
+      }
+    }
+
+    if (state.destinationMode === "tv") {
+      haltMobilePlayersForCast();
+      var media = state.currentMedia || normalizeMedia({});
+      if (media && session()) {
+        loadMediaOnCast(media, { force: true });
+      }
+      showCastToast("Diffusion automatique vers la TV activée");
+    } else {
+      document.querySelectorAll("video, audio").forEach(function (v) {
+        if (v) {
+          try {
+            v.muted = false;
+            v.volume = 1;
+          } catch (_) {}
+        }
+      });
+      showCastToast("Prochaines vidéos sur le téléphone (la TV continue)");
+    }
+  }
+
+  function haltMobilePlayersForCast() {
+    var liveContainer = document.getElementById("player-container");
+    if (liveContainer) liveContainer.classList.add("hidden");
+    var vodContainer = document.getElementById("vod-player-container");
+    if (vodContainer) vodContainer.classList.add("hidden");
+
+    var vElements = [document.getElementById("video-vod"), document.getElementById("video")];
+    document.querySelectorAll("video, audio").forEach(function (v) {
+      if (vElements.indexOf(v) === -1) vElements.push(v);
+    });
+
+    vElements.forEach(function (v) {
+      if (!v) return;
+      try {
+        v.pause();
+        v.muted = true;
+      } catch (_) {}
+    });
+  }
+
+  function resolveFullPublicUrl(url) {
+    if (!url) return "";
+    var target = String(url).trim();
+    if (!target || /^(blob:|data:|about:|mediastream:)/i.test(target)) return "";
+    try {
+      if (target.indexOf("/") === 0) {
+        target = window.location.origin + target;
+      } else if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(target)) {
+        target = target.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i, window.location.origin);
+      }
+      var token = getAuthToken();
+      if (token && (target.indexOf("/api/") !== -1 || target.indexOf("/proxy") !== -1)) {
+        if (target.indexOf("token=") === -1) {
+          target += (target.indexOf("?") === -1 ? "?" : "&") + "token=" + encodeURIComponent(token);
+        }
+      }
+      return target;
+    } catch (_) {
+      return target;
     }
   }
 
@@ -67,12 +164,29 @@
   }
 
   function activeVideo() {
+    var liveContainer = document.getElementById("player-container");
+    var vodContainer = document.getElementById("vod-player-container");
+    var isPlayerVisible = (liveContainer && !liveContainer.classList.contains("hidden")) ||
+                          (vodContainer && !vodContainer.classList.contains("hidden"));
+
     var videos = Array.prototype.slice.call(document.querySelectorAll("video"));
-    return videos.find(function (video) {
-      return video && !video.paused && !video.ended && video.readyState > 0;
-    }) || state.activeVideo || videos.find(function (video) {
-      return video && (video.__veloraCastUrl || video.currentSrc || video.src);
-    }) || document.getElementById("video-vod") || document.getElementById("video") || null;
+    var playing = videos.find(function (video) {
+      return video && !video.paused && !video.ended && (video.currentTime > 0 || video.readyState > 0);
+    });
+    if (playing) return playing;
+
+    if (isPlayerVisible) {
+      if (vodContainer && !vodContainer.classList.contains("hidden")) {
+        var vv = document.getElementById("video-vod");
+        if (vv && (vv.__veloraCastUrl || vv.currentSrc || vv.src) && !vv.ended) return vv;
+      }
+      if (liveContainer && !liveContainer.classList.contains("hidden")) {
+        var vl = document.getElementById("video");
+        if (vl && (vl.__veloraCastUrl || vl.currentSrc || vl.src) && !vl.ended) return vl;
+      }
+    }
+
+    return (state.activeVideo && !state.activeVideo.paused && !state.activeVideo.ended) ? state.activeVideo : null;
   }
 
   function textFrom(selectors) {
@@ -107,7 +221,7 @@
       document.querySelector(".vel-vod-detail img") && document.querySelector(".vel-vod-detail img").getAttribute("src")
     ];
     for (var i = 0; i < candidates.length; i += 1) {
-      var url = absoluteUrl(candidates[i]);
+      var url = resolveFullPublicUrl(candidates[i]);
       if (url) return url;
     }
     return "";
@@ -130,46 +244,69 @@
   }
 
   function normalizeMedia(input) {
-    var video = input && input.video || activeVideo();
+    var video = (input && input.video) || activeVideo();
     var app = window.app || {};
-    var appUrl = app.pages && app.pages.watch && app.pages.watch.currentUrl || app.player && app.player.currentUrl;
-    var url = absoluteUrl(input && input.url || appUrl || video && video.__veloraCastUrl || video && (video.currentSrc || video.src));
+    var appUrl = (app.pages && app.pages.watch && app.pages.watch.currentUrl) || (app.player && app.player.currentUrl);
+    
+    var rawUrl = (
+      (input && (input.url || input.castUrl || input.direct_source || input.sourceUrl)) ||
+      (video && video.__veloraCastUrl) ||
+      (video && video.hls && video.hls.url) ||
+      (window.hls && window.hls.url) ||
+      window.__veloraCurrentStreamUrl ||
+      appUrl ||
+      (video && video.currentSrc && !/^(blob:|data:|about:|mediastream:)/i.test(video.currentSrc) ? video.currentSrc : "") ||
+      (video && video.src && !/^(blob:|data:|about:|mediastream:)/i.test(video.src) ? video.src : "")
+    );
+
+    var url = resolveFullPublicUrl(rawUrl);
     if (!url) return null;
 
-    var type = input && input.type || (input && input.isLive ? "live" : isM3u8(url) ? "video" : "video");
-    var isLive = Boolean(input && input.isLive) || type === "live";
+    var type = (input && input.type) || ((input && input.isLive) ? "live" : isM3u8(url) ? "video" : "video");
+    var isLive = Boolean(input && input.isLive) || type === "live" || Boolean(input && input.stream_type === "live");
+    var title = (input && (input.title || input.name)) || pageTitle(video);
+    var poster = resolveFullPublicUrl((input && input.poster) || pagePoster(video));
+
     var media = {
       type: type,
       url: url,
-      title: input && input.title || pageTitle(video),
-      poster: absoluteUrl(input && input.poster) || pagePoster(video),
-      contentType: input && input.contentType || contentTypeFor(url),
+      castUrl: url,
+      title: title,
+      name: title,
+      poster: poster,
+      contentType: (input && input.contentType) || contentTypeFor(url),
+      castContentType: (input && input.castContentType) || contentTypeFor(url),
       isLive: isLive,
       position: isLive ? 0 : logicalPosition(input, video),
       offset: input && Number.isFinite(Number(input.offset)) ? Math.max(0, Number(input.offset)) : 0,
       duration: input && Number.isFinite(Number(input.duration))
         ? Math.max(0, Number(input.duration))
         : (!isLive && video && Number.isFinite(Number(video.duration)) ? Math.max(0, Number(video.duration)) : 0),
-      sourceUrl: absoluteUrl(input && input.sourceUrl),
-      baseUrl: absoluteUrl(input && input.baseUrl),
+      sourceUrl: resolveFullPublicUrl(input && input.sourceUrl),
+      baseUrl: resolveFullPublicUrl(input && input.baseUrl),
       authHeaders: input && input.authHeaders || null,
       videoMode: input && input.videoMode,
       videoCodec: input && input.videoCodec,
       audioCodec: input && input.audioCodec,
       audioChannels: input && input.audioChannels,
+      streamId: (input && input.streamId) || (video && video.dataset && video.dataset.streamId) || null,
+      seriesId: (input && input.seriesId) || (video && video.dataset && video.dataset.seriesId) || null,
+      episodeStreamId: (input && input.episodeStreamId) || (video && video.dataset && video.dataset.episodeStreamId) || null,
+      seasonNumber: (input && input.seasonNumber) || null,
+      episodeNumber: (input && input.episodeNumber) || null,
+      sourceId: (input && input.sourceId) || "",
+      packageId: (input && input.packageId) || "",
       video: video || null
     };
-    media.playbackMode = input && input.playbackMode || (isInternalTranscode(url) ? "transcode" : "final");
-    media.castUrl = absoluteUrl(input && input.castUrl) || url;
-    media.castContentType = input && input.castContentType || contentTypeFor(media.castUrl || media.url);
+    media.playbackMode = (input && input.playbackMode) || (isInternalTranscode(url) ? "transcode" : "final");
     return media;
   }
 
   function setStatus(text) {
     var button = byId("velora-cast-button");
     if (!button) return;
-    button.title = text || "Cast video to TV";
-    button.setAttribute("aria-label", text || "Cast video to TV");
+    button.title = text || "Diffuser la vidéo sur votre TV";
+    button.setAttribute("aria-label", text || "Diffuser la vidéo sur votre TV");
   }
 
   function setPhase(phase) {
@@ -184,23 +321,6 @@
     }
   }
 
-  function showBlockedMessage() {
-    if (!state.pendingCastClick || state.sdkReady || isIosOrSafari()) return;
-    state.sdkLoading = false;
-    var oldScript = byId("velora-google-cast-sdk");
-    if (oldScript) oldScript.remove();
-    window.alert(
-      "Cast is blocked by your browser.\n\n" +
-      "Allow local network access and allow Google Cast / third-party scripts for this site, then click Cast again."
-    );
-  }
-
-  function armBlockedTimer() {
-    if (isIosOrSafari()) return;
-    clearBlockedTimer();
-    state.blockedTimer = window.setTimeout(showBlockedMessage, 5500);
-  }
-
   function rememberSessionActive(active) {
     try {
       if (active) localStorage.setItem(SESSION_KEY, "1");
@@ -208,17 +328,13 @@
     } catch (_) { }
   }
 
-  function hadSessionActive() {
-    try {
-      return localStorage.getItem(SESSION_KEY) === "1";
-    } catch (_) {
-      return false;
-    }
-  }
-
   function session() {
-    if (!state.sdkReady || !window.cast || !window.cast.framework) return null;
-    return window.cast.framework.CastContext.getInstance().getCurrentSession();
+    if (!state.sdkReady || !window.cast || !window.cast.framework || !window.cast.framework.CastContext) return null;
+    try {
+      return window.cast.framework.CastContext.getInstance().getCurrentSession();
+    } catch (_) {
+      return null;
+    }
   }
 
   function canUseGoogleCast() {
@@ -232,48 +348,481 @@
     );
   }
 
-  function isTvReachableCastUrl(url) {
-    if (!url || /^(blob:|data:|about:|mediastream:)/i.test(String(url))) return false;
-    try {
-      var parsed = new URL(url, window.location.href);
-      if (parsed.protocol !== "https:") return false;
-      return !/^(localhost|127(?:\.\d+){3}|\[::1\])$/i.test(parsed.hostname);
-    } catch (_) {
-      return false;
-    }
-  }
-
   function syncButton() {
     var button = byId("velora-cast-button");
     if (!button) return;
-    var video = activeVideo();
-    var hasMedia = !!state.currentMedia || !!normalizeMedia({}) || (video && !!(video.currentSrc || video.src));
     var isIos = isIosOrSafari();
     var isConnected = !!session() || !!state.airPlayConnected;
 
-    button.disabled = !hasMedia || state.requestPending;
+    button.disabled = false;
     button.classList.toggle("velora-cast-button--connected", isConnected);
 
-    if (!hasMedia) setStatus(isIos ? "Lancez une vidéo pour diffuser (AirPlay)" : "Start a video first, then cast it");
-    else if (state.requestPending) setStatus("Opening Cast picker");
-    else if (isConnected) setStatus(isIos ? "AirPlay actif sur TV" : "Casting to TV");
+    if (isConnected) setStatus(isIos ? "AirPlay actif sur TV" : "Diffusion active sur TV");
     else if (isIos) setStatus("Diffuser sur la TV (AirPlay)");
-    else if (!state.sdkReady) setStatus("Cast loading. If nothing opens, allow local network access for this site.");
-    else if (session() && state.phase === "LOADING_MEDIA") setStatus("Sending video to TV");
-    else if (session()) setStatus("Casting to TV");
-    else if (state.castState === "NO_DEVICES_AVAILABLE") setStatus("Cast ready. Click to search for TVs.");
-    else setStatus("Cast video to TV");
+    else if (session() && state.phase === "LOADING_MEDIA") setStatus("Envoi vers la TV…");
+    else if (session()) setStatus("Diffusion active sur TV");
+    else setStatus("Diffuser sur la TV (Cast / AirPlay)");
+  }
+
+  function getCastDeviceName() {
+    if (state.airPlayConnected) return "AirPlay (Apple TV)";
+    var castSession = session();
+    if (castSession && castSession.getCastDevice()) {
+      return castSession.getCastDevice().friendlyName || "Google Cast";
+    }
+    return "Smart TV (Cast)";
+  }
+
+  function showCastToast(msg) {
+    try {
+      var existing = document.getElementById("vel-cast-toast");
+      if (existing) existing.remove();
+
+      var toast = document.createElement("div");
+      toast.id = "vel-cast-toast";
+      toast.style.cssText = "position:fixed;top:24px;left:50%;transform:translateX(-50%);background:rgba(21,13,42,0.96);border:1px solid rgba(167,139,250,0.5);color:#fff;padding:12px 22px;border-radius:14px;font-size:14px;font-weight:500;box-shadow:0 10px 35px rgba(0,0,0,0.6);z-index:9999999;transition:all 0.3s cubic-bezier(0.16,1,0.3,1);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;align-items:center;gap:12px;pointer-events:none;max-width:90vw;text-align:center;";
+      toast.innerHTML = "<svg viewBox='0 0 24 24' width='16' height='16' fill='none' stroke='#a78bfa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M2 16.1A5 5 0 0 1 5.9 20M2 12.05A9 9 0 0 1 9.95 20M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6M2 20h.01'/></svg> <span>" + msg + "</span>";
+      document.body.appendChild(toast);
+
+      setTimeout(function () {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateX(-50%) translateY(-12px)";
+        setTimeout(function () { toast.remove(); }, 350);
+      }, 3000);
+    } catch (_) {}
+  }
+
+  function formatCastTime(secs) {
+    if (!Number.isFinite(secs) || secs < 0) return "00:00";
+    var s = Math.floor(secs);
+    var h = Math.floor(s / 3600);
+    var m = Math.floor((s % 3600) / 60);
+    var sec = s % 60;
+    var mm = m < 10 ? "0" + m : "" + m;
+    var ss = sec < 10 ? "0" + sec : "" + sec;
+    if (h > 0) {
+      return h + ":" + mm + ":" + ss;
+    }
+    return mm + ":" + ss;
+  }
+
+  function updateCastBarTime() {
+    var wrap = document.getElementById("vel-cast-active-bar-wrap");
+    if (!wrap) return;
+    var castSess = (typeof session === "function") ? session() : null;
+    var curr = 0;
+    var dur = 0;
+    var isLive = false;
+
+    if (castSess) {
+      try {
+        var remoteMedia = castSess.getMediaSession();
+        if (remoteMedia) {
+          if (!remoteMedia.__veloraListenerAttached && typeof remoteMedia.addUpdateListener === "function") {
+            remoteMedia.__veloraListenerAttached = true;
+            remoteMedia.addUpdateListener(function () {
+              syncFromRemoteSession(castSess);
+              updateCastBarTime();
+            });
+          }
+          if (!state.currentMedia || !state.currentMedia.title || state.currentMedia.title === "Diffusion TV") {
+            syncFromRemoteSession(castSess);
+          }
+          curr = typeof remoteMedia.getEstimatedTime === "function" ? remoteMedia.getEstimatedTime() : (Number(remoteMedia.currentTime) || 0);
+          dur = (remoteMedia.media && Number(remoteMedia.media.duration)) || (state.currentMedia && Number(state.currentMedia.duration)) || 0;
+          isLive = (remoteMedia.media && remoteMedia.media.streamType === (window.chrome && window.chrome.cast && window.chrome.cast.media ? window.chrome.cast.media.StreamType.LIVE : "LIVE")) || (state.currentMedia && !!state.currentMedia.isLive);
+        }
+      } catch (_) {}
+    }
+
+    if (!curr && state.currentMedia && Number.isFinite(state.currentMedia.position)) {
+      curr = state.currentMedia.position;
+      dur = state.currentMedia.duration || 0;
+      isLive = !!state.currentMedia.isLive;
+    }
+
+    var timeBadge = wrap.querySelector(".vel-cast-capsule-time-badge");
+    var progressFill = wrap.querySelector(".vel-cast-capsule-progress-fill");
+
+    var CAST_STATE_KEY = "velora_active_cast_state_v1";
+
+    if (isLive) {
+      if (timeBadge) {
+        timeBadge.textContent = "EN DIRECT";
+        timeBadge.classList.remove("hidden");
+        timeBadge.classList.add("is-live");
+      }
+      if (progressFill) progressFill.style.width = "100%";
+      try {
+        localStorage.setItem(CAST_STATE_KEY, JSON.stringify({
+          active: true,
+          title: (state.currentMedia && (state.currentMedia.title || state.currentMedia.name)) || "Diffusion TV",
+          deviceName: getCastDeviceName(),
+          isLive: true,
+          curr: 0,
+          dur: 0,
+          timestamp: Date.now()
+        }));
+      } catch (_) {}
+      return;
+    }
+
+    if (Number.isFinite(curr) && curr >= 0) {
+      var currStr = formatCastTime(curr);
+      var durStr = (Number.isFinite(dur) && dur > 0) ? formatCastTime(dur) : "";
+      var label = durStr ? currStr + " / " + durStr : currStr;
+
+      if (timeBadge) {
+        if (curr > 0 || dur > 0) {
+          timeBadge.textContent = label;
+          timeBadge.classList.remove("hidden", "is-live");
+        }
+      }
+      if (progressFill && Number.isFinite(dur) && dur > 0) {
+        var pct = Math.min(100, Math.max(0, (curr / dur) * 100));
+        progressFill.style.width = pct.toFixed(1) + "%";
+      }
+
+      // Persist state across reloads and other tabs
+      try {
+        localStorage.setItem(CAST_STATE_KEY, JSON.stringify({
+          active: true,
+          title: (state.currentMedia && (state.currentMedia.title || state.currentMedia.name)) || "Diffusion TV",
+          deviceName: getCastDeviceName(),
+          isLive: false,
+          curr: curr,
+          dur: dur,
+          streamId: state.currentMedia && state.currentMedia.streamId,
+          seriesId: state.currentMedia && state.currentMedia.seriesId,
+          episodeStreamId: state.currentMedia && state.currentMedia.episodeStreamId,
+          seasonNumber: state.currentMedia && state.currentMedia.seasonNumber,
+          episodeNumber: state.currentMedia && state.currentMedia.episodeNumber,
+          sourceId: state.currentMedia && state.currentMedia.sourceId,
+          packageId: state.currentMedia && state.currentMedia.packageId,
+          poster: state.currentMedia && state.currentMedia.poster,
+          timestamp: Date.now()
+        }));
+      } catch (_) {}
+
+      // Dispatch event so Watch History (Reprendre la lecture) records playback in real-time
+      try {
+        document.dispatchEvent(new CustomEvent("velora-cast-playback-progress", {
+          detail: {
+            currentTime: curr,
+            duration: dur,
+            isLive: false,
+            media: state.currentMedia
+          }
+        }));
+      } catch (_) {}
+    }
+  }
+
+  function startCastTimeTicker() {
+    stopCastTimeTicker();
+    updateCastBarTime();
+    state.timeTicker = setInterval(updateCastBarTime, 1000);
+  }
+
+  function stopCastTimeTicker() {
+    if (state.timeTicker) {
+      clearInterval(state.timeTicker);
+      state.timeTicker = null;
+    }
+  }
+
+  function removeCastActiveBar() {
+    stopCastTimeTicker();
+    var wrap = document.getElementById("vel-cast-active-bar-wrap");
+    if (wrap) {
+      wrap.remove();
+    }
+    if (document.body && document.body.classList) {
+      document.body.classList.remove("vel-cast-active-bar-open");
+    }
+    if (document.documentElement && document.documentElement.style) {
+      document.documentElement.style.removeProperty("--vel-cast-bar-height");
+    }
+  }
+
+  function attachCastStopBtnHandler(btn) {
+    if (!btn || btn._hasCastHandler) return;
+    btn._hasCastHandler = true;
+    btn.onclick = function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      stopCast(true);
+      showCastToast("Diffusion Cast arrêtée");
+    };
+  }
+
+  function syncFromRemoteSession(castSession) {
+    if (!castSession) return;
+    try {
+      var remoteMedia = castSession.getMediaSession();
+      if (remoteMedia && remoteMedia.media) {
+        var rm = remoteMedia.media;
+        var meta = rm.metadata || {};
+        var title = meta.title || (meta.getString && meta.getString(window.chrome.cast.media.MetadataKey.TITLE)) || "";
+        var img = (meta.images && meta.images[0] && meta.images[0].url) || "";
+        var isLive = rm.streamType === (window.chrome && window.chrome.cast && window.chrome.cast.media ? window.chrome.cast.media.StreamType.LIVE : "LIVE");
+        var currTime = typeof remoteMedia.getEstimatedTime === "function" ? remoteMedia.getEstimatedTime() : (Number(remoteMedia.currentTime) || 0);
+
+        if (title || rm.contentId) {
+          state.currentMedia = {
+            title: title || "Vidéo TV",
+            name: title || "Vidéo TV",
+            url: rm.contentId || "",
+            castUrl: rm.contentId || "",
+            poster: img,
+            isLive: isLive,
+            contentType: rm.contentType || contentTypeFor(rm.contentId),
+            castContentType: rm.contentType || contentTypeFor(rm.contentId),
+            position: currTime,
+            duration: rm.duration || 0,
+            explicit: true
+          };
+
+          var wrap = document.getElementById("vel-cast-active-bar-wrap");
+          if (wrap) {
+            var titleSpan = wrap.querySelector(".vel-cast-capsule-title");
+            if (titleSpan && title) titleSpan.textContent = title;
+          }
+          updateCastBarTime();
+        }
+      }
+    } catch (err) {
+      console.warn("[VeloraCast] syncFromRemoteSession error", err);
+    }
+  }
+
+  function attachRemoteMediaListeners(castSession) {
+    if (!castSession || castSession.__veloraMediaAttached) return;
+    castSession.__veloraMediaAttached = true;
+    try {
+      castSession.addMediaListener(function (mediaSession) {
+        if (mediaSession) {
+          syncFromRemoteSession(castSession);
+          updateCastBarTime();
+          mediaSession.addUpdateListener(function () {
+            syncFromRemoteSession(castSession);
+            updateCastBarTime();
+          });
+        }
+      });
+      var currentMedia = castSession.getMediaSession();
+      if (currentMedia) {
+        syncFromRemoteSession(castSession);
+        updateCastBarTime();
+        currentMedia.addUpdateListener(function () {
+          syncFromRemoteSession(castSession);
+          updateCastBarTime();
+        });
+      }
+    } catch (_) {}
+  }
+
+  function scheduleRemoteSync(castSession) {
+    if (!castSession) return;
+    [100, 300, 600, 1000, 1500, 2500, 4000, 6000].forEach(function (delay) {
+      setTimeout(function () {
+        syncFromRemoteSession(castSession);
+        updateCastBarTime();
+        showCastActiveBar();
+      }, delay);
+    });
+  }
+
+  // Dedicated Cast luxury top floating capsule bar
+  function showCastActiveBar() {
+    var isConnected = (typeof session === "function" && !!session()) || state.airPlayConnected;
+    if (!isConnected) {
+      removeCastActiveBar();
+      return;
+    }
+
+    var castSess = session();
+    if (castSess && (!state.currentMedia || !state.currentMedia.title)) {
+      syncFromRemoteSession(castSess);
+    }
+
+    // Stop paired TV association diffusion so both cannot run at the same time
+    if (typeof window.veloraStopTvAssociationDiffusion === "function") {
+      try { window.veloraStopTvAssociationDiffusion(); } catch (_) {}
+    }
+
+    var media = state.currentMedia || normalizeMedia({});
+    var activeTitle = media ? (media.title || media.name || "Diffusion TV") : "Diffusion TV";
+    var deviceName = getCastDeviceName();
+    var isTvMode = isCastAutoDiffuseOn();
+
+    var existingWrap = document.getElementById("vel-cast-active-bar-wrap");
+    if (existingWrap) {
+      var iconWrap = existingWrap.querySelector(".vel-cast-capsule-icon-wrap");
+      if (iconWrap) {
+        iconWrap.classList.add("is-streaming");
+        iconWrap.innerHTML = `
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path d="M1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm0-4v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11zm20-7H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
+          </svg>
+          <span class="vel-cast-live-beacon"></span>
+        `;
+      }
+
+      var titleSpan = existingWrap.querySelector(".vel-cast-capsule-title");
+      if (titleSpan && activeTitle) titleSpan.textContent = activeTitle;
+
+      var subSpan = existingWrap.querySelector(".vel-cast-capsule-sub");
+      if (subSpan) {
+        subSpan.textContent = isTvMode ? deviceName : deviceName + " · Mode téléphone";
+        subSpan.classList.toggle("is-idle", !isTvMode);
+      }
+
+      var phoneBtn = existingWrap.querySelector(".vel-cast-segment-btn[data-mode='phone']");
+      var tvBtn = existingWrap.querySelector(".vel-cast-segment-btn[data-mode='tv']");
+      if (phoneBtn) phoneBtn.classList.toggle("is-active", !isTvMode);
+      if (tvBtn) tvBtn.classList.toggle("is-active", isTvMode);
+
+      var stopBtn = existingWrap.querySelector("#vel-cast-stop-playback");
+      if (stopBtn) attachCastStopBtnHandler(stopBtn);
+
+      startCastTimeTicker();
+      document.body.classList.add("vel-cast-active-bar-open");
+      var barEl = existingWrap.querySelector(".vel-cast-active-bar");
+      var h = (barEl ? barEl.offsetHeight : 48) + 14;
+      document.documentElement.style.setProperty("--vel-cast-bar-height", h + "px");
+      return;
+    }
+
+    var wrap = document.createElement("div");
+    wrap.id = "vel-cast-active-bar-wrap";
+    wrap.className = "vel-cast-active-bar-wrap";
+    wrap.innerHTML = `
+      <div class="vel-cast-active-bar">
+        <div class="vel-cast-capsule-left">
+          <div class="vel-cast-capsule-icon-wrap is-streaming">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+              <path d="M1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm0-4v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11zm20-7H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
+            </svg>
+            <span class="vel-cast-live-beacon"></span>
+          </div>
+          <div class="vel-cast-capsule-meta">
+            <div class="vel-cast-capsule-title-row">
+              <span class="vel-cast-capsule-title">${activeTitle}</span>
+              <span class="vel-cast-capsule-time-badge hidden"></span>
+            </div>
+            <span class="vel-cast-capsule-sub ${!isTvMode ? "is-idle" : ""}">${isTvMode ? deviceName : deviceName + " · Mode téléphone"}</span>
+          </div>
+        </div>
+        <div class="vel-cast-capsule-actions">
+          <button type="button" id="vel-cast-stop-playback" class="vel-cast-stop-btn" title="Arrêter la diffusion Cast">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+              <rect x="5" y="5" width="14" height="14" rx="2.5"/>
+            </svg>
+          </button>
+          <div class="vel-cast-segmented-switch" role="group" aria-label="Destination de lecture">
+            <button type="button" class="vel-cast-segment-btn ${!isTvMode ? "is-active" : ""}" data-mode="phone" title="Regarder les prochaines vidéos sur le téléphone">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="3" ry="3"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+            </button>
+            <button type="button" class="vel-cast-segment-btn ${isTvMode ? "is-active" : ""}" data-mode="tv" title="Diffuser sur la TV (Cast)">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="vel-cast-capsule-progress-track">
+          <div class="vel-cast-capsule-progress-fill" style="width: 0%"></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(wrap);
+    document.body.classList.add("vel-cast-active-bar-open");
+
+    requestAnimationFrame(function () {
+      var barEl = wrap.querySelector(".vel-cast-active-bar");
+      var h = (barEl ? barEl.offsetHeight : 48) + 14;
+      document.documentElement.style.setProperty("--vel-cast-bar-height", h + "px");
+      startCastTimeTicker();
+    });
+
+    var phoneBtn = wrap.querySelector(".vel-cast-segment-btn[data-mode='phone']");
+    if (phoneBtn) {
+      phoneBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        setCastDestination("phone");
+      });
+    }
+
+    var tvBtn = wrap.querySelector(".vel-cast-segment-btn[data-mode='tv']");
+    if (tvBtn) {
+      tvBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        setCastDestination("tv");
+      });
+    }
+
+    var stopBtn = wrap.querySelector("#vel-cast-stop-playback");
+    if (stopBtn) attachCastStopBtnHandler(stopBtn);
+  }
+
+  function stopCast(resumeLocal) {
+    var castSession = session();
+    var currentTime = 0;
+    if (castSession) {
+      try {
+        var remoteMedia = castSession.getMediaSession();
+        if (remoteMedia && Number.isFinite(remoteMedia.currentTime)) {
+          currentTime = remoteMedia.currentTime;
+        }
+      } catch (_) {}
+      try {
+        castSession.endSession(true);
+      } catch (_) {}
+    }
+    var media = state.currentMedia;
+    if (media && media.castSessionId) {
+      try {
+        fetch("/api/transcode/" + encodeURIComponent(media.castSessionId), { method: "DELETE", keepalive: true }).catch(function () {});
+      } catch (_) {}
+    }
+    if (state.airPlayConnected && state.activeVideo) {
+      state.airPlayConnected = false;
+    }
+    clearLocalCastSessionState();
+    syncButton();
+    removeCastActiveBar();
+    showCastToast("Diffusion Cast arrêtée");
+
+    // Clear active media state so casting requires launching a video
+    state.currentMedia = null;
+    state.activeVideo = null;
+    window.__veloraCurrentStreamUrl = "";
+    document.querySelectorAll("video, audio").forEach(function (v) {
+      if (v) {
+        try {
+          v.pause();
+          v.__veloraCastUrl = "";
+          v.muted = false;
+          v.volume = 1;
+        } catch (_) {}
+      }
+    });
+
+    try {
+      document.dispatchEvent(new CustomEvent("velora-cast-disconnected"));
+    } catch (_) {}
   }
 
   function buildMediaRequest(media) {
-    var castUrl = media.castUrl || media.url;
+    var castUrl = resolveFullPublicUrl(media.castUrl || media.url);
     var mediaInfo = new window.chrome.cast.media.MediaInfo(castUrl, media.castContentType || contentTypeFor(castUrl));
     mediaInfo.streamType = media.isLive
       ? window.chrome.cast.media.StreamType.LIVE
       : window.chrome.cast.media.StreamType.BUFFERED;
     mediaInfo.metadata = new window.chrome.cast.media.GenericMediaMetadata();
     mediaInfo.metadata.title = media.title || "VeloraVIP";
-    if (media.poster) mediaInfo.metadata.images = [{ url: media.poster }];
+    if (media.poster) mediaInfo.metadata.images = [{ url: resolveFullPublicUrl(media.poster) }];
 
     var request = new window.chrome.cast.media.LoadRequest(mediaInfo);
     request.autoplay = true;
@@ -282,29 +831,89 @@
     return request;
   }
 
+  async function prepareCastPlayableMedia(media) {
+    if (!media || !media.url) return media;
+    var rawUrl = media.sourceUrl || media.url;
+
+    // If already an internal transcode stream, keep it
+    if (isInternalTranscode(rawUrl)) {
+      media.castUrl = resolveFullPublicUrl(rawUrl);
+      media.castContentType = "application/x-mpegURL";
+      return media;
+    }
+
+    // For raw streams (MP4/MKV/TS/upstream live), request an audio-compatible stream with -c:v copy
+    try {
+      var token = getAuthToken();
+      var headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = "Bearer " + token;
+
+      var res = await fetch("/api/transcode/session", {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify({
+          url: rawUrl,
+          mode: media.isLive ? "live" : "vod",
+          videoMode: "copy",
+          videoCodec: media.videoCodec,
+          audioCodec: media.audioCodec,
+          audioChannels: media.audioChannels,
+          seekOffset: Math.max(0, Math.floor(media.position || 0)),
+          startAt: Math.max(0, Math.floor(media.position || 0))
+        })
+      });
+
+      if (res.ok) {
+        var data = await res.json();
+        if (data && data.playlistUrl) {
+          media.castUrl = resolveFullPublicUrl(data.playlistUrl);
+          media.castContentType = "application/x-mpegURL";
+          media.castSessionId = data.sessionId;
+          return media;
+        }
+      }
+    } catch (err) {
+      console.warn("[VeloraCast] Failed to create audio-safe transcode session, falling back to direct URL", err);
+    }
+
+    // Fallback: direct public URL
+    media.castUrl = resolveFullPublicUrl(media.url);
+    media.castContentType = contentTypeFor(media.castUrl);
+    return media;
+  }
+
   async function loadMediaOnCast(media, options) {
     if (!canUseGoogleCast()) return false;
     var castSession = session();
     if (!castSession) return false;
-    if (!isTvReachableCastUrl(media.castUrl || media.url)) {
-      window.alert("This video URL cannot be reached by the TV. Cast needs a public HTTPS playback URL, not localhost, blob, or browser-only media.");
-      return false;
-    }
+    if (!media) return false;
+
     var key = mediaKey(media);
     if (!options || !options.force) {
       if (state.lastLoadedKey === key) return true;
     }
     try {
       setPhase("LOADING_MEDIA");
-      await castSession.loadMedia(buildMediaRequest(media));
+      // Stop paired Smart TV diffusion before loading on Cast
+      if (typeof window.veloraStopTvAssociationDiffusion === "function") {
+        try { window.veloraStopTvAssociationDiffusion(); } catch (_) {}
+      }
+
+      // Ensure audio-compatible stream with universal AAC stereo
+      var castReadyMedia = await prepareCastPlayableMedia(media);
+      var request = buildMediaRequest(castReadyMedia);
+
+      await castSession.loadMedia(request);
       state.lastLoadedKey = key;
-      state.currentMedia = media;
+      state.currentMedia = castReadyMedia;
       rememberSessionActive(true);
       setPhase("PLAYING");
+      showCastActiveBar();
       return true;
     } catch (error) {
       console.warn("[VeloraCast] loadMedia failed", error);
       setPhase("CONNECTED");
+      showCastActiveBar();
       return false;
     }
   }
@@ -312,7 +921,9 @@
   function scheduleCastReload(force) {
     window.clearTimeout(state.loadTimer);
     state.loadTimer = window.setTimeout(function () {
-      if (state.currentMedia && session()) loadMediaOnCast(state.currentMedia, { force: !!force });
+      if (state.currentMedia && session() && isCastAutoDiffuseOn()) {
+        loadMediaOnCast(state.currentMedia, { force: !!force });
+      }
     }, 120);
   }
 
@@ -326,22 +937,36 @@
       state.activeVideo = media.video;
     }
     syncButton();
-    if (session()) scheduleCastReload(true);
+
+    if (session() || state.airPlayConnected) {
+      showCastActiveBar();
+      // Only reload on Cast automatically if destination switch is on 'TV'
+      if (session() && isCastAutoDiffuseOn()) {
+        haltMobilePlayersForCast();
+        scheduleCastReload(true);
+      }
+    }
     return media;
   }
 
   function rememberMedia(video, url, meta) {
-    var mediaUrl = absoluteUrl(url);
+    var fullUrl = resolveFullPublicUrl(url);
+    if (!fullUrl) return state.currentMedia;
+    if (video) {
+      video.__veloraCastUrl = fullUrl;
+      state.activeVideo = video;
+    }
+    window.__veloraCurrentStreamUrl = fullUrl;
     if (
       state.currentMedia &&
       state.currentMedia.explicit &&
       state.currentMedia.video === (video || state.activeVideo) &&
-      mediaUrl &&
-      mediaUrl === state.currentMedia.url
+      fullUrl &&
+      fullUrl === state.currentMedia.url
     ) {
       return state.currentMedia;
     }
-    return setMedia(Object.assign({}, meta || {}, { video: video || activeVideo(), url: url }), { implicit: true });
+    return setMedia(Object.assign({}, meta || {}, { video: video || activeVideo(), url: fullUrl }), { implicit: true });
   }
 
   function clearLocalCastSessionState() {
@@ -351,22 +976,29 @@
     state.pendingInitialMedia = null;
     state.pendingInitialToken += 1;
     state.lastLoadedKey = "";
+    state.currentMedia = null;
     state.castState = "NO_DEVICES_AVAILABLE";
     state.sessionState = "NO_SESSION";
     rememberSessionActive(false);
+    try { localStorage.removeItem("velora_active_cast_state_v1"); } catch (_) {}
     setPhase("DISCONNECTED");
   }
 
   async function requestUniversalCast() {
     var video = activeVideo();
+    var media = state.currentMedia || normalizeMedia({});
+    var hasActiveVideo = !!(video && !video.paused && !video.ended) ||
+                         !!(media && media.url && (video || (state.currentMedia && state.currentMedia.explicit)));
 
-    // 1. iPhone / iPad / Safari: Trigger native WebKit AirPlay Target Picker
+    // If no video is actively playing/selected, notify the user and do not open cast dialog
+    if (!hasActiveVideo) {
+      showCastToast("Lancez d'abord une vidéo pour la diffuser sur votre TV.");
+      return;
+    }
+
+    // 1. iPhone / iPad / Safari: Native WebKit AirPlay Target Picker
     if (isIosOrSafari() || (video && typeof video.webkitShowPlaybackTargetPicker === "function")) {
-      if (!video) {
-        window.alert("Lancez d'abord une vidéo, puis touchez le bouton pour diffuser sur votre TV.");
-        return;
-      }
-      if (typeof video.webkitShowPlaybackTargetPicker === "function") {
+      if (video && typeof video.webkitShowPlaybackTargetPicker === "function") {
         try {
           video.webkitShowPlaybackTargetPicker();
           return;
@@ -382,92 +1014,122 @@
       return;
     }
 
-    // 2. Android / PC / Chrome: Use Google Cast SDK
-    return requestGoogleCast();
+    // 2. Google Cast Sender Framework if available
+    if (canUseGoogleCast()) {
+      return requestGoogleCast(media);
+    }
+
+    // 3. Try initializing CastContext if cast object already injected
+    if (window.cast && window.cast.framework && initCastContext()) {
+      return requestGoogleCast(media);
+    }
+
+    // 4. If Paired Smart TV is connected via /api/tv, diffuse to it!
+    if (typeof window.veloraSendToPairedTv === "function" && media) {
+      var sent = window.veloraSendToPairedTv(media);
+      if (sent) return;
+    }
+
+    // 5. If Google Cast SDK is loading
+    if (state.sdkLoading) {
+      state.pendingCastClick = true;
+      showCastToast("Initialisation de Google Cast en cours…");
+      return;
+    }
+
+    // 6. Otherwise inform the user of options
+    window.alert(
+      "Diffusion TV (Cast & AirPlay) :\n\n" +
+      "• Utilisez Google Chrome sur PC/Android pour caster directement sur Chromecast ou TV Android.\n" +
+      "• Utilisez Safari sur iPhone/iPad/Mac pour diffuser via AirPlay.\n" +
+      "• Vous pouvez également associer votre Smart TV depuis le menu Profil avec un code à 4 chiffres."
+    );
   }
 
-  async function requestGoogleCast() {
-    if (state.requestPending) return;
-    if (!state.sdkReady) {
-      state.pendingCastClick = true;
-      setPhase("CONNECTING");
-      setStatus("Cast loading");
-      armBlockedTimer();
-      loadGoogleCastSdk();
-      return;
-    }
-
+  async function requestGoogleCast(mediaToCast) {
     if (!canUseGoogleCast()) {
-      window.alert("Google Cast is not available in this browser. Please use Chrome on Android or PC.");
-      return;
-    }
-
-    var selectedMedia = normalizeMedia(state.currentMedia || {});
-    if (!selectedMedia) {
-      window.alert("Start a video first, then cast it.");
-      return;
-    }
-
-    try {
-      var context = window.cast.framework.CastContext.getInstance();
-      var castSession = context.getCurrentSession();
-      if (!castSession) {
-        state.requestPending = true;
-        state.pendingInitialMedia = selectedMedia;
-        var token = ++state.pendingInitialToken;
-        syncButton();
-        setPhase("CONNECTING");
-        try {
-          await context.requestSession();
-        } catch (error) {
-          clearLocalCastSessionState();
-          syncButton();
-          console.warn("[VeloraCast] requestSession failed", error);
-          return;
-        }
-        castSession = context.getCurrentSession();
-        state.requestPending = false;
-        syncButton();
-        if (!castSession || token !== state.pendingInitialToken) {
-          clearLocalCastSessionState();
-          syncButton();
-          return;
-        }
-        var mediaToLoad = state.pendingInitialMedia;
-        state.pendingInitialMedia = null;
-        if (!(await loadMediaOnCast(mediaToLoad, { force: true }))) {
-          window.alert("Cast session started, but the video could not be loaded on the TV.");
-        }
+      initCastContext();
+      if (!canUseGoogleCast()) {
+        showCastToast("Google Cast n'est pas disponible dans ce navigateur.");
         return;
       }
-
-      if (!(await loadMediaOnCast(selectedMedia, { force: true }))) {
-        window.alert("Cast session started, but the video could not be loaded on the TV.");
-      }
-    } catch (error) {
-      console.warn("[VeloraCast] loadMedia failed", error);
-      window.alert("Cast session started, but the video could not be loaded on the TV.");
-    } finally {
-      state.requestPending = false;
-      syncButton();
-    }
-  }
-
-  function onCastApiAvailable(available) {
-    clearBlockedTimer();
-    state.sdkReady = Boolean(available && window.cast && window.cast.framework && window.chrome && window.chrome.cast);
-    state.sdkLoading = false;
-    if (!state.sdkReady) {
-      syncButton();
-      return;
     }
 
     var context = window.cast.framework.CastContext.getInstance();
-    if (!state.sdkInitialized) {
-      state.sdkInitialized = true;
+    var castSession = context.getCurrentSession();
+    var targetMedia = mediaToCast || normalizeMedia({}) || state.currentMedia;
+
+    if (!targetMedia || !targetMedia.url) {
+      showCastToast("Lancez d'abord une vidéo pour la diffuser sur votre TV.");
+      return;
+    }
+
+    // If session is already connected: perform immediate takeover
+    if (castSession) {
+      attachRemoteMediaListeners(castSession);
+      haltMobilePlayersForCast();
+      showCastToast("Diffusion vers " + getCastDeviceName() + "…");
+      await loadMediaOnCast(targetMedia, { force: true });
+      return;
+    }
+
+    // No session connected yet: request session via Chrome Cast prompt
+    state.requestPending = true;
+    state.pendingInitialMedia = targetMedia;
+    syncButton();
+    setPhase("CONNECTING");
+
+    try {
+      await context.requestSession();
+    } catch (error) {
+      clearLocalCastSessionState();
+      syncButton();
+      console.warn("[VeloraCast] requestSession cancelled or failed", error);
+      return;
+    } finally {
+      state.requestPending = false;
+    }
+
+    castSession = context.getCurrentSession();
+    syncButton();
+
+    if (!castSession) {
+      clearLocalCastSessionState();
+      syncButton();
+      return;
+    }
+
+    rememberSessionActive(true);
+    setPhase("CONNECTED");
+    attachRemoteMediaListeners(castSession);
+    scheduleRemoteSync(castSession);
+
+    var mediaToLoad = state.pendingInitialMedia || targetMedia;
+    state.pendingInitialMedia = null;
+
+    if (mediaToLoad && mediaToLoad.url) {
+      haltMobilePlayersForCast();
+      showCastToast("Diffusion vers " + getCastDeviceName() + "…");
+      if (!(await loadMediaOnCast(mediaToLoad, { force: true }))) {
+        showCastToast("Connecté à la TV. Erreur de chargement du flux.");
+      }
+    } else {
+      syncFromRemoteSession(castSession);
+      showCastActiveBar();
+    }
+  }
+
+  function initCastContext() {
+    if (state.sdkInitialized) return true;
+    if (!window.cast || !window.cast.framework || !window.cast.framework.CastContext) return false;
+
+    try {
+      var context = window.cast.framework.CastContext.getInstance();
       context.setOptions({
         receiverApplicationId: RECEIVER_APP_ID,
-        autoJoinPolicy: window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
+        autoJoinPolicy: window.chrome && window.chrome.cast && window.chrome.cast.AutoJoinPolicy
+          ? window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+          : "origin_scoped",
         resumeSavedSession: true
       });
 
@@ -484,23 +1146,68 @@
         ) {
           rememberSessionActive(true);
           setPhase("CONNECTED");
+          var sess = context.getCurrentSession();
+          if (sess) {
+            attachRemoteMediaListeners(sess);
+            var localMedia = state.pendingInitialMedia || (isCastAutoDiffuseOn() ? (state.currentMedia || normalizeMedia({})) : null);
+            if (localMedia && localMedia.url) {
+              state.pendingInitialMedia = null;
+              haltMobilePlayersForCast();
+              loadMediaOnCast(localMedia, { force: true });
+            } else {
+              scheduleRemoteSync(sess);
+            }
+          }
+          showCastActiveBar();
         }
         if (
           event.sessionState === window.cast.framework.SessionState.SESSION_ENDED ||
           event.sessionState === window.cast.framework.SessionState.SESSION_START_FAILED
         ) {
           clearLocalCastSessionState();
+          removeCastActiveBar();
         }
         syncButton();
       });
-    }
 
+      state.sdkReady = true;
+      state.sdkInitialized = true;
+      state.sdkLoading = false;
+      syncButton();
+
+      // Check if session was already resumed on init
+      var activeSess = context.getCurrentSession();
+      if (activeSess) {
+        rememberSessionActive(true);
+        setPhase("CONNECTED");
+        attachRemoteMediaListeners(activeSess);
+        scheduleRemoteSync(activeSess);
+        showCastActiveBar();
+      }
+
+      return true;
+    } catch (e) {
+      console.warn("[VeloraCast] initCastContext error:", e);
+      return false;
+    }
+  }
+
+  function onCastApiAvailable(available) {
+    clearBlockedTimer();
+    state.sdkLoading = false;
+    if (available && window.cast && window.cast.framework) {
+      state.sdkReady = true;
+      initCastContext();
+    }
     syncButton();
-    if (state.pendingCastClick) state.pendingCastClick = false;
+    if (state.pendingCastClick) {
+      state.pendingCastClick = false;
+      requestGoogleCast();
+    }
   }
 
   function loadGoogleCastSdk() {
-    if (isIosOrSafari()) return; // Skip Google Cast SDK on iOS Safari
+    if (isIosOrSafari()) return;
     window.__onGCastApiAvailable = onCastApiAvailable;
     if (state.sdkReady || state.sdkLoading) return;
     var oldScript = byId("velora-google-cast-sdk");
@@ -518,33 +1225,71 @@
     document.head.appendChild(script);
   }
 
-  function patchVideoSources() {
-    if (HTMLMediaElement.prototype.__veloraCastPatched) return;
-    HTMLMediaElement.prototype.__veloraCastPatched = true;
-
-    try {
-      var descriptor = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, "src");
-      if (descriptor && descriptor.get && descriptor.set) {
-        Object.defineProperty(HTMLMediaElement.prototype, "src", {
-          configurable: true,
-          enumerable: descriptor.enumerable,
-          get: function () {
-            return descriptor.get.call(this);
-          },
-          set: function (value) {
-            rememberMedia(this, value);
-            return descriptor.set.call(this, value);
+  function patchHlsAndVideoSources() {
+    // 1. Hook into window.Hls prototype
+    function hookHls() {
+      if (window.Hls && window.Hls.prototype && !window.Hls.prototype.__veloraCastHooked) {
+        window.Hls.prototype.__veloraCastHooked = true;
+        var origLoad = window.Hls.prototype.loadSource;
+        window.Hls.prototype.loadSource = function (url) {
+          window.__veloraCurrentStreamUrl = url;
+          if (this.media) {
+            this.media.__veloraCastUrl = url;
+            rememberMedia(this.media, url);
           }
-        });
+          if (session() && isCastAutoDiffuseOn()) {
+            haltMobilePlayersForCast();
+          }
+          return origLoad.apply(this, arguments);
+        };
+        var origAttach = window.Hls.prototype.attachMedia;
+        window.Hls.prototype.attachMedia = function (media) {
+          if (media) {
+            var u = this.url || window.__veloraCurrentStreamUrl;
+            if (u) {
+              media.__veloraCastUrl = u;
+              rememberMedia(media, u);
+            }
+          }
+          return origAttach.apply(this, arguments);
+        };
       }
-    } catch (_) { }
+    }
 
-    var originalSetAttribute = HTMLMediaElement.prototype.setAttribute;
-    if (typeof originalSetAttribute === "function") {
-      HTMLMediaElement.prototype.setAttribute = function (name, value) {
-        if (String(name || "").toLowerCase() === "src") rememberMedia(this, value);
-        return originalSetAttribute.apply(this, arguments);
-      };
+    hookHls();
+    window.addEventListener("DOMContentLoaded", hookHls);
+
+    // 2. HTMLMediaElement.src descriptor
+    if (!HTMLMediaElement.prototype.__veloraCastPatched) {
+      HTMLMediaElement.prototype.__veloraCastPatched = true;
+      try {
+        var descriptor = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, "src");
+        if (descriptor && descriptor.get && descriptor.set) {
+          Object.defineProperty(HTMLMediaElement.prototype, "src", {
+            configurable: true,
+            enumerable: descriptor.enumerable,
+            get: function () {
+              return descriptor.get.call(this);
+            },
+            set: function (value) {
+              if (value && !/^(blob:|data:|about:|mediastream:)/i.test(String(value))) {
+                rememberMedia(this, value);
+              }
+              return descriptor.set.call(this, value);
+            }
+          });
+        }
+      } catch (_) { }
+
+      var originalSetAttribute = HTMLMediaElement.prototype.setAttribute;
+      if (typeof originalSetAttribute === "function") {
+        HTMLMediaElement.prototype.setAttribute = function (name, value) {
+          if (String(name || "").toLowerCase() === "src" && value && !/^(blob:|data:|about:|mediastream:)/i.test(String(value))) {
+            rememberMedia(this, value);
+          }
+          return originalSetAttribute.apply(this, arguments);
+        };
+      }
     }
   }
 
@@ -561,14 +1306,27 @@
         });
         video.addEventListener("webkitcurrentplaybacktargetiswirelesschanged", function (event) {
           state.airPlayConnected = !!(video.webkitCurrentPlaybackTargetIsWireless);
+          if (state.airPlayConnected) {
+            showCastActiveBar();
+          } else {
+            removeCastActiveBar();
+          }
           syncButton();
         });
       }
 
-      ["play", "loadedmetadata", "canplay"].forEach(function (eventName) {
+      ["play", "playing", "loadstart", "loadedmetadata", "canplay"].forEach(function (eventName) {
         video.addEventListener(eventName, function () {
           state.activeVideo = video;
-          rememberMedia(video, video.__veloraCastUrl || video.currentSrc || video.src);
+          var u = video.__veloraCastUrl || (video.hls && video.hls.url) || window.__veloraCurrentStreamUrl;
+          if (u) {
+            rememberMedia(video, u);
+          } else if (video.currentSrc && !/^(blob:|data:|about:|mediastream:)/i.test(video.currentSrc)) {
+            rememberMedia(video, video.currentSrc);
+          }
+          if (session() && isCastAutoDiffuseOn()) {
+            haltMobilePlayersForCast();
+          }
         }, true);
       });
     });
@@ -580,7 +1338,7 @@
     button.id = "velora-cast-button";
     button.className = "velora-cast-button";
     button.type = "button";
-    button.title = isIosOrSafari() ? "Diffuser sur TV (AirPlay)" : "Cast video to TV";
+    button.title = isIosOrSafari() ? "Diffuser sur TV (AirPlay)" : "Diffuser sur la TV (Cast / AirPlay)";
     button.setAttribute("aria-label", button.title);
     button.innerHTML =
       '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
@@ -595,11 +1353,266 @@
     syncButton();
   }
 
+  function injectActiveBarStyles() {
+    if (document.getElementById("velora-cast-styles")) return;
+    var style = document.createElement("style");
+    style.id = "velora-cast-styles";
+    style.textContent = `
+      .vel-cast-active-bar-wrap {
+        position: fixed;
+        top: max(8px, env(safe-area-inset-top));
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: center;
+        z-index: 999999;
+        pointer-events: none;
+        animation: velCastSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      @keyframes velCastSlideDown {
+        from { transform: translateY(-120%); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+      .vel-cast-active-bar {
+        pointer-events: auto;
+        width: calc(100% - 24px);
+        max-width: 520px;
+        min-height: 48px;
+        background: linear-gradient(135deg, rgba(25, 16, 48, 0.94), rgba(12, 8, 28, 0.97));
+        border: 1px solid rgba(167, 139, 250, 0.35);
+        border-radius: 999px;
+        padding: 5px 12px 5px 6px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65), 0 0 24px rgba(139, 92, 246, 0.22);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        color: #fff;
+        font-family: inherit;
+        box-sizing: border-box;
+      }
+      body.vel-cast-active-bar-open {
+        padding-top: var(--vel-cast-bar-height, 62px) !important;
+        box-sizing: border-box !important;
+      }
+      body.vel-cast-active-bar-open .main--velora {
+        height: calc(100dvh - var(--vel-cast-bar-height, 62px)) !important;
+        height: calc(100vh - var(--vel-cast-bar-height, 62px)) !important;
+      }
+      body.vel-cast-active-bar-open #vel-floating-search,
+      body.vel-cast-active-bar-open .vel-floating-search {
+        top: calc(12px + var(--vel-cast-bar-height, 62px)) !important;
+      }
+      body.vel-search-open .vel-cast-active-bar-wrap {
+        opacity: 0 !important;
+        pointer-events: none !important;
+        transform: translateY(-120%) !important;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+      }
+      .vel-cast-capsule-left {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        min-width: 0;
+        flex: 1;
+      }
+      .vel-cast-capsule-icon-wrap {
+        width: 36px;
+        height: 36px;
+        flex-shrink: 0;
+        border-radius: 50%;
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.35), rgba(76, 29, 149, 0.5));
+        border: 1px solid rgba(167, 139, 250, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        color: #c4b5fd;
+      }
+      .vel-cast-capsule-icon-wrap.is-streaming {
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(16, 185, 129, 0.3));
+        border-color: rgba(52, 211, 153, 0.5);
+        color: #6ee7b7;
+      }
+      .vel-cast-live-beacon {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #10b981;
+        border: 2px solid #0f0b21;
+        box-shadow: 0 0 6px #10b981;
+        animation: velCastBeaconPulse 2s infinite ease-in-out;
+      }
+      @keyframes velCastBeaconPulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.25); opacity: 0.6; }
+      }
+      .vel-cast-active-bar {
+        position: relative;
+        overflow: hidden;
+      }
+      .vel-cast-capsule-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        min-width: 0;
+        overflow: hidden;
+      }
+      .vel-cast-capsule-title-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        overflow: hidden;
+      }
+      .vel-cast-capsule-title {
+        font-size: 13.5px;
+        font-weight: 800;
+        color: #ffffff;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        letter-spacing: -0.01em;
+      }
+      .vel-cast-capsule-time-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 1px 6px;
+        background: rgba(167, 139, 250, 0.2);
+        border: 1px solid rgba(167, 139, 250, 0.35);
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 700;
+        color: #c4b5fd;
+        letter-spacing: 0.02em;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .vel-cast-capsule-time-badge.is-live {
+        background: rgba(239, 68, 68, 0.2);
+        border-color: rgba(239, 68, 68, 0.4);
+        color: #fca5a5;
+      }
+      .vel-cast-capsule-progress-track {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 2.5px;
+        background: rgba(255, 255, 255, 0.08);
+        overflow: hidden;
+        border-bottom-left-radius: 999px;
+        border-bottom-right-radius: 999px;
+      }
+      .vel-cast-capsule-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #a78bfa, #c084fc);
+        border-radius: 999px;
+        transition: width 0.8s linear;
+      }
+      .vel-cast-capsule-sub {
+        font-size: 11px;
+        font-weight: 600;
+        color: #a78bfa;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .vel-cast-capsule-sub.is-idle {
+        color: #94a3b8;
+      }
+      .vel-cast-capsule-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+      .vel-cast-segmented-switch {
+        display: flex;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 999px;
+        padding: 2px;
+        gap: 2px;
+      }
+      .vel-cast-segment-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 28px;
+        border-radius: 999px;
+        border: none;
+        background: transparent;
+        color: rgba(255, 255, 255, 0.4);
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        padding: 0;
+      }
+      .vel-cast-segment-btn svg {
+        display: block;
+        transition: transform 0.15s ease, stroke 0.2s ease;
+      }
+      .vel-cast-segment-btn:hover {
+        color: rgba(255, 255, 255, 0.85);
+      }
+      .vel-cast-segment-btn.is-active {
+        background: rgba(255, 255, 255, 0.18);
+        color: #ffffff;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      }
+      .vel-cast-segment-btn.is-active svg {
+        stroke-width: 2.2;
+      }
+      .vel-cast-stop-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: rgba(239, 68, 68, 0.18);
+        border: 1px solid rgba(239, 68, 68, 0.45);
+        color: #fca5a5;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        padding: 0;
+      }
+      .vel-cast-stop-btn:hover {
+        background: rgba(239, 68, 68, 0.4);
+        border-color: #ef4444;
+        color: #ffffff;
+        box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+        transform: scale(1.06);
+      }
+      .vel-cast-stop-btn:active {
+        transform: scale(0.92);
+      }
+      .vel-cast-stop-btn.is-stopping {
+        opacity: 0.4;
+        pointer-events: none;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function boot() {
     window.VeloraCast = {
       setMedia: setMedia,
       rememberMedia: rememberMedia,
       cast: requestUniversalCast,
+      stop: stopCast,
+      setDestination: setCastDestination,
       getCurrentMedia: function () {
         return state.currentMedia || normalizeMedia({});
       },
@@ -611,6 +1624,7 @@
           phase: state.phase,
           castState: state.castState,
           sessionState: state.sessionState,
+          destinationMode: state.destinationMode,
           connected: !!session() || !!state.airPlayConnected,
           airPlay: isIosOrSafari(),
           media: state.currentMedia
@@ -618,12 +1632,78 @@
       }
     };
 
-    patchVideoSources();
+    injectActiveBarStyles();
+    patchHlsAndVideoSources();
     installButton();
     bindVideos();
-    if (!isIosOrSafari()) {
+
+    try {
+      var rawCast = localStorage.getItem("velora_active_cast_state_v1");
+      if (rawCast) {
+        var parsedCast = JSON.parse(rawCast);
+        if (parsedCast && parsedCast.active && Date.now() - (parsedCast.timestamp || 0) < 60000) {
+          state.currentMedia = {
+            title: parsedCast.title || "Diffusion TV",
+            name: parsedCast.title || "Diffusion TV",
+            poster: parsedCast.poster || "",
+            isLive: !!parsedCast.isLive,
+            position: parsedCast.curr || 0,
+            duration: parsedCast.dur || 0,
+            streamId: parsedCast.streamId,
+            seriesId: parsedCast.seriesId,
+            episodeStreamId: parsedCast.episodeStreamId,
+            seasonNumber: parsedCast.seasonNumber,
+            episodeNumber: parsedCast.episodeNumber,
+            sourceId: parsedCast.sourceId,
+            packageId: parsedCast.packageId,
+            explicit: true
+          };
+          showCastActiveBar();
+          updateCastBarTime();
+        }
+      }
+    } catch (_) {}
+
+    window.addEventListener("storage", function (e) {
+      if (e.key === "velora_active_cast_state_v1") {
+        if (!e.newValue) {
+          removeCastActiveBar();
+        } else {
+          try {
+            var data = JSON.parse(e.newValue);
+            if (data && data.active && Date.now() - (data.timestamp || 0) < 60000) {
+              if (!state.currentMedia || state.currentMedia.title !== data.title) {
+                state.currentMedia = Object.assign(state.currentMedia || {}, {
+                  title: data.title,
+                  name: data.title,
+                  poster: data.poster || "",
+                  isLive: !!data.isLive,
+                  position: data.curr || 0,
+                  duration: data.dur || 0,
+                  streamId: data.streamId,
+                  seriesId: data.seriesId,
+                  episodeStreamId: data.episodeStreamId,
+                  seasonNumber: data.seasonNumber,
+                  episodeNumber: data.episodeNumber,
+                  sourceId: data.sourceId,
+                  packageId: data.packageId,
+                  explicit: true
+                });
+              }
+              showCastActiveBar();
+              updateCastBarTime();
+            }
+          } catch (_) {}
+        }
+      }
+    });
+
+    if (window.cast && window.cast.framework && window.cast.framework.CastContext) {
+      initCastContext();
+    } else if (!isIosOrSafari()) {
       loadGoogleCastSdk();
     }
+
     new MutationObserver(function () {
       bindVideos();
       syncButton();
@@ -636,3 +1716,4 @@
     boot();
   }
 })();
+

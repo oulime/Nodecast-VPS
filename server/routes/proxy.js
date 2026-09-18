@@ -9,6 +9,7 @@ const cache = require('../services/cache');
 const veloraCatalogCache = require('../services/veloraCatalogCache');
 const path = require('path');
 const fs = require('fs');
+const activeStreamsStore = require('../services/activeStreamsStore');
 const http = require('http');
 const https = require('https');
 const { spawn } = require('child_process');
@@ -1391,10 +1392,109 @@ function getStreamAccountKey(streamUrl = '', req) {
     }
 }
 
+router.all('/stream/heartbeat', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Velora-Client-Id,X-Velora-Device-Id,X-Velora-Token');
+    if (req.method === 'OPTIONS') return res.status(200).end();
+
+    const user = activeStreamsStore.extractUserFromRequest(req);
+    const body = req.method === 'POST' ? (req.body || {}) : {};
+    const query = req.query || {};
+
+    const deviceId = String(body.deviceId || query.deviceId || req.headers['x-velora-device-id'] || getClientIdentifier(req)).trim();
+    const deviceType = String(body.deviceType || query.deviceType || (user?.isTv ? 'tv' : 'machine')).trim().toLowerCase() === 'tv' ? 'tv' : 'machine';
+    const streamId = String(body.streamId || query.streamId || body.url || query.url || '').trim();
+    const streamTitle = String(body.streamTitle || query.streamTitle || body.title || query.title || '').trim();
+    const sessionKey = String(body.sessionKey || query.sessionKey || '').trim();
+    const action = String(body.action || query.action || 'heartbeat').trim().toLowerCase();
+
+    // If user is not authenticated, acknowledge gracefully
+    if (!user || !user.id) {
+        return res.json({ ok: true, active: true, unauthenticated: true });
+    }
+
+    if (action === 'stop' || action === 'release') {
+        activeStreamsStore.releaseStream({
+            userId: user.id,
+            deviceType,
+            deviceId,
+            sessionKey
+        });
+        return res.json({ ok: true, stopped: true });
+    }
+
+    if (action === 'register' || action === 'start') {
+        const reg = activeStreamsStore.registerStream({
+            userId: user.id,
+            deviceType,
+            deviceId,
+            streamId,
+            streamTitle,
+            ipAddress: req.ip || getClientIdentifier(req),
+            sessionKey
+        });
+
+        if (!reg.slotGranted) {
+            return res.status(409).json({
+                ok: false,
+                active: false,
+                slotGranted: false,
+                inUse: true,
+                message: reg.message || (deviceType === 'tv'
+                    ? 'La lecture est déjà en cours sur un autre téléviseur.'
+                    : 'Un flux est actuellement en cours de lecture sur un autre appareil.')
+            });
+        }
+
+        return res.json({
+            ok: true,
+            active: true,
+            slotGranted: true,
+            sessionKey: reg.sessionKey,
+            deviceType
+        });
+    }
+
+    // Default: heartbeat
+    const result = activeStreamsStore.heartbeat({
+        userId: user.id,
+        deviceType,
+        deviceId,
+        sessionKey
+    });
+
+    return res.json({
+        ok: result.ok,
+        active: result.active,
+        inUse: result.inUse || false,
+        message: result.message || null,
+        deviceType
+    });
+});
+
 router.all('/stream/stop', (req, res) => {
     const url = req.query?.url || req.body?.url || '';
     const accountKey = getStreamAccountKey(url, req);
     let stopped = false;
+
+    // Release slot in activeStreamsStore
+    try {
+        const user = activeStreamsStore.extractUserFromRequest(req);
+        if (user && user.id) {
+            const body = req.method === 'POST' ? (req.body || {}) : {};
+            const query = req.query || {};
+            const deviceId = String(body.deviceId || query.deviceId || req.headers['x-velora-device-id'] || getClientIdentifier(req)).trim();
+            const deviceType = String(body.deviceType || query.deviceType || (user.isTv ? 'tv' : 'machine')).trim().toLowerCase() === 'tv' ? 'tv' : 'machine';
+            const sessionKey = String(body.sessionKey || query.sessionKey || '').trim();
+            activeStreamsStore.releaseStream({
+                userId: user.id,
+                deviceType,
+                deviceId,
+                sessionKey
+            });
+        }
+    } catch (_) {}
 
     if (url && activeStreamControllersByAccount.has(accountKey)) {
         const entry = activeStreamControllersByAccount.get(accountKey);
@@ -1442,6 +1542,12 @@ router.all('/stream/stop', (req, res) => {
     res.status(200).json({ ok: true, stopped });
 });
 
+
+function isPpvOfflineStreamUrl(targetUrl) {
+    if (!targetUrl || typeof targetUrl !== 'string') return false;
+    return /(?:^|[/?#&=:])(?:video\/)?(?:black|offline|standby|offair|noevent|placeholder|dummy)\.(?:ts|m3u8|mp4)|wdcdn\d*s?\.com\/video\/black|[\/=]black\.ts/i.test(targetUrl);
+}
+
 router.get('/stream', async (req, res) => {
     const maxRetries = 3;
     const retryDelays = [1500, 2500, 3500];
@@ -1450,6 +1556,19 @@ router.get('/stream', async (req, res) => {
     let { url } = req.query;
     if (!url) {
         return res.status(400).json({ error: 'URL required' });
+    }
+
+    if (isPpvOfflineStreamUrl(url)) {
+        res.set('Access-Control-Allow-Origin', '*');
+        res.set('Access-Control-Expose-Headers', 'X-Velora-PPV-Status, X-Velora-Stream-State');
+        res.set('X-Velora-PPV-Status', 'offline');
+        res.set('X-Velora-Stream-State', 'no-event');
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+        return res.status(404).json({
+            error: 'ppv_no_event',
+            status: 'offline',
+            message: "Ceci est une chaîne événementielle (PPV / Live Events). Aucun événement n'est en cours de diffusion pour le moment."
+        });
     }
 
     const isM3u8Url = /\.m3u8(\?|$)/i.test(url);
@@ -1662,13 +1781,32 @@ router.get('/stream', async (req, res) => {
                     });
                 }
             }
+
+            const responseFinalUrl = response.url || targetFetchUrl || '';
+            if (isPpvOfflineStreamUrl(responseFinalUrl)) {
+                cleanupListeners();
+                if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
+                    activeStreamControllersByAccount.delete(accountKey);
+                }
+                res.set('Access-Control-Allow-Origin', '*');
+                res.set('Access-Control-Expose-Headers', 'X-Velora-PPV-Status, X-Velora-Stream-State');
+                res.set('X-Velora-PPV-Status', 'offline');
+                res.set('X-Velora-Stream-State', 'no-event');
+                res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+                return res.status(404).json({
+                    error: 'ppv_no_event',
+                    status: 'offline',
+                    message: "Ceci est une chaîne événementielle (PPV / Live Events). Aucun événement n'est en cours de diffusion pour le moment."
+                });
+            }
+
             activeResponse = response;
             currentEntry.activeResponse = response;
             console.log(`[Proxy Stream] OPEN: Range: ${rangeHeader || 'None'} -> ${cleanUrl.substring(0, 80)}`);
 
-            // If upstream returns 458/429/5xx for an m3u8 and we have a cached manifest, serve it IMMEDIATELY
+            // If upstream returns 458/460/429/5xx for an m3u8 and we have a cached manifest, serve it IMMEDIATELY
             // without slamming upstream or sleeping 800ms
-            if ((response.status === 458 || response.status === 429 || response.status >= 500) && isM3u8Url && liveManifestCache.has(url)) {
+            if ((response.status === 458 || response.status === 460 || response.status === 429 || response.status >= 500) && isM3u8Url && liveManifestCache.has(url)) {
                 const cached = liveManifestCache.get(url);
                 if (Date.now() - cached.timestamp < LIVE_MANIFEST_STALE_TTL_MS) {
                     cleanupListeners();
@@ -1684,8 +1822,8 @@ router.get('/stream', async (req, res) => {
                 }
             }
 
-            // Retry on 5xx errors or transient burst rate limits (458, 429) when client is still connected
-            if ((response.status >= 500 || response.status === 458 || response.status === 429) && attempt < maxRetries) {
+            // Retry on 5xx errors or transient burst rate limits (458, 460, 429) when client is still connected
+            if ((response.status >= 500 || response.status === 458 || response.status === 460 || response.status === 429) && attempt < maxRetries) {
                 cleanupListeners();
                 try { abortController.abort(); } catch {}
                 try { response.body?.cancel?.().catch?.(() => {}); } catch {}
@@ -1716,7 +1854,7 @@ router.get('/stream', async (req, res) => {
                 if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
                     activeStreamControllersByAccount.delete(accountKey);
                 }
-                // If upstream failed with 458/429/5xx and we have a cached manifest, serve it to prevent player stutter
+                // If upstream failed with 458/460/429/5xx and we have a cached manifest, serve it to prevent player stutter
                 if (isM3u8Url && liveManifestCache.has(url)) {
                     const cached = liveManifestCache.get(url);
                     res.set('Access-Control-Allow-Origin', '*');
@@ -1731,7 +1869,7 @@ router.get('/stream', async (req, res) => {
                     const errorBody = await response.text().catch(() => 'N/A');
                     console.error(`403 Response body: ${errorBody.substring(0, 200)}`);
                 }
-                const clientStatus = (response.status === 458 || response.status === 429) ? 503 : response.status;
+                const clientStatus = (response.status === 458 || response.status === 460 || response.status === 429) ? 503 : response.status;
                 if (clientStatus === 503) {
                     res.set('Retry-After', '2');
                 }
@@ -1809,6 +1947,23 @@ router.get('/stream', async (req, res) => {
                 res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
 
                 let manifest = buffer.toString('utf-8');
+
+                if (isPpvOfflineStreamUrl(manifest)) {
+                    cleanupListeners();
+                    if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
+                        activeStreamControllersByAccount.delete(accountKey);
+                    }
+                    res.set('Access-Control-Allow-Origin', '*');
+                    res.set('Access-Control-Expose-Headers', 'X-Velora-PPV-Status, X-Velora-Stream-State');
+                    res.set('X-Velora-PPV-Status', 'offline');
+                    res.set('X-Velora-Stream-State', 'no-event');
+                    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+                    return res.status(404).json({
+                        error: 'ppv_no_event',
+                        status: 'offline',
+                        message: "Ceci est une chaîne événementielle (PPV / Live Events). Aucun événement n'est en cours de diffusion pour le moment."
+                    });
+                }
 
                 const finalUrlObj = new URL(finalUrl);
                 const baseUrl = finalUrlObj.origin + finalUrlObj.pathname.substring(0, finalUrlObj.pathname.lastIndexOf('/') + 1);

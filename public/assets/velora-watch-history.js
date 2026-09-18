@@ -5,6 +5,7 @@
   var MIN_WATCH_SECONDS = 2;
   var FINISHED_WATCH_PERCENT = 90;
   var state = {
+    currentUserKey: null,
     currentPlaying: null,
     cachedHistory: null,
     lastDiskSaveTimestamp: 0,
@@ -33,8 +34,15 @@
         --vel-home-heading-b: #ff5252;
         --vel-home-heading-glow: rgba(229, 9, 20, 0.45);
         order: -1;
-        margin-bottom: 0.65rem;
+        margin: 0 !important;
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
         transition: opacity 0.3s ease, transform 0.3s ease, margin 0.3s ease;
+      }
+      .vel-home-section--resume .vel-home-section__rail {
+        padding-bottom: 2px !important;
       }
       .vel-home-section--resume.is-hiding {
         opacity: 0 !important;
@@ -273,6 +281,51 @@
         margin-top: 1px !important;
         line-height: 1.15 !important;
       }
+      .vel-home-section__card--resume.has-title-logo .vel-home-section__name,
+      .vel-home-section__card--resume.has-integrated-title .vel-home-section__name {
+        display: none !important;
+      }
+      .vel-home-section__card--resume .vel-home-section__title-logo {
+        position: absolute !important;
+        bottom: 12px !important;
+        left: 12px !important;
+        max-height: clamp(38px, 6.8vw, 64px) !important;
+        max-width: min(78%, 230px) !important;
+        width: auto !important;
+        height: auto !important;
+        object-fit: contain !important;
+        object-position: left bottom !important;
+        filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.98)) drop-shadow(0 4px 14px rgba(0, 0, 0, 0.92)) drop-shadow(0 0 2px rgba(0, 0, 0, 0.85)) !important;
+        z-index: 4 !important;
+        pointer-events: none !important;
+        transform: none !important;
+        transition: none !important;
+      }
+      .vel-home-section__card--resume .vel-home-section__title-logo.vel-title-logo--wide {
+        min-width: clamp(95px, 13vw, 150px) !important;
+        max-height: clamp(34px, 5.8vw, 56px) !important;
+        max-width: min(80%, 240px) !important;
+      }
+      .vel-home-section__card--resume .vel-home-section__title-logo.vel-title-logo--standard {
+        min-width: clamp(90px, 12.5vw, 140px) !important;
+        max-height: clamp(42px, 7.5vw, 70px) !important;
+        max-width: min(76%, 220px) !important;
+      }
+      .vel-home-section__card--resume .vel-home-section__title-logo.vel-title-logo--tall {
+        max-height: clamp(34px, 5.5vw, 52px) !important;
+        max-width: min(58%, 170px) !important;
+      }
+      .vel-home-section__card--resume .vel-home-section__title-logo.is-dark-logo,
+      .vel-home-section__card--resume .vel-home-section__title-logo.vel-title-logo--dark,
+      .vel-home-section__card--resume.has-dark-title-logo .vel-home-section__title-logo {
+        background: transparent !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.35)) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.9)) !important;
+      }
       @media(max-width:640px) {
         .vel-home-section__card--resume {
           flex: 0 0 clamp(12.5rem, 62vw, 17.5rem) !important;
@@ -399,120 +452,6 @@
     }
   }
 
-  function getLocalHistory() {
-    if (state.cachedHistory && Array.isArray(state.cachedHistory)) {
-      return state.cachedHistory;
-    }
-    try {
-      var activeKey = getActiveUserKey();
-      var raw = localStorage.getItem(activeKey);
-      if (raw) {
-        var items = JSON.parse(raw);
-        if (Array.isArray(items) && items.length > 0) {
-          var validOnly = items.filter(isValidMediaEntry);
-          state.cachedHistory = validOnly;
-          return validOnly;
-        }
-      }
-
-      // Seamlessly scan legacy keys
-      for (var i = 0; i < localStorage.length; i++) {
-        var k = localStorage.key(i);
-        if (k && k.startsWith("velora_resume_") && k !== activeKey) {
-          try {
-            var legacyRaw = localStorage.getItem(k);
-            if (legacyRaw) {
-              var legItems = JSON.parse(legacyRaw);
-              if (Array.isArray(legItems) && legItems.length > 0) {
-                var validLeg = legItems.filter(isValidMediaEntry);
-                if (validLeg.length > 0) {
-                  localStorage.setItem(activeKey, JSON.stringify(validLeg));
-                  return validLeg;
-                }
-              }
-            }
-          } catch (_) {}
-        }
-      }
-      return [];
-    } catch (_) {
-      return [];
-    }
-  }
-
-  function saveLocalHistory(items, skipDomRebuild) {
-    try {
-      var valid = items.filter(isValidMediaEntry);
-      var key = getActiveUserKey();
-      localStorage.setItem(key, JSON.stringify(valid.slice(0, MAX_ITEMS)));
-      document.dispatchEvent(new CustomEvent("velora-watch-history-updated"));
-      if (!skipDomRebuild) {
-        injectResumeSectionDirectly();
-      }
-      requestDecorateEpisodes();
-    } catch (_) {}
-  }
-
-  function filterHistoryList(list, item) {
-    if (!Array.isArray(list) || !item) return [];
-    var targetId = String(item.id || "");
-    var sId = item.streamId ? String(item.streamId) : "";
-    var epId = item.episodeStreamId ? String(item.episodeStreamId) : "";
-    var seriesId = item.seriesId ? String(item.seriesId) : "";
-
-    return list.filter(function (it) {
-      if (!it) return false;
-      if (targetId && String(it.id) === targetId) return false;
-      if (item.type === "series" && seriesId && (String(it.seriesId) === seriesId || String(it.streamId) === seriesId)) return false;
-      if (sId && (String(it.streamId) === sId || String(it.episodeStreamId) === sId)) return false;
-      if (epId && (String(it.episodeStreamId) === epId || String(it.streamId) === epId)) return false;
-      return isValidMediaEntry(it);
-    });
-  }
-
-  function removeHistoryItem(item, cardEl) {
-    if (!item) return;
-
-    // 1. Clean from ALL localStorage keys immediately so it is never resurrected on reload
-    try {
-      for (var i = 0; i < localStorage.length; i++) {
-        var k = localStorage.key(i);
-        if (k && k.startsWith("velora_resume_")) {
-          try {
-            var raw = localStorage.getItem(k);
-            if (raw) {
-              var parsed = JSON.parse(raw);
-              if (Array.isArray(parsed)) {
-                var filtered = filterHistoryList(parsed, item);
-                localStorage.setItem(k, JSON.stringify(filtered));
-              }
-            }
-          } catch (_) {}
-        }
-      }
-    } catch (_) {}
-
-    var activeItems = filterHistoryList(getLocalHistory(), item);
-    saveLocalHistory(activeItems, !!cardEl);
-
-    // 2. Sync removal to backend database for all IDs
-    var token = authToken();
-    if (token) {
-      var idsToDelete = new Set();
-      if (item.id) idsToDelete.add(String(item.id));
-      if (item.streamId) idsToDelete.add(String(item.streamId));
-      if (item.episodeStreamId) idsToDelete.add(String(item.episodeStreamId));
-      if (item.seriesId) idsToDelete.add(String(item.seriesId));
-
-      idsToDelete.forEach(function (id) {
-        fetch("/api/history/" + encodeURIComponent(String(id)), {
-          method: "DELETE",
-          headers: { Authorization: "Bearer " + token }
-        }).catch(function () {});
-      });
-    }
-  }
-
   function cleanCoverUrl(url) {
     if (!url || typeof url !== "string") return "";
     var s = url.trim();
@@ -527,6 +466,256 @@
       .replace(/\b(4k|8k|fhd|hd|hevc|vf|vostfr|multi)\b/gi, "")
       .replace(/[^a-z0-9]/g, "")
       .trim();
+  }
+
+  // --- Tombstones (Deleted History Registry) ---
+  function getTombstoneKey() {
+    return "velora_deleted_history_tombstones_" + getActiveUserKey();
+  }
+
+  function getTombstones() {
+    try {
+      var raw = localStorage.getItem(getTombstoneKey());
+      if (raw) {
+        var list = JSON.parse(raw);
+        if (Array.isArray(list)) return list;
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function addTombstone(item) {
+    if (!item) return;
+    try {
+      var list = getTombstones();
+      var norm = normalizeTitle(item.seriesName || item.name || "");
+      var entry = {
+        id: item.id ? String(item.id) : null,
+        streamId: item.streamId ? String(item.streamId) : null,
+        episodeStreamId: item.episodeStreamId ? String(item.episodeStreamId) : null,
+        seriesId: item.seriesId ? String(item.seriesId) : null,
+        name: item.name ? String(item.name).trim() : null,
+        seriesName: item.seriesName ? String(item.seriesName).trim() : null,
+        normTitle: norm || null,
+        type: item.type || "movie",
+        timestamp: Date.now()
+      };
+      list.push(entry);
+      var cutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
+      list = list.filter(function (t) { return t && t.timestamp > cutoff; }).slice(-200);
+      localStorage.setItem(getTombstoneKey(), JSON.stringify(list));
+    } catch (_) {}
+  }
+
+  function removeTombstoneForMedia(media) {
+    if (!media) return;
+    try {
+      var list = getTombstones();
+      if (!list.length) return;
+      var norm = normalizeTitle(media.seriesName || media.name || "");
+      var mId = String(media.id || "");
+      var sId = String(media.seriesId || media.streamId || "");
+      var filtered = list.filter(function (t) {
+        if (mId && t.id && t.id === mId) return false;
+        if (sId && (t.seriesId === sId || t.streamId === sId)) return false;
+        if (norm && t.normTitle && t.normTitle === norm) return false;
+        return true;
+      });
+      localStorage.setItem(getTombstoneKey(), JSON.stringify(filtered));
+    } catch (_) {}
+  }
+
+  function isItemTombstoned(item) {
+    if (!item) return false;
+    var list = getTombstones();
+    if (!list.length) return false;
+    var itId = String(item.id || "");
+    var itStreamId = item.streamId ? String(item.streamId) : "";
+    var itEpId = item.episodeStreamId ? String(item.episodeStreamId) : "";
+    var itSeriesId = item.seriesId ? String(item.seriesId) : "";
+    var itNorm = normalizeTitle(item.seriesName || item.name || "");
+
+    return list.some(function (t) {
+      if (itId && t.id && t.id === itId) return true;
+      if (t.type === "series" || item.type === "series") {
+        if (itSeriesId && t.seriesId && itSeriesId === t.seriesId) return true;
+        if (itSeriesId && t.streamId && itSeriesId === t.streamId) return true;
+        if (itStreamId && t.seriesId && itStreamId === t.seriesId) return true;
+        if (itNorm && t.normTitle && itNorm === t.normTitle) return true;
+      }
+      if (itStreamId && t.streamId && itStreamId === t.streamId) return true;
+      if (itEpId && t.episodeStreamId && itEpId === t.episodeStreamId) return true;
+      if (itNorm && itNorm.length >= 2 && t.normTitle && itNorm === t.normTitle) return true;
+      return false;
+    });
+  }
+
+  function getLocalHistory() {
+    var activeKey = getActiveUserKey();
+    if (state.currentUserKey !== activeKey) {
+      state.currentUserKey = activeKey;
+      state.cachedHistory = null;
+    }
+    if (state.cachedHistory && Array.isArray(state.cachedHistory)) {
+      return state.cachedHistory.filter(function (it) { return !isItemTombstoned(it); });
+    }
+    try {
+      var raw = localStorage.getItem(activeKey);
+      if (raw) {
+        var items = JSON.parse(raw);
+        if (Array.isArray(items) && items.length > 0) {
+          var validOnly = items.filter(isValidMediaEntry).filter(function (it) { return !isItemTombstoned(it); });
+          state.cachedHistory = validOnly;
+          return validOnly;
+        }
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function saveLocalHistory(items, skipDomRebuild) {
+    try {
+      var valid = items.filter(isValidMediaEntry).filter(function (it) { return !isItemTombstoned(it); });
+      var key = getActiveUserKey();
+      localStorage.setItem(key, JSON.stringify(valid.slice(0, MAX_ITEMS)));
+      state.cachedHistory = valid;
+      state.needsResumeRailRefresh = true;
+      document.dispatchEvent(new CustomEvent("velora-watch-history-updated", { detail: { items: valid } }));
+      if (!skipDomRebuild) {
+        injectResumeSectionDirectly();
+      }
+      requestDecorateEpisodes();
+    } catch (_) {}
+  }
+
+  function filterHistoryList(list, item) {
+    if (!Array.isArray(list) || !item) return [];
+    var targetId = String(item.id || "");
+    var sId = item.streamId ? String(item.streamId) : "";
+    var epId = item.episodeStreamId ? String(item.episodeStreamId) : "";
+    var seriesId = item.seriesId ? String(item.seriesId) : "";
+    var normTitle = normalizeTitle(item.seriesName || item.name || "");
+    var isSeries = item.type === "series";
+
+    return list.filter(function (it) {
+      if (!it) return false;
+      if (isItemTombstoned(it)) return false;
+      if (targetId && String(it.id) === targetId) return false;
+
+      var itSeriesId = it.seriesId ? String(it.seriesId) : "";
+      var itStreamId = it.streamId ? String(it.streamId) : "";
+      var itEpId = it.episodeStreamId ? String(it.episodeStreamId) : "";
+      var itNormTitle = normalizeTitle(it.seriesName || it.name || "");
+      var itIsSeries = it.type === "series";
+
+      // If item is a series, completely wipe ALL episodes of this series from history
+      if (isSeries || itIsSeries) {
+        if (seriesId && (itSeriesId === seriesId || itStreamId === seriesId)) return false;
+        if (itSeriesId && (itSeriesId === sId || itSeriesId === targetId)) return false;
+        if (normTitle && normTitle.length >= 2 && itNormTitle && normTitle === itNormTitle) return false;
+      }
+
+      if (sId && (itStreamId === sId || itEpId === sId)) return false;
+      if (epId && (itEpId === epId || itStreamId === epId)) return false;
+      if (normTitle && normTitle.length >= 2 && itNormTitle && normTitle === itNormTitle) return false;
+
+      return isValidMediaEntry(it);
+    });
+  }
+
+  function removeHistoryItem(item, cardEl) {
+    if (!item) return;
+
+    // 1. Add to tombstones immediately so it can never resurrect
+    addTombstone(item);
+
+    // 2. Clear any active playback / session state for this item
+    if (state.currentPlaying) {
+      var curNorm = normalizeTitle(state.currentPlaying.seriesName || state.currentPlaying.name || "");
+      var itemNorm = normalizeTitle(item.seriesName || item.name || "");
+      var curSId = String(state.currentPlaying.seriesId || state.currentPlaying.streamId || "");
+      var itemSId = String(item.seriesId || item.streamId || "");
+      if (
+        String(state.currentPlaying.id) === String(item.id) ||
+        (curSId && curSId === itemSId) ||
+        (curNorm && itemNorm && curNorm === itemNorm)
+      ) {
+        state.currentPlaying = null;
+        sessionTracker.mediaId = null;
+        sessionTracker.continuousSeconds = 0;
+        sessionTracker.qualified = false;
+        sessionTracker.rewindActive = false;
+      }
+    }
+
+    // 3. Clear series episode cache if series
+    if (item.type === "series") {
+      var sId = item.seriesId || item.streamId;
+      if (sId) {
+        delete window.__veloraSeriesEpisodesCache[String(sId)];
+        try { localStorage.removeItem("velora_series_eps_" + String(sId)); } catch (_) {}
+      }
+    }
+
+    // 4. Clean from active user's localStorage key
+    try {
+      var activeKey = getActiveUserKey();
+      var raw = localStorage.getItem(activeKey);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          var filtered = filterHistoryList(parsed, item);
+          localStorage.setItem(activeKey, JSON.stringify(filtered));
+        }
+      }
+    } catch (_) {}
+
+    state.cachedHistory = null;
+    var activeItems = filterHistoryList(getLocalHistory(), item);
+    saveLocalHistory(activeItems, !!cardEl);
+
+    // 5. Sync removal to backend database for all IDs and series metadata
+    var token = authToken();
+    if (token) {
+      var idsToDelete = new Set();
+      if (item.id) idsToDelete.add(String(item.id));
+      if (item.streamId) idsToDelete.add(String(item.streamId));
+      if (item.episodeStreamId) idsToDelete.add(String(item.episodeStreamId));
+      if (item.seriesId) idsToDelete.add(String(item.seriesId));
+
+      var qParams = new URLSearchParams();
+      if (item.seriesId) qParams.set("seriesId", String(item.seriesId));
+      if (item.name) qParams.set("name", String(item.name));
+      if (item.seriesName) qParams.set("seriesName", String(item.seriesName));
+      var queryString = qParams.toString() ? ("?" + qParams.toString()) : "";
+
+      idsToDelete.forEach(function (id) {
+        fetch("/api/history/" + encodeURIComponent(String(id)) + queryString, {
+          method: "DELETE",
+          headers: { Authorization: "Bearer " + token }
+        }).catch(function () {});
+      });
+    }
+
+    // 6. Refresh episode row decorations in detail page (clears "✓ Vu" and progress bar)
+    requestDecorateEpisodes();
+  }
+
+  function parseVodClock(value) {
+    var str = String(value || "").trim();
+    if (str.includes("/")) {
+      var split = str.split("/");
+      str = split[split.length - 1].trim();
+    }
+    var parts = str.split(":").map(Number);
+    if (parts.some(function (part) { return !Number.isFinite(part); })) return NaN;
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    return NaN;
   }
 
   function parseSeasonEpisode(badgeText, titleText) {
@@ -736,12 +925,14 @@
     var token = authToken();
     if (!token || state.dbSyncInProgress) return;
     state.dbSyncInProgress = true;
+    var userKeyAtStart = getActiveUserKey();
     try {
       var res = await fetch("/api/history?limit=40", {
         headers: { Authorization: "Bearer " + token }
       });
       if (res.ok) {
         var rows = await res.json();
+        if (getActiveUserKey() !== userKeyAtStart) return;
         if (Array.isArray(rows) && rows.length > 0) {
           var serverItems = rows.map(function (r) {
             var d = r.data || {};
@@ -757,7 +948,11 @@
               isFinished: percent >= FINISHED_WATCH_PERCENT,
               updatedAt: r.updated_at ? Number(r.updated_at) : (d.updatedAt || Date.now())
             });
-          }).filter(isValidMediaEntry);
+          }).filter(isValidMediaEntry).filter(function (it) {
+            return !isItemTombstoned(it);
+          });
+
+          if (getActiveUserKey() !== userKeyAtStart) return;
 
           var local = getLocalHistory();
           var mergedMap = new Map();
@@ -793,13 +988,76 @@
     rewindContinuousSeconds: 0
   };
 
+  // Helper to check if a movie or series is ALREADY present in the "Continuer de regarder" (Reprendre) rail
+  function isMediaAlreadyInResume(mediaObj, mediaId) {
+    if (!mediaObj && !mediaId) return false;
+    if (mediaObj && mediaObj.isResumeCard) return true;
+    var history = getLocalHistory();
+    if (!history || !history.length) return false;
+
+    var targetId = String(mediaId || (mediaObj ? mediaObj.id : "") || "").trim();
+    var isSeries = mediaObj ? (mediaObj.type === "series" || String(mediaObj.contentType) === "series" || targetId.startsWith("series:")) : targetId.startsWith("series:");
+
+    // 1. Direct ID match in active history
+    if (targetId && history.some(function (it) { return it && !isItemTombstoned(it) && String(it.id) === targetId; })) {
+      return true;
+    }
+
+    // 2. Series match: if ANY episode/card of this series is already tracked in history
+    if (isSeries && mediaObj) {
+      var sId = String(mediaObj.seriesId || mediaObj.streamId || "").trim();
+      var epStreamId = String(mediaObj.episodeStreamId || "").trim();
+      var sNorm = normalizeTitle(mediaObj.seriesName || mediaObj.name || "");
+
+      var hasSeries = history.some(function (it) {
+        if (!it || it.type !== "series" || isItemTombstoned(it)) return false;
+        var itSId = String(it.seriesId || it.streamId || "").trim();
+        var itEpId = String(it.episodeStreamId || "").trim();
+        if (sId && itSId && (itSId === sId || String(it.id).startsWith("series:" + sId + ":"))) return true;
+        if (epStreamId && itEpId && itEpId === epStreamId) return true;
+        if (sNorm && sNorm.length >= 2 && it.name) {
+          var itNorm = normalizeTitle(it.seriesName || it.name);
+          if (itNorm && itNorm === sNorm) return true;
+        }
+        return false;
+      });
+
+      if (hasSeries) return true;
+    }
+
+    // 3. Movie match: if this movie is already tracked in active history
+    if (!isSeries && mediaObj) {
+      var mStreamId = String(mediaObj.streamId || "").trim();
+      var mNorm = normalizeTitle(mediaObj.name || "");
+
+      var hasMovie = history.some(function (it) {
+        if (!it || it.type === "series" || isItemTombstoned(it)) return false;
+        if (mStreamId && String(it.streamId || "") === mStreamId) return true;
+        if (mNorm && mNorm.length >= 2 && it.name) {
+          var itNorm = normalizeTitle(it.name);
+          if (itNorm && itNorm === mNorm) return true;
+        }
+        return false;
+      });
+
+      if (hasMovie) return true;
+    }
+
+    return false;
+  }
+
   function updateSessionTrackerMedia(mediaId, mediaObj) {
     if (!mediaId) return;
-    if (sessionTracker.mediaId === mediaId) return;
+    if (mediaObj) removeTombstoneForMedia(mediaObj);
+    if (sessionTracker.mediaId === mediaId) {
+      if (mediaObj && isMediaAlreadyInResume(mediaObj, mediaId)) {
+        sessionTracker.qualified = true;
+      }
+      return;
+    }
+
+    var alreadyInResume = isMediaAlreadyInResume(mediaObj, mediaId);
     var history = getLocalHistory();
-    var alreadySaved = history.some(function (it) {
-      return String(it.id) === String(mediaId);
-    });
 
     var isRewindEpisode = false;
     if (mediaObj && mediaObj.type === "series") {
@@ -828,7 +1086,7 @@
     sessionTracker.mediaId = mediaId;
     sessionTracker.continuousSeconds = 0;
     sessionTracker.lastTick = null;
-    sessionTracker.qualified = alreadySaved;
+    sessionTracker.qualified = alreadyInResume;
     sessionTracker.seekFromTime = 0;
     sessionTracker.rewindActive = isRewindEpisode;
     sessionTracker.rewindStartTime = 0;
@@ -836,11 +1094,45 @@
   }
 
   function tickHeartbeat() {
+    var isCast = window.VeloraCast && typeof window.VeloraCast.isConnected === "function" && window.VeloraCast.isConnected();
     var vodVideo = document.getElementById("video-vod");
+
+    if (isCast) {
+      var castMedia = typeof window.VeloraCast.getCurrentMedia === "function" ? window.VeloraCast.getCurrentMedia() : null;
+      if (castMedia && !castMedia.isLive) {
+        var nowCast = Date.now();
+        if (sessionTracker.lastTick) {
+          var deltaCast = (nowCast - sessionTracker.lastTick) / 1000;
+          if (deltaCast > 0 && deltaCast < 8) {
+            sessionTracker.continuousSeconds += deltaCast;
+          }
+        }
+        sessionTracker.lastTick = nowCast;
+
+        var minSecCast = getResumeMinWatchSeconds();
+        var currCast = Number.isFinite(castMedia.position) ? castMedia.position : 0;
+        var durCast = Number.isFinite(castMedia.duration) ? castMedia.duration : 0;
+
+        if (currCast > 0) {
+          if (!sessionTracker.qualified && sessionTracker.continuousSeconds >= minSecCast) {
+            sessionTracker.qualified = true;
+            recordProgressWithData(currCast, durCast, false, false, false, castMedia);
+          } else if (sessionTracker.qualified) {
+            if (nowCast - state.lastDiskSaveTimestamp >= 10000) {
+              recordProgressWithData(currCast, durCast, false, true, false, castMedia);
+            }
+          }
+        }
+        return;
+      }
+    }
+
     if (!vodVideo || vodVideo.paused || vodVideo.seeking || vodVideo.ended) {
       sessionTracker.lastTick = null;
       return;
     }
+
+    updateActiveEpisodeLiveProgress();
 
     var now = Date.now();
     if (sessionTracker.lastTick) {
@@ -871,13 +1163,41 @@
     }
   }
 
-  // Record playback progress (Strictly for VOD Movies & Series Episodes only)
-  function recordProgress(video, isEnd, isThrottled, isRewindCommit) {
-    if (!video || video.id === "video" || video.id === "vel-adult-video" || isNaN(video.currentTime) || (video.currentTime < MIN_WATCH_SECONDS && !isEnd)) return;
+  // Record playback progress with explicit seconds or video element
+  function recordProgressWithData(currSeconds, durSeconds, isEnd, isThrottled, isRewindCommit, mediaOverride) {
+    var rawCurrent = Number(currSeconds);
+    if (!Number.isFinite(rawCurrent) || (rawCurrent < MIN_WATCH_SECONDS && !isEnd)) return;
     if (document.body.dataset.velActiveTab === "live" || document.body.dataset.velActiveTab === "adult" || document.body.dataset.veloraReturnAdult === "true" || document.body.classList.contains("vel-adult-active")) return;
-    if (!isVodPlayerVisible()) return;
 
-    var media = state.currentPlaying;
+    var media = state.currentPlaying || window.__veloraLastPlayingMedia;
+    if (!media && mediaOverride) {
+      var isSeriesOverride = mediaOverride.type === "series" || !!mediaOverride.seriesId || !!mediaOverride.episodeStreamId;
+      var sIdOverride = mediaOverride.seriesId || mediaOverride.streamId || "";
+      var epIdOverride = mediaOverride.episodeStreamId || mediaOverride.streamId || "";
+      media = {
+        id: isSeriesOverride ? ("series:" + (sIdOverride || "series") + ":ep:" + (epIdOverride || "ep")) : ("movie:" + (mediaOverride.streamId || sIdOverride || "vod")),
+        type: isSeriesOverride ? "series" : "movie",
+        streamId: mediaOverride.streamId || epIdOverride,
+        seriesId: sIdOverride || null,
+        episodeStreamId: isSeriesOverride ? (epIdOverride || null) : null,
+        name: mediaOverride.title || mediaOverride.name || "Vidéo",
+        seriesName: mediaOverride.seriesName || mediaOverride.title || mediaOverride.name || null,
+        episodeTitle: mediaOverride.episodeTitle || null,
+        seasonNumber: mediaOverride.seasonNumber != null ? Number(mediaOverride.seasonNumber) : 1,
+        episodeNumber: mediaOverride.episodeNumber != null ? Number(mediaOverride.episodeNumber) : 1,
+        thumbUrl: cleanCoverUrl(mediaOverride.poster || mediaOverride.thumbUrl || ""),
+        backdropUrl: cleanCoverUrl(mediaOverride.poster || mediaOverride.backdropUrl || ""),
+        packageId: mediaOverride.packageId || "",
+        sourceId: mediaOverride.sourceId || "",
+        containerExtension: mediaOverride.containerExtension || "mp4",
+        duration: Number(durSeconds || mediaOverride.duration) || 0,
+        updatedAt: Date.now()
+      };
+      state.currentPlaying = media;
+      window.__veloraLastPlayingMedia = media;
+      updateSessionTrackerMedia(media.id, media);
+    }
+
     if (!media) {
       var activeEp = document.querySelector(".vel-vod-detail__episode--playing, .vel-vod-detail__episode[aria-current='true']");
       var seriesTitle = document.querySelector(".vel-vod-detail__title");
@@ -901,32 +1221,39 @@
           updatedAt: Date.now()
         };
         state.currentPlaying = media;
+        window.__veloraLastPlayingMedia = media;
       }
     }
 
-    if (!media || !isValidMediaEntry(media)) return;
+    if (!media || !isValidMediaEntry(media) || isItemTombstoned(media)) return;
 
     var id = media.id;
+    var alreadyInResume = isMediaAlreadyInResume(media, id);
     var existingEntry = getLocalHistory().find(function (item) { return String(item.id) === String(id); });
 
-    var realCurrent = Number.isFinite(video.currentTime) ? video.currentTime : 0;
-    var realDuration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : (media.duration || 0);
+    var realCurrent = Number.isFinite(rawCurrent) ? rawCurrent : 0;
+    var realDuration = Number.isFinite(durSeconds) && durSeconds > 0 ? durSeconds : (media.duration || (existingEntry ? existingEntry.duration : 0));
 
     var duration = Math.round(realDuration);
     var currentPos = isEnd ? duration : Math.max(0, Math.round(realCurrent));
     var percent = isEnd ? 100 : (duration > 0 ? Math.round((currentPos / duration) * 100) : 5);
     var isFinished = isEnd || (duration > 0 && percent >= FINISHED_WATCH_PERCENT);
 
-    if (!isFinished && !sessionTracker.qualified && !existingEntry && !isRewindCommit) {
-      // User has not watched continuously for the required minimum time yet and video is not finished
+    var minSec = getResumeMinWatchSeconds();
+    var continuousSecs = sessionTracker.continuousSeconds || 0;
+
+    var isQualified = isFinished || alreadyInResume || !!existingEntry || sessionTracker.qualified || (isRewindCommit && sessionTracker.qualified) || (continuousSecs >= minSec);
+
+    if (!isQualified) {
       return;
     }
+
+    sessionTracker.qualified = true;
 
     var items = getLocalHistory().filter(function (item) {
       return String(item.id) !== String(id);
     });
 
-    // If user is watching a series episode, prune any subsequent episodes of this series (e.g. Ep 8 when currently watching Ep 4) and unstarted placeholders
     if (media.type === "series") {
       var activeSeriesId = String(media.seriesId || media.streamId || "");
       var sNorm = normalizeTitle(media.name || media.seriesName || "");
@@ -940,11 +1267,9 @@
         if (sameSeries) {
           var itSeason = Number(it.seasonNumber) || 1;
           var itEpisode = Number(it.episodeNumber) || 1;
-          // 1. If it's a later episode than the one currently being watched (e.g. Ep 8 when currently watching Ep 4), forget/remove it!
           if (itSeason > curSeason || (itSeason === curSeason && itEpisode > curEpisode)) {
             return false;
           }
-          // 2. If it's an unstarted placeholder episode for this series, remove it
           if (it.currentTime === 0 && (it.progressPercent === 0 || it.progressPercent == null) && !it.isFinished) {
             return false;
           }
@@ -955,6 +1280,9 @@
 
     var thumb = cleanCoverUrl(media.thumbUrl || (existingEntry ? existingEntry.thumbUrl : "") || "");
     var backdrop = cleanCoverUrl(media.backdropUrl || (existingEntry ? existingEntry.backdropUrl : "") || media.thumbUrl || "");
+    var horizThumb = media.horizontal_thumb || (existingEntry ? existingEntry.horizontal_thumb : "") || "";
+    var titleLogo = media.title_logo || media.titleLogo || (existingEntry ? (existingEntry.title_logo || existingEntry.titleLogo) : "") || "";
+    var hasIntegrated = Boolean(media.has_integrated_title || (existingEntry ? existingEntry.has_integrated_title : false));
 
     var entry = {
       id: String(id),
@@ -969,6 +1297,9 @@
       episodeTitle: media.episodeTitle || null,
       thumbUrl: thumb,
       backdropUrl: backdrop || thumb,
+      horizontal_thumb: horizThumb,
+      title_logo: titleLogo,
+      has_integrated_title: hasIntegrated,
       packageId: media.packageId || "",
       sourceId: media.sourceId || "",
       containerExtension: media.containerExtension || "mp4",
@@ -984,12 +1315,12 @@
     items.unshift(entry);
 
     if (media.type === "series" && isFinished) {
-      var sId = media.seriesId || media.streamId;
-      var cachedEps = getSeriesEpisodesCache(sId);
+      var sIdCached = media.seriesId || media.streamId;
+      var cachedEps = getSeriesEpisodesCache(sIdCached);
       if (cachedEps && cachedEps.length > 0) {
         var nextEp = findNextEpisodeInList(cachedEps, media.seasonNumber, media.episodeNumber, media.episodeStreamId);
         if (nextEp) {
-          var nextId = "series:" + sId + ":ep:" + nextEp.episodeStreamId;
+          var nextId = "series:" + sIdCached + ":ep:" + nextEp.episodeStreamId;
           var existingNext = items.find(function (it) { return String(it.id) === String(nextId); });
           if (!existingNext) {
             var nextEntry = {
@@ -1005,6 +1336,9 @@
               episodeTitle: nextEp.title || null,
               thumbUrl: thumb,
               backdropUrl: backdrop || thumb,
+              horizontal_thumb: horizThumb,
+              title_logo: titleLogo,
+              has_integrated_title: hasIntegrated,
               packageId: media.packageId || "",
               sourceId: media.sourceId || "",
               containerExtension: nextEp.containerExtension || media.containerExtension || "mp4",
@@ -1017,52 +1351,23 @@
             items.unshift(nextEntry);
           }
         }
-      } else {
-        fetchSeriesEpisodes(sId, media.sourceId).then(function (eps) {
-          if (eps && eps.length > 0) {
-            var nextEpAsync = findNextEpisodeInList(eps, media.seasonNumber, media.episodeNumber, media.episodeStreamId);
-            if (nextEpAsync) {
-              var curHist = getLocalHistory();
-              var nextIdAsync = "series:" + sId + ":ep:" + nextEpAsync.episodeStreamId;
-              if (!curHist.some(function (it) { return String(it.id) === String(nextIdAsync); })) {
-                var nextEntryAsync = {
-                  id: nextIdAsync,
-                  type: "series",
-                  streamId: media.streamId || null,
-                  seriesId: media.seriesId || null,
-                  episodeStreamId: nextEpAsync.episodeStreamId,
-                  seasonNumber: nextEpAsync.seasonNumber,
-                  episodeNumber: nextEpAsync.episodeNum,
-                  name: media.name,
-                  seriesName: media.seriesName || media.name || null,
-                  episodeTitle: nextEpAsync.title || null,
-                  thumbUrl: thumb,
-                  backdropUrl: backdrop || thumb,
-                  packageId: media.packageId || "",
-                  sourceId: media.sourceId || "",
-                  containerExtension: nextEpAsync.containerExtension || media.containerExtension || "mp4",
-                  currentTime: 0,
-                  duration: 0,
-                  progressPercent: 0,
-                  isFinished: false,
-                  updatedAt: Date.now() + 1
-                };
-                curHist.unshift(nextEntryAsync);
-                saveLocalHistory(curHist);
-              }
-            }
-          }
-        });
       }
     }
 
-    saveLocalHistory(items, !isRewindCommit && (isThrottled || isVodPlayerVisible()));
+    state.lastDiskSaveTimestamp = Date.now();
+    saveLocalHistory(items, !isRewindCommit && !isEnd && isThrottled && isVodPlayerVisible());
 
     var now = Date.now();
     if (isEnd || isRewindCommit || !isThrottled || (now - state.lastDbSyncTimestamp >= 30000)) {
       state.lastDbSyncTimestamp = now;
       syncProgressToDatabase(entry);
     }
+  }
+
+  // Record playback progress (Strictly for VOD Movies & Series Episodes only)
+  function recordProgress(video, isEnd, isThrottled, isRewindCommit) {
+    if (!video || video.id === "video" || video.id === "vel-adult-video" || isNaN(video.currentTime) || (video.currentTime < MIN_WATCH_SECONDS && !isEnd)) return;
+    recordProgressWithData(video.currentTime, video.duration, isEnd, isThrottled, isRewindCommit, null);
   }
 
   function formatPlaybackTimestamp(seconds) {
@@ -1243,6 +1548,7 @@
           }
         }
       });
+      updateActiveEpisodeLiveProgress();
     } finally {
       state.isDecorating = false;
     }
@@ -1295,7 +1601,11 @@
   }
 
   function updateActiveEpisodeLiveProgress() {
-    var activeRow = document.querySelector(".vel-vod-detail__episode--playing, .vel-vod-detail__episode[aria-current='true']");
+    var activeRow = document.querySelector(".vel-vod-detail__episode--playing, .vel-vod-detail__episode[aria-current='true'], .vel-vod-detail__episode[data-vel-playing='true']");
+    if (!activeRow && state.currentPlaying && (state.currentPlaying.episodeStreamId || state.currentPlaying.streamId)) {
+      var epId = String(state.currentPlaying.episodeStreamId || state.currentPlaying.streamId);
+      activeRow = document.querySelector('.vel-vod-detail__episode[data-episode-stream-id="' + epId + '"], .vel-vod-detail__episode[data-stream-id="' + epId + '"]');
+    }
     if (!activeRow) return;
     var body = activeRow.querySelector(".vel-vod-detail__episode-body");
     if (!body) return;
@@ -1322,9 +1632,15 @@
       }
     }
 
-    if (!realCurrent) {
-      var vodVideo = document.getElementById("video-vod");
-      if (vodVideo && Number.isFinite(vodVideo.currentTime)) realCurrent = vodVideo.currentTime;
+    var vodVideo = document.getElementById("video-vod");
+    if (!realCurrent && vodVideo && Number.isFinite(vodVideo.currentTime)) {
+      realCurrent = vodVideo.currentTime;
+    }
+
+    if (!realDuration || !(realDuration > 0)) {
+      if (vodVideo && Number.isFinite(vodVideo.duration) && vodVideo.duration > 0) {
+        realDuration = vodVideo.duration;
+      }
     }
 
     if (!realDuration || !(realDuration > 0)) {
@@ -1338,6 +1654,9 @@
     if (!realDuration || !(realDuration > 0)) return;
 
     var percent = Math.min(100, Math.max(0, (realCurrent / realDuration) * 100));
+    var targetPercent = Math.round(percent);
+    var targetState = percent >= FINISHED_WATCH_PERCENT ? "watched" : ("in-progress:" + targetPercent);
+    activeRow.dataset.velDecoratedState = targetState;
 
     if (percent >= FINISHED_WATCH_PERCENT) {
       activeRow.classList.add("vel-vod-detail__episode--watched");
@@ -1351,7 +1670,7 @@
       }
       var oldBar = body.querySelector(".vel-ep-progress-bar");
       if (oldBar) oldBar.remove();
-    } else if (percent >= 0.5) {
+    } else if (percent >= 0.1) {
       activeRow.classList.remove("vel-vod-detail__episode--watched");
       activeRow.classList.add("vel-vod-detail__episode--in-progress");
       var oldTag = activeRow.querySelector(".vel-ep-watched-tag");
@@ -1400,43 +1719,32 @@
           lastKnownVodTime = vodVideo.currentTime;
         }
         tryApplySeekOnActiveVideo(vodVideo);
+        updateActiveEpisodeLiveProgress();
       }, { passive: true });
 
       vodVideo.addEventListener("playing", function () {
         sessionTracker.lastTick = Date.now();
         tryApplySeekOnActiveVideo(vodVideo);
+        updateActiveEpisodeLiveProgress();
         startHeartbeat();
       }, { passive: true });
 
       vodVideo.addEventListener("seeking", function () {
         sessionTracker.seekFromTime = lastKnownVodTime || (Number.isFinite(vodVideo.currentTime) ? vodVideo.currentTime : 0);
-        if (!sessionTracker.qualified) {
-          sessionTracker.continuousSeconds = 0;
-          sessionTracker.lastTick = null;
-        }
+        sessionTracker.lastTick = null;
+        updateActiveEpisodeLiveProgress();
       }, { passive: true });
 
       vodVideo.addEventListener("seeked", function () {
         var toTime = Number.isFinite(vodVideo.currentTime) ? vodVideo.currentTime : 0;
-        var fromTime = sessionTracker.seekFromTime || 0;
-        var history = getLocalHistory();
-        var curEntry = history.find(function (it) {
-          return state.currentPlaying && String(it.id) === String(state.currentPlaying.id);
-        });
-        var refTime = Math.max(fromTime, curEntry && Number.isFinite(curEntry.currentTime) ? curEntry.currentTime : 0);
-
-        if (toTime < refTime - 2) {
-          // Backward seek (rewind): arm 5-second continuous watch timer to commit new resume point
-          sessionTracker.rewindActive = true;
-          sessionTracker.rewindStartTime = toTime;
-          sessionTracker.rewindContinuousSeconds = 0;
-          sessionTracker.lastTick = Date.now();
-        } else {
-          // Forward seek / normal scrubbing
-          sessionTracker.rewindActive = false;
-          sessionTracker.rewindContinuousSeconds = 0;
-        }
         lastKnownVodTime = toTime;
+        sessionTracker.rewindActive = false;
+        sessionTracker.rewindContinuousSeconds = 0;
+        updateActiveEpisodeLiveProgress();
+        if (sessionTracker.qualified) {
+          recordProgress(vodVideo, false, false, true);
+          injectResumeSectionDirectly();
+        }
       }, { passive: true });
 
       vodVideo.addEventListener("waiting", function () {
@@ -1445,29 +1753,38 @@
 
       vodVideo.addEventListener("canplay", function () {
         tryApplySeekOnActiveVideo(vodVideo);
+        updateActiveEpisodeLiveProgress();
       }, { passive: true });
 
       vodVideo.addEventListener("loadedmetadata", function () {
         tryApplySeekOnActiveVideo(vodVideo);
+        updateActiveEpisodeLiveProgress();
       }, { passive: true });
 
       vodVideo.addEventListener("pause", function () {
         stopHeartbeat();
+        updateActiveEpisodeLiveProgress();
         if (sessionTracker.rewindActive && sessionTracker.rewindContinuousSeconds >= 5) {
           sessionTracker.rewindActive = false;
           sessionTracker.rewindContinuousSeconds = 0;
           sessionTracker.qualified = true;
           recordProgress(vodVideo, false, false, true);
         } else {
-          recordProgress(vodVideo, false, false, false);
+          recordProgress(vodVideo, false, false, true);
         }
+        injectResumeSectionDirectly();
       }, { passive: true });
 
       vodVideo.addEventListener("ended", function () {
         stopHeartbeat();
         sessionTracker.lastTick = null;
         sessionTracker.qualified = true;
-        recordProgress(vodVideo, true, false, false);
+        updateActiveEpisodeLiveProgress();
+        recordProgress(vodVideo, true, false, true);
+        injectResumeSectionDirectly();
+        setTimeout(function () {
+          triggerAutoPlayNextEpisode();
+        }, 800);
       }, { passive: true });
     }
 
@@ -1482,6 +1799,131 @@
 
     requestDecorateEpisodes();
   }
+
+  // ============================================================
+  // Auto-Play Next Episode Engine
+  // ============================================================
+  var isAutoPlayingNext = false;
+  function triggerAutoPlayNextEpisode() {
+    if (isAutoPlayingNext) return;
+
+    var isSeries = (state.currentPlaying && state.currentPlaying.type === "series") ||
+                   !!document.querySelector(".vel-vod-detail--series") ||
+                   !!document.querySelector(".vel-vod-detail__episode--playing");
+    if (!isSeries) return;
+
+    isAutoPlayingNext = true;
+    setTimeout(function () {
+      isAutoPlayingNext = false;
+    }, 4000);
+
+    console.info("[Watch History] Auto-advancing to next episode...");
+
+    // 1. Try existing adjacent episode navigator if present in DOM
+    if (typeof window.veloraPlayAdjacentEpisode === "function") {
+      try {
+        var played = window.veloraPlayAdjacentEpisode(1);
+        if (played) return;
+      } catch (_) {}
+    }
+
+    var nextBtn = document.getElementById("vod-ctl-next-episode");
+    if (nextBtn && !nextBtn.disabled && !nextBtn.hidden) {
+      nextBtn.click();
+      return;
+    }
+
+    // 2. Fallback: Find next episode button in current series detail page
+    var activeEp = document.querySelector(".vel-vod-detail__episode--playing, .vel-vod-detail__episode[aria-current='true']");
+    if (activeEp) {
+      var allEpisodes = Array.from(document.querySelectorAll(".vel-vod-detail__episode[data-episode-stream-id]"));
+      var idx = allEpisodes.indexOf(activeEp);
+      if (idx >= 0 && idx < allEpisodes.length - 1) {
+        allEpisodes[idx + 1].click();
+        return;
+      }
+      // Check if there's a next season in the select dropdown
+      var seasonSelect = document.querySelector(".vel-vod-detail__season-select");
+      if (seasonSelect && seasonSelect.selectedIndex < seasonSelect.options.length - 1) {
+        seasonSelect.selectedIndex += 1;
+        seasonSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        setTimeout(function () {
+          var newEpisodes = document.querySelectorAll(".vel-vod-detail__episode[data-episode-stream-id]");
+          if (newEpisodes && newEpisodes.length > 0) {
+            newEpisodes[0].click();
+          }
+        }, 300);
+        return;
+      }
+    }
+
+    // 3. Fallback: Use Series Episode Cache & API via veloraResumePlayback
+    if (state.currentPlaying && (state.currentPlaying.seriesId || state.currentPlaying.streamId)) {
+      var sId = state.currentPlaying.seriesId || state.currentPlaying.streamId;
+      var curMedia = Object.assign({}, state.currentPlaying);
+      var cached = getSeriesEpisodesCache(sId);
+      if (cached && cached.length > 0) {
+        var nextEp = findNextEpisodeInList(cached, curMedia.seasonNumber, curMedia.episodeNumber, curMedia.episodeStreamId);
+        if (nextEp) {
+          var nextItem = {
+            id: "series:" + sId + ":ep:" + nextEp.episodeStreamId,
+            type: "series",
+            streamId: curMedia.streamId || null,
+            seriesId: sId,
+            episodeStreamId: nextEp.episodeStreamId,
+            seasonNumber: nextEp.seasonNumber,
+            episodeNumber: nextEp.episodeNum,
+            name: curMedia.name,
+            seriesName: curMedia.seriesName || curMedia.name,
+            episodeTitle: nextEp.title,
+            thumbUrl: curMedia.thumbUrl,
+            backdropUrl: curMedia.backdropUrl,
+            packageId: curMedia.packageId || "series:all",
+            sourceId: curMedia.sourceId || "",
+            containerExtension: nextEp.containerExtension || "mp4",
+            currentTime: 0,
+            duration: 0,
+            progressPercent: 0,
+            isFinished: false,
+            updatedAt: Date.now()
+          };
+          window.veloraResumePlayback(nextItem);
+        }
+      } else {
+        fetchSeriesEpisodes(sId, curMedia.sourceId).then(function (eps) {
+          if (eps && eps.length > 0) {
+            var nextEpAsync = findNextEpisodeInList(eps, curMedia.seasonNumber, curMedia.episodeNumber, curMedia.episodeStreamId);
+            if (nextEpAsync) {
+              var nextItemAsync = {
+                id: "series:" + sId + ":ep:" + nextEpAsync.episodeStreamId,
+                type: "series",
+                streamId: curMedia.streamId || null,
+                seriesId: sId,
+                episodeStreamId: nextEpAsync.episodeStreamId,
+                seasonNumber: nextEpAsync.seasonNumber,
+                episodeNumber: nextEpAsync.episodeNum,
+                name: curMedia.name,
+                seriesName: curMedia.seriesName || curMedia.name,
+                episodeTitle: nextEpAsync.title,
+                thumbUrl: curMedia.thumbUrl,
+                backdropUrl: curMedia.backdropUrl,
+                packageId: curMedia.packageId || "series:all",
+                sourceId: curMedia.sourceId || "",
+                containerExtension: nextEpAsync.containerExtension || "mp4",
+                currentTime: 0,
+                duration: 0,
+                progressPercent: 0,
+                isFinished: false,
+                updatedAt: Date.now()
+              };
+              window.veloraResumePlayback(nextItemAsync);
+            }
+          }
+        });
+      }
+    }
+  }
+  window.veloraTriggerAutoPlayNextEpisode = triggerAutoPlayNextEpisode;
 
   // Safe seek handler once video playback actively starts (Netflix-style 5s rewind buffer)
   window.veloraResumePlayback = function (item) {
@@ -1729,6 +2171,7 @@
       currentTime: initialSeekTime,
       updatedAt: Date.now()
     };
+    window.__veloraLastPlayingMedia = state.currentPlaying;
 
     updateSessionTrackerMedia(state.currentPlaying.id, state.currentPlaying);
   });
@@ -1869,8 +2312,17 @@
       var card = document.createElement("button");
       card.type = "button";
       card.className = "vel-home-section__card vel-home-section__card--" + (isSeries ? "series" : "movies") + " vel-home-section__card--resume vel-home-section__card--horizontal";
+      var rawTitle = item.seriesName || item.name || "";
+      var cleanTitle = (typeof window.stripChannelPrefixes === "function" ? window.stripChannelPrefixes(rawTitle) : rawTitle).trim();
       card.setAttribute("tabindex", "0");
-      card.setAttribute("aria-label", "Continuer de regarder " + (item.seriesName || item.name));
+      card.setAttribute("aria-label", "Continuer de regarder " + (cleanTitle || rawTitle));
+
+      var hasIntegratedTitle = Boolean(
+        item.has_integrated_title ||
+        item.horizontal_thumb ||
+        (item.thumbUrl && String(item.thumbUrl).includes("/uploads/horizontal-thumbs/")) ||
+        (item.backdropUrl && String(item.backdropUrl).includes("/uploads/horizontal-thumbs/"))
+      );
 
       var entryForOpen = isSeries ? {
         id: "series:" + (item.seriesId || item.streamId),
@@ -1880,9 +2332,12 @@
         seasonNumber: item.seasonNumber,
         episodeNumber: item.episodeNumber,
         currentTime: item.currentTime,
-        name: item.seriesName || item.name,
+        name: cleanTitle || item.seriesName || item.name,
         thumbUrl: item.thumbUrl || item.cover || item.stream_icon || "",
         backdropUrl: item.backdropUrl || item.backdrop || item.thumbUrl || item.cover || "",
+        horizontal_thumb: item.horizontal_thumb || "",
+        title_logo: item.title_logo || item.titleLogo || "",
+        has_integrated_title: hasIntegratedTitle,
         cover: item.thumbUrl || item.cover || item.stream_icon || "",
         packageId: item.packageId || "series:all",
         sourceId: item.sourceId || "",
@@ -1890,6 +2345,8 @@
         isResumeCard: true,
         rawItem: item
       } : Object.assign({}, item, {
+        name: cleanTitle || item.name,
+        has_integrated_title: hasIntegratedTitle,
         isResumeCard: true,
         rawItem: item
       });
@@ -1910,7 +2367,7 @@
       media.loading = "lazy";
       media.decoding = "async";
       media.className = "vel-home-section__media";
-      var imgSrc = item.backdropUrl || item.backdrop || item.thumbUrl || item.cover || "";
+      var imgSrc = item.horizontal_thumb || item.backdropUrl || item.backdrop || item.thumbUrl || item.cover || "";
       if (imgSrc && typeof window.veloraSetHomeImageSource === "function") {
         window.veloraSetHomeImageSource(media, imgSrc, function () {
           if (imgSrc !== item.thumbUrl && item.thumbUrl) {
@@ -1926,6 +2383,96 @@
       } else {
         media.classList.add("vel-home-section__fallback");
         media.textContent = "▶";
+      }
+
+      // Dynamic Title Logo (Transparent PNG) or Integrated Title resolution
+      if (hasIntegratedTitle) {
+        card.classList.add("has-integrated-title");
+        card.classList.remove("has-title-logo");
+        var exLogo = card.querySelector(".vel-home-section__title-logo");
+        if (exLogo) exLogo.remove();
+      } else {
+        var titleLogoUrl = String(item.title_logo || item.titleLogo || item.logo || "").trim();
+        function applyTitleLogo(url) {
+          if (!url || url === "NONE") return;
+          if (card.classList.contains("has-integrated-title")) return;
+          if (card.querySelector(".vel-home-section__title-logo")) return;
+          card.classList.add("has-title-logo");
+          var logoImg = document.createElement("img");
+          logoImg.className = "vel-home-section__title-logo";
+          logoImg.alt = cleanTitle || rawTitle;
+          logoImg.loading = "lazy";
+          logoImg.decoding = "async";
+          function smartScale() {
+            var nw = logoImg.naturalWidth, nh = logoImg.naturalHeight;
+            if (nw && nh) {
+              var r = nw / nh;
+              if (r >= 2.4) logoImg.classList.add("vel-title-logo--wide");
+              else if (r <= 1.45) logoImg.classList.add("vel-title-logo--tall");
+              else logoImg.classList.add("vel-title-logo--standard");
+            }
+            if (typeof window.veloraDetectDarkLogo === "function") {
+              window.veloraDetectDarkLogo(logoImg, card);
+            }
+          }
+          logoImg.onload = smartScale;
+          logoImg.onerror = function () {
+            card.classList.remove("has-title-logo");
+            logoImg.remove();
+          };
+          logoImg.src = url;
+          if (logoImg.complete) smartScale();
+          card.appendChild(logoImg);
+        }
+
+        if (titleLogoUrl) {
+          applyTitleLogo(titleLogoUrl);
+        } else if (cleanTitle) {
+          var cType = isSeries ? "series" : "movies";
+          if (!window.__veloraFetchingLogos) window.__veloraFetchingLogos = new Map();
+          var logoKey = cType + ":" + cleanTitle.toLowerCase();
+          if (!window.__veloraFetchingLogos.has(logoKey)) {
+            var p = fetch("/api/velora-db/title-logo?name=" + encodeURIComponent(cleanTitle) + "&type=" + encodeURIComponent(cType))
+              .then(function (r) { return r.ok ? r.json() : null; })
+              .then(function (data) {
+                if (data && data.hasHorizontalThumb && data.thumbUrl) {
+                  item.horizontal_thumb = data.thumbUrl;
+                  item.has_integrated_title = true;
+                  item.backdropUrl = data.thumbUrl;
+                  item.thumbUrl = data.thumbUrl;
+                  delete item.title_logo;
+                  return { type: "thumb", url: data.thumbUrl };
+                }
+                if (data && data.url) {
+                  item.title_logo = data.url;
+                  return { type: "logo", url: data.url };
+                }
+                return null;
+              })
+              .catch(function () { return null; });
+            window.__veloraFetchingLogos.set(logoKey, p);
+          }
+          window.__veloraFetchingLogos.get(logoKey).then(function (res) {
+            if (!res) return;
+            if (res.type === "thumb" && res.url) {
+              card.classList.add("has-integrated-title");
+              card.classList.remove("has-title-logo");
+              var exLogo = card.querySelector(".vel-home-section__title-logo");
+              if (exLogo) exLogo.remove();
+              if (media.tagName === "IMG") {
+                if (typeof window.veloraSetHomeImageSource === "function") {
+                  window.veloraSetHomeImageSource(media, res.url);
+                } else {
+                  media.src = res.url;
+                }
+              }
+            } else if (res.type === "logo" && res.url) {
+              if (!card.classList.contains("has-integrated-title")) {
+                applyTitleLogo(res.url);
+              }
+            }
+          });
+        }
       }
 
       // Center Glass Play Button
@@ -2056,55 +2603,231 @@
     } else {
       root.prepend(block);
     }
+    if (typeof window.veloraInjectFootballSection === "function") {
+      try { window.veloraInjectFootballSection(); } catch (_) {}
+    }
   }
   window.veloraInjectResumeSection = injectResumeSectionDirectly;
+  window.veloraSaveCurrentProgress = function () {
+    var video = document.getElementById("video-vod");
+    if (video && Number.isFinite(video.currentTime)) {
+      recordProgress(video, false, false, true);
+      injectResumeSectionDirectly();
+    }
+  };
+
+  var episodeObserver = null;
+  function setupEpisodeObserver() {
+    if (episodeObserver) return;
+    if (typeof MutationObserver === "undefined") return;
+    try {
+      episodeObserver = new MutationObserver(function (mutations) {
+        var needsDecorate = false;
+        for (var i = 0; i < mutations.length; i++) {
+          var m = mutations[i];
+          if (m.addedNodes && m.addedNodes.length > 0) {
+            for (var j = 0; j < m.addedNodes.length; j++) {
+              var node = m.addedNodes[j];
+              if (node.nodeType === 1) {
+                if (node.classList && (node.classList.contains("vel-vod-detail__episode") || node.classList.contains("vel-vod-detail") || node.classList.contains("vel-vod-detail__episodes-section") || (node.querySelector && node.querySelector(".vel-vod-detail__episode")))) {
+                  needsDecorate = true;
+                  break;
+                }
+              }
+            }
+          }
+          if (needsDecorate) break;
+        }
+        if (needsDecorate) {
+          bindVideoTrackers();
+          requestDecorateEpisodes();
+          updateActiveEpisodeLiveProgress();
+        }
+      });
+
+      episodeObserver.observe(document.body, { childList: true, subtree: true });
+    } catch (_) {}
+  }
+
+  var vodContainerObserver = null;
+  function setupVodContainerObserver() {
+    if (vodContainerObserver) return;
+    var vodContainer = document.getElementById("vod-player-container");
+    if (!vodContainer || typeof MutationObserver === "undefined") return;
+    try {
+      vodContainerObserver = new MutationObserver(function () {
+        var isHiddenNow = vodContainer.classList.contains("hidden") || vodContainer.style.display === "none";
+        if (isHiddenNow) {
+          var video = document.getElementById("video-vod");
+          if (video && Number.isFinite(video.currentTime)) {
+            recordProgress(video, false, false, true);
+          }
+          injectResumeSectionDirectly();
+        }
+      });
+      vodContainerObserver.observe(vodContainer, { attributes: true, attributeFilter: ["class", "style"] });
+    } catch (_) {}
+  }
+
+  var homeSectionsObserver = null;
+  function setupHomeSectionsObserver() {
+    if (homeSectionsObserver) return;
+    var root = document.getElementById("vel-home-sections");
+    if (!root || typeof MutationObserver === "undefined") return;
+    try {
+      homeSectionsObserver = new MutationObserver(function () {
+        if (state.needsResumeRailRefresh) {
+          state.needsResumeRailRefresh = false;
+          injectResumeSectionDirectly();
+        }
+      });
+      homeSectionsObserver.observe(root, { childList: true });
+    } catch (_) {}
+  }
 
   // Lifecycle boot
   function init() {
     injectStyles();
     bindVideoTrackers();
+    setupEpisodeObserver();
+    setupVodContainerObserver();
+    setupHomeSectionsObserver();
 
     loadHistoryFromDatabase();
     syncResumeMinWatchSetting();
 
-    document.addEventListener("velora-user-logged-in", function () {
+    function handleUserSessionChange() {
+      var newKey = getActiveUserKey();
+      if (state.currentUserKey !== newKey) {
+        state.currentUserKey = newKey;
+      }
       state.cachedHistory = null;
+      state.currentPlaying = null;
       loadHistoryFromDatabase();
       syncResumeMinWatchSetting();
+      injectResumeSectionDirectly();
+      requestDecorateEpisodes();
+    }
+
+    document.addEventListener("velora-user-logged-in", handleUserSessionChange);
+    document.addEventListener("velora-user-logged-out", handleUserSessionChange);
+    document.addEventListener("velora-user-changed", handleUserSessionChange);
+    window.addEventListener("storage", function (e) {
+      if (!e || !e.key || e.key === "authToken" || e.key === "velora_user" || e.key === "user") {
+        handleUserSessionChange();
+      }
     });
 
     document.addEventListener("velora-resume-settings-changed", injectResumeSectionDirectly);
 
-    // Refresh resume section only when returning home or viewing home
-    document.addEventListener("velora-home-tab", function () {
-      if (state.needsResumeRailRefresh) {
-        state.needsResumeRailRefresh = false;
+    document.addEventListener("velora-cast-playback-progress", function (e) {
+      if (!e || !e.detail) return;
+      var d = e.detail;
+      if (d.isLive) return;
+      var curr = Number(d.currentTime);
+      var dur = Number(d.duration);
+      if (!Number.isFinite(curr) || curr < MIN_WATCH_SECONDS) return;
+
+      var now = Date.now();
+      if (sessionTracker.lastTick) {
+        var delta = (now - sessionTracker.lastTick) / 1000;
+        if (delta > 0 && delta < 8) {
+          sessionTracker.continuousSeconds += delta;
+        }
+      }
+      sessionTracker.lastTick = now;
+
+      var minSec = getResumeMinWatchSeconds();
+      if (!sessionTracker.qualified && sessionTracker.continuousSeconds >= minSec) {
+        sessionTracker.qualified = true;
+        recordProgressWithData(curr, dur, false, false, false, d.media);
+      } else if (sessionTracker.qualified) {
+        if (now - state.lastDiskSaveTimestamp >= 10000) {
+          recordProgressWithData(curr, dur, false, true, false, d.media);
+        }
+      }
+    });
+
+    document.addEventListener("velora-cast-disconnected", function () {
+      if (sessionTracker.qualified) {
         injectResumeSectionDirectly();
       }
+    });
+
+    // Refresh resume section upon returning to home or viewing home
+    var homeEvents = [
+      "velora-home-tab",
+      "velora-show-home",
+      "velora-return-home",
+      "velora-home-media-stop",
+      "velora-home-country-rendered",
+      "velora-country-changed",
+      "velora-country-change",
+      "velora-nav-home"
+    ];
+    homeEvents.forEach(function (evName) {
+      document.addEventListener(evName, function () {
+        var video = document.getElementById("video-vod");
+        if (video && Number.isFinite(video.currentTime)) {
+          recordProgress(video, false, false, true);
+        }
+        state.needsResumeRailRefresh = false;
+        injectResumeSectionDirectly();
+        requestDecorateEpisodes();
+      });
+    });
+
+    window.addEventListener("velora-home-media-stop", function () {
+      var video = document.getElementById("video-vod");
+      if (video && Number.isFinite(video.currentTime)) {
+        recordProgress(video, false, false, true);
+      }
+      state.needsResumeRailRefresh = false;
+      injectResumeSectionDirectly();
       requestDecorateEpisodes();
     });
 
-    document.addEventListener("velora-show-home", function () {
-      if (state.needsResumeRailRefresh) {
-        state.needsResumeRailRefresh = false;
-        injectResumeSectionDirectly();
+    // Capture clicks on navigation buttons leading to Home or closing player
+    document.addEventListener("click", function (e) {
+      if (!e.target) return;
+      var targetEl = e.target.closest("#btn-close-vod-player, .btn-close-vod, #btn-go-home, #btn-logo-home, #btn-back-home, [data-tab='home'], [data-nav-target='home'], .vel-nav-item[data-tab='home'], [data-bottom-nav], .vel-bottom-nav__button, .vel-vod-back-btn, .vod-back-btn, .player-back-btn, #btn-adult-back-home, #vel-home-search-trigger, #vel-home-profile-trigger, [data-tab]");
+      if (targetEl) {
+        var video = document.getElementById("video-vod");
+        if (video && Number.isFinite(video.currentTime)) {
+          recordProgress(video, false, false, true);
+        }
+        setTimeout(injectResumeSectionDirectly, 40);
+        setTimeout(injectResumeSectionDirectly, 200);
       }
-    });
+    }, true);
 
     document.addEventListener("velora-home-media-open", function () {
       bindVideoTrackers();
       requestDecorateEpisodes();
     });
 
+    window.addEventListener("popstate", function () {
+      injectResumeSectionDirectly();
+    });
+
+    window.addEventListener("hashchange", function () {
+      injectResumeSectionDirectly();
+    });
+
     window.addEventListener("pagehide", function () {
       var video = document.getElementById("video-vod");
-      if (video) recordProgress(video, false, false);
+      if (video) recordProgress(video, false, false, true);
     });
 
     document.addEventListener("visibilitychange", function () {
       if (document.visibilityState === "hidden") {
         var video = document.getElementById("video-vod");
-        if (video) recordProgress(video, false, false);
+        if (video) recordProgress(video, false, false, true);
+      } else if (document.visibilityState === "visible") {
+        if (state.needsResumeRailRefresh) {
+          state.needsResumeRailRefresh = false;
+          injectResumeSectionDirectly();
+        }
       }
     });
 

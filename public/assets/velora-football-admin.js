@@ -2007,11 +2007,20 @@
 
   injectStyles();
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () {
+  // Lazy load on first tab display rather than blocking startup
+  var footballLoaded = false;
+  function ensureFootballAdminLoaded() {
+    if (footballLoaded) return;
+    var panel = document.getElementById("settings-tab-football");
+    if (panel && !panel.hidden && !panel.classList.contains("hidden")) {
+      footballLoaded = true;
       loadAndRenderMappings();
-    }, { once: true });
-  } else {
-    loadAndRenderMappings();
+    }
   }
+
+  document.addEventListener("click", function (e) {
+    if (e.target && e.target.closest('#settings-tab-btn-football, [data-settings-tab="football"]')) {
+      ensureFootballAdminLoaded();
+    }
+  });
 })();

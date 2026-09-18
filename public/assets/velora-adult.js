@@ -3714,10 +3714,38 @@
     }
   });
 
-  fetchAssignedAdultPackages();
-  fetchAdultHubImages();
-  fetchServerPinRecord();
-  fetchServerAdultConfirmed();
+  // Synchronous hydration from localStorage on initial script load
+  try {
+    const cachedPkg = localStorage.getItem(LOCAL_STORAGE_ADULT_KEY);
+    if (cachedPkg && assignedAdultPackages.size === 0) {
+      const list = JSON.parse(cachedPkg);
+      if (Array.isArray(list)) {
+        list.forEach(r => {
+          const pkgId = String(r.package_id || r.id);
+          if (pkgId) assignedAdultPackages.set(pkgId, r);
+          if (r.kind && r.source_id && r.category_id) {
+            assignedAdultPackages.set(makePackageKey(r.kind, r.source_id, r.category_id), r);
+          }
+        });
+      }
+    }
+    const cachedImgs = localStorage.getItem(LOCAL_STORAGE_ADULT_HUB_IMAGES_KEY);
+    if (cachedImgs) {
+      const parsed = JSON.parse(cachedImgs);
+      if (parsed && typeof parsed === "object") {
+        if (parsed.liveImage != null) adultHubImages.liveImage = String(parsed.liveImage).trim();
+        if (parsed.vodImage != null) adultHubImages.vodImage = String(parsed.vodImage).trim();
+      }
+    }
+  } catch (_) {}
+
+  // Defer network sync so initial startup bandwidth is reserved for hero/home render
+  setTimeout(() => {
+    fetchAssignedAdultPackages().catch(() => {});
+    fetchAdultHubImages().catch(() => {});
+    fetchServerPinRecord().catch(() => {});
+    fetchServerAdultConfirmed().catch(() => {});
+  }, 3500);
 
   document.addEventListener("velora-show-home", () => {
     isAdultOpen = false;

@@ -60,10 +60,19 @@
   function hide(id) {
     if (id !== runId) return;
     const node = overlay();
-    node?.classList.add("hidden");
-    node?.setAttribute("aria-hidden", "true");
-    document.body.classList.remove("vel-home-choice-loading", "vel-home-choice-catalog-pending", "vel-country-switch-loading");
-    document.documentElement.classList.remove("vel-country-switch-loading");
+    if (node) {
+      node.classList.add("is-leaving");
+      setTimeout(() => {
+        node.classList.add("hidden");
+        node.classList.remove("is-leaving");
+        node.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("vel-home-choice-loading", "vel-home-choice-catalog-pending", "vel-country-switch-loading");
+        document.documentElement.classList.remove("vel-country-switch-loading");
+      }, 450);
+    } else {
+      document.body.classList.remove("vel-home-choice-loading", "vel-home-choice-catalog-pending", "vel-country-switch-loading");
+      document.documentElement.classList.remove("vel-country-switch-loading");
+    }
     pendingCountryValue = "";
   }
 
@@ -91,14 +100,11 @@
   function releaseReadyStartupLoader() {
     if (document.body.classList.contains("vel-country-switch-loading")) return false;
     if (!document.body.classList.contains("vel-home-choice-loading")) return true;
-    const select = document.getElementById("country-select");
-    const hasCountry = !!select && [...select.options].some(option => !option.disabled && String(option.value || "").trim());
-    if (!hasCountry) return false;
-    const node = overlay();
-    node?.classList.add("hidden");
-    node?.setAttribute("aria-hidden", "true");
-    document.body.classList.remove("vel-home-choice-loading", "vel-home-choice-catalog-pending");
-    return true;
+    if (typeof window.veloraCheckInitialHomeReady === "function") {
+      window.veloraCheckInitialHomeReady();
+      return !document.body.classList.contains("vel-home-choice-loading");
+    }
+    return false;
   }
 
   document.addEventListener("velora-country-switch-start", event => {

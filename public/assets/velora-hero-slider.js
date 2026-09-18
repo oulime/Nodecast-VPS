@@ -486,6 +486,10 @@
     activeCountryId = countryId || getActiveCountry();
     var items = await fetchHeroSliderData(activeCountryId);
     renderHeroSlider(items);
+    document.dispatchEvent(new CustomEvent("velora-hero-slider-ready"));
+    if (typeof window.veloraCheckInitialHomeReady === "function") {
+      window.veloraCheckInitialHomeReady();
+    }
   }
 
   function initHeroSlider() {

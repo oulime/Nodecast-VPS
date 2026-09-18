@@ -46,6 +46,13 @@
   let cachedPrefixes = [];
   let cachedSuffixes = [];
 
+  try {
+    const pCached = JSON.parse(localStorage.getItem("velora_cached_channel_prefixes") || "[]");
+    if (Array.isArray(pCached) && pCached.length) cachedPrefixes = pCached;
+    const sCached = JSON.parse(localStorage.getItem("velora_cached_channel_suffixes") || "[]");
+    if (Array.isArray(sCached) && sCached.length) cachedSuffixes = sCached;
+  } catch (_) {}
+
   async function loadPrefixAndSuffixRules() {
     try {
       const [pRes, sRes] = await Promise.all([
@@ -57,6 +64,7 @@
         if (Array.isArray(pRows)) {
           cachedPrefixes = [...new Set(pRows.map(r => String(r.prefix || "").trim()).filter(Boolean))]
             .sort((a, b) => b.length - a.length);
+          try { localStorage.setItem("velora_cached_channel_prefixes", JSON.stringify(cachedPrefixes)); } catch (_) {}
         }
       }
       if (sRes.ok) {
@@ -64,12 +72,15 @@
         if (Array.isArray(sRows)) {
           cachedSuffixes = [...new Set(sRows.map(r => String(r.suffix || "").trim()).filter(Boolean))]
             .sort((a, b) => b.length - a.length);
+          try { localStorage.setItem("velora_cached_channel_suffixes", JSON.stringify(cachedSuffixes)); } catch (_) {}
         }
       }
     } catch (_) {}
   }
 
-  loadPrefixAndSuffixRules();
+  // Defer network fetch so startup is instantaneous from localStorage
+  setTimeout(loadPrefixAndSuffixRules, 2500);
+
   document.addEventListener("velora-channel-prefixes-changed", () => {
     loadPrefixAndSuffixRules().then(() => {
       lastFeedKey = "";
@@ -84,6 +95,20 @@
   });
 
   let adultPackageIds = new Set();
+  try {
+    const cached = localStorage.getItem("velora_admin_adult_packages");
+    if (cached) {
+      const list = JSON.parse(cached);
+      if (Array.isArray(list)) {
+        adultPackageIds = new Set(list.flatMap(r => [
+          String(r.package_id),
+          String(r.id),
+          `${r.kind}:${r.source_id}:${r.category_id}`
+        ]).filter(Boolean));
+      }
+    }
+  } catch (_) {}
+
   async function loadAdultPackageRules() {
     try {
       const res = await fetch("/api/velora-db/rest/v1/admin_settings?key=eq.adult_packages", { cache: "no-store" });
@@ -97,24 +122,14 @@
               String(r.id),
               `${r.kind}:${r.source_id}:${r.category_id}`
             ]).filter(Boolean));
+            try { localStorage.setItem("velora_admin_adult_packages", JSON.stringify(list)); } catch (_) {}
             return;
           }
         }
       }
-      const cached = localStorage.getItem("velora_admin_adult_packages");
-      if (cached) {
-        const list = JSON.parse(cached);
-        if (Array.isArray(list)) {
-          adultPackageIds = new Set(list.flatMap(r => [
-            String(r.package_id),
-            String(r.id),
-            `${r.kind}:${r.source_id}:${r.category_id}`
-          ]).filter(Boolean));
-        }
-      }
     } catch (_) {}
   }
-  loadAdultPackageRules();
+  setTimeout(loadAdultPackageRules, 3000);
   document.addEventListener("velora-adult-packages-changed", () => {
     loadAdultPackageRules().then(() => {
       lastFeedKey = "";
@@ -1288,6 +1303,11 @@
       // Render initial 4 rows
       renderNextHomeChunk(4);
 
+      document.dispatchEvent(new CustomEvent("velora-prime-feed-rendered"));
+      if (typeof window.veloraCheckInitialHomeReady === "function") {
+        window.veloraCheckInitialHomeReady();
+      }
+
       // Attach scroll observer for lazy loading remaining rows
       setupHomeScrollSentinel(container);
     } finally {
@@ -1357,7 +1377,19 @@
 
     if (tab === "home") {
       container.style.setProperty("display", "none", "important");
-      initHomeMixedFeed(force);
+      const hasTopSections = !!document.querySelector("#vel-home-sections .vel-home-section__card");
+      if (hasTopSections || force) {
+        initHomeMixedFeed(force);
+      } else {
+        // Strict top-to-bottom loading: let Hero Slider and top Home curated rails finish first
+        const onHomeRendered = () => {
+          document.removeEventListener("velora-home-country-rendered", onHomeRendered);
+          clearTimeout(fallbackTimer);
+          initHomeMixedFeed(force);
+        };
+        const fallbackTimer = setTimeout(onHomeRendered, 300);
+        document.addEventListener("velora-home-country-rendered", onHomeRendered, { once: true });
+      }
       return;
     }
 

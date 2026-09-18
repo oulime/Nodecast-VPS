@@ -296,6 +296,59 @@
       window.veloraIsStartupContentReady = function (select) {
         return window.veloraIsStartupCountryReady(select);
       };
+
+      // ============================================================
+      // Smooth Central Startup Loader Dismissal Controller
+      // ============================================================
+      var startupDismissed = false;
+      var startupDismissTimer = null;
+
+      function isActualInitialHomeContentReady() {
+        var hasHero = !!document.querySelector("#velora-hero-slider-track .velora-hero-slide, #velora-hero-slider-container .velora-hero-slide, #vel-home-hero-slider .velora-hero-slide");
+        var hasHomeSections = !!document.querySelector("#vel-home-sections .vel-home-section__card");
+        var hasPrimeRows = !!document.querySelector("#vel-prime-carousels-container .UI3iHJ, #vel-prime-carousels-container [data-testid='navigation-carousel-wrapper']");
+        var hasPackages = !!document.querySelector("#packages-view .vel-package-card[data-package-id]");
+        return hasHero || hasHomeSections || hasPrimeRows || hasPackages;
+      }
+
+      window.veloraCheckInitialHomeReady = function (force) {
+        if (startupDismissed) return;
+        var select = document.getElementById("country-select");
+        var hasCountry = select && select.options && select.options.length > 0;
+        if (force || (hasCountry && isActualInitialHomeContentReady())) {
+          window.veloraDismissStartupLoader();
+        }
+      };
+
+      window.veloraDismissStartupLoader = function () {
+        if (startupDismissed) return;
+        startupDismissed = true;
+        if (startupDismissTimer) clearTimeout(startupDismissTimer);
+
+        var overlay = document.getElementById("catalog-loading-overlay");
+        if (overlay) {
+          overlay.classList.add("is-leaving");
+          setTimeout(function () {
+            overlay.classList.add("hidden");
+            overlay.classList.remove("is-leaving");
+            overlay.setAttribute("aria-hidden", "true");
+            document.body.classList.remove("vel-home-choice-loading", "vel-home-choice-catalog-pending");
+          }, 450);
+        } else {
+          document.body.classList.remove("vel-home-choice-loading", "vel-home-choice-catalog-pending");
+        }
+      };
+
+      // Safety timeout so user is never stuck indefinitely
+      startupDismissTimer = setTimeout(function () {
+        window.veloraDismissStartupLoader();
+      }, 3000);
+
+      document.addEventListener("velora-hero-slider-ready", function () { window.veloraCheckInitialHomeReady(); });
+      document.addEventListener("velora-home-country-rendered", function () { window.veloraCheckInitialHomeReady(); });
+      document.addEventListener("velora-prime-feed-rendered", function () { window.veloraCheckInitialHomeReady(); });
+      document.addEventListener("velora-packages-rendered", function () { window.veloraCheckInitialHomeReady(); });
+
       window.veloraBlockCountryPickerUntil = 0;
       window.veloraBlockCountryPickerAfterPageChange = function () {
         window.veloraBlockCountryPickerUntil = Date.now() + 900;
@@ -355,14 +408,15 @@
         if (!homeHasRealCountries(select)) return false;
         restorePersistedCountry(select);
         if (!window.veloraIsStartupContentReady(select)) return false;
-        document.body.classList.remove("vel-home-choice-loading");
-        document.body.classList.remove("vel-home-choice-catalog-pending");
         try {
           document.dispatchEvent(new CustomEvent("velora-countries-ready", {
             detail: { count: select.options.length, source: "early-dom-watchdog" }
           }));
         } catch (error) {
           /* CustomEvent may be unavailable in very old browsers. */
+        }
+        if (typeof window.veloraCheckInitialHomeReady === "function") {
+          window.veloraCheckInitialHomeReady();
         }
         return true;
       }
@@ -864,7 +918,7 @@
       pointer-events: none !important;
     }
 
-    body:not(.vel-home-choice-picked):not(.vel-home-choice-loading) #catalog-loading-overlay,
+    body:not(.vel-home-choice-picked):not(.vel-home-choice-loading) #catalog-loading-overlay.hidden:not(.is-leaving),
     body:not(.vel-home-choice-picked) #trial-countdown-root {
       display: none !important;
       visibility: hidden !important;
@@ -886,6 +940,7 @@
 
     body.vel-home-choice-loading:not(.vel-home-choice-picked) #catalog-loading-overlay {
       display: flex !important;
+      opacity: 1 !important;
       visibility: visible !important;
       pointer-events: auto !important;
     }
@@ -5971,24 +6026,35 @@
       display: none !important;
     }
 
-    body:not(.vel-home-choice-loading) #catalog-loading-overlay,
-    body:not(.vel-home-choice-loading) #catalog-loading-overlay.catalog-loading-overlay,
-    body:not(.vel-home-choice-loading) #catalog-loading-overlay:not(.hidden) {
+    #catalog-loading-overlay.catalog-loading-overlay {
+      position: fixed !important;
+      inset: 0 !important;
+      z-index: 2147483640 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      pointer-events: auto !important;
+      transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.45s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+
+    #catalog-loading-overlay.catalog-loading-overlay.is-leaving {
+      opacity: 0 !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+
+    #catalog-loading-overlay.catalog-loading-overlay.hidden:not(.is-leaving) {
       display: none !important;
       visibility: hidden !important;
       pointer-events: none !important;
     }
 
-    body.vel-home-choice-loading #catalog-loading-overlay.hidden {
+    /* Country transitions */
+    html.vel-country-switch-loading body.vel-country-switch-loading #catalog-loading-overlay.catalog-loading-overlay {
       display: flex !important;
-      visibility: visible !important;
-      pointer-events: auto !important;
-    }
-
-    /* Country transitions are independent from the first-visit home gate. */
-    html.vel-country-switch-loading body.vel-country-switch-loading #catalog-loading-overlay.catalog-loading-overlay,
-    html.vel-country-switch-loading body.vel-country-switch-loading #catalog-loading-overlay.catalog-loading-overlay.hidden {
-      display: flex !important;
+      opacity: 1 !important;
       visibility: visible !important;
       pointer-events: auto !important;
     }
@@ -8716,8 +8782,9 @@
           typeof window.veloraIsStartupContentReady !== "function" ||
           window.veloraIsStartupContentReady(main)
         ) {
-          document.body.classList.remove("vel-home-choice-loading");
-          document.body.classList.remove("vel-home-choice-catalog-pending");
+          if (typeof window.veloraCheckInitialHomeReady === "function") {
+            window.veloraCheckInitialHomeReady();
+          }
         }
         return true;
       }
@@ -8842,16 +8909,20 @@
         }
 
         function hasPackageCards() {
-          var view = document.getElementById("packages-view");
-          var hasPackages = !!(view && view.querySelector(".vel-package-card[data-package-id]"));
-          var hasHomeFeed = !!(document.getElementById("vel-home-empty-page") || document.querySelector(".vel-prime-row-card") || document.getElementById("vel-prime-carousels-container"));
-          return hasPackages || hasHomeFeed;
+          var hasHero = !!document.querySelector("#velora-hero-slider-track .velora-hero-slide, #velora-hero-slider-container .velora-hero-slide, #vel-home-hero-slider .velora-hero-slide");
+          var hasHomeSections = !!document.querySelector("#vel-home-sections .vel-home-section__card");
+          var hasPrimeRows = !!document.querySelector("#vel-prime-carousels-container .UI3iHJ, #vel-prime-carousels-container [data-testid='navigation-carousel-wrapper']");
+          var hasPackages = !!document.querySelector("#packages-view .vel-package-card[data-package-id]");
+          return hasHero || hasHomeSections || hasPrimeRows || hasPackages;
         }
 
         function showHomeChoiceWhenReady() {
           if (document.body.classList.contains("vel-home-choice-picked")) {
-            document.body.classList.remove("vel-home-choice-loading");
-            document.body.classList.remove("vel-home-choice-catalog-pending");
+            if (typeof window.veloraDismissStartupLoader === "function") {
+              window.veloraDismissStartupLoader();
+            } else {
+              document.body.classList.remove("vel-home-choice-loading", "vel-home-choice-catalog-pending");
+            }
             return;
           }
 
@@ -8870,9 +8941,10 @@
             if (finished) return;
             finished = true;
             syncHomeCountryOptions();
-            if (!document.body.classList.contains("vel-home-choice-picked")) {
-              document.body.classList.remove("vel-home-choice-loading");
-              document.body.classList.remove("vel-home-choice-catalog-pending");
+            if (typeof window.veloraDismissStartupLoader === "function") {
+              window.veloraDismissStartupLoader();
+            } else if (!document.body.classList.contains("vel-home-choice-picked")) {
+              document.body.classList.remove("vel-home-choice-loading", "vel-home-choice-catalog-pending");
               window.scrollTo(0, 0);
             }
             if (readyTimer) window.clearTimeout(readyTimer);
@@ -8897,7 +8969,7 @@
             if (hasCountriesReady()) {
               window.setTimeout(function () {
                 finish();
-              }, 90);
+              }, 60);
               return;
             }
             if (Date.now() - started >= maxWait) {
@@ -18523,7 +18595,6 @@
       document.addEventListener("click", function (event) {
         if (event.target && event.target.closest("[data-settings-tab='prefixes']")) load();
       });
-      load();
     })();
   </script>
   <script>
@@ -18668,7 +18739,6 @@
       document.addEventListener("click", function (event) {
         if (event.target && event.target.closest("[data-settings-tab='prefixes']")) load();
       });
-      load();
     })();
   </script>
   <script>

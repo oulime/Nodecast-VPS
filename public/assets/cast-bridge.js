@@ -155,12 +155,29 @@
   }
 
   function activeVideo() {
+    var liveContainer = document.getElementById("player-container");
+    var vodContainer = document.getElementById("vod-player-container");
+    var isPlayerVisible = (liveContainer && !liveContainer.classList.contains("hidden")) ||
+                          (vodContainer && !vodContainer.classList.contains("hidden"));
+
     var videos = Array.prototype.slice.call(document.querySelectorAll("video"));
-    return videos.find(function (video) {
-      return video && !video.paused && !video.ended && video.readyState > 0;
-    }) || state.activeVideo || videos.find(function (video) {
-      return video && (video.__veloraCastUrl || video.currentSrc || video.src);
-    }) || document.getElementById("video-vod") || document.getElementById("video") || null;
+    var playing = videos.find(function (video) {
+      return video && !video.paused && !video.ended && (video.currentTime > 0 || video.readyState > 0);
+    });
+    if (playing) return playing;
+
+    if (isPlayerVisible) {
+      if (vodContainer && !vodContainer.classList.contains("hidden")) {
+        var vv = document.getElementById("video-vod");
+        if (vv && (vv.__veloraCastUrl || vv.currentSrc || vv.src) && !vv.ended) return vv;
+      }
+      if (liveContainer && !liveContainer.classList.contains("hidden")) {
+        var vl = document.getElementById("video");
+        if (vl && (vl.__veloraCastUrl || vl.currentSrc || vl.src) && !vl.ended) return vl;
+      }
+    }
+
+    return (state.activeVideo && !state.activeVideo.paused && !state.activeVideo.ended) ? state.activeVideo : null;
   }
 
   function textFrom(selectors) {
@@ -579,7 +596,6 @@
 
   function stopCast(resumeLocal) {
     var castSession = session();
-    var media = state.currentMedia || normalizeMedia({});
     var currentTime = 0;
     if (castSession) {
       try {
@@ -598,16 +614,20 @@
     clearLocalCastSessionState();
     syncButton();
     removeCastActiveBar();
+    showCastToast("Diffusion Cast arrêtée");
 
-    if (resumeLocal && media) {
-      var video = media.video || activeVideo();
-      if (video) {
-        if (currentTime > 0 && !media.isLive) {
-          try { video.currentTime = currentTime; } catch (_) {}
-        }
-        try { video.play().catch(function () {}); } catch (_) {}
+    // Clear active media state so casting requires launching a video
+    state.currentMedia = null;
+    state.activeVideo = null;
+    window.__veloraCurrentStreamUrl = "";
+    document.querySelectorAll("video").forEach(function (v) {
+      if (v) {
+        try {
+          v.pause();
+          v.__veloraCastUrl = "";
+        } catch (_) {}
       }
-    }
+    });
 
     try {
       document.dispatchEvent(new CustomEvent("velora-cast-disconnected"));
@@ -724,6 +744,7 @@
     state.pendingInitialMedia = null;
     state.pendingInitialToken += 1;
     state.lastLoadedKey = "";
+    state.currentMedia = null;
     state.castState = "NO_DEVICES_AVAILABLE";
     state.sessionState = "NO_SESSION";
     rememberSessionActive(false);
@@ -732,10 +753,11 @@
 
   async function requestUniversalCast() {
     var video = activeVideo();
-    var media = normalizeMedia({}) || state.currentMedia;
-    var hasActiveVideo = !!(media && media.url) || !!(video && (video.currentSrc || video.src || !video.paused));
+    var media = state.currentMedia || normalizeMedia({});
+    var hasActiveVideo = !!(video && !video.paused && !video.ended) ||
+                         !!(media && media.url && (video || (state.currentMedia && state.currentMedia.explicit)));
 
-    // If no video is playing/selected, notify the user and do not open cast dialog
+    // If no video is actively playing/selected, notify the user and do not open cast dialog
     if (!hasActiveVideo) {
       showCastToast("Lancez d'abord une vidéo pour la diffuser sur votre TV.");
       return;

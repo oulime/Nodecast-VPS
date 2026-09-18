@@ -1287,7 +1287,7 @@
 
     container.innerHTML = `
       <div class="vel-adult-video-wrapper">
-        <video id="vel-adult-video" playsinline webkit-playsinline preload="none"></video>
+        <video id="vel-adult-video" playsinline webkit-playsinline autopictureinpicture="true" preload="none"></video>
         <div id="vel-adult-touch-overlay" class="vel-adult-touch-overlay"></div>
         <button type="button" id="vel-adult-unmute-badge" class="vel-adult-unmute-badge hidden" title="Activer le son">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>

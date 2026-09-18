@@ -23,7 +23,8 @@
     phase: "DISCONNECTED",
     activeVideo: null,
     airPlayAvailable: false,
-    airPlayConnected: false
+    airPlayConnected: false,
+    timeTicker: null
   };
 
   function isIosOrSafari() {
@@ -376,7 +377,89 @@
     } catch (_) {}
   }
 
+  function formatCastTime(secs) {
+    if (!Number.isFinite(secs) || secs < 0) return "00:00";
+    var s = Math.floor(secs);
+    var h = Math.floor(s / 3600);
+    var m = Math.floor((s % 3600) / 60);
+    var sec = s % 60;
+    var mm = m < 10 ? "0" + m : "" + m;
+    var ss = sec < 10 ? "0" + sec : "" + sec;
+    if (h > 0) {
+      return h + ":" + mm + ":" + ss;
+    }
+    return mm + ":" + ss;
+  }
+
+  function updateCastBarTime() {
+    var wrap = document.getElementById("vel-cast-active-bar-wrap");
+    if (!wrap) return;
+    var castSess = (typeof session === "function") ? session() : null;
+    var curr = 0;
+    var dur = 0;
+    var isLive = false;
+
+    if (castSess) {
+      try {
+        var remoteMedia = castSess.getMediaSession();
+        if (remoteMedia) {
+          curr = typeof remoteMedia.getEstimatedTime === "function" ? remoteMedia.getEstimatedTime() : (Number(remoteMedia.currentTime) || 0);
+          dur = (remoteMedia.media && Number(remoteMedia.media.duration)) || (state.currentMedia && Number(state.currentMedia.duration)) || 0;
+          isLive = (remoteMedia.media && remoteMedia.media.streamType === (window.chrome && window.chrome.cast && window.chrome.cast.media ? window.chrome.cast.media.StreamType.LIVE : "LIVE")) || (state.currentMedia && !!state.currentMedia.isLive);
+        }
+      } catch (_) {}
+    }
+
+    if (!curr && state.currentMedia && Number.isFinite(state.currentMedia.position)) {
+      curr = state.currentMedia.position;
+      dur = state.currentMedia.duration || 0;
+      isLive = !!state.currentMedia.isLive;
+    }
+
+    var timeBadge = wrap.querySelector(".vel-cast-capsule-time-badge");
+    var progressFill = wrap.querySelector(".vel-cast-capsule-progress-fill");
+
+    if (isLive) {
+      if (timeBadge) {
+        timeBadge.textContent = "EN DIRECT";
+        timeBadge.classList.remove("hidden");
+        timeBadge.classList.add("is-live");
+      }
+      if (progressFill) progressFill.style.width = "100%";
+      return;
+    }
+
+    if (Number.isFinite(curr) && curr >= 0) {
+      var currStr = formatCastTime(curr);
+      var durStr = (Number.isFinite(dur) && dur > 0) ? formatCastTime(dur) : "";
+      var label = durStr ? currStr + " / " + durStr : currStr;
+
+      if (timeBadge) {
+        timeBadge.textContent = label;
+        timeBadge.classList.remove("hidden", "is-live");
+      }
+      if (progressFill && Number.isFinite(dur) && dur > 0) {
+        var pct = Math.min(100, Math.max(0, (curr / dur) * 100));
+        progressFill.style.width = pct.toFixed(1) + "%";
+      }
+    }
+  }
+
+  function startCastTimeTicker() {
+    stopCastTimeTicker();
+    updateCastBarTime();
+    state.timeTicker = setInterval(updateCastBarTime, 1000);
+  }
+
+  function stopCastTimeTicker() {
+    if (state.timeTicker) {
+      clearInterval(state.timeTicker);
+      state.timeTicker = null;
+    }
+  }
+
   function removeCastActiveBar() {
+    stopCastTimeTicker();
     var wrap = document.getElementById("vel-cast-active-bar-wrap");
     if (wrap) {
       wrap.remove();
@@ -410,6 +493,7 @@
         var title = meta.title || (meta.getString && meta.getString(window.chrome.cast.media.MetadataKey.TITLE)) || "";
         var img = (meta.images && meta.images[0] && meta.images[0].url) || "";
         var isLive = rm.streamType === (window.chrome && window.chrome.cast && window.chrome.cast.media ? window.chrome.cast.media.StreamType.LIVE : "LIVE");
+        var currTime = typeof remoteMedia.getEstimatedTime === "function" ? remoteMedia.getEstimatedTime() : (Number(remoteMedia.currentTime) || 0);
 
         if (title || rm.contentId) {
           state.currentMedia = {
@@ -421,7 +505,7 @@
             isLive: isLive,
             contentType: rm.contentType || contentTypeFor(rm.contentId),
             castContentType: rm.contentType || contentTypeFor(rm.contentId),
-            position: remoteMedia.currentTime || 0,
+            position: currTime,
             duration: rm.duration || 0,
             explicit: true
           };
@@ -431,6 +515,7 @@
             var titleSpan = wrap.querySelector(".vel-cast-capsule-title");
             if (titleSpan && title) titleSpan.textContent = title;
           }
+          updateCastBarTime();
         }
       }
     } catch (err) {
@@ -522,6 +607,7 @@
       var stopBtn = existingWrap.querySelector("#vel-cast-stop-playback");
       if (stopBtn) attachCastStopBtnHandler(stopBtn);
 
+      startCastTimeTicker();
       document.body.classList.add("vel-cast-active-bar-open");
       var barEl = existingWrap.querySelector(".vel-cast-active-bar");
       var h = (barEl ? barEl.offsetHeight : 48) + 14;
@@ -542,7 +628,10 @@
             <span class="vel-cast-live-beacon"></span>
           </div>
           <div class="vel-cast-capsule-meta">
-            <span class="vel-cast-capsule-title">${activeTitle}</span>
+            <div class="vel-cast-capsule-title-row">
+              <span class="vel-cast-capsule-title">${activeTitle}</span>
+              <span class="vel-cast-capsule-time-badge hidden"></span>
+            </div>
             <span class="vel-cast-capsule-sub ${!isTvMode ? "is-idle" : ""}">${isTvMode ? deviceName : deviceName + " · Mode téléphone"}</span>
           </div>
         </div>
@@ -561,6 +650,9 @@
             </button>
           </div>
         </div>
+        <div class="vel-cast-capsule-progress-track">
+          <div class="vel-cast-capsule-progress-fill" style="width: 0%"></div>
+        </div>
       </div>
     `;
     document.body.appendChild(wrap);
@@ -570,6 +662,7 @@
       var barEl = wrap.querySelector(".vel-cast-active-bar");
       var h = (barEl ? barEl.offsetHeight : 48) + 14;
       document.documentElement.style.setProperty("--vel-cast-bar-height", h + "px");
+      startCastTimeTicker();
     });
 
     var phoneBtn = wrap.querySelector(".vel-cast-segment-btn[data-mode='phone']");
@@ -1274,10 +1367,21 @@
         0%, 100% { transform: scale(1); opacity: 1; }
         50% { transform: scale(1.25); opacity: 0.6; }
       }
+      .vel-cast-active-bar {
+        position: relative;
+        overflow: hidden;
+      }
       .vel-cast-capsule-meta {
         display: flex;
         flex-direction: column;
         gap: 1px;
+        min-width: 0;
+        overflow: hidden;
+      }
+      .vel-cast-capsule-title-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
         min-width: 0;
         overflow: hidden;
       }
@@ -1289,6 +1393,43 @@
         overflow: hidden;
         text-overflow: ellipsis;
         letter-spacing: -0.01em;
+      }
+      .vel-cast-capsule-time-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 1px 6px;
+        background: rgba(167, 139, 250, 0.2);
+        border: 1px solid rgba(167, 139, 250, 0.35);
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 700;
+        color: #c4b5fd;
+        letter-spacing: 0.02em;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .vel-cast-capsule-time-badge.is-live {
+        background: rgba(239, 68, 68, 0.2);
+        border-color: rgba(239, 68, 68, 0.4);
+        color: #fca5a5;
+      }
+      .vel-cast-capsule-progress-track {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 2.5px;
+        background: rgba(255, 255, 255, 0.08);
+        overflow: hidden;
+        border-bottom-left-radius: 999px;
+        border-bottom-right-radius: 999px;
+      }
+      .vel-cast-capsule-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #a78bfa, #c084fc);
+        border-radius: 999px;
+        transition: width 0.8s linear;
       }
       .vel-cast-capsule-sub {
         font-size: 11px;

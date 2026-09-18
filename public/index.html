@@ -7794,7 +7794,7 @@
             <div class="video-wrapper">
               <video id="video" playsinline webkit-playsinline x5-playsinline="true" x5-video-player-type="h5-page"
                 x5-video-player-fullscreen="false" x5-video-orientation="landscape"
-                controlslist="nofullscreen nodownload noplaybackrate" disablepictureinpicture preload="auto"
+                controlslist="nofullscreen nodownload noplaybackrate" autopictureinpicture="true" preload="auto"
                 crossorigin="anonymous"></video>
               <div id="player-buffering" class="player-buffering hidden" aria-hidden="true" role="status"
                 aria-live="polite" aria-label="Chargement de la lecture">
@@ -7860,7 +7860,7 @@
             <div class="video-wrapper">
               <video id="video-vod" playsinline webkit-playsinline x5-playsinline="true" x5-video-player-type="h5-page"
                 x5-video-player-fullscreen="false" x5-video-orientation="landscape"
-                controlslist="nofullscreen nodownload noremoteplayback" disablepictureinpicture disableremoteplayback
+                controlslist="nofullscreen nodownload noremoteplayback" autopictureinpicture="true" disableremoteplayback
                 preload="auto" crossorigin="anonymous"></video>
               <canvas id="vod-frame-freeze" class="vod-frame-freeze hidden" aria-hidden="true" style="display:none !important;"></canvas>
               <div id="vod-player-buffering" class="player-buffering hidden" aria-hidden="true" role="status"
@@ -14030,10 +14030,12 @@
         video.setAttribute("x5-video-player-type", "h5-page");
         video.setAttribute("x5-video-player-fullscreen", "false");
         video.setAttribute("controlslist", "nofullscreen nodownload noplaybackrate");
-        video.setAttribute("disablepictureinpicture", "");
+        video.removeAttribute("disablepictureinpicture");
+        video.setAttribute("autopictureinpicture", "true");
         video.removeAttribute("disableremoteplayback");
         try {
-          video.disablePictureInPicture = true;
+          video.disablePictureInPicture = false;
+          video.autoPictureInPicture = true;
         } catch (err) { }
         try {
           video.disableRemotePlayback = false;
@@ -18698,7 +18700,7 @@
       });
     })();
   </script>
-  <script defer src="/assets/cast-bridge.js?v=20260918-robust-cast-v9"></script>
+  <script defer src="/assets/cast-bridge.js?v=20260918-robust-cast-v10"></script>
   <script defer src="/assets/velora-live-wheel.js?v=20260916-live-only-strict-v7"></script>
   <link rel="stylesheet" href="/assets/velora-prime-carousel.css?v=20260914-exact-provider-order-v11" />
   <script defer src="/assets/velora-prime-carousels.js?v=20260918-stable-feed-v3"></script>
@@ -18757,6 +18759,7 @@
   <script defer src="/assets/velora-adult.js?v=20260912-hub-images-v3"></script>
   <script defer src="/assets/velora-football-admin.js?v=20260916-foot-admin-options-v10"></script>
   <script defer src="/assets/tv-connect-bridge.js?v=20260918-smart-diffusion-v9"></script>
+  <script defer src="/assets/velora-pip-controller.js?v=20260918-auto-pip-v1"></script>
 </body>
 
 </html>

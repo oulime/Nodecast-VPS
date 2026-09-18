@@ -281,6 +281,13 @@
       videoCodec: input && input.videoCodec,
       audioCodec: input && input.audioCodec,
       audioChannels: input && input.audioChannels,
+      streamId: (input && input.streamId) || (video && video.dataset && video.dataset.streamId) || null,
+      seriesId: (input && input.seriesId) || (video && video.dataset && video.dataset.seriesId) || null,
+      episodeStreamId: (input && input.episodeStreamId) || (video && video.dataset && video.dataset.episodeStreamId) || null,
+      seasonNumber: (input && input.seasonNumber) || null,
+      episodeNumber: (input && input.episodeNumber) || null,
+      sourceId: (input && input.sourceId) || "",
+      packageId: (input && input.packageId) || "",
       video: video || null
     };
     media.playbackMode = (input && input.playbackMode) || (isInternalTranscode(url) ? "transcode" : "final");
@@ -429,6 +436,8 @@
     var timeBadge = wrap.querySelector(".vel-cast-capsule-time-badge");
     var progressFill = wrap.querySelector(".vel-cast-capsule-progress-fill");
 
+    var CAST_STATE_KEY = "velora_active_cast_state_v1";
+
     if (isLive) {
       if (timeBadge) {
         timeBadge.textContent = "EN DIRECT";
@@ -436,6 +445,17 @@
         timeBadge.classList.add("is-live");
       }
       if (progressFill) progressFill.style.width = "100%";
+      try {
+        localStorage.setItem(CAST_STATE_KEY, JSON.stringify({
+          active: true,
+          title: (state.currentMedia && (state.currentMedia.title || state.currentMedia.name)) || "Diffusion TV",
+          deviceName: getCastDeviceName(),
+          isLive: true,
+          curr: 0,
+          dur: 0,
+          timestamp: Date.now()
+        }));
+      } catch (_) {}
       return;
     }
 
@@ -454,6 +474,39 @@
         var pct = Math.min(100, Math.max(0, (curr / dur) * 100));
         progressFill.style.width = pct.toFixed(1) + "%";
       }
+
+      // Persist state across reloads and other tabs
+      try {
+        localStorage.setItem(CAST_STATE_KEY, JSON.stringify({
+          active: true,
+          title: (state.currentMedia && (state.currentMedia.title || state.currentMedia.name)) || "Diffusion TV",
+          deviceName: getCastDeviceName(),
+          isLive: false,
+          curr: curr,
+          dur: dur,
+          streamId: state.currentMedia && state.currentMedia.streamId,
+          seriesId: state.currentMedia && state.currentMedia.seriesId,
+          episodeStreamId: state.currentMedia && state.currentMedia.episodeStreamId,
+          seasonNumber: state.currentMedia && state.currentMedia.seasonNumber,
+          episodeNumber: state.currentMedia && state.currentMedia.episodeNumber,
+          sourceId: state.currentMedia && state.currentMedia.sourceId,
+          packageId: state.currentMedia && state.currentMedia.packageId,
+          poster: state.currentMedia && state.currentMedia.poster,
+          timestamp: Date.now()
+        }));
+      } catch (_) {}
+
+      // Dispatch event so Watch History (Reprendre la lecture) records playback in real-time
+      try {
+        document.dispatchEvent(new CustomEvent("velora-cast-playback-progress", {
+          detail: {
+            currentTime: curr,
+            duration: dur,
+            isLive: false,
+            media: state.currentMedia
+          }
+        }));
+      } catch (_) {}
     }
   }
 
@@ -914,6 +967,7 @@
     state.castState = "NO_DEVICES_AVAILABLE";
     state.sessionState = "NO_SESSION";
     rememberSessionActive(false);
+    try { localStorage.removeItem("velora_active_cast_state_v1"); } catch (_) {}
     setPhase("DISCONNECTED");
   }
 
@@ -1061,8 +1115,8 @@
       context.setOptions({
         receiverApplicationId: RECEIVER_APP_ID,
         autoJoinPolicy: window.chrome && window.chrome.cast && window.chrome.cast.AutoJoinPolicy
-          ? window.chrome.cast.AutoJoinPolicy.TAB_AND_ORIGIN_SCOPED
-          : "tab_and_origin_scoped",
+          ? window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+          : "origin_scoped",
         resumeSavedSession: true
       });
 
@@ -1569,6 +1623,67 @@
     patchHlsAndVideoSources();
     installButton();
     bindVideos();
+
+    try {
+      var rawCast = localStorage.getItem("velora_active_cast_state_v1");
+      if (rawCast) {
+        var parsedCast = JSON.parse(rawCast);
+        if (parsedCast && parsedCast.active && Date.now() - (parsedCast.timestamp || 0) < 60000) {
+          state.currentMedia = {
+            title: parsedCast.title || "Diffusion TV",
+            name: parsedCast.title || "Diffusion TV",
+            poster: parsedCast.poster || "",
+            isLive: !!parsedCast.isLive,
+            position: parsedCast.curr || 0,
+            duration: parsedCast.dur || 0,
+            streamId: parsedCast.streamId,
+            seriesId: parsedCast.seriesId,
+            episodeStreamId: parsedCast.episodeStreamId,
+            seasonNumber: parsedCast.seasonNumber,
+            episodeNumber: parsedCast.episodeNumber,
+            sourceId: parsedCast.sourceId,
+            packageId: parsedCast.packageId,
+            explicit: true
+          };
+          showCastActiveBar();
+          updateCastBarTime();
+        }
+      }
+    } catch (_) {}
+
+    window.addEventListener("storage", function (e) {
+      if (e.key === "velora_active_cast_state_v1") {
+        if (!e.newValue) {
+          removeCastActiveBar();
+        } else {
+          try {
+            var data = JSON.parse(e.newValue);
+            if (data && data.active && Date.now() - (data.timestamp || 0) < 60000) {
+              if (!state.currentMedia || state.currentMedia.title !== data.title) {
+                state.currentMedia = Object.assign(state.currentMedia || {}, {
+                  title: data.title,
+                  name: data.title,
+                  poster: data.poster || "",
+                  isLive: !!data.isLive,
+                  position: data.curr || 0,
+                  duration: data.dur || 0,
+                  streamId: data.streamId,
+                  seriesId: data.seriesId,
+                  episodeStreamId: data.episodeStreamId,
+                  seasonNumber: data.seasonNumber,
+                  episodeNumber: data.episodeNumber,
+                  sourceId: data.sourceId,
+                  packageId: data.packageId,
+                  explicit: true
+                });
+              }
+              showCastActiveBar();
+              updateCastBarTime();
+            }
+          } catch (_) {}
+        }
+      }
+    });
 
     if (window.cast && window.cast.framework && window.cast.framework.CastContext) {
       initCastContext();

@@ -1107,7 +1107,39 @@
   }
 
   function tickHeartbeat() {
+    var isCast = window.VeloraCast && typeof window.VeloraCast.isConnected === "function" && window.VeloraCast.isConnected();
     var vodVideo = document.getElementById("video-vod");
+
+    if (isCast) {
+      var castMedia = typeof window.VeloraCast.getCurrentMedia === "function" ? window.VeloraCast.getCurrentMedia() : null;
+      if (castMedia && !castMedia.isLive) {
+        var nowCast = Date.now();
+        if (sessionTracker.lastTick) {
+          var deltaCast = (nowCast - sessionTracker.lastTick) / 1000;
+          if (deltaCast > 0 && deltaCast < 8) {
+            sessionTracker.continuousSeconds += deltaCast;
+          }
+        }
+        sessionTracker.lastTick = nowCast;
+
+        var minSecCast = getResumeMinWatchSeconds();
+        var currCast = Number.isFinite(castMedia.position) ? castMedia.position : 0;
+        var durCast = Number.isFinite(castMedia.duration) ? castMedia.duration : 0;
+
+        if (currCast > 0) {
+          if (!sessionTracker.qualified && sessionTracker.continuousSeconds >= minSecCast) {
+            sessionTracker.qualified = true;
+            recordProgressWithData(currCast, durCast, false, false, false, castMedia);
+          } else if (sessionTracker.qualified) {
+            if (nowCast - state.lastDiskSaveTimestamp >= 10000) {
+              recordProgressWithData(currCast, durCast, false, true, false, castMedia);
+            }
+          }
+        }
+        return;
+      }
+    }
+
     if (!vodVideo || vodVideo.paused || vodVideo.seeking || vodVideo.ended) {
       sessionTracker.lastTick = null;
       return;
@@ -1144,12 +1176,41 @@
     }
   }
 
-  // Record playback progress (Strictly for VOD Movies & Series Episodes only)
-  function recordProgress(video, isEnd, isThrottled, isRewindCommit) {
-    if (!video || video.id === "video" || video.id === "vel-adult-video" || isNaN(video.currentTime) || (video.currentTime < MIN_WATCH_SECONDS && !isEnd)) return;
+  // Record playback progress with explicit seconds or video element
+  function recordProgressWithData(currSeconds, durSeconds, isEnd, isThrottled, isRewindCommit, mediaOverride) {
+    var rawCurrent = Number(currSeconds);
+    if (!Number.isFinite(rawCurrent) || (rawCurrent < MIN_WATCH_SECONDS && !isEnd)) return;
     if (document.body.dataset.velActiveTab === "live" || document.body.dataset.velActiveTab === "adult" || document.body.dataset.veloraReturnAdult === "true" || document.body.classList.contains("vel-adult-active")) return;
 
     var media = state.currentPlaying || window.__veloraLastPlayingMedia;
+    if (!media && mediaOverride) {
+      var isSeriesOverride = mediaOverride.type === "series" || !!mediaOverride.seriesId || !!mediaOverride.episodeStreamId;
+      var sIdOverride = mediaOverride.seriesId || mediaOverride.streamId || "";
+      var epIdOverride = mediaOverride.episodeStreamId || mediaOverride.streamId || "";
+      media = {
+        id: isSeriesOverride ? ("series:" + (sIdOverride || "series") + ":ep:" + (epIdOverride || "ep")) : ("movie:" + (mediaOverride.streamId || sIdOverride || "vod")),
+        type: isSeriesOverride ? "series" : "movie",
+        streamId: mediaOverride.streamId || epIdOverride,
+        seriesId: sIdOverride || null,
+        episodeStreamId: isSeriesOverride ? (epIdOverride || null) : null,
+        name: mediaOverride.title || mediaOverride.name || "Vidéo",
+        seriesName: mediaOverride.seriesName || mediaOverride.title || mediaOverride.name || null,
+        episodeTitle: mediaOverride.episodeTitle || null,
+        seasonNumber: mediaOverride.seasonNumber != null ? Number(mediaOverride.seasonNumber) : 1,
+        episodeNumber: mediaOverride.episodeNumber != null ? Number(mediaOverride.episodeNumber) : 1,
+        thumbUrl: cleanCoverUrl(mediaOverride.poster || mediaOverride.thumbUrl || ""),
+        backdropUrl: cleanCoverUrl(mediaOverride.poster || mediaOverride.backdropUrl || ""),
+        packageId: mediaOverride.packageId || "",
+        sourceId: mediaOverride.sourceId || "",
+        containerExtension: mediaOverride.containerExtension || "mp4",
+        duration: Number(durSeconds || mediaOverride.duration) || 0,
+        updatedAt: Date.now()
+      };
+      state.currentPlaying = media;
+      window.__veloraLastPlayingMedia = media;
+      updateSessionTrackerMedia(media.id, media);
+    }
+
     if (!media) {
       var activeEp = document.querySelector(".vel-vod-detail__episode--playing, .vel-vod-detail__episode[aria-current='true']");
       var seriesTitle = document.querySelector(".vel-vod-detail__title");
@@ -1183,8 +1244,8 @@
     var alreadyInResume = isMediaAlreadyInResume(media, id);
     var existingEntry = getLocalHistory().find(function (item) { return String(item.id) === String(id); });
 
-    var realCurrent = Number.isFinite(video.currentTime) ? video.currentTime : 0;
-    var realDuration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : (media.duration || 0);
+    var realCurrent = Number.isFinite(rawCurrent) ? rawCurrent : 0;
+    var realDuration = Number.isFinite(durSeconds) && durSeconds > 0 ? durSeconds : (media.duration || (existingEntry ? existingEntry.duration : 0));
 
     var duration = Math.round(realDuration);
     var currentPos = isEnd ? duration : Math.max(0, Math.round(realCurrent));
@@ -1194,11 +1255,6 @@
     var minSec = getResumeMinWatchSeconds();
     var continuousSecs = sessionTracker.continuousSeconds || 0;
 
-    // Strict qualification check:
-    // 1. Content already in Reprendre / History -> always qualified (immediate seek/position updates)
-    // 2. Video completed/ended -> qualified
-    // 3. User actually watched for >= minSec (e.g. 3 mins configured in settings) -> qualified
-    // 4. Already marked qualified during this active session -> qualified
     var isQualified = isFinished || alreadyInResume || !!existingEntry || sessionTracker.qualified || (isRewindCommit && sessionTracker.qualified) || (continuousSecs >= minSec);
 
     if (!isQualified) {
@@ -1211,7 +1267,6 @@
       return String(item.id) !== String(id);
     });
 
-    // If user is watching a series episode, prune any subsequent episodes of this series (e.g. Ep 8 when currently watching Ep 4) and unstarted placeholders
     if (media.type === "series") {
       var activeSeriesId = String(media.seriesId || media.streamId || "");
       var sNorm = normalizeTitle(media.name || media.seriesName || "");
@@ -1225,11 +1280,9 @@
         if (sameSeries) {
           var itSeason = Number(it.seasonNumber) || 1;
           var itEpisode = Number(it.episodeNumber) || 1;
-          // 1. If it's a later episode than the one currently being watched (e.g. Ep 8 when currently watching Ep 4), forget/remove it!
           if (itSeason > curSeason || (itSeason === curSeason && itEpisode > curEpisode)) {
             return false;
           }
-          // 2. If it's an unstarted placeholder episode for this series, remove it
           if (it.currentTime === 0 && (it.progressPercent === 0 || it.progressPercent == null) && !it.isFinished) {
             return false;
           }
@@ -1240,7 +1293,6 @@
 
     var thumb = cleanCoverUrl(media.thumbUrl || (existingEntry ? existingEntry.thumbUrl : "") || "");
     var backdrop = cleanCoverUrl(media.backdropUrl || (existingEntry ? existingEntry.backdropUrl : "") || media.thumbUrl || "");
-
     var horizThumb = media.horizontal_thumb || (existingEntry ? existingEntry.horizontal_thumb : "") || "";
     var titleLogo = media.title_logo || media.titleLogo || (existingEntry ? (existingEntry.title_logo || existingEntry.titleLogo) : "") || "";
     var hasIntegrated = Boolean(media.has_integrated_title || (existingEntry ? existingEntry.has_integrated_title : false));
@@ -1276,12 +1328,12 @@
     items.unshift(entry);
 
     if (media.type === "series" && isFinished) {
-      var sId = media.seriesId || media.streamId;
-      var cachedEps = getSeriesEpisodesCache(sId);
+      var sIdCached = media.seriesId || media.streamId;
+      var cachedEps = getSeriesEpisodesCache(sIdCached);
       if (cachedEps && cachedEps.length > 0) {
         var nextEp = findNextEpisodeInList(cachedEps, media.seasonNumber, media.episodeNumber, media.episodeStreamId);
         if (nextEp) {
-          var nextId = "series:" + sId + ":ep:" + nextEp.episodeStreamId;
+          var nextId = "series:" + sIdCached + ":ep:" + nextEp.episodeStreamId;
           var existingNext = items.find(function (it) { return String(it.id) === String(nextId); });
           if (!existingNext) {
             var nextEntry = {
@@ -1312,45 +1364,6 @@
             items.unshift(nextEntry);
           }
         }
-      } else {
-        fetchSeriesEpisodes(sId, media.sourceId).then(function (eps) {
-          if (eps && eps.length > 0) {
-            var nextEpAsync = findNextEpisodeInList(eps, media.seasonNumber, media.episodeNumber, media.episodeStreamId);
-            if (nextEpAsync) {
-              var curHist = getLocalHistory();
-              var nextIdAsync = "series:" + sId + ":ep:" + nextEpAsync.episodeStreamId;
-              if (!curHist.some(function (it) { return String(it.id) === String(nextIdAsync); })) {
-                var nextEntryAsync = {
-                  id: nextIdAsync,
-                  type: "series",
-                  streamId: media.streamId || null,
-                  seriesId: media.seriesId || null,
-                  episodeStreamId: nextEpAsync.episodeStreamId,
-                  seasonNumber: nextEpAsync.seasonNumber,
-                  episodeNumber: nextEpAsync.episodeNum,
-                  name: media.name,
-                  seriesName: media.seriesName || media.name || null,
-                  episodeTitle: nextEpAsync.title || null,
-                  thumbUrl: thumb,
-                  backdropUrl: backdrop || thumb,
-                  horizontal_thumb: horizThumb,
-                  title_logo: titleLogo,
-                  has_integrated_title: hasIntegrated,
-                  packageId: media.packageId || "",
-                  sourceId: media.sourceId || "",
-                  containerExtension: nextEpAsync.containerExtension || media.containerExtension || "mp4",
-                  currentTime: 0,
-                  duration: 0,
-                  progressPercent: 0,
-                  isFinished: false,
-                  updatedAt: Date.now() + 1
-                };
-                curHist.unshift(nextEntryAsync);
-                saveLocalHistory(curHist);
-              }
-            }
-          }
-        });
       }
     }
 
@@ -1362,6 +1375,12 @@
       state.lastDbSyncTimestamp = now;
       syncProgressToDatabase(entry);
     }
+  }
+
+  // Record playback progress (Strictly for VOD Movies & Series Episodes only)
+  function recordProgress(video, isEnd, isThrottled, isRewindCommit) {
+    if (!video || video.id === "video" || video.id === "vel-adult-video" || isNaN(video.currentTime) || (video.currentTime < MIN_WATCH_SECONDS && !isEnd)) return;
+    recordProgressWithData(video.currentTime, video.duration, isEnd, isThrottled, isRewindCommit, null);
   }
 
   function formatPlaybackTimestamp(seconds) {
@@ -2697,6 +2716,40 @@
     });
 
     document.addEventListener("velora-resume-settings-changed", injectResumeSectionDirectly);
+
+    document.addEventListener("velora-cast-playback-progress", function (e) {
+      if (!e || !e.detail) return;
+      var d = e.detail;
+      if (d.isLive) return;
+      var curr = Number(d.currentTime);
+      var dur = Number(d.duration);
+      if (!Number.isFinite(curr) || curr < MIN_WATCH_SECONDS) return;
+
+      var now = Date.now();
+      if (sessionTracker.lastTick) {
+        var delta = (now - sessionTracker.lastTick) / 1000;
+        if (delta > 0 && delta < 8) {
+          sessionTracker.continuousSeconds += delta;
+        }
+      }
+      sessionTracker.lastTick = now;
+
+      var minSec = getResumeMinWatchSeconds();
+      if (!sessionTracker.qualified && sessionTracker.continuousSeconds >= minSec) {
+        sessionTracker.qualified = true;
+        recordProgressWithData(curr, dur, false, false, false, d.media);
+      } else if (sessionTracker.qualified) {
+        if (now - state.lastDiskSaveTimestamp >= 10000) {
+          recordProgressWithData(curr, dur, false, true, false, d.media);
+        }
+      }
+    });
+
+    document.addEventListener("velora-cast-disconnected", function () {
+      if (sessionTracker.qualified) {
+        injectResumeSectionDirectly();
+      }
+    });
 
     // Refresh resume section upon returning to home or viewing home
     var homeEvents = [

@@ -10,6 +10,7 @@
     sdkLoading: false,
     castState: "NO_DEVICES_AVAILABLE",
     sessionState: "NO_SESSION",
+    destinationMode: "tv", // 'tv' (diffuse to TV) | 'phone' (play locally on phone, keep cast running)
     currentMedia: null,
     lastLoadedKey: "",
     pendingCastClick: false,
@@ -42,6 +43,92 @@
     } catch (_) {
       return "";
     }
+  }
+
+  function getSavedDestinationMode() {
+    try {
+      var saved = localStorage.getItem("velora_cast_destination");
+      return saved === "phone" ? "phone" : "tv";
+    } catch (_) {
+      return "tv";
+    }
+  }
+
+  state.destinationMode = getSavedDestinationMode();
+
+  function isCastAutoDiffuseOn() {
+    return state.destinationMode === "tv";
+  }
+
+  function setCastDestination(mode) {
+    state.destinationMode = mode === "phone" ? "phone" : "tv";
+    try {
+      localStorage.setItem("velora_cast_destination", state.destinationMode);
+    } catch (_) {}
+
+    var wrap = document.getElementById("vel-cast-active-bar-wrap");
+    if (wrap) {
+      var phoneBtn = wrap.querySelector(".vel-cast-segment-btn[data-mode='phone']");
+      var tvBtn = wrap.querySelector(".vel-cast-segment-btn[data-mode='tv']");
+      var subSpan = wrap.querySelector(".vel-cast-capsule-sub");
+      var deviceName = getCastDeviceName();
+
+      if (phoneBtn) phoneBtn.classList.toggle("is-active", state.destinationMode === "phone");
+      if (tvBtn) tvBtn.classList.toggle("is-active", state.destinationMode === "tv");
+
+      if (subSpan) {
+        subSpan.textContent = state.destinationMode === "tv"
+          ? deviceName
+          : deviceName + " · Mode téléphone";
+        subSpan.classList.toggle("is-idle", state.destinationMode === "phone");
+      }
+    }
+
+    if (state.destinationMode === "tv") {
+      haltMobilePlayersForCast();
+      var media = state.currentMedia || normalizeMedia({});
+      if (media && session()) {
+        loadMediaOnCast(media, { force: true });
+      }
+      showCastToast("Diffusion automatique vers la TV activée");
+    } else {
+      showCastToast("Prochaines vidéos sur le téléphone (la TV continue)");
+    }
+  }
+
+  function haltMobilePlayersForCast() {
+    try {
+      if (typeof window.veloraCloseActiveTranscodeSession === "function") {
+        window.veloraCloseActiveTranscodeSession();
+      }
+    } catch (_) {}
+
+    var closeVodBtn = document.getElementById("btn-close-vod-player");
+    if (closeVodBtn) {
+      try { closeVodBtn.click(); } catch (_) {}
+    }
+    var closeLiveBtn = document.getElementById("btn-close-player");
+    if (closeLiveBtn) {
+      try { closeLiveBtn.click(); } catch (_) {}
+    }
+
+    var liveContainer = document.getElementById("player-container");
+    if (liveContainer) liveContainer.classList.add("hidden");
+    var vodContainer = document.getElementById("vod-player-container");
+    if (vodContainer) vodContainer.classList.add("hidden");
+
+    var vElements = [document.getElementById("video-vod"), document.getElementById("video")];
+    document.querySelectorAll("video, audio").forEach(function (v) {
+      if (vElements.indexOf(v) === -1) vElements.push(v);
+    });
+
+    vElements.forEach(function (v) {
+      if (!v) return;
+      try {
+        v.pause();
+        v.muted = true;
+      } catch (_) {}
+    });
   }
 
   function resolveFullPublicUrl(url) {
@@ -288,11 +375,15 @@
   }
 
   function removeCastActiveBar() {
-    var wrap = document.getElementById("vel-tv-active-bar-wrap");
-    if (wrap && wrap.dataset.source === "cast") {
+    var wrap = document.getElementById("vel-cast-active-bar-wrap");
+    if (wrap) {
       wrap.remove();
-      document.body.classList.remove("vel-tv-active-bar-open");
-      document.documentElement.style.removeProperty("--vel-tv-bar-height");
+    }
+    if (document.body && document.body.classList) {
+      document.body.classList.remove("vel-cast-active-bar-open");
+    }
+    if (document.documentElement && document.documentElement.style) {
+      document.documentElement.style.removeProperty("--vel-cast-bar-height");
     }
   }
 
@@ -307,6 +398,7 @@
     };
   }
 
+  // Dedicated Cast luxury top floating capsule bar
   function showCastActiveBar() {
     var isConnected = (typeof session === "function" && !!session()) || state.airPlayConnected;
     if (!isConnected) {
@@ -322,90 +414,73 @@
     var media = state.currentMedia || normalizeMedia({});
     var activeTitle = media ? (media.title || media.name || "Vidéo") : "Diffusion TV";
     var deviceName = getCastDeviceName();
+    var isTvMode = isCastAutoDiffuseOn();
 
-    var existingWrap = document.getElementById("vel-tv-active-bar-wrap");
+    var existingWrap = document.getElementById("vel-cast-active-bar-wrap");
     if (existingWrap) {
-      existingWrap.dataset.source = "cast";
-      var iconWrap = existingWrap.querySelector(".vel-tv-capsule-icon-wrap");
+      var iconWrap = existingWrap.querySelector(".vel-cast-capsule-icon-wrap");
       if (iconWrap) {
         iconWrap.classList.add("is-streaming");
         iconWrap.innerHTML = `
           <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
             <path d="M1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm0-4v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11zm20-7H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
           </svg>
-          <span class="vel-tv-live-beacon"></span>
+          <span class="vel-cast-live-beacon"></span>
         `;
       }
 
-      var titleSpan = existingWrap.querySelector(".vel-tv-capsule-title");
+      var titleSpan = existingWrap.querySelector(".vel-cast-capsule-title");
       if (titleSpan) titleSpan.textContent = activeTitle;
 
-      var subSpan = existingWrap.querySelector(".vel-tv-capsule-sub");
+      var subSpan = existingWrap.querySelector(".vel-cast-capsule-sub");
       if (subSpan) {
-        subSpan.textContent = deviceName;
-        subSpan.classList.remove("is-idle");
+        subSpan.textContent = isTvMode ? deviceName : deviceName + " · Mode téléphone";
+        subSpan.classList.toggle("is-idle", !isTvMode);
       }
 
-      var phoneBtn = existingWrap.querySelector(".vel-tv-segment-btn[data-mode='phone']");
-      var tvBtn = existingWrap.querySelector(".vel-tv-segment-btn[data-mode='tv']");
-      if (phoneBtn) phoneBtn.classList.remove("is-active");
-      if (tvBtn) tvBtn.classList.add("is-active");
+      var phoneBtn = existingWrap.querySelector(".vel-cast-segment-btn[data-mode='phone']");
+      var tvBtn = existingWrap.querySelector(".vel-cast-segment-btn[data-mode='tv']");
+      if (phoneBtn) phoneBtn.classList.toggle("is-active", !isTvMode);
+      if (tvBtn) tvBtn.classList.toggle("is-active", isTvMode);
 
-      var stopBtn = existingWrap.querySelector("#vel-tv-stop-playback, #vel-cast-stop-playback");
-      if (!stopBtn) {
-        var actions = existingWrap.querySelector(".vel-tv-capsule-actions");
-        if (actions) {
-          var btn = document.createElement("button");
-          btn.type = "button";
-          btn.id = "vel-cast-stop-playback";
-          btn.className = "vel-tv-stop-btn";
-          btn.title = "Arrêter la diffusion Cast";
-          btn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg>';
-          actions.prepend(btn);
-          attachCastStopBtnHandler(btn);
-        }
-      } else {
-        stopBtn.id = "vel-cast-stop-playback";
-        stopBtn.title = "Arrêter la diffusion Cast";
-        attachCastStopBtnHandler(stopBtn);
-      }
+      var stopBtn = existingWrap.querySelector("#vel-cast-stop-playback");
+      if (stopBtn) attachCastStopBtnHandler(stopBtn);
 
-      document.body.classList.add("vel-tv-active-bar-open");
-      var barEl = existingWrap.querySelector(".vel-tv-active-bar");
+      document.body.classList.add("vel-cast-active-bar-open");
+      var barEl = existingWrap.querySelector(".vel-cast-active-bar");
       var h = (barEl ? barEl.offsetHeight : 48) + 14;
-      document.documentElement.style.setProperty("--vel-tv-bar-height", h + "px");
+      document.documentElement.style.setProperty("--vel-cast-bar-height", h + "px");
       return;
     }
 
     var wrap = document.createElement("div");
-    wrap.id = "vel-tv-active-bar-wrap";
-    wrap.dataset.source = "cast";
-    wrap.className = "vel-tv-active-bar-wrap";
+    wrap.id = "vel-cast-active-bar-wrap";
+    wrap.className = "vel-cast-active-bar-wrap";
     wrap.innerHTML = `
-      <div class="vel-tv-active-bar">
-        <div class="vel-tv-capsule-left">
-          <div class="vel-tv-capsule-icon-wrap is-streaming">
+      <div class="vel-cast-active-bar">
+        <div class="vel-cast-capsule-left">
+          <div class="vel-cast-capsule-icon-wrap is-streaming">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
               <path d="M1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm0-4v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11zm20-7H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
             </svg>
-            <span class="vel-tv-live-beacon"></span>
+            <span class="vel-cast-live-beacon"></span>
           </div>
-          <div class="vel-tv-capsule-meta">
-            <span class="vel-tv-capsule-title">${activeTitle}</span>
-            <span class="vel-tv-capsule-sub">${deviceName}</span>
+          <div class="vel-cast-capsule-meta">
+            <span class="vel-cast-capsule-title">${activeTitle}</span>
+            <span class="vel-cast-capsule-sub ${!isTvMode ? "is-idle" : ""}">${isTvMode ? deviceName : deviceName + " · Mode téléphone"}</span>
           </div>
         </div>
-        <div class="vel-tv-capsule-actions">
-          <button type="button" id="vel-cast-stop-playback" class="vel-tv-stop-btn" title="Arrêter la diffusion Cast">
+        <div class="vel-cast-capsule-actions">
+          <button type="button" id="vel-cast-stop-playback" class="vel-cast-stop-btn" title="Arrêter la diffusion Cast">
             <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
               <rect x="5" y="5" width="14" height="14" rx="2.5"/>
             </svg>
           </button>
-          <div class="vel-tv-segmented-switch" role="group" aria-label="Destination de lecture">
-            <button type="button" class="vel-tv-segment-btn" data-mode="phone" title="Basculer la lecture sur le téléphone">
+          <div class="vel-cast-segmented-switch" role="group" aria-label="Destination de lecture">
+            <button type="button" class="vel-cast-segment-btn ${!isTvMode ? "is-active" : ""}" data-mode="phone" title="Regarder les prochaines vidéos sur le téléphone">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="3" ry="3"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
             </button>
-            <button type="button" class="vel-tv-segment-btn is-active" data-mode="tv" title="Diffuser sur la TV (Cast)">
+            <button type="button" class="vel-cast-segment-btn ${isTvMode ? "is-active" : ""}" data-mode="tv" title="Diffuser sur la TV (Cast)">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
             </button>
           </div>
@@ -413,30 +488,29 @@
       </div>
     `;
     document.body.appendChild(wrap);
-    document.body.classList.add("vel-tv-active-bar-open");
+    document.body.classList.add("vel-cast-active-bar-open");
 
     requestAnimationFrame(function () {
-      var barEl = wrap.querySelector(".vel-tv-active-bar");
+      var barEl = wrap.querySelector(".vel-cast-active-bar");
       var h = (barEl ? barEl.offsetHeight : 48) + 14;
-      document.documentElement.style.setProperty("--vel-tv-bar-height", h + "px");
+      document.documentElement.style.setProperty("--vel-cast-bar-height", h + "px");
     });
 
-    var phoneBtn = wrap.querySelector(".vel-tv-segment-btn[data-mode='phone']");
+    var phoneBtn = wrap.querySelector(".vel-cast-segment-btn[data-mode='phone']");
     if (phoneBtn) {
       phoneBtn.addEventListener("click", function (e) {
         e.preventDefault();
         e.stopPropagation();
-        stopCast(true);
-        showCastToast("Lecture basculée sur le téléphone");
+        setCastDestination("phone");
       });
     }
 
-    var tvBtn = wrap.querySelector(".vel-tv-segment-btn[data-mode='tv']");
+    var tvBtn = wrap.querySelector(".vel-cast-segment-btn[data-mode='tv']");
     if (tvBtn) {
       tvBtn.addEventListener("click", function (e) {
         e.preventDefault();
         e.stopPropagation();
-        requestUniversalCast();
+        setCastDestination("tv");
       });
     }
 
@@ -535,7 +609,9 @@
   function scheduleCastReload(force) {
     window.clearTimeout(state.loadTimer);
     state.loadTimer = window.setTimeout(function () {
-      if (state.currentMedia && session()) loadMediaOnCast(state.currentMedia, { force: !!force });
+      if (state.currentMedia && session() && isCastAutoDiffuseOn()) {
+        loadMediaOnCast(state.currentMedia, { force: !!force });
+      }
     }, 120);
   }
 
@@ -549,9 +625,14 @@
       state.activeVideo = media.video;
     }
     syncButton();
+
     if (session() || state.airPlayConnected) {
       showCastActiveBar();
-      if (session()) scheduleCastReload(true);
+      // Only reload on Cast automatically if destination switch is on 'TV'
+      if (session() && isCastAutoDiffuseOn()) {
+        haltMobilePlayersForCast();
+        scheduleCastReload(true);
+      }
     }
     return media;
   }
@@ -703,12 +784,14 @@
         }
         var mediaToLoad = state.pendingInitialMedia;
         state.pendingInitialMedia = null;
+        haltMobilePlayersForCast();
         if (!(await loadMediaOnCast(mediaToLoad, { force: true }))) {
           window.alert("Session Cast connectée, mais la vidéo n'a pas pu être chargée sur la TV.");
         }
         return;
       }
 
+      haltMobilePlayersForCast();
       if (!(await loadMediaOnCast(selectedMedia, { force: true }))) {
         window.alert("Session Cast connectée, mais la vidéo n'a pas pu être chargée sur la TV.");
       }
@@ -816,6 +899,9 @@
             this.media.__veloraCastUrl = url;
             rememberMedia(this.media, url);
           }
+          if (session() && isCastAutoDiffuseOn()) {
+            haltMobilePlayersForCast();
+          }
           return origLoad.apply(this, arguments);
         };
         var origAttach = window.Hls.prototype.attachMedia;
@@ -900,6 +986,9 @@
           } else if (video.currentSrc && !/^(blob:|data:|about:|mediastream:)/i.test(video.currentSrc)) {
             rememberMedia(video, video.currentSrc);
           }
+          if (session() && isCastAutoDiffuseOn()) {
+            haltMobilePlayersForCast();
+          }
         }, true);
       });
     });
@@ -927,11 +1016,11 @@
   }
 
   function injectActiveBarStyles() {
-    if (document.getElementById("velora-tv-bridge-styles")) return;
+    if (document.getElementById("velora-cast-styles")) return;
     var style = document.createElement("style");
-    style.id = "velora-tv-bridge-styles";
+    style.id = "velora-cast-styles";
     style.textContent = `
-      .vel-tv-active-bar-wrap {
+      .vel-cast-active-bar-wrap {
         position: fixed;
         top: max(8px, env(safe-area-inset-top));
         left: 0;
@@ -940,13 +1029,13 @@
         justify-content: center;
         z-index: 999999;
         pointer-events: none;
-        animation: velTvSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        animation: velCastSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1);
       }
-      @keyframes velTvSlideDown {
+      @keyframes velCastSlideDown {
         from { transform: translateY(-120%); opacity: 0; }
         to { transform: translateY(0); opacity: 1; }
       }
-      .vel-tv-active-bar {
+      .vel-cast-active-bar {
         pointer-events: auto;
         width: calc(100% - 24px);
         max-width: 520px;
@@ -966,26 +1055,26 @@
         font-family: inherit;
         box-sizing: border-box;
       }
-      body.vel-tv-active-bar-open {
-        padding-top: var(--vel-tv-bar-height, 62px) !important;
+      body.vel-cast-active-bar-open {
+        padding-top: var(--vel-cast-bar-height, 62px) !important;
         box-sizing: border-box !important;
       }
-      body.vel-tv-active-bar-open .main--velora {
-        height: calc(100dvh - var(--vel-tv-bar-height, 62px)) !important;
-        height: calc(100vh - var(--vel-tv-bar-height, 62px)) !important;
+      body.vel-cast-active-bar-open .main--velora {
+        height: calc(100dvh - var(--vel-cast-bar-height, 62px)) !important;
+        height: calc(100vh - var(--vel-cast-bar-height, 62px)) !important;
       }
-      body.vel-tv-active-bar-open #vel-floating-search,
-      body.vel-tv-active-bar-open .vel-floating-search {
-        top: calc(12px + var(--vel-tv-bar-height, 62px)) !important;
+      body.vel-cast-active-bar-open #vel-floating-search,
+      body.vel-cast-active-bar-open .vel-floating-search {
+        top: calc(12px + var(--vel-cast-bar-height, 62px)) !important;
       }
-      .vel-tv-capsule-left {
+      .vel-cast-capsule-left {
         display: flex;
         align-items: center;
         gap: 9px;
         min-width: 0;
         flex: 1;
       }
-      .vel-tv-capsule-icon-wrap {
+      .vel-cast-capsule-icon-wrap {
         width: 36px;
         height: 36px;
         flex-shrink: 0;
@@ -998,12 +1087,12 @@
         position: relative;
         color: #c4b5fd;
       }
-      .vel-tv-capsule-icon-wrap.is-streaming {
+      .vel-cast-capsule-icon-wrap.is-streaming {
         background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(16, 185, 129, 0.3));
         border-color: rgba(52, 211, 153, 0.5);
         color: #6ee7b7;
       }
-      .vel-tv-live-beacon {
+      .vel-cast-live-beacon {
         position: absolute;
         bottom: 0;
         right: 0;
@@ -1013,20 +1102,20 @@
         background: #10b981;
         border: 2px solid #0f0b21;
         box-shadow: 0 0 6px #10b981;
-        animation: velTvBeaconPulse 2s infinite ease-in-out;
+        animation: velCastBeaconPulse 2s infinite ease-in-out;
       }
-      @keyframes velTvBeaconPulse {
+      @keyframes velCastBeaconPulse {
         0%, 100% { transform: scale(1); opacity: 1; }
         50% { transform: scale(1.25); opacity: 0.6; }
       }
-      .vel-tv-capsule-meta {
+      .vel-cast-capsule-meta {
         display: flex;
         flex-direction: column;
         gap: 1px;
         min-width: 0;
         overflow: hidden;
       }
-      .vel-tv-capsule-title {
+      .vel-cast-capsule-title {
         font-size: 13.5px;
         font-weight: 800;
         color: #ffffff;
@@ -1035,7 +1124,7 @@
         text-overflow: ellipsis;
         letter-spacing: -0.01em;
       }
-      .vel-tv-capsule-sub {
+      .vel-cast-capsule-sub {
         font-size: 11px;
         font-weight: 600;
         color: #a78bfa;
@@ -1046,16 +1135,16 @@
         align-items: center;
         gap: 5px;
       }
-      .vel-tv-capsule-sub.is-idle {
+      .vel-cast-capsule-sub.is-idle {
         color: #94a3b8;
       }
-      .vel-tv-capsule-actions {
+      .vel-cast-capsule-actions {
         display: flex;
         align-items: center;
         gap: 6px;
         flex-shrink: 0;
       }
-      .vel-tv-segmented-switch {
+      .vel-cast-segmented-switch {
         display: flex;
         align-items: center;
         background: rgba(255, 255, 255, 0.07);
@@ -1064,7 +1153,7 @@
         padding: 2px;
         gap: 2px;
       }
-      .vel-tv-segment-btn {
+      .vel-cast-segment-btn {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -1078,22 +1167,22 @@
         transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
         padding: 0;
       }
-      .vel-tv-segment-btn svg {
+      .vel-cast-segment-btn svg {
         display: block;
         transition: transform 0.15s ease, stroke 0.2s ease;
       }
-      .vel-tv-segment-btn:hover {
+      .vel-cast-segment-btn:hover {
         color: rgba(255, 255, 255, 0.85);
       }
-      .vel-tv-segment-btn.is-active {
+      .vel-cast-segment-btn.is-active {
         background: rgba(255, 255, 255, 0.18);
         color: #ffffff;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
       }
-      .vel-tv-segment-btn.is-active svg {
+      .vel-cast-segment-btn.is-active svg {
         stroke-width: 2.2;
       }
-      .vel-tv-stop-btn {
+      .vel-cast-stop-btn {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -1107,17 +1196,17 @@
         transition: all 0.2s ease;
         padding: 0;
       }
-      .vel-tv-stop-btn:hover {
+      .vel-cast-stop-btn:hover {
         background: rgba(239, 68, 68, 0.4);
         border-color: #ef4444;
         color: #ffffff;
         box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
         transform: scale(1.06);
       }
-      .vel-tv-stop-btn:active {
+      .vel-cast-stop-btn:active {
         transform: scale(0.92);
       }
-      .vel-tv-stop-btn.is-stopping {
+      .vel-cast-stop-btn.is-stopping {
         opacity: 0.4;
         pointer-events: none;
       }
@@ -1131,6 +1220,7 @@
       rememberMedia: rememberMedia,
       cast: requestUniversalCast,
       stop: stopCast,
+      setDestination: setCastDestination,
       getCurrentMedia: function () {
         return state.currentMedia || normalizeMedia({});
       },
@@ -1142,6 +1232,7 @@
           phase: state.phase,
           castState: state.castState,
           sessionState: state.sessionState,
+          destinationMode: state.destinationMode,
           connected: !!session() || !!state.airPlayConnected,
           airPlay: isIosOrSafari(),
           media: state.currentMedia

@@ -689,41 +689,17 @@ body.vel-media-package-sweeping.vel-media-package-sweeping-leaving::after,
   }
 }
 
-/* Rating badge & heart button */
-.vel-vod-movie-card__rating-badge,
-.vel-home-section__rating-badge,
-.vel-prime-rating-badge,
-.vel-media-rating-badge {
-  position: absolute !important;
-  top: 7px !important;
-  right: 7px !important;
-  z-index: 6 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 3px !important;
-  padding: 2.5px 6.5px !important;
-  background: rgba(12, 12, 18, 0.82) !important;
-  -webkit-backdrop-filter: blur(8px) saturate(160%) !important;
-  backdrop-filter: blur(8px) saturate(160%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.16) !important;
-  border-radius: 6px !important;
-  color: #ffffff !important;
-  font-family: inherit !important;
-  font-size: 11px !important;
-  font-weight: 800 !important;
-  line-height: 1 !important;
-  letter-spacing: 0.02em !important;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.65), 0 0 1px rgba(0, 0, 0, 0.9) !important;
-  pointer-events: none !important;
-  user-select: none !important;
-  white-space: nowrap !important;
-  opacity: 1 !important;
-  transition: opacity 0.3s cubic-bezier(0.25, 1, 0.5, 1), transform 0.2s ease !important;
+/* Rating badge & heart button only appear when image is ready */
+.vel-vod-movie-card__rating-badge {
+  opacity: 0 !important;
+  transition: opacity 0.3s cubic-bezier(0.25, 1, 0.5, 1) !important;
+  pointer-events: none;
 }
 
-.vel-vod-movie-card__rating-badge {
-  color: #ffffff !important;
+.vel-vod-movie-card__poster.vel-image-loaded-host ~ .vel-vod-movie-card__rating-badge,
+.vel-vod-movie-card:has(.vel-image-loaded) .vel-vod-movie-card__rating-badge,
+.vel-vod-movie-card:has(.vel-image-loaded-host) .vel-vod-movie-card__rating-badge {
+  opacity: 1 !important;
 }
 
 .vel-vod-movie-card .vel-favorite-heart {
@@ -740,5 +716,4 @@ body.vel-media-package-sweeping.vel-media-package-sweeping-leaving::after,
 .vel-vod-movie-card:hover:has(.vel-image-loaded-host) .vel-favorite-heart {
   opacity: 1 !important;
 }
-
 

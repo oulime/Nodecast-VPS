@@ -234,11 +234,8 @@
   window.veloraApplyPackageCoversToDOM = applyCoversToDOM;
 
   // Initialize
-  function startSync() {
-    applyCoversToDOM();
-    setTimeout(() => {
-      loadAllCovers();
-    }, 2000);
+  document.addEventListener("DOMContentLoaded", () => {
+    loadAllCovers();
 
     const target = document.getElementById("content-view") || document.body;
     const observer = new MutationObserver(() => {
@@ -249,12 +246,11 @@
     if (document.getElementById("packages-view")) {
       observer.observe(document.getElementById("packages-view"), { childList: true, subtree: true });
     }
-  }
+  });
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", startSync, { once: true });
-  } else {
-    startSync();
+  // Start immediately if DOM already loaded
+  if (document.readyState !== "loading") {
+    loadAllCovers();
   }
 
   window.addEventListener("velora-package-covers-updated", () => {

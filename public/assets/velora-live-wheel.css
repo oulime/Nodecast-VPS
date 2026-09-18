@@ -552,7 +552,7 @@ body[data-vel-top-level="live"] #content-view {
 }
 
 /* =========================================================
-   Solid White Tile for Dark Channel Logos (Contrast Mode)
+   Solid White Tile for Channel Logos
    ========================================================= */
 .main--velora .media-item__thumb,
 .media-item__thumb {
@@ -561,8 +561,8 @@ body[data-vel-top-level="live"] #content-view {
   height: 48px;
   flex-shrink: 0;
   border-radius: 12px !important;
-  background: rgba(255, 255, 255, 0.06) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.95) !important;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25) !important;
   display: flex;
   align-items: center;
@@ -571,14 +571,6 @@ body[data-vel-top-level="live"] #content-view {
   padding: 4px !important;
   box-sizing: border-box;
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-}
-
-.main--velora .media-item__thumb.vel-dark-logo-mode,
-.media-item__thumb.vel-dark-logo-mode,
-.media-item__thumb:has(.vel-dark-logo-mode) {
-  background: #ffffff !important;
-  border: 1px solid rgba(255, 255, 255, 0.95) !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
 }
 
 .main--velora .media-item__thumb img,
@@ -598,19 +590,9 @@ body[data-vel-top-level="live"] #content-view {
 .media-item__main.selected .media-item__thumb,
 .vel-media-item-row:focus-within .media-item__thumb {
   border-color: rgba(192, 132, 252, 0.9) !important;
+  background: #ffffff !important;
   box-shadow: 0 0 10px rgba(168, 85, 247, 0.4), 0 2px 6px rgba(0, 0, 0, 0.25) !important;
   transform: scale(1.03);
-}
-
-.vel-media-item-row:hover .media-item__thumb.vel-dark-logo-mode,
-.vel-media-item-row.vel-media-item-row--active .media-item__thumb.vel-dark-logo-mode,
-.media-item__main.selected .media-item__thumb.vel-dark-logo-mode,
-.vel-media-item-row:focus-within .media-item__thumb.vel-dark-logo-mode,
-.vel-media-item-row:hover .media-item__thumb:has(.vel-dark-logo-mode),
-.vel-media-item-row.vel-media-item-row--active .media-item__thumb:has(.vel-dark-logo-mode),
-.media-item__main.selected .media-item__thumb:has(.vel-dark-logo-mode),
-.vel-media-item-row:focus-within .media-item__thumb:has(.vel-dark-logo-mode) {
-  background: #ffffff !important;
 }
 
 .vel-media-item-row:hover .media-item__thumb img,

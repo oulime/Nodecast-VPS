@@ -7,14 +7,9 @@
   const REST_BASE = "/api/velora-db/rest/v1";
   const ADULT_CONFIRMED_KEY = "velora_adult_confirmed_v1";
   const LOCAL_STORAGE_ADULT_KEY = "velora_admin_adult_packages";
-  const LOCAL_STORAGE_ADULT_HUB_IMAGES_KEY = "velora_admin_adult_hub_images";
   const ADULT_KEYWORDS = /(^|\s|[-_\[(])(xxx|xx|adult|adults|adulte|adultes|adulti|erotic|erotique|erotik|porn|porno|sexy|sex|hot|playboy|hustler|dorcel|forno|penthouse|brazzers|redlight|vivid|evilangel|mfc|chaturbate|x-rated|x\s*rated|18\+|18\s*plus|\+18)($|\s|[-_\])])/i;
 
   let assignedAdultPackages = new Map(); // key: package_id -> row
-  let adultHubImages = {
-    liveImage: "",
-    vodImage: ""
-  };
   let allCatalogPackages = [];
   let allSources = [];
   let currentAdultView = null; // null | "vod"
@@ -24,16 +19,6 @@
   let adminSourceFilter = "all";
   let adminSelectedOnly = false;
   let isAdultOpen = false;
-
-  function escapeHtml(str) {
-    if (!str) return "";
-    return String(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
 
   function makePackageKey(kind, sourceId, categoryId) {
     return `${kind}:${sourceId}:${categoryId}`;
@@ -198,80 +183,6 @@
     window.dispatchEvent(new CustomEvent("velora-adult-packages-changed"));
   }
 
-  let fetchAdultHubImagesPromise = null;
-  async function fetchAdultHubImages(forceRefresh = false) {
-    if (!forceRefresh && (adultHubImages.liveImage || adultHubImages.vodImage)) {
-      return adultHubImages;
-    }
-    if (fetchAdultHubImagesPromise) return fetchAdultHubImagesPromise;
-
-    const cached = localStorage.getItem(LOCAL_STORAGE_ADULT_HUB_IMAGES_KEY);
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        if (parsed && typeof parsed === "object") {
-          if (parsed.liveImage != null) adultHubImages.liveImage = String(parsed.liveImage).trim();
-          if (parsed.vodImage != null) adultHubImages.vodImage = String(parsed.vodImage).trim();
-        }
-      } catch (_) {}
-    }
-
-    fetchAdultHubImagesPromise = (async () => {
-      try {
-        const res = await fetch(`${REST_BASE}/admin_settings?key=eq.adult_hub_images`, {
-          headers: { "Content-Type": "application/json" }
-        });
-        if (res.ok) {
-          const rows = await res.json();
-          if (Array.isArray(rows) && rows[0] && rows[0].value) {
-            try {
-              const val = typeof rows[0].value === "string" ? JSON.parse(rows[0].value) : rows[0].value;
-              if (val && typeof val === "object") {
-                adultHubImages.liveImage = String(val.liveImage || "").trim();
-                adultHubImages.vodImage = String(val.vodImage || "").trim();
-                localStorage.setItem(LOCAL_STORAGE_ADULT_HUB_IMAGES_KEY, JSON.stringify(adultHubImages));
-              }
-            } catch (_) {}
-          }
-        }
-      } catch (err) {
-        console.warn("[Velora Adult] Notice fetching adult_hub_images:", err.message);
-      } finally {
-        fetchAdultHubImagesPromise = null;
-      }
-      return adultHubImages;
-    })();
-
-    return fetchAdultHubImagesPromise;
-  }
-
-  async function saveAdultHubImages(newImages) {
-    adultHubImages.liveImage = String(newImages.liveImage || "").trim();
-    adultHubImages.vodImage = String(newImages.vodImage || "").trim();
-    localStorage.setItem(LOCAL_STORAGE_ADULT_HUB_IMAGES_KEY, JSON.stringify(adultHubImages));
-
-    try {
-      await fetch(`${REST_BASE}/admin_settings?key=eq.adult_hub_images`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Prefer": "resolution=merge-duplicates,return=representation"
-        },
-        body: JSON.stringify({
-          key: "adult_hub_images",
-          value: JSON.stringify(adultHubImages)
-        })
-      });
-    } catch (err) {
-      console.warn("[Velora Adult] Error saving adult_hub_images:", err.message);
-    }
-
-    window.dispatchEvent(new CustomEvent("velora-adult-hub-images-changed"));
-    if (isAdultOpen) {
-      renderAdultPortal();
-    }
-  }
-
   async function fetchAllCatalogPackages() {
     try {
       const pkgMap = new Map();
@@ -433,155 +344,6 @@
     const badge = document.getElementById("vel-admin-adult-count-badge");
     const searchInput = document.getElementById("vel-admin-adult-search");
     const sourceSelect = document.getElementById("vel-admin-adult-source-select");
-
-    // Hub Images Admin Elements
-    const liveImgInput = document.getElementById("vel-admin-adult-live-img-url");
-    const liveImgFile = document.getElementById("vel-admin-adult-live-img-file");
-    const liveImgUploadBtn = document.getElementById("vel-admin-adult-live-img-upload-btn");
-    const liveImgPreview = document.getElementById("vel-admin-adult-live-img-preview");
-    const liveImgPlaceholder = document.getElementById("vel-admin-adult-live-img-placeholder");
-    const liveImgClearBtn = document.getElementById("vel-admin-adult-live-img-clear");
-
-    const vodImgInput = document.getElementById("vel-admin-adult-vod-img-url");
-    const vodImgFile = document.getElementById("vel-admin-adult-vod-img-file");
-    const vodImgUploadBtn = document.getElementById("vel-admin-adult-vod-img-upload-btn");
-    const vodImgPreview = document.getElementById("vel-admin-adult-vod-img-preview");
-    const vodImgPlaceholder = document.getElementById("vel-admin-adult-vod-img-placeholder");
-    const vodImgClearBtn = document.getElementById("vel-admin-adult-vod-img-clear");
-
-    const imagesSaveBtn = document.getElementById("vel-admin-adult-images-save-btn");
-    const imagesStatus = document.getElementById("vel-admin-adult-images-status");
-
-    function setImagesStatus(msg, isError = false) {
-      if (imagesStatus) {
-        imagesStatus.textContent = msg;
-        imagesStatus.style.color = isError ? "#fca5a5" : "#86efac";
-      }
-    }
-
-    function updateImgPreview(imgEl, placeholderEl, url) {
-      const clean = String(url || "").trim();
-      if (clean) {
-        if (imgEl) {
-          imgEl.src = clean;
-          imgEl.classList.remove("hidden");
-        }
-        if (placeholderEl) placeholderEl.classList.add("hidden");
-      } else {
-        if (imgEl) {
-          imgEl.removeAttribute("src");
-          imgEl.classList.add("hidden");
-        }
-        if (placeholderEl) placeholderEl.classList.remove("hidden");
-      }
-    }
-
-    // Populate hub images admin values
-    fetchAdultHubImages().then(imgs => {
-      if (liveImgInput) liveImgInput.value = imgs.liveImage || "";
-      if (vodImgInput) vodImgInput.value = imgs.vodImage || "";
-      updateImgPreview(liveImgPreview, liveImgPlaceholder, imgs.liveImage);
-      updateImgPreview(vodImgPreview, vodImgPlaceholder, imgs.vodImage);
-    });
-
-    if (liveImgInput) {
-      liveImgInput.oninput = () => updateImgPreview(liveImgPreview, liveImgPlaceholder, liveImgInput.value);
-    }
-    if (vodImgInput) {
-      vodImgInput.oninput = () => updateImgPreview(vodImgPreview, vodImgPlaceholder, vodImgInput.value);
-    }
-
-    if (liveImgClearBtn) {
-      liveImgClearBtn.onclick = () => {
-        if (liveImgInput) liveImgInput.value = "";
-        updateImgPreview(liveImgPreview, liveImgPlaceholder, "");
-      };
-    }
-    if (vodImgClearBtn) {
-      vodImgClearBtn.onclick = () => {
-        if (vodImgInput) vodImgInput.value = "";
-        updateImgPreview(vodImgPreview, vodImgPlaceholder, "");
-      };
-    }
-
-    async function handleImageFileUpload(file, inputEl, previewEl, placeholderEl, btnEl) {
-      if (!file) return;
-      if (file.size > 8 * 1024 * 1024) {
-        setImagesStatus("L'image ne doit pas dépasser 8 Mo.", true);
-        return;
-      }
-      if (btnEl) {
-        btnEl.disabled = true;
-        btnEl.textContent = "⏳ Envoi...";
-      }
-      setImagesStatus("Importation de l'image sur le VPS...");
-      try {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          try {
-            const dataBase64 = e.target.result;
-            const res = await fetch("/api/velora-db/upload-section-logo", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ dataBase64, fileName: file.name })
-            });
-            const json = await res.json();
-            if (!res.ok || !json.ok) throw new Error(json.error || "Erreur upload");
-            if (inputEl) inputEl.value = json.url;
-            updateImgPreview(previewEl, placeholderEl, json.url);
-            setImagesStatus("Image importée avec succès ! Pensez à enregistrer.");
-          } catch (err) {
-            setImagesStatus("Erreur d'importation : " + err.message, true);
-          } finally {
-            if (btnEl) {
-              btnEl.disabled = false;
-              btnEl.textContent = "📁 Importer (PC)";
-            }
-          }
-        };
-        reader.readAsDataURL(file);
-      } catch (err) {
-        if (btnEl) {
-          btnEl.disabled = false;
-          btnEl.textContent = "📁 Importer (PC)";
-        }
-        setImagesStatus("Impossible de lire le fichier.", true);
-      }
-    }
-
-    if (liveImgUploadBtn && liveImgFile) {
-      liveImgUploadBtn.onclick = () => liveImgFile.click();
-      liveImgFile.onchange = () => {
-        const file = liveImgFile.files && liveImgFile.files[0];
-        if (file) handleImageFileUpload(file, liveImgInput, liveImgPreview, liveImgPlaceholder, liveImgUploadBtn);
-        liveImgFile.value = "";
-      };
-    }
-
-    if (vodImgUploadBtn && vodImgFile) {
-      vodImgUploadBtn.onclick = () => vodImgFile.click();
-      vodImgFile.onchange = () => {
-        const file = vodImgFile.files && vodImgFile.files[0];
-        if (file) handleImageFileUpload(file, vodImgInput, vodImgPreview, vodImgPlaceholder, vodImgUploadBtn);
-        vodImgFile.value = "";
-      };
-    }
-
-    if (imagesSaveBtn) {
-      imagesSaveBtn.onclick = async () => {
-        imagesSaveBtn.disabled = true;
-        setImagesStatus("Enregistrement des images...");
-        const newImages = {
-          liveImage: liveImgInput ? liveImgInput.value.trim() : "",
-          vodImage: vodImgInput ? vodImgInput.value.trim() : ""
-        };
-        await saveAdultHubImages(newImages);
-        setImagesStatus("✅ Images enregistrées et appliquées avec succès !");
-        imagesSaveBtn.disabled = false;
-        setTimeout(() => setImagesStatus(""), 3500);
-      };
-    }
-
     if (!grid) return;
 
     function setStatus(msg, isError = false) {
@@ -592,7 +354,7 @@
     }
 
     setStatus("Chargement des streams et catalogues de tous les fournisseurs...");
-    await Promise.all([fetchAssignedAdultPackages(), fetchAllCatalogPackages(), fetchAdultHubImages()]);
+    await Promise.all([fetchAssignedAdultPackages(), fetchAllCatalogPackages()]);
     setStatus("");
 
     if (sourceSelect) {
@@ -848,47 +610,6 @@
   let currentAdultVodDuration = null;
   let currentAdultVodStartAt = 0;
   let currentAdultMovieMetadata = null;
-  let currentAdultVodSessionId = null;
-  let isAdultVodTranscode = false;
-  let adultVodSeekRestartInFlight = false;
-
-  async function startAdultVodTranscodeSession(url, options = {}) {
-    try {
-      const startAt = Number.isFinite(Number(options.startAt)) ? Math.max(0, Number(options.startAt)) : 0;
-      const res = await fetch("/api/transcode/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url,
-          mode: "vod",
-          startAt,
-          seekOffset: startAt,
-          duration: currentAdultVodDuration || options.duration || null,
-          metadata: currentAdultMovieMetadata || null
-        })
-      });
-      if (!res.ok) throw new Error("Transcode session failed");
-      const session = await res.json();
-      currentAdultVodSessionId = session.sessionId;
-      return session;
-    } catch (err) {
-      console.warn("[Adult VOD] Transcode session start notice:", err.message);
-      return null;
-    }
-  }
-
-  async function stopAdultVodTranscodeSession() {
-    if (currentAdultVodSessionId) {
-      const sid = currentAdultVodSessionId;
-      currentAdultVodSessionId = null;
-      try {
-        await fetch(`/api/transcode/${encodeURIComponent(sid)}`, {
-          method: "DELETE",
-          keepalive: true
-        });
-      } catch (_) {}
-    }
-  }
 
   let adultNetworkRetryCount = 0;
   let adultLastNetworkErrorTime = 0;
@@ -947,9 +668,8 @@
     };
   }
 
-  async function seekAdultVod(targetSeconds) {
+  function seekAdultVod(targetSeconds) {
     const video = document.getElementById("vel-adult-video");
-    const buffering = document.getElementById("vel-adult-player-buffering");
     if (!video) return;
 
     const totalDuration = (Number.isFinite(currentAdultVodDuration) && currentAdultVodDuration > 0)
@@ -958,39 +678,14 @@
 
     const clampedTarget = Math.max(0, Math.min(targetSeconds, totalDuration || targetSeconds));
 
-    if (isAdultVodTranscode && currentAdultVodSourceUrl) {
-      if (adultVodSeekRestartInFlight) return;
-      adultVodSeekRestartInFlight = true;
-      try {
-        if (buffering) buffering.classList.remove("hidden");
-        try { video.pause(); } catch (_) {}
-        await stopAdultVodTranscodeSession();
-        const session = await startAdultVodTranscodeSession(currentAdultVodSourceUrl, {
-          startAt: clampedTarget,
-          duration: totalDuration
-        });
-        if (session && session.playlistUrl) {
-          currentAdultVodStartAt = clampedTarget;
-          if (session.durationSeconds) currentAdultVodDuration = session.durationSeconds;
-          playAdultHlsStream(session.playlistUrl, false);
-        } else if (video.hls) {
-          video.currentTime = clampedTarget;
-        } else {
-          try { video.currentTime = clampedTarget; } catch (_) {}
-        }
-      } catch (e) {
-        console.warn("[Adult VOD] Seek error:", e);
-      } finally {
-        adultVodSeekRestartInFlight = false;
-      }
+    if (video.hls) {
+      video.currentTime = clampedTarget;
+    } else if (Number.isFinite(video.duration) && video.duration > 0) {
+      video.currentTime = clampedTarget;
     } else {
-      if (video.hls) {
+      try {
         video.currentTime = clampedTarget;
-      } else if (Number.isFinite(video.duration) && video.duration > 0) {
-        video.currentTime = clampedTarget;
-      } else {
-        try { video.currentTime = clampedTarget; } catch (_) {}
-      }
+      } catch (_) {}
     }
   }
 
@@ -1287,7 +982,7 @@
 
     container.innerHTML = `
       <div class="vel-adult-video-wrapper">
-        <video id="vel-adult-video" playsinline webkit-playsinline autopictureinpicture="true" preload="none"></video>
+        <video id="vel-adult-video" playsinline webkit-playsinline preload="none"></video>
         <div id="vel-adult-touch-overlay" class="vel-adult-touch-overlay"></div>
         <button type="button" id="vel-adult-unmute-badge" class="vel-adult-unmute-badge hidden" title="Activer le son">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
@@ -1469,6 +1164,48 @@
       }
     }
 
+    let controlsVisibleAtTapStart = null;
+    let revealOnlyTap = false;
+    let lastTapStart = 0;
+
+    function consumeTapEvent(e) {
+      if (e.cancelable) e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+    }
+
+    function rememberControlsAtTapStart(e) {
+      const touchLike = e.type === "touchstart" || e.pointerType === "touch" ||
+        e.pointerType === "pen" || (!e.pointerType && !usesHoverControls());
+      if (!touchLike) return;
+      if (!(e.target instanceof Element) || !e.target.closest("#vel-adult-player-container .vel-adult-video-wrapper")) return;
+      if (e.target.closest("button, [role='slider'], .vel-adult-center-btn, .vel-adult-tool-btn, .vel-adult-seek-track")) {
+        revealOnlyTap = false;
+        controlsVisibleAtTapStart = true;
+        return;
+      }
+      const now = Date.now();
+      if (now - lastTapStart < 80) {
+        if (revealOnlyTap) consumeTapEvent(e);
+        return;
+      }
+      lastTapStart = now;
+      controlsVisibleAtTapStart = controlsAreVisible();
+      revealOnlyTap = controlsVisibleAtTapStart !== true;
+      if (revealOnlyTap) {
+        if (video && video.muted) {
+          video.muted = false;
+          video.volume = 1;
+          syncVolumeUI();
+        }
+        showControls(true);
+        consumeTapEvent(e);
+      }
+    }
+
+    window.addEventListener("pointerdown", rememberControlsAtTapStart, true);
+    window.addEventListener("touchstart", rememberControlsAtTapStart, { capture: true, passive: false });
+
     const wrapper = container.querySelector(".vel-adult-video-wrapper");
     if (wrapper) {
       wrapper.addEventListener("mouseenter", () => {
@@ -1482,8 +1219,16 @@
       });
       wrapper.addEventListener("click", (e) => {
         if (e.target.closest("button, [role='slider'], .vel-adult-center-btn, .vel-adult-tool-btn, .vel-adult-seek-track")) {
+          revealOnlyTap = false;
           return;
         }
+        if (revealOnlyTap) {
+          revealOnlyTap = false;
+          controlsVisibleAtTapStart = null;
+          consumeTapEvent(e);
+          return;
+        }
+        e.preventDefault();
         e.stopPropagation();
         if (video && video.muted) {
           video.muted = false;
@@ -1494,12 +1239,10 @@
           showControls(true);
           return;
         }
-        if (controlsAreVisible()) {
-          hideControls();
-        } else {
-          showControls(true);
-        }
-      });
+        const shouldHide = controlsVisibleAtTapStart === true;
+        controlsVisibleAtTapStart = null;
+        if (shouldHide) hideControls(); else showControls(true);
+      }, true);
     }
 
     function togglePlay(e) {
@@ -1566,7 +1309,7 @@
       prevBtn.onclick = (e) => {
         e.stopPropagation();
         if (window._veloraAdultVodMovies && window._veloraAdultVodCurrentIndex > 0) {
-          playAdultMovieByIndex(window._veloraAdultVodCurrentIndex - 1, true);
+          playAdultMovieByIndex(window._veloraAdultVodCurrentIndex - 1);
         }
       };
     }
@@ -1575,7 +1318,7 @@
       nextBtn.onclick = (e) => {
         e.stopPropagation();
         if (window._veloraAdultVodMovies && window._veloraAdultVodCurrentIndex < window._veloraAdultVodMovies.length - 1) {
-          playAdultMovieByIndex(window._veloraAdultVodCurrentIndex + 1, true);
+          playAdultMovieByIndex(window._veloraAdultVodCurrentIndex + 1);
         }
       };
     }
@@ -1655,8 +1398,8 @@
       };
     }
 
-    let isSeeking = false;
     if (seekTrack) {
+      let isSeeking = false;
       const getPosFromEvent = (e) => {
         const rect = seekTrack.getBoundingClientRect();
         if (!rect.width) return 0;
@@ -1683,7 +1426,7 @@
         isSeeking = true;
         try { seekTrack.setPointerCapture(e.pointerId); } catch (_) {}
         const pos = getPosFromEvent(e);
-        applySeekPos(pos, false);
+        applySeekPos(pos, true);
         showControls();
       });
 
@@ -1746,7 +1489,6 @@
         if (buffering && video.currentTime > 0) {
           buffering.classList.add("hidden");
         }
-        if (isSeeking) return;
         if (!isLive && curTime && durTime && seekFill && seekHandle) {
           const displayedCurrent = currentAdultVodStartAt + (video.currentTime || 0);
           const totalDuration = (Number.isFinite(currentAdultVodDuration) && currentAdultVodDuration > 0)
@@ -1930,15 +1672,9 @@
           if (entries[0] && entries[0].isIntersecting) {
             requestAnimationFrame(() => appendNextChannelChunk());
           }
-        }, { root: itemsContainer, rootMargin: "350px 0px" });
+        }, { rootMargin: "350px 0px" });
         activeLiveSentinelObserver.observe(sentinelEl);
       }
-
-      itemsContainer.addEventListener("scroll", () => {
-        if (itemsContainer.scrollTop + itemsContainer.clientHeight >= itemsContainer.scrollHeight - 350) {
-          appendNextChannelChunk();
-        }
-      }, { passive: true });
     }
 
     let searchTimeout = null;
@@ -1956,7 +1692,7 @@
     container.appendChild(itemsContainer);
   }
 
-  async function playAdultLiveChannelByIndex(index, programmaticallyTriggered = false) {
+  async function playAdultLiveChannelByIndex(index) {
     const list = window._veloraAdultLiveChannels;
     if (!list || index < 0 || index >= list.length) return;
 
@@ -1964,11 +1700,12 @@
     const channel = list[index];
 
     const rows = document.querySelectorAll(".vel-adult-channel-row");
-    rows.forEach((row) => {
-      const isCurrent = row.dataset.index === String(index);
+    rows.forEach((row, idx) => {
+      const isCurrent = idx === index;
       row.classList.toggle("vel-adult-channel-row--active", isCurrent);
-      if (isCurrent && index > 0 && programmaticallyTriggered) {
-        try { row.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (_) {}
+      row.classList.toggle("selected", isCurrent);
+      if (isCurrent && index > 0) {
+        row.scrollIntoView({ block: "nearest", behavior: "smooth" });
       }
     });
 
@@ -2166,7 +1903,7 @@
   }
 
   let activeVodPlayToken = 0;
-  async function playAdultMovieByIndex(index, programmaticallyTriggered = false) {
+  async function playAdultMovieByIndex(index) {
     const list = window._veloraAdultVodMovies;
     if (!list || index < 0 || index >= list.length) return;
 
@@ -2178,13 +1915,14 @@
     currentAdultVodDuration = Number(movie.duration_secs || movie.duration) || null;
 
     const rows = document.querySelectorAll(".vel-adult-movie-row");
-    rows.forEach((row) => {
-      const isCurrent = row.dataset.index === String(index);
+    rows.forEach((row, idx) => {
+      const isCurrent = idx === index;
       row.classList.toggle("vel-adult-movie-row--active", isCurrent);
+      row.classList.toggle("selected", isCurrent);
       const badge = row.querySelector(".vel-adult-movie-row__playing-badge");
       if (badge) badge.style.display = isCurrent ? "inline-flex" : "none";
-      if (isCurrent && index > 0 && programmaticallyTriggered) {
-        try { row.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (_) {}
+      if (isCurrent && index > 0) {
+        row.scrollIntoView({ block: "nearest", behavior: "smooth" });
       }
     });
 
@@ -2230,55 +1968,17 @@
       finalPlayUrl = `/api/proxy/stream?url=${encodeURIComponent(directSourceUrl)}`;
     }
 
-    // Step 2: Playback matching normal VOD in VeloraVIP
+    // Step 2: Direct playback for VOD (matching normal Movies/VOD in VeloraVIP)
     const isM3u8 = /\.m3u8(\?|#|&|$)/i.test(directSourceUrl) || /[?&]container=m3u8(?:\b|$)/i.test(directSourceUrl);
-    const isSafari = (
-      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ||
-      (/Safari/i.test(navigator.userAgent) && !/Chrome|CriOS|Chromium|Android/i.test(navigator.userAgent))
-    );
-    const needsSafariTranscode = isSafari && !isM3u8 && /\.(mkv|webm|avi|mov|m4v)(\?|#|&|$)/i.test(directSourceUrl);
 
     if (video.hls && typeof video.hls.destroy === "function") {
       try { video.hls.destroy(); } catch (_) {}
       video.hls = null;
     }
 
-    await stopAdultVodTranscodeSession();
-    if (playToken !== activeVodPlayToken) return;
-
     if (isM3u8) {
-      isAdultVodTranscode = false;
-      currentAdultVodStartAt = 0;
       playAdultHlsStream(finalPlayUrl, false);
-    } else if (needsSafariTranscode) {
-      // Safari / iOS cannot play MKV natively -> start HLS transcode session
-      const session = await startAdultVodTranscodeSession(directSourceUrl, {
-        startAt: 0,
-        duration: currentAdultVodDuration
-      });
-      if (playToken !== activeVodPlayToken) return;
-      if (session && session.playlistUrl) {
-        isAdultVodTranscode = true;
-        currentAdultVodStartAt = 0;
-        if (session.durationSeconds) currentAdultVodDuration = session.durationSeconds;
-        playAdultHlsStream(session.playlistUrl, false);
-      } else {
-        isAdultVodTranscode = false;
-        video.src = finalPlayUrl;
-        video.load();
-        const p = video.play();
-        if (p && typeof p.catch === "function") {
-          p.catch(() => {
-            video.muted = true;
-            video.play().catch(e => console.warn("[Adult VOD] Autoplay fallback notice:", e));
-          });
-        }
-      }
     } else {
-      // Non-Apple devices (PC Chrome, Android, Firefox, Edge) & MP4: Direct playback matching normal VOD
-      isAdultVodTranscode = false;
-      currentAdultVodStartAt = 0;
       video.src = finalPlayUrl;
       video.load();
       const p = video.play();
@@ -2494,15 +2194,9 @@
           if (entries[0] && entries[0].isIntersecting) {
             requestAnimationFrame(() => appendNextMovieChunk());
           }
-        }, { root: itemsContainer, rootMargin: "400px 0px" });
+        }, { rootMargin: "400px 0px" });
         activeVodSentinelObserver.observe(sentinelEl);
       }
-
-      itemsContainer.addEventListener("scroll", () => {
-        if (itemsContainer.scrollTop + itemsContainer.clientHeight >= itemsContainer.scrollHeight - 350) {
-          appendNextMovieChunk();
-        }
-      }, { passive: true });
     }
 
     let searchTimeout = null;
@@ -2651,49 +2345,34 @@
     portal.setAttribute("aria-hidden", "false");
     portal.style.removeProperty("display");
 
-    await fetchAdultHubImages();
-
-    const liveImgSrc = (adultHubImages && adultHubImages.liveImage) ? adultHubImages.liveImage.trim() : "";
-    const vodImgSrc = (adultHubImages && adultHubImages.vodImage) ? adultHubImages.vodImage.trim() : "";
-
-    const liveCardInner = liveImgSrc
-      ? `<div class="vel-adult-hub-card__visual">
-           <img class="vel-adult-hub-card__img" src="${escapeHtml(liveImgSrc)}" alt="TV en Direct" loading="lazy" />
-         </div>`
-      : `<div class="vel-adult-hub-card__visual">
-           <div class="vel-adult-hub-card__fallback">
-             <div class="vel-adult-hub-card__icon">
-               <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
-             </div>
-             <h2 class="vel-adult-hub-card__title">TV en Direct</h2>
-             <p class="vel-adult-hub-card__desc">Accéder aux chaînes de télévision adultes en direct</p>
-           </div>
-         </div>`;
-
-    const vodCardInner = vodImgSrc
-      ? `<div class="vel-adult-hub-card__visual">
-           <img class="vel-adult-hub-card__img" src="${escapeHtml(vodImgSrc)}" alt="Films & VOD" loading="lazy" />
-         </div>`
-      : `<div class="vel-adult-hub-card__visual">
-           <div class="vel-adult-hub-card__fallback">
-             <div class="vel-adult-hub-card__icon">
-               <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-             </div>
-             <h2 class="vel-adult-hub-card__title">Films & VOD</h2>
-             <p class="vel-adult-hub-card__desc">Accéder au catalogue et au lecteur de films adultes</p>
-           </div>
-         </div>`;
-
     container.replaceChildren();
     container.innerHTML = `
       <div class="vel-adult-portal-hub">
         
-        <div id="vel-adult-hub-live" class="vel-adult-hub-card vel-adult-hub-card--live ${liveImgSrc ? 'has-custom-img' : ''}" role="button" tabindex="0" aria-label="Accéder à la TV Adulte en Direct">
-          ${liveCardInner}
+        <div id="vel-adult-hub-live" class="vel-adult-hub-card vel-adult-hub-card--live">
+          <div class="vel-adult-hub-card__icon">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
+          </div>
+          <div class="vel-adult-hub-card__body">
+            <h2 class="vel-adult-hub-card__title">TV en Direct</h2>
+            <p class="vel-adult-hub-card__desc">Accéder aux chaînes de télévision adultes en direct.</p>
+            <button type="button" class="vel-adult-hub-card__btn">
+              ▶ Lancer la TV en Direct
+            </button>
+          </div>
         </div>
 
-        <div id="vel-adult-hub-vod" class="vel-adult-hub-card vel-adult-hub-card--vod ${vodImgSrc ? 'has-custom-img' : ''}" role="button" tabindex="0" aria-label="Accéder aux Films & VOD Adultes">
-          ${vodCardInner}
+        <div id="vel-adult-hub-vod" class="vel-adult-hub-card vel-adult-hub-card--vod">
+          <div class="vel-adult-hub-card__icon">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          </div>
+          <div class="vel-adult-hub-card__body">
+            <h2 class="vel-adult-hub-card__title">Films & VOD</h2>
+            <p class="vel-adult-hub-card__desc">Accéder au lecteur et au catalogue des films adultes.</p>
+            <button type="button" class="vel-adult-hub-card__btn">
+              ▶ Lancer les Films (VOD)
+            </button>
+          </div>
         </div>
 
       </div>
@@ -2702,23 +2381,11 @@
     const liveCard = document.getElementById("vel-adult-hub-live");
     if (liveCard) {
       liveCard.onclick = () => openAdultLivePlayerDirectly();
-      liveCard.onkeydown = (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          openAdultLivePlayerDirectly();
-        }
-      };
     }
 
     const vodCard = document.getElementById("vel-adult-hub-vod");
     if (vodCard) {
       vodCard.onclick = () => openAdultMoviesPlayerDirectly();
-      vodCard.onkeydown = (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          openAdultMoviesPlayerDirectly();
-        }
-      };
     }
 
     // Silent background pre-warm
@@ -3448,7 +3115,7 @@
 
   function stopAllActiveStreams() {
     try {
-      stopAdultVodTranscodeSession();
+      closeAdultTranscodeSession();
     } catch (_) {}
     try {
       const videos = document.querySelectorAll("video");
@@ -3468,7 +3135,8 @@
   }
   window.veloraStopAllStreams = stopAllActiveStreams;
 
-  function closeAdultView(navigateToHome = true) {
+  function closeAdultView(navigateToHome = false) {
+    const wasAdultActive = isAdultOpen || document.body.classList.contains("vel-adult-active") || (document.body.dataset && document.body.dataset.velActiveTab === "adult");
     isAdultOpen = false;
     currentAdultView = null;
     if (activeVodSentinelObserver) {
@@ -3516,37 +3184,28 @@
     const stickyTop = document.querySelector(".vel-sticky-top");
     if (stickyTop) stickyTop.style.removeProperty("display");
 
-    if (navigateToHome) {
-      if (typeof window.veloraShowHome === "function") {
-        try { window.veloraShowHome(); } catch (_) {}
-      } else {
-        const homeLogo = document.getElementById("btn-logo-home");
-        if (homeLogo) {
-          try { homeLogo.click(); } catch (_) {}
-        }
-      }
-
+    // Only force return to home if explicitly requested (e.g. clicking the adult back button) and adult was active
+    if (navigateToHome && wasAdultActive) {
       const homePage = document.getElementById("vel-home-empty-page");
       if (homePage) {
         homePage.classList.remove("hidden");
         homePage.setAttribute("aria-hidden", "false");
         homePage.style.removeProperty("display");
       }
-      document.body.classList.add("vel-home-empty-active", "vel-home-choice-picked");
+      document.body.classList.add("vel-home-empty-active");
       document.body.dataset.velActiveTab = "home";
-      delete document.body.dataset.velTopLevel;
+      document.body.dataset.velTopLevel = "home";
 
       if (typeof window.veloraSetBottomNavActive === "function") {
         window.veloraSetBottomNavActive("home");
       }
 
-      try { document.dispatchEvent(new CustomEvent("velora-show-home")); } catch (_) {}
-      try { document.dispatchEvent(new CustomEvent("velora-return-home")); } catch (_) {}
+      document.dispatchEvent(new CustomEvent("velora-show-home"));
+      document.dispatchEvent(new CustomEvent("velora-return-home"));
     }
   }
 
   window.veloraCloseAdultView = closeAdultView;
-  window.veloraCloseAdultPortal = closeAdultView;
 
   // ---------------------------------------------------------------------------
   // Global Lifecycle & Triggers
@@ -3708,44 +3367,9 @@
     }
   });
 
-  document.addEventListener("velora-adult-hub-images-changed", () => {
-    if (isAdultOpen) {
-      renderAdultPortal();
-    }
-  });
-
-  // Synchronous hydration from localStorage on initial script load
-  try {
-    const cachedPkg = localStorage.getItem(LOCAL_STORAGE_ADULT_KEY);
-    if (cachedPkg && assignedAdultPackages.size === 0) {
-      const list = JSON.parse(cachedPkg);
-      if (Array.isArray(list)) {
-        list.forEach(r => {
-          const pkgId = String(r.package_id || r.id);
-          if (pkgId) assignedAdultPackages.set(pkgId, r);
-          if (r.kind && r.source_id && r.category_id) {
-            assignedAdultPackages.set(makePackageKey(r.kind, r.source_id, r.category_id), r);
-          }
-        });
-      }
-    }
-    const cachedImgs = localStorage.getItem(LOCAL_STORAGE_ADULT_HUB_IMAGES_KEY);
-    if (cachedImgs) {
-      const parsed = JSON.parse(cachedImgs);
-      if (parsed && typeof parsed === "object") {
-        if (parsed.liveImage != null) adultHubImages.liveImage = String(parsed.liveImage).trim();
-        if (parsed.vodImage != null) adultHubImages.vodImage = String(parsed.vodImage).trim();
-      }
-    }
-  } catch (_) {}
-
-  // Defer network sync so initial startup bandwidth is reserved for hero/home render
-  setTimeout(() => {
-    fetchAssignedAdultPackages().catch(() => {});
-    fetchAdultHubImages().catch(() => {});
-    fetchServerPinRecord().catch(() => {});
-    fetchServerAdultConfirmed().catch(() => {});
-  }, 3500);
+  fetchAssignedAdultPackages();
+  fetchServerPinRecord();
+  fetchServerAdultConfirmed();
 
   document.addEventListener("velora-show-home", () => {
     isAdultOpen = false;

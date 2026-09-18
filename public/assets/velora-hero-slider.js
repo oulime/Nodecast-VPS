@@ -34,12 +34,8 @@
       var id = window.veloraGetActiveCountryId();
       if (id) return id;
     }
-    var select = document.getElementById("country-select") || document.getElementById("home-country-select");
+    var select = document.getElementById("country-select");
     if (select && select.value) return select.value;
-    try {
-      var saved = localStorage.getItem("lumina_selected_country_id") || sessionStorage.getItem("lumina_selected_country_id");
-      if (saved) return saved;
-    } catch (_) {}
     return "default";
   }
 
@@ -303,9 +299,6 @@
         } else {
           imgEl.classList.add("is-balanced-logo");
         }
-        if (typeof window.veloraDetectDarkLogo === "function") {
-          window.veloraDetectDarkLogo(imgEl, logoWrap);
-        }
       }
 
       logoImg.onload = function() {
@@ -486,10 +479,6 @@
     activeCountryId = countryId || getActiveCountry();
     var items = await fetchHeroSliderData(activeCountryId);
     renderHeroSlider(items);
-    document.dispatchEvent(new CustomEvent("velora-hero-slider-ready"));
-    if (typeof window.veloraCheckInitialHomeReady === "function") {
-      window.veloraCheckInitialHomeReady();
-    }
   }
 
   function initHeroSlider() {
@@ -509,31 +498,16 @@
     updateHeroSliderForCountry();
 
     // Listen for Country changes
-    document.addEventListener("change", function(e) {
-      if (e.target && (e.target.id === "country-select" || e.target.id === "home-country-select")) {
+    var countrySelect = document.getElementById("country-select");
+    if (countrySelect) {
+      countrySelect.addEventListener("change", function() {
         window.setTimeout(function() {
           updateHeroSliderForCountry();
         }, 80);
-      }
-    }, true);
+      });
+    }
 
     document.addEventListener("velora-country-change", function() {
-      updateHeroSliderForCountry();
-    });
-
-    document.addEventListener("velora-country-changed", function() {
-      updateHeroSliderForCountry();
-    });
-
-    document.addEventListener("velora-countries-ready", function() {
-      updateHeroSliderForCountry();
-    });
-
-    window.addEventListener("velora-country-change", function() {
-      updateHeroSliderForCountry();
-    });
-
-    window.addEventListener("velora-countries-ready", function() {
       updateHeroSliderForCountry();
     });
 

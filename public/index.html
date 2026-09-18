@@ -76,8 +76,7 @@
               var requestUrl = new URL(typeof input === "string" ? input : input.url, window.location.href);
               var isApiRequest = requestUrl.origin === window.location.origin && requestUrl.pathname.indexOf("/api/") === 0;
               var isLoginRequest = /^\/api\/auth\/(login|setup|setup-required)$/.test(requestUrl.pathname);
-              var isTvRequest = requestUrl.pathname.indexOf("/api/tv/") === 0;
-              if (isApiRequest && !isLoginRequest && !isTvRequest && response.status === 401) redirectToLogin();
+              if (isApiRequest && !isLoginRequest && response.status === 401) redirectToLogin();
             } catch (_) { }
             return response;
           });
@@ -296,59 +295,6 @@
       window.veloraIsStartupContentReady = function (select) {
         return window.veloraIsStartupCountryReady(select);
       };
-
-      // ============================================================
-      // Smooth Central Startup Loader Dismissal Controller
-      // ============================================================
-      var startupDismissed = false;
-      var startupDismissTimer = null;
-
-      function isActualInitialHomeContentReady() {
-        var hasHero = !!document.querySelector("#velora-hero-slider-track .velora-hero-slide, #velora-hero-slider-container .velora-hero-slide, #vel-home-hero-slider .velora-hero-slide");
-        var hasHomeSections = !!document.querySelector("#vel-home-sections .vel-home-section__card");
-        var hasPrimeRows = !!document.querySelector("#vel-prime-carousels-container .UI3iHJ, #vel-prime-carousels-container [data-testid='navigation-carousel-wrapper']");
-        var hasPackages = !!document.querySelector("#packages-view .vel-package-card[data-package-id]");
-        return hasHero || hasHomeSections || hasPrimeRows || hasPackages;
-      }
-
-      window.veloraCheckInitialHomeReady = function (force) {
-        if (startupDismissed) return;
-        var select = document.getElementById("country-select");
-        var hasCountry = select && select.options && select.options.length > 0;
-        if (force || (hasCountry && isActualInitialHomeContentReady())) {
-          window.veloraDismissStartupLoader();
-        }
-      };
-
-      window.veloraDismissStartupLoader = function () {
-        if (startupDismissed) return;
-        startupDismissed = true;
-        if (startupDismissTimer) clearTimeout(startupDismissTimer);
-
-        var overlay = document.getElementById("catalog-loading-overlay");
-        if (overlay) {
-          overlay.classList.add("is-leaving");
-          setTimeout(function () {
-            overlay.classList.add("hidden");
-            overlay.classList.remove("is-leaving");
-            overlay.setAttribute("aria-hidden", "true");
-            document.body.classList.remove("vel-home-choice-loading", "vel-home-choice-catalog-pending");
-          }, 450);
-        } else {
-          document.body.classList.remove("vel-home-choice-loading", "vel-home-choice-catalog-pending");
-        }
-      };
-
-      // Safety timeout so user is never stuck indefinitely
-      startupDismissTimer = setTimeout(function () {
-        window.veloraDismissStartupLoader();
-      }, 3000);
-
-      document.addEventListener("velora-hero-slider-ready", function () { window.veloraCheckInitialHomeReady(); });
-      document.addEventListener("velora-home-country-rendered", function () { window.veloraCheckInitialHomeReady(); });
-      document.addEventListener("velora-prime-feed-rendered", function () { window.veloraCheckInitialHomeReady(); });
-      document.addEventListener("velora-packages-rendered", function () { window.veloraCheckInitialHomeReady(); });
-
       window.veloraBlockCountryPickerUntil = 0;
       window.veloraBlockCountryPickerAfterPageChange = function () {
         window.veloraBlockCountryPickerUntil = Date.now() + 900;
@@ -408,15 +354,14 @@
         if (!homeHasRealCountries(select)) return false;
         restorePersistedCountry(select);
         if (!window.veloraIsStartupContentReady(select)) return false;
+        document.body.classList.remove("vel-home-choice-loading");
+        document.body.classList.remove("vel-home-choice-catalog-pending");
         try {
           document.dispatchEvent(new CustomEvent("velora-countries-ready", {
             detail: { count: select.options.length, source: "early-dom-watchdog" }
           }));
         } catch (error) {
           /* CustomEvent may be unavailable in very old browsers. */
-        }
-        if (typeof window.veloraCheckInitialHomeReady === "function") {
-          window.veloraCheckInitialHomeReady();
         }
         return true;
       }
@@ -918,7 +863,7 @@
       pointer-events: none !important;
     }
 
-    body:not(.vel-home-choice-picked):not(.vel-home-choice-loading) #catalog-loading-overlay.hidden:not(.is-leaving),
+    body:not(.vel-home-choice-picked):not(.vel-home-choice-loading) #catalog-loading-overlay,
     body:not(.vel-home-choice-picked) #trial-countdown-root {
       display: none !important;
       visibility: hidden !important;
@@ -940,7 +885,6 @@
 
     body.vel-home-choice-loading:not(.vel-home-choice-picked) #catalog-loading-overlay {
       display: flex !important;
-      opacity: 1 !important;
       visibility: visible !important;
       pointer-events: auto !important;
     }
@@ -1623,25 +1567,26 @@
       }
     }
   </style>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20260916-pro-v1" />
-  <link rel="icon" href="/favicon.svg?v=20260916-pro-v1" sizes="any" />
+  <link rel="icon" href="/logos/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/logos/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/logos/favicon-16x16.png" />
   <link rel="apple-touch-icon" href="/logos/apple-touch-icon.png" />
   <link rel="manifest" href="/logos/site.webmanifest" />
   <meta name="theme-color" content="#0b0b0f" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet" />
-  <link href="/assets/velora-home-sections.css?v=20260915-no-dark-pill-v2" rel="stylesheet" />
+  <link href="/assets/velora-home-sections.css?v=20260909-vertical-popup-v1" rel="stylesheet" />
   <script src="/assets/local-velora-data.js?v=instant-nav-v20260821-54"></script>
-  <script defer src="/assets/velora-home-sections.js?v=20260918-random-cards-v1"></script>
-  <script defer src="/assets/velora-home-cache-fallback.js?v=20260918-random-cards-v1"></script>
-  <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=20260918-audio-fix-v2"></script>
-  <script defer src="/assets/subscription-access-guard.js?v=stream-in-use-v20260917-1"></script>
+  <script defer src="/assets/velora-home-sections.js?v=20260909-vertical-popup-v1"></script>
+  <script defer src="/assets/velora-home-cache-fallback.js?v=20260909-full-cat-v4"></script>
+  <script type="module" crossorigin src="/assets/main-JkackQV-custom-package-v7.js?v=20260911-tab-click-guard-v1"></script>
+  <script defer src="/assets/subscription-access-guard.js?v=instant-nav-v20260821-54"></script>
   <script defer src="/assets/subscription-welcome.js?v=instant-nav-v20260821-54"></script>
-  <script defer src="/assets/profile-account.js?v=instant-nav-v20260918-1"></script>
+  <script defer src="/assets/profile-account.js?v=instant-nav-v20260821-54"></script>
   <link rel="stylesheet" href="/assets/velora-favorites.css?v=white-logo-v20260911-1" />
   <script defer src="/assets/velora-favorites.js?v=20260911-search-fav-name-v5"></script>
-  <script defer src="/assets/velora-watch-history.js?v=20260918-cast-sync-v1"></script>
+  <script defer src="/assets/velora-watch-history.js?v=20260911-series-rewind-ep-v2"></script>
   <script defer src="/assets/velora-catalog-scroll-memory.js?v=20260902-scroll-memory-v6"></script>
   <script defer src="/assets/velora-cache-inventory.js?v=instant-nav-v20260821-54"></script>
   <script defer src="/assets/manual-pays-visible-memberships.js?v=instant-nav-v20260907-151"></script>
@@ -1654,14 +1599,14 @@
   <script defer src="/assets/country-switch-loader.js?v=20260902-loader-fix-v1"></script>
   <script defer src="/assets/paid-users-admin.js?v=instant-nav-v20260821-54"></script>
   <script defer src="/assets/ios-native-fullscreen.js?v=20260911-adult-fs-v1"></script>
-  <script defer src="/assets/velora-hero-slider.js?v=20260915-no-dark-pill-v2"></script>
+  <script defer src="/assets/velora-hero-slider.js?v=20260909-infinite-loop-v1"></script>
   <script defer src="/assets/velora-hero-slider-admin.js?v=20260904-hero-v12"></script>
   <link rel="stylesheet" crossorigin href="/assets/main-pspufkkb.css?v=instant-nav-v20260821-112">
   <link rel="stylesheet" href="/assets/manual-pays.css?v=instant-nav-v20260907-150">
   <link rel="stylesheet" href="/assets/manual-pays-logo-contain.css?v=instant-nav-v20260821-54">
   <link rel="stylesheet" href="/assets/parent-packages.css?v=instant-nav-v20260821-102">
   <link rel="stylesheet" href="/assets/direct-media-packages.css?v=20260830-roller-v34">
-  <link rel="stylesheet" href="/assets/velora-hero-slider.css?v=20260915-no-dark-pill-v2">
+  <link rel="stylesheet" href="/assets/velora-hero-slider.css?v=20260909-tight-gap-v2">
   <link rel="stylesheet" href="/assets/velora-hero-slider-admin.css?v=20260902-hero-v9">
   <link rel="stylesheet" href="/assets/tv-logos-admin.css?v=20260908-logos-v15">
   <script defer src="/assets/tv-logos-admin.js?v=20260908-logos-v15"></script>
@@ -1843,87 +1788,7 @@
       cursor: wait
     }
 
-    .vel-stream-superseded[hidden] {
-      display: none !important
-    }
-    .vel-stream-superseded {
-      position: fixed;
-      inset: 0;
-      z-index: 2147483600;
-      display: grid;
-      place-items: center;
-      padding: 20px;
-      background: rgba(3, 3, 8, .84);
-      backdrop-filter: blur(14px);
-    }
-    .vel-stream-superseded__card {
-      width: min(100%, 470px);
-      padding: 30px;
-      border: 1px solid rgba(255, 255, 255, .14);
-      border-radius: 24px;
-      background: linear-gradient(145deg, rgba(20, 24, 47, .98), rgba(10, 11, 18, .99));
-      box-shadow: 0 28px 90px rgba(0, 0, 0, .65);
-      color: #fff;
-      text-align: center;
-    }
-    .vel-stream-superseded__icon {
-      display: grid;
-      place-items: center;
-      width: 58px;
-      height: 58px;
-      margin: 0 auto 16px;
-      border-radius: 18px;
-      background: linear-gradient(135deg, #0284c7, #7c3aed);
-      box-shadow: 0 12px 35px rgba(124, 58, 237, .28);
-      font-size: 28px;
-    }
-    .vel-stream-superseded__eyebrow {
-      margin: 0 0 7px;
-      color: #38bdf8;
-      font-size: 11px;
-      font-weight: 900;
-      letter-spacing: .18em;
-    }
-    .vel-stream-superseded h2 {
-      margin: 0;
-      font-size: clamp(22px, 5.5vw, 30px);
-      line-height: 1.15;
-    }
-    .vel-stream-superseded__copy {
-      margin: 14px auto 20px;
-      color: rgba(255, 255, 255, .72);
-      font-size: 14px;
-      line-height: 1.55;
-    }
-    .vel-stream-superseded__actions {
-      display: grid;
-      gap: 10px;
-    }
-    .vel-stream-superseded__actions button {
-      min-height: 48px;
-      border-radius: 13px;
-      font: inherit;
-      font-weight: 800;
-      cursor: pointer;
-    }
-    .vel-stream-superseded__resume {
-      border: none;
-      background: linear-gradient(135deg, #0284c7, #7c3aed);
-      color: #fff;
-      font-weight: 900;
-      box-shadow: 0 8px 24px rgba(124, 58, 237, 0.35);
-    }
-    .vel-stream-superseded__resume:hover {
-      filter: brightness(1.1);
-    }
-    .vel-stream-superseded__close {
-      border: 0;
-      background: transparent;
-      color: rgba(255, 255, 255, .58);
-    }
-
     .vel-subscription-welcome {
-
       position: fixed;
       inset: 0;
       z-index: 2147483595;
@@ -2046,34 +1911,22 @@
       text-align: center
     }
 
-    .vel-profile-modal-top {
-      display: flex;
-      align-items: stretch;
-      gap: 10px;
-      margin-bottom: 22px;
-      width: 100%;
-    }
-
     .vel-profile-account__close {
-      position: static;
-      flex-shrink: 0;
+      position: absolute;
+      top: 14px;
+      right: 14px;
       display: grid;
       place-items: center;
-      width: 44px;
+      width: 38px;
+      height: 38px;
       padding: 0;
-      border: 1px solid rgba(255, 255, 255, .1);
-      border-radius: 13px;
-      background: rgba(255, 255, 255, .05);
-      color: rgba(255, 255, 255, .6);
-      cursor: pointer;
-      transition: all .2s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .vel-profile-account__close:hover {
-      background: rgba(239, 68, 68, .18);
-      border-color: rgba(239, 68, 68, .35);
-      color: #fca5a5;
-      transform: scale(1.04);
+      border: 1px solid rgba(255, 255, 255, .12);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, .06);
+      color: #fff;
+      font-size: 24px;
+      line-height: 1;
+      cursor: pointer
     }
 
     .vel-profile-account__avatar {
@@ -2232,296 +2085,6 @@
       color: #fca5a5
     }
 
-    /* Modal Top Tabs */
-    .vel-profile-tabs {
-      flex: 1;
-      min-width: 0;
-      display: flex;
-      align-items: center;
-      background: rgba(255, 255, 255, .04);
-      border: 1px solid rgba(255, 255, 255, .09);
-      border-radius: 13px;
-      padding: 3px;
-      gap: 3px;
-      margin: 0;
-    }
-
-    .vel-profile-tab {
-      flex: 1;
-      min-width: 0;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 7px;
-      padding: 9px 8px;
-      border-radius: 10px;
-      border: 1px solid transparent;
-      background: transparent;
-      color: rgba(255, 255, 255, .55);
-      font: inherit;
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: .15px;
-      white-space: nowrap;
-      cursor: pointer;
-      transition: all .2s cubic-bezier(0.16, 1, 0.3, 1);
-      position: relative;
-    }
-
-    .vel-profile-tab span {
-      white-space: nowrap;
-    }
-
-    .vel-profile-tab svg {
-      flex-shrink: 0;
-      opacity: .75;
-      transition: opacity .2s ease;
-    }
-
-    .vel-profile-tab:hover {
-      color: rgba(255, 255, 255, .9);
-      background: rgba(255, 255, 255, .04);
-    }
-
-    .vel-profile-tab:hover svg {
-      opacity: 1;
-    }
-
-    .vel-profile-tab.is-active {
-      background: linear-gradient(135deg, #7c3aed, #6366f1);
-      border-color: rgba(255, 255, 255, .15);
-      color: #fff;
-      font-weight: 700;
-      box-shadow: 0 4px 14px rgba(124, 58, 237, .42);
-    }
-
-    .vel-profile-tab.is-active svg {
-      opacity: 1;
-    }
-
-    .vel-profile-tab-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: #4ade80;
-      box-shadow: 0 0 8px #4ade80;
-      display: inline-block;
-      margin-left: 2px;
-    }
-    .vel-profile-tab-dot.hidden {
-      display: none !important;
-    }
-
-    .vel-profile-panel {
-      display: block;
-      width: 100%;
-      animation: velTabFadeIn .2s ease;
-    }
-    .vel-profile-panel[hidden] {
-      display: none !important;
-    }
-    @keyframes velTabFadeIn {
-      from { opacity: 0; transform: translateY(6px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Smart TV Tab Content */
-    .vel-tv-tab-box {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      text-align: center;
-      padding: 4px 0 2px;
-    }
-
-    .vel-tv-tab-hero {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .vel-tv-tab-icon-wrap {
-      width: 58px;
-      height: 58px;
-      border-radius: 19px;
-      background: linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(99, 102, 241, 0.25));
-      border: 1px solid rgba(167, 139, 250, 0.35);
-      display: grid;
-      place-items: center;
-      color: #c4b5fd;
-      box-shadow: 0 10px 25px rgba(124, 58, 237, 0.2);
-    }
-
-    .vel-tv-tab-title {
-      font-size: 20px;
-      font-weight: 800;
-      color: #ffffff;
-      margin: 0;
-    }
-
-    .vel-tv-instructions {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 16px;
-      text-align: left;
-    }
-
-    .vel-tv-step {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-    }
-
-    .vel-tv-step-num {
-      width: 24px;
-      height: 24px;
-      flex-shrink: 0;
-      border-radius: 50%;
-      background: #8b5cf6;
-      color: #fff;
-      font-size: 12px;
-      font-weight: 800;
-      display: grid;
-      place-items: center;
-      margin-top: 1px;
-    }
-
-    .vel-tv-step-text {
-      font-size: 13.5px;
-      color: #cbd5e1;
-      line-height: 1.45;
-    }
-
-    .vel-tv-url-pill {
-      display: inline-block;
-      margin-top: 6px;
-      padding: 6px 14px;
-      border-radius: 999px;
-      background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(99, 102, 241, 0.15));
-      border: 1px solid rgba(167, 139, 250, 0.4);
-      color: #a78bfa;
-      font-weight: 800;
-      font-size: 14px;
-      letter-spacing: 0.5px;
-    }
-
-    .vel-tv-pin-entry {
-      display: flex;
-      justify-content: center;
-      margin-top: 4px;
-    }
-
-    .vel-tv-pin-input {
-      width: 190px;
-      letter-spacing: 12px;
-      font-size: 32px;
-      font-weight: 800;
-      text-align: center;
-      padding: 10px 14px;
-      border-radius: 14px;
-      background: rgba(0, 0, 0, 0.45);
-      border: 2px solid rgba(167, 139, 250, 0.4);
-      color: #fff;
-      outline: none;
-      transition: all 0.2s ease;
-      font-family: inherit;
-    }
-
-    .vel-tv-pin-input:focus {
-      border-color: #a855f7;
-      box-shadow: 0 0 16px rgba(168, 85, 247, 0.45);
-      background: rgba(0, 0, 0, 0.6);
-    }
-
-    /* Connected Card */
-    .vel-tv-connected-card {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(167, 139, 250, 0.25);
-      border-radius: 18px;
-      padding: 20px;
-      text-align: left;
-    }
-
-    .vel-tv-connected-header {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-
-    .vel-tv-connected-icon {
-      width: 46px;
-      height: 46px;
-      border-radius: 14px;
-      background: rgba(34, 197, 94, 0.15);
-      border: 1px solid rgba(34, 197, 94, 0.35);
-      display: grid;
-      place-items: center;
-      flex-shrink: 0;
-      color: #4ade80;
-    }
-
-    .vel-tv-connected-meta {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .vel-tv-connected-title-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 3px;
-    }
-
-    .vel-tv-connected-title {
-      margin: 0;
-      font-size: 16px;
-      font-weight: 800;
-      color: #fff;
-    }
-
-    .vel-tv-connected-device {
-      margin: 0;
-      font-size: 13px;
-      color: #94a3b8;
-    }
-
-    .vel-tv-connected-status-desc {
-      font-size: 13px;
-      color: #cbd5e1;
-      line-height: 1.45;
-      background: rgba(255, 255, 255, 0.03);
-      border-radius: 10px;
-      padding: 10px 12px;
-      border: 1px solid rgba(255, 255, 255, 0.06);
-    }
-
-    .vel-tv-connected-actions {
-      display: flex;
-      justify-content: stretch;
-      margin-top: 4px;
-    }
-
-    .vel-tv-connected-actions .vel-profile-tv-btn--danger {
-      width: 100%;
-      min-height: 44px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      font-size: 14px;
-      font-weight: 700;
-      border-radius: 12px;
-    }
-
     @media(max-width:520px) {
       .vel-profile-account__card {
         padding: 24px 17px
@@ -2535,7 +2098,7 @@
   <link rel="stylesheet" crossorigin href="/assets/compact-media-loading.css?v=vod-contrast-shimmer-v5-20260830">
   <link rel="stylesheet" href="/assets/velora-bigscreen-performance.css?v=large-package-virtualization-v1-20260810">
   <link rel="stylesheet" href="/assets/live-package-text-cards.css?v=tv-package-flat-inner-v1-20260814">
-  <link rel="stylesheet" href="/assets/velora-live-wheel.css?v=20260915-dark-contrast-v1">
+  <link rel="stylesheet" href="/assets/velora-live-wheel.css?v=20260911-white-channel-thumb-v1">
   <link rel="stylesheet" href="/assets/pkg-hub-selector.css?v=20260830-visibility-fix-v43">
   <style>
     #settings-tab-btn-ip,
@@ -2551,31 +2114,9 @@
       display: none !important;
     }
 
-    /* Solid dark base background everywhere */
+    /* Ultra-light unified solid dark background everywhere (0% CPU/GPU overhead) */
     html,
-    body {
-      background-color: #07060b !important;
-      background-image: none !important;
-    }
-
-    body::before {
-      display: none !important;
-      content: none !important;
-    }
-
-    /* Ambient purple glow placed at the top of content ONLY for Accueil (choice portal & home page) — scrolls away into solid black */
-    .vel-home-choice,
-    .vel-home-empty-page,
-    body.vel-home-empty-active {
-      background-image:
-        radial-gradient(ellipse 850px 550px at 12% 0%, rgba(147, 51, 234, 0.22) 0%, rgba(124, 58, 237, 0.10) 30%, rgba(88, 28, 135, 0.03) 55%, transparent 70%),
-        radial-gradient(ellipse 550px 380px at 0% 0%, rgba(168, 85, 247, 0.15) 0%, rgba(139, 92, 246, 0.06) 35%, transparent 65%) !important;
-      background-attachment: local !important;
-      background-repeat: no-repeat !important;
-      background-position: top center !important;
-      background-size: 100% 550px !important;
-    }
-
+    body,
     .main--velora,
     body .main--velora,
     body[data-vel-active-tab="live"] .main--velora,
@@ -2588,8 +2129,10 @@
     body[data-vel-active-tab="home"] .main--velora,
     body[data-vel-top-level="home"] .main--velora,
     body.vel-home-empty-active .main--velora,
+    .vel-home-empty-page,
+    #vel-home-empty-page,
     body.velora-tv-mode .main--velora {
-      background-color: transparent !important;
+      background-color: #06050a !important;
       background-image: none !important;
     }
 
@@ -3572,147 +3115,37 @@
       opacity: 1 !important;
     }
 
+    .player-buffering,
     #player-container .player-buffering,
+    #vod-player-container .player-buffering,
     #player-container:fullscreen .player-buffering,
+    #vod-player-container:fullscreen .player-buffering,
     #player-container:-webkit-full-screen .player-buffering,
-    #player-container.player-container--live-fullscreen .player-buffering {
-      position: absolute !important;
-      inset: 0 !important;
-      z-index: 30 !important;
-      display: flex !important;
-      flex-direction: column !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: 0.85rem !important;
-      background: rgba(0, 0, 0, 0.55) !important;
-      backdrop-filter: blur(5px) !important;
-      -webkit-backdrop-filter: blur(5px) !important;
-      pointer-events: none !important;
-      user-select: none !important;
+    #vod-player-container:-webkit-full-screen .player-buffering,
+    #player-container.player-container--live-fullscreen .player-buffering,
+    #vod-player-container.player-container--fullscreen .player-buffering {
+      background: transparent !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
     }
 
     .player-buffering.hidden,
     #player-container .player-buffering.hidden,
+    #vod-player-container .player-buffering.hidden,
     #player-container:fullscreen .player-buffering.hidden,
+    #vod-player-container:fullscreen .player-buffering.hidden,
     #player-container:-webkit-full-screen .player-buffering.hidden,
+    #vod-player-container:-webkit-full-screen .player-buffering.hidden,
     #player-container.player-container--live-fullscreen .player-buffering.hidden,
-    #vod-player-buffering,
-    #vod-player-container .player-buffering {
+    #vod-player-container.player-container--fullscreen .player-buffering.hidden {
       display: none !important;
-    }
-
-    .player-buffering__logo-wrap {
-      --buffering-primary: #38bdf8;
-      --buffering-secondary: #818cf8;
-      --buffering-glow: rgba(56, 189, 248, 0.45);
-      position: relative;
-      width: 86px;
-      height: 86px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 22px;
-      background: radial-gradient(circle at center, rgba(24, 30, 48, 0.96), rgba(11, 15, 26, 0.98));
-      border: 1.5px solid var(--buffering-glow, rgba(56, 189, 248, 0.45));
-      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75), 0 0 35px var(--buffering-glow, rgba(56, 189, 248, 0.35));
-      padding: 12px;
-      box-sizing: border-box;
-      overflow: hidden;
-      transition: border-color 0.35s ease, box-shadow 0.35s ease;
-    }
-
-    .player-buffering__ring {
-      position: absolute;
-      inset: -2px;
-      border-radius: 24px;
-      padding: 2.5px;
-      background: conic-gradient(from 0deg, transparent 35%, var(--buffering-primary, #38bdf8) 75%, var(--buffering-secondary, #818cf8) 100%);
-      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
-      animation: vel-spin-ring 1.6s linear infinite;
-      pointer-events: none;
-    }
-
-    @keyframes vel-spin-ring {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
-    .player-buffering__logo {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.7));
-      animation: vel-logo-pulse 1.4s ease-in-out infinite alternate;
-      position: relative;
-      z-index: 2;
-    }
-
-    .player-buffering__logo.hidden {
-      display: none !important;
-    }
-
-    @keyframes vel-logo-pulse {
-      0% {
-        transform: scale(0.92);
-        opacity: 0.8;
-        filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.7)) brightness(0.95);
-      }
-      100% {
-        transform: scale(1.06);
-        opacity: 1;
-        filter: drop-shadow(0 8px 20px var(--buffering-glow, rgba(56, 189, 248, 0.6))) brightness(1.15);
-      }
-    }
-
-    .player-buffering__spinner {
-      width: 2.75rem;
-      height: 2.75rem;
-      border-radius: 50%;
-      border: 3px solid rgba(255, 255, 255, 0.15);
-      border-top-color: var(--buffering-primary, #38bdf8);
-      border-right-color: var(--buffering-secondary, #818cf8);
-      animation: vel-player-spin 0.8s cubic-bezier(0.4, 0.1, 0.2, 1) infinite;
-      box-shadow: 0 0 24px var(--buffering-glow, rgba(56, 189, 248, 0.35));
-      position: relative;
-      z-index: 2;
-    }
-
-    .player-buffering__spinner.hidden {
-      display: none !important;
-    }
-
-    @keyframes vel-player-spin {
-      to {
-        transform: rotate(360deg);
-      }
+      background: transparent !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
     }
 
     .player-buffering__label {
-      font-size: 0.85rem;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: #f1f5f9;
-      text-shadow: 0 0 14px var(--buffering-glow, rgba(56, 189, 248, 0.4)), 0 2px 10px rgba(0, 0, 0, 0.95) !important;
-      transition: text-shadow 0.35s ease;
-    }
-
-    @media (max-width: 480px) {
-      .player-buffering__logo-wrap {
-        width: 70px;
-        height: 70px;
-        border-radius: 18px;
-        padding: 9px;
-      }
-      .player-buffering__ring {
-        border-radius: 20px;
-      }
-      .player-buffering__label {
-        font-size: 0.78rem !important;
-      }
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.95), 0 0 20px rgba(0, 0, 0, 0.8) !important;
     }
 
     #player-container:fullscreen video::-webkit-media-controls,
@@ -3747,114 +3180,6 @@
       box-shadow: none !important;
       -webkit-backdrop-filter: none !important;
       backdrop-filter: none !important;
-    }
-
-    /* PPV / Live Events Offline Minimal Player Overlay */
-    .player-ppv-noevent-overlay {
-      position: absolute;
-      inset: 0;
-      z-index: 35;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 12px;
-      background: rgba(0, 0, 0, 0.72);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      pointer-events: none;
-      user-select: none;
-      box-sizing: border-box;
-    }
-
-    .player-ppv-noevent-overlay.hidden {
-      display: none !important;
-    }
-
-    .vel-ppv-card {
-      display: inline-flex;
-      align-items: center;
-      gap: 12px;
-      max-width: min(92%, 460px);
-      width: auto;
-      padding: 12px 18px;
-      background: rgba(18, 22, 34, 0.94);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 14px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-      color: #ffffff;
-      box-sizing: border-box;
-      pointer-events: auto;
-    }
-
-    .vel-ppv-icon {
-      position: relative;
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      background: rgba(56, 189, 248, 0.14);
-      border: 1px solid rgba(56, 189, 248, 0.35);
-      color: #38bdf8;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .vel-ppv-dot {
-      position: absolute;
-      top: -2px;
-      right: -2px;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background-color: #fb7185;
-      box-shadow: 0 0 6px #fb7185;
-    }
-
-    .vel-ppv-text {
-      display: flex;
-      flex-direction: column;
-      text-align: left;
-      min-width: 0;
-    }
-
-    .vel-ppv-title {
-      margin: 0;
-      font-size: 0.88rem;
-      font-weight: 700;
-      color: #ffffff;
-      line-height: 1.25;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .vel-ppv-desc {
-      margin: 2px 0 0 0;
-      font-size: 0.76rem;
-      color: #94a3b8;
-      line-height: 1.35;
-    }
-
-    @media (max-width: 480px) {
-      .vel-ppv-card {
-        padding: 9px 12px;
-        gap: 9px;
-      }
-      .vel-ppv-icon {
-        width: 30px;
-        height: 30px;
-      }
-      .vel-ppv-icon svg {
-        width: 16px;
-        height: 16px;
-      }
-      .vel-ppv-title {
-        font-size: 0.8rem;
-      }
-      .vel-ppv-desc {
-        font-size: 0.7rem;
-      }
     }
 
     /* iPhone Safari does not support fullscreen on an arbitrary container. The
@@ -4116,14 +3441,31 @@
       }
     }
 
-    .vod-frame-freeze,
-    #vod-player-buffering,
-    #vod-player-container .vod-frame-freeze,
-    #vod-player-container .player-buffering {
+    .vod-frame-freeze {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+      z-index: 2;
+      background: transparent;
+    }
+
+    .vod-frame-freeze.hidden {
       display: none !important;
-      visibility: hidden !important;
-      opacity: 0 !important;
-      pointer-events: none !important;
+    }
+
+    #vod-player-buffering {
+      display: none !important;
+    }
+
+    #vod-player-container:fullscreen .vod-frame-freeze,
+    #vod-player-container:-webkit-full-screen .vod-frame-freeze,
+    #vod-player-container.player-container--fullscreen .vod-frame-freeze {
+      width: 100vw !important;
+      height: 100vh !important;
+      object-fit: fill !important;
     }
 
     .vel-vod-center-controls .vel-vod-skip-btn svg {
@@ -6026,35 +5368,24 @@
       display: none !important;
     }
 
-    #catalog-loading-overlay.catalog-loading-overlay {
-      position: fixed !important;
-      inset: 0 !important;
-      z-index: 2147483640 !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      opacity: 1 !important;
-      visibility: visible !important;
-      pointer-events: auto !important;
-      transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.45s cubic-bezier(0.16, 1, 0.3, 1) !important;
-    }
-
-    #catalog-loading-overlay.catalog-loading-overlay.is-leaving {
-      opacity: 0 !important;
-      visibility: hidden !important;
-      pointer-events: none !important;
-    }
-
-    #catalog-loading-overlay.catalog-loading-overlay.hidden:not(.is-leaving) {
+    body:not(.vel-home-choice-loading) #catalog-loading-overlay,
+    body:not(.vel-home-choice-loading) #catalog-loading-overlay.catalog-loading-overlay,
+    body:not(.vel-home-choice-loading) #catalog-loading-overlay:not(.hidden) {
       display: none !important;
       visibility: hidden !important;
       pointer-events: none !important;
     }
 
-    /* Country transitions */
-    html.vel-country-switch-loading body.vel-country-switch-loading #catalog-loading-overlay.catalog-loading-overlay {
+    body.vel-home-choice-loading #catalog-loading-overlay.hidden {
       display: flex !important;
-      opacity: 1 !important;
+      visibility: visible !important;
+      pointer-events: auto !important;
+    }
+
+    /* Country transitions are independent from the first-visit home gate. */
+    html.vel-country-switch-loading body.vel-country-switch-loading #catalog-loading-overlay.catalog-loading-overlay,
+    html.vel-country-switch-loading body.vel-country-switch-loading #catalog-loading-overlay.catalog-loading-overlay.hidden {
+      display: flex !important;
       visibility: visible !important;
       pointer-events: auto !important;
     }
@@ -6121,11 +5452,6 @@
             data-settings-tab="logos" aria-selected="false" aria-controls="settings-tab-logos" tabindex="-1"
             onclick="if(window.veloraShowLogosTab){window.veloraShowLogosTab();}else if(window.veloraLogosAdmin&amp;&amp;window.veloraLogosAdmin.showLogosTab){window.veloraLogosAdmin.showLogosTab();}else{document.querySelectorAll('#settings-tabs .settings-tabs__tab').forEach(function(b){b.classList.remove('settings-tabs__tab--active');b.setAttribute('aria-selected','false');});this.classList.add('settings-tabs__tab--active');this.setAttribute('aria-selected','true');document.querySelectorAll('.settings-tab-panel').forEach(function(p){p.classList.add('hidden');p.hidden=true;});var lp=document.getElementById('settings-tab-logos');if(lp){lp.classList.remove('hidden');lp.hidden=false;}}">
             ✨ Logos TV
-          </button>
-          <button type="button" role="tab" id="settings-tab-btn-football" class="settings-tabs__tab"
-            data-settings-tab="football" aria-selected="false" aria-controls="settings-tab-football" tabindex="-1"
-            onclick="if(window.veloraShowFootballTab){window.veloraShowFootballTab();}else if(window.veloraFootballAdmin&amp;&amp;window.veloraFootballAdmin.showFootballTab){window.veloraFootballAdmin.showFootballTab();}">
-            ⚽ Football
           </button>
           <button type="button" role="tab" id="settings-tab-btn-adult" class="settings-tabs__tab"
             data-settings-tab="adult" aria-selected="false" aria-controls="settings-tab-adult" tabindex="-1">
@@ -6328,7 +5654,8 @@
               </h3>
               <p class="hint"
                 style="margin-top:0; margin-bottom:0.75rem; font-size:0.8rem; color:var(--text-secondary,#cbd5e1);">
-                Définit le temps de visionnage minimum requis lors du <strong>premier visionnage</strong> avant qu'un film ou une série n'apparaisse dans le rail « Continuer de regarder » (par défaut : 3 minutes). Si le contenu est déjà présent dans le rail, les mises à jour de progression sont immédiates.
+                Définit le temps de visionnage minimum requis avant qu'un film ou épisode n'apparaisse dans le rail «
+                Continuer de regarder » (par défaut : 3 minutes).
               </p>
               <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
                 <div style="display:flex; align-items:center; gap:0.5rem;">
@@ -6660,9 +5987,6 @@
                   <div class="vel-home-content-dialog__list-header">
                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                       <strong id="home-section-content-count">0 élément(s)</strong>
-                      <button type="button" id="home-section-content-sync-pkg-btn" class="vel-home-content-enrich-btn"
-                        style="background: rgba(59, 130, 246, 0.2); border-color: rgba(59, 130, 246, 0.4);"
-                        title="Recharger et synchroniser la liste exacte des médias actuels du package fournisseur">🔄 Synchroniser depuis le package</button>
                       <button type="button" id="home-section-content-enrich-btn" class="vel-home-content-enrich-btn"
                         title="Rechercher et associer automatiquement les visuels manquants (Fanart.tv / TMDB)">✨
                         Récupérer visuels Fanart / TMDB</button>
@@ -7261,333 +6585,13 @@
             </dialog>
           </section>
 
-          <section id="settings-tab-football" class="settings-tab-panel panel countries-admin-form vel-foot-admin-panel hidden"
-            role="tabpanel" aria-labelledby="settings-tab-btn-football" data-settings-tab="football" hidden>
-            <div class="vel-foot-header">
-              <div>
-                <h2><span>⚽</span> Mappage des Chaînes Football</h2>
-                <p>Associez les diffuseurs officiels des matchs aux chaînes IPTV de votre bouquet pour chaque pays ou région (ex: <code>Canal+</code> &rarr; <code>Canal+ Sport</code>, <code>Canal+ Foot</code>).</p>
-              </div>
-              <div class="vel-foot-actions-top">
-                <button id="foot-btn-load-defaults" type="button" class="vel-foot-btn vel-foot-btn-secondary"
-                  title="Charger les règles recommandées pour le pays actif">
-                  ✨ Règles recommandées
-                </button>
-                <button id="foot-btn-copy-rules" type="button" class="vel-foot-btn vel-foot-btn-secondary"
-                  title="Copier les règles configurées depuis un autre pays">
-                  📋 Copier d'un pays
-                </button>
-                <button id="foot-btn-open-json" type="button" class="vel-foot-btn vel-foot-btn-secondary"
-                  title="Afficher et modifier directement le format JSON brut">
-                  📝 Éditeur JSON
-                </button>
-              </div>
-            </div>
-
-            <!-- Barre de sélection du Pays (Synchronisée avec l'onglet Pays) -->
-            <!-- Barre de sélection du Pays (Synchronisée avec l'onglet Pays) -->
-            <div class="vel-foot-country-bar" id="foot-country-bar">
-              <div class="vel-foot-country-bar-label">
-                <span>🌍</span>
-                <strong>Pays du bouquet :</strong>
-              </div>
-              <div class="vel-foot-country-pills" id="foot-country-pills">
-                <!-- Rempli dynamiquement avec les pays visibles configurés dans l'onglet Pays -->
-              </div>
-            </div>
-
-            <!-- Options & Activation du Football pour le pays actif -->
-            <div class="vel-foot-country-options-card" id="foot-country-options-card" style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: 0.85rem; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);">
-              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
-                <div style="display: flex; align-items: center; gap: 0.65rem;">
-                  <span id="foot-opt-country-flag" style="font-size: 1.4rem;">🇫🇷</span>
-                  <div>
-                    <strong id="foot-opt-country-name" style="font-size: 1.05rem; color: #f8fafc;">France</strong>
-                    <div style="font-size: 0.8rem; color: #94a3b8;">État et paramètres du module Football pour ce pays</div>
-                  </div>
-                </div>
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                  <label for="foot-country-enabled-switch" style="display: inline-flex; align-items: center; gap: 0.6rem; cursor: pointer; font-weight: 700; font-size: 0.88rem; color: #fff;">
-                    <span>Activer le Football pour ce pays :</span>
-                    <input type="checkbox" id="foot-country-enabled-switch" style="width: 1.25rem; height: 1.25rem; accent-color: #10b981; cursor: pointer;" />
-                    <span id="foot-country-enabled-status-badge" style="font-size: 0.76rem; padding: 0.2rem 0.6rem; border-radius: 9999px; font-weight: 800; background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4);">🔴 Désactivé (Par défaut)</span>
-                  </label>
-                </div>
-              </div>
-
-              <div style="display: flex; flex-direction: column; gap: 0.4rem; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.75rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-                  <label for="foot-country-ignored-channels-input" style="font-size: 0.8rem; font-weight: 700; color: #cbd5e1; text-transform: uppercase; letter-spacing: 0.04em;">
-                    🚫 Chaînes à ignorer pour ce pays (séparées par des virgules ou retours à la ligne)
-                  </label>
-                  <button type="button" id="foot-btn-save-country-options" class="vel-foot-btn vel-foot-btn-primary vel-foot-btn-sm" onclick="window.veloraFootballAdmin && window.veloraFootballAdmin.saveActiveCountryOptions()">💾 Enregistrer les options du pays</button>
-                </div>
-                <textarea id="foot-country-ignored-channels-input" class="vel-foot-textarea" rows="2" placeholder="ex: TOD, beIN Sports MAX 7, DAZN 2 (Ces chaînes ne seront pas prises en compte pour ce pays lors de la récupération des données de l'API)"></textarea>
-                <span style="font-size: 0.75rem; color: #94a3b8;">💡 Si une chaîne est listée ici, elle sera automatiquement ignorée et exclue des données API pour <span id="foot-opt-country-hint-name">ce pays</span>.</span>
-              </div>
-            </div>
-
-            <p id="football-admin-status" class="vel-foot-status" aria-live="polite"></p>
-
-            <div class="vel-foot-cards-grid">
-              <!-- Formulaire d'ajout / modification -->
-              <div class="vel-foot-card" id="foot-map-form-card">
-                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
-                  <h3><span>➕</span> Ajouter / Modifier un Mappage</h3>
-                  <div style="display:flex; align-items:center; gap:0.5rem;">
-                    <label for="foot-form-country-select" style="font-size:0.8rem; font-weight:700; color:#94a3b8;">Pays cible :</label>
-                    <select id="foot-form-country-select" class="vel-foot-select" style="padding:0.3rem 0.6rem; font-size:0.82rem; font-weight:700; border-color:#3b82f6; background:rgba(15,23,42,0.9);">
-                      <!-- Rempli dynamiquement avec les pays visibles -->
-                    </select>
-                  </div>
-                </div>
-                <p class="desc">Associez un diffuseur et/ou une compétition à des packages IPTV prioritaires et/ou des mots-clés de chaînes.</p>
-                <form id="foot-map-form" onsubmit="window.veloraFootballAdmin && window.veloraFootballAdmin.handleSubmit(event); return false;">
-                  <div class="vel-foot-form-group">
-                    <label for="foot-map-competition">Compétition (Optionnel)</label>
-                    <input type="text" id="foot-map-competition" list="foot-competition-datalist" class="vel-foot-input" placeholder="🌐 Toutes les compétitions (Par défaut) ou ex: Ligue 1" autocomplete="off" />
-                    <datalist id="foot-competition-datalist">
-                      <option value="_all">🌐 Toutes les compétitions (Par défaut)</option>
-                      <!-- Compétitions européennes & Internationales de clubs -->
-                      <option value="UEFA Champions League">🏆 UEFA Champions League</option>
-                      <option value="UEFA Europa League">🏆 UEFA Europa League</option>
-                      <option value="UEFA Conference League">🏆 UEFA Conference League</option>
-                      <option value="UEFA Super Cup">🏆 UEFA Super Cup</option>
-                      <option value="Copa Libertadores">🏆 Copa Libertadores</option>
-                      <option value="Copa Sudamericana">🏆 Copa Sudamericana</option>
-                      <option value="CAF Champions League">🏆 CAF Champions League</option>
-                      <option value="AFC Champions League">🏆 AFC Champions League</option>
-                      <!-- Angleterre -->
-                      <option value="Premier League">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option>
-                      <option value="Carabao Cup">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Carabao Cup (League Cup)</option>
-                      <option value="FA Cup">🏴󠁧󠁢󠁥󠁮󠁧󠁿 FA Cup</option>
-                      <option value="Championship">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Championship</option>
-                      <option value="Community Shield">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Community Shield</option>
-                      <!-- France -->
-                      <option value="Ligue 1">🇫🇷 Ligue 1</option>
-                      <option value="Coupe de France">🇫🇷 Coupe de France</option>
-                      <option value="Trophée des Champions">🇫🇷 Trophée des Champions</option>
-                      <option value="Ligue 2">🇫🇷 Ligue 2</option>
-                      <!-- Espagne -->
-                      <option value="La Liga">🇪🇸 La Liga</option>
-                      <option value="Copa del Rey">🇪🇸 Copa del Rey</option>
-                      <option value="Supercopa de España">🇪🇸 Supercopa de España</option>
-                      <option value="LaLiga Hypermotion">🇪🇸 LaLiga Hypermotion (Segunda)</option>
-                      <!-- Italie -->
-                      <option value="Serie A">🇮🇹 Serie A</option>
-                      <option value="Coppa Italia">🇮🇹 Coppa Italia</option>
-                      <option value="Supercoppa Italiana">🇮🇹 Supercoppa Italiana</option>
-                      <option value="Serie B">🇮🇹 Serie B</option>
-                      <!-- Allemagne -->
-                      <option value="Bundesliga">🇩🇪 Bundesliga</option>
-                      <option value="DFB-Pokal">🇩🇪 DFB-Pokal</option>
-                      <option value="DFL-Supercup">🇩🇪 DFL-Supercup</option>
-                      <option value="2. Bundesliga">🇩🇪 2. Bundesliga</option>
-                      <!-- Autres championnats -->
-                      <option value="Liga Portugal">🇵🇹 Liga Portugal</option>
-                      <option value="Eredivisie">🇳🇱 Eredivisie (Pays-Bas)</option>
-                      <option value="Jupiler Pro League">🇧🇪 Jupiler Pro League (Belgique)</option>
-                      <option value="Süper Lig">🇹🇷 Süper Lig (Turquie)</option>
-                      <option value="Saudi Pro League">🇸🇦 Saudi Pro League</option>
-                      <option value="Botola Pro">🇲🇦 Botola Pro (Maroc)</option>
-                      <option value="Ligue 1 Mobilis">🇩🇿 Ligue 1 Mobilis (Algérie)</option>
-                      <option value="Ligue 1 Professionnelle">🇹🇳 Ligue 1 Professionnelle (Tunisie)</option>
-                      <option value="Egyptian Premier League">🇪🇬 Egyptian Premier League</option>
-                      <option value="Brasileirão Serie A">🇧🇷 Brasileirão Serie A</option>
-                      <option value="Primera División">🇦🇷 Primera División (Argentine)</option>
-                      <option value="MLS">🇺🇸 MLS (Major League Soccer)</option>
-                      <option value="Scottish Premiership">🏴󠁧󠁢󠁳󠁣󠁴󠁿 Scottish Premiership</option>
-                      <!-- Sélections nationales & Tournois Internationaux -->
-                      <option value="Coupe du Monde FIFA">🌍 Coupe du Monde FIFA</option>
-                      <option value="Éliminatoires Coupe du Monde">🌍 Éliminatoires Coupe du Monde</option>
-                      <option value="UEFA Euro">🇪🇺 UEFA Euro</option>
-                      <option value="Éliminatoires Euro">🇪🇺 Éliminatoires Euro</option>
-                      <option value="Coupe d'Afrique des Nations (CAN)">🌍 Coupe d'Afrique des Nations (CAN)</option>
-                      <option value="Éliminatoires CAN">🌍 Éliminatoires CAN</option>
-                      <option value="Ligue des Nations UEFA">🇪🇺 Ligue des Nations UEFA</option>
-                      <option value="CONCACAF Nations League">🌎 CONCACAF Nations League</option>
-                      <option value="Copa América">🌎 Copa América</option>
-                      <option value="Coupe d'Asie des Nations">🌏 Coupe d'Asie des Nations (AFC)</option>
-                      <option value="Coupe Arabe de la FIFA">🌍 Coupe Arabe de la FIFA</option>
-                      <option value="Gold Cup">🌎 CONCACAF Gold Cup</option>
-                      <option value="Match Amical International">🌐 Match Amical International</option>
-                      <option value="Tournoi Olympique">🏅 Tournoi Olympique (JO)</option>
-                    </datalist>
-                  </div>
-
-                  <div class="vel-foot-form-group" style="margin-top: 0.5rem;">
-                    <label for="foot-map-key">Nom chaîne du match (diffuseur)</label>
-                    <input type="text" id="foot-map-key" class="vel-foot-input" placeholder="ex: Canal+ ou beIN Sports 1" required autocomplete="off" />
-                  </div>
-
-                  <div class="vel-foot-form-group" style="margin-top: 0.5rem;">
-                    <label for="foot-map-pkg-input">Package(s) de chaînes IPTV prioritaires (Optionnel)</label>
-                    <div class="vel-foot-pkg-picker-wrap">
-                      <div id="foot-map-selected-packages" class="vel-foot-selected-tags"></div>
-                      <div style="display:flex; gap:0.4rem; margin-top:0.35rem;">
-                        <input type="text" id="foot-map-pkg-input" list="foot-packages-datalist" class="vel-foot-input" style="flex:1;" placeholder="Choisir ou taper un package (ex: FR | CANAL+, FR | SPORTS)..." autocomplete="off" />
-                        <button type="button" id="foot-map-pkg-add-btn" class="vel-foot-btn vel-foot-btn-secondary vel-foot-btn-sm" onclick="window.veloraFootballAdmin &amp;&amp; window.veloraFootballAdmin.addPackageTag()">➕ Ajouter package</button>
-                      </div>
-                      <datalist id="foot-packages-datalist">
-                        <!-- Rempli dynamiquement avec les packages Live du pays -->
-                      </datalist>
-                    </div>
-                    <span style="font-size:0.75rem; color:#94a3b8; margin-top:0.2rem;">💡 Si configuré, toutes les chaînes de ces packages seront listées dans le tiroir TV au clic sur le match (avec priorité aux chaînes des packages).</span>
-                  </div>
-
-                  <div class="vel-foot-form-group" style="margin-top: 0.5rem;">
-                    <label for="foot-map-aliases">Mots-clés de recherche / Alias de chaînes (séparés par des virgules)</label>
-                    <input type="text" id="foot-map-aliases" class="vel-foot-input" placeholder="ex: Canal+ Sport, Canal+ Foot, Canal+ 360" autocomplete="off" />
-                    <span style="font-size:0.75rem; color:#94a3b8; margin-top:0.2rem;">Permet de cibler la chaîne précise qui démarrera automatiquement.</span>
-                  </div>
-
-                  <div class="vel-foot-form-actions">
-                    <button type="button" id="foot-map-submit-btn" class="vel-foot-btn vel-foot-btn-primary" onclick="window.veloraFootballAdmin && window.veloraFootballAdmin.handleSubmit(event)">➕ Ajouter la règle</button>
-                    <button type="button" id="foot-map-reset-btn" class="vel-foot-btn vel-foot-btn-secondary" onclick="window.veloraFootballAdmin && window.veloraFootballAdmin.resetForm()">Réinitialiser</button>
-                  </div>
-                </form>
-              </div>
-
-              <!-- Testeur en direct -->
-              <div class="vel-foot-card">
-                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem;">
-                  <h3><span>🧪</span> Testeur de Correspondance</h3>
-                  <select id="foot-test-country-select" class="vel-foot-select" style="padding:0.25rem 0.6rem; font-size:0.8rem;" aria-label="Pays pour le test">
-                    <!-- Rempli dynamiquement -->
-                  </select>
-                </div>
-                <p class="desc">Testez la résolution d'une chaîne et d'une compétition pour voir les packages et mots-clés qui seront déclenchés.</p>
-                
-                <div class="vel-foot-form-group">
-                  <label for="foot-test-comp">Compétition du test (Optionnel)</label>
-                  <input type="text" id="foot-test-comp" list="foot-competition-datalist" class="vel-foot-input" placeholder="ex: Ligue 1, Premier League ou laisser vide" autocomplete="off" />
-                </div>
-
-                <div class="vel-foot-form-group" style="margin-top: 0.4rem;">
-                  <label for="foot-test-input">Chaîne diffuseur à tester</label>
-                  <input type="text" id="foot-test-input" class="vel-foot-input" placeholder="Tapez ex: Canal+, beIN 1, Sky Sports, DAZN..." autocomplete="off" />
-                </div>
-
-                <div id="foot-test-results" class="vel-foot-test-box" style="margin-top: 0.5rem;">
-                  <span class="vel-foot-test-hint">Entrez le nom d'un diffuseur pour tester le résultat.</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Tableau des règles actives -->
-            <div class="vel-foot-table-wrap">
-              <div class="vel-foot-table-header">
-                <div>
-                  <h3 style="margin:0; font-size:1rem; font-weight:800;">📋 Règles Actives</h3>
-                  <span id="foot-mappings-count" style="font-size:0.8rem; color:#94a3b8;">0 règle configurée</span>
-                </div>
-                <input type="search" id="foot-mappings-search" class="vel-foot-input vel-foot-search-input" placeholder="Filtrer les règles..." autocomplete="off" />
-              </div>
-              <div style="overflow-x: auto;">
-                <table class="vel-foot-table">
-                  <thead>
-                    <tr>
-                      <th style="width: 20%;">Chaîne Match</th>
-                      <th style="width: 18%;">Compétition</th>
-                      <th style="width: 25%;">Packages Prioritaires</th>
-                      <th style="width: 25%;">Mots-clés / Alias</th>
-                      <th style="width: 12%; text-align: right;">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="foot-mappings-tbody">
-                    <tr><td colspan="5" class="vel-foot-empty">Chargement des règles...</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <!-- Dialogue Éditeur JSON -->
-            <dialog id="foot-json-dialog" class="vel-foot-json-dialog">
-              <h3 style="margin-top:0;">📝 Éditeur JSON des Mappages Football</h3>
-              <div class="vel-foot-json-tabs">
-                <button type="button" id="foot-json-tab-country" class="vel-foot-json-tab-btn is-active">Pays actif</button>
-                <button type="button" id="foot-json-tab-all" class="vel-foot-json-tab-btn">🌐 Tous les pays (Multi-pays complet)</button>
-              </div>
-              <p style="font-size:0.82rem; color:#94a3b8; margin-bottom:0.75rem;">
-                Format étendu : <code>[ { "channel": "Canal+", "competition": "_all", "packages": ["FR | CANAL+"], "aliases": ["Canal+ Sport"] } ]</code>.
-              </p>
-              <textarea id="foot-json-textarea" class="vel-foot-textarea" rows="14" style="width:100%; box-sizing:border-box; font-family:monospace; font-size:0.85rem;"></textarea>
-              <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1rem;">
-                <button id="foot-json-cancel" type="button" class="vel-foot-btn vel-foot-btn-secondary">Annuler</button>
-                <button id="foot-json-save" type="button" class="vel-foot-btn vel-foot-btn-primary">💾 Enregistrer le JSON</button>
-              </div>
-            </dialog>
-          </section>
-
           <section id="settings-tab-adult" class="settings-tab-panel panel countries-admin-form hidden" role="tabpanel"
             aria-labelledby="settings-tab-btn-adult" data-settings-tab="adult" hidden>
             <div
               style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-              <h2>🔞 Gestion de la Section Adulte +18</h2>
+              <h2>🔞 Gestion des Bouquets Adulte +18</h2>
               <span id="vel-admin-adult-count-badge" class="vel-admin-adult-badge">0 bouquet(s) activé(s)</span>
             </div>
-
-            <!-- Bannières Images du Portail Adulte -->
-            <div class="vel-admin-adult-hub-images-section">
-              <div class="vel-admin-adult-images-header">
-                <h3>🖼️ Images d'Accueil du Portail Adulte</h3>
-                <p class="countries-admin-intro" style="margin: 4px 0 12px;">
-                  Personnalisez les deux bannières cliquables (TV en Direct & Films/VOD) affichées à l'entrée du portail Adulte.
-                </p>
-              </div>
-              <div class="vel-admin-adult-images-grid">
-                <!-- TV Direct Image Card -->
-                <div class="vel-admin-adult-image-card">
-                  <div class="vel-admin-adult-image-title-row">
-                    <strong>📺 Bannière TV en Direct</strong>
-                    <button type="button" id="vel-admin-adult-live-img-clear" class="vel-admin-img-clear-btn" title="Effacer cette image">✕</button>
-                  </div>
-                  <div class="vel-admin-adult-image-preview-wrap">
-                    <img id="vel-admin-adult-live-img-preview" class="vel-admin-adult-image-preview hidden" alt="Aperçu TV Direct" />
-                    <div id="vel-admin-adult-live-img-placeholder" class="vel-admin-adult-image-placeholder">
-                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
-                      <span>Aucune image configurée (visuel par défaut)</span>
-                    </div>
-                  </div>
-                  <div class="vel-admin-adult-image-controls">
-                    <input type="text" id="vel-admin-adult-live-img-url" class="admin-add-package-dialog__input" placeholder="URL image (https://... ou /uploads/...)" autocomplete="off" />
-                    <input type="file" id="vel-admin-adult-live-img-file" accept="image/*" style="display:none;" />
-                    <button type="button" id="vel-admin-adult-live-img-upload-btn" class="countries-admin-cancel" style="white-space:nowrap;">📁 Importer (PC)</button>
-                  </div>
-                </div>
-
-                <!-- Films & VOD Image Card -->
-                <div class="vel-admin-adult-image-card">
-                  <div class="vel-admin-adult-image-title-row">
-                    <strong>🎬 Bannière Films & VOD</strong>
-                    <button type="button" id="vel-admin-adult-vod-img-clear" class="vel-admin-img-clear-btn" title="Effacer cette image">✕</button>
-                  </div>
-                  <div class="vel-admin-adult-image-preview-wrap">
-                    <img id="vel-admin-adult-vod-img-preview" class="vel-admin-adult-image-preview hidden" alt="Aperçu Films & VOD" />
-                    <div id="vel-admin-adult-vod-img-placeholder" class="vel-admin-adult-image-placeholder">
-                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                      <span>Aucune image configurée (visuel par défaut)</span>
-                    </div>
-                  </div>
-                  <div class="vel-admin-adult-image-controls">
-                    <input type="text" id="vel-admin-adult-vod-img-url" class="admin-add-package-dialog__input" placeholder="URL image (https://... ou /uploads/...)" autocomplete="off" />
-                    <input type="file" id="vel-admin-adult-vod-img-file" accept="image/*" style="display:none;" />
-                    <button type="button" id="vel-admin-adult-vod-img-upload-btn" class="countries-admin-cancel" style="white-space:nowrap;">📁 Importer (PC)</button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="vel-admin-adult-images-actions">
-                <button type="button" id="vel-admin-adult-images-save-btn" class="vel-btn-subtle" style="background: rgba(225, 29, 72, 0.25); border: 1px solid rgba(225, 29, 72, 0.55); font-weight: 700; color: #fff; padding: 7px 18px;">
-                  💾 Enregistrer les Images
-                </button>
-                <span id="vel-admin-adult-images-status" class="status" style="margin: 0;"></span>
-              </div>
-            </div>
-
-            <hr style="border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 20px 0 16px;" />
-
-            <h3 style="margin: 0 0 6px; font-size: 1.05rem;">📦 Bouquets TV & VOD Adulte +18</h3>
             <p class="countries-admin-intro" style="margin-top: 0">
               Sélectionnez les bouquets (TV en direct, Films ou Séries de tous vos fournisseurs) à inclure dans la
               section <strong>Adulte +18</strong>.
@@ -7860,15 +6864,11 @@
             <div class="video-wrapper">
               <video id="video" playsinline webkit-playsinline x5-playsinline="true" x5-video-player-type="h5-page"
                 x5-video-player-fullscreen="false" x5-video-orientation="landscape"
-                controlslist="nofullscreen nodownload noplaybackrate" autopictureinpicture="true" preload="auto"
+                controlslist="nofullscreen nodownload noplaybackrate" disablepictureinpicture preload="auto"
                 crossorigin="anonymous"></video>
               <div id="player-buffering" class="player-buffering hidden" aria-hidden="true" role="status"
                 aria-live="polite" aria-label="Chargement de la lecture">
-                <div class="player-buffering__logo-wrap">
-                  <div class="player-buffering__ring" aria-hidden="true"></div>
-                  <img id="player-buffering-logo" class="player-buffering__logo hidden" alt="Logo chaîne" src="" />
-                  <div id="player-buffering-fallback-spinner" class="player-buffering__spinner" aria-hidden="true"></div>
-                </div>
+                <div class="player-buffering__spinner" aria-hidden="true"></div>
                 <span class="player-buffering__label">Chargement…</span>
               </div>
               <div id="live-controls-overlay" class="live-controls-overlay hidden" aria-hidden="true">
@@ -7894,24 +6894,6 @@
                     tabindex="0" data-tv-focusable="true"></button>
                 </div>
               </div>
-              <div id="player-ppv-noevent-overlay" class="player-ppv-noevent-overlay hidden" aria-hidden="true">
-                <div class="vel-ppv-card">
-                  <div class="vel-ppv-icon">
-                    <span class="vel-ppv-dot"></span>
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M4.93 4.93a10 10 0 0 0 0 14.14"/>
-                      <path d="M7.76 7.76a6 6 0 0 0 0 8.48"/>
-                      <circle cx="12" cy="12" r="2.5" fill="currentColor"/>
-                      <path d="M16.24 7.76a6 6 0 0 1 0 8.48"/>
-                      <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-                    </svg>
-                  </div>
-                  <div class="vel-ppv-text">
-                    <h4 id="vel-ppv-channel-name" class="vel-ppv-title">Chaîne événementielle (PPV)</h4>
-                    <p class="vel-ppv-desc">Aucun événement en cours de diffusion pour le moment.</p>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -7926,11 +6908,14 @@
             <div class="video-wrapper">
               <video id="video-vod" playsinline webkit-playsinline x5-playsinline="true" x5-video-player-type="h5-page"
                 x5-video-player-fullscreen="false" x5-video-orientation="landscape"
-                controlslist="nofullscreen nodownload noremoteplayback" autopictureinpicture="true" disableremoteplayback
+                controlslist="nofullscreen nodownload noremoteplayback" disablepictureinpicture disableremoteplayback
                 preload="auto" crossorigin="anonymous"></video>
-              <canvas id="vod-frame-freeze" class="vod-frame-freeze hidden" aria-hidden="true" style="display:none !important;"></canvas>
+              <canvas id="vod-frame-freeze" class="vod-frame-freeze hidden" aria-hidden="true"></canvas>
               <div id="vod-player-buffering" class="player-buffering hidden" aria-hidden="true" role="status"
-                aria-live="polite" aria-label="Chargement du film" style="display:none !important;"></div>
+                aria-live="polite" aria-label="Chargement du film">
+                <div class="player-buffering__spinner" aria-hidden="true"></div>
+                <span class="player-buffering__label">Chargement…</span>
+              </div>
               <div id="vod-center-controls" class="vel-vod-center-controls hidden" aria-hidden="true">
                 <button id="vod-ctl-back-10" type="button" class="vel-vod-center-btn vel-vod-skip-btn"
                   aria-label="Reculer de 10 secondes" title="−10 secondes" tabindex="0" data-tv-focusable="true">
@@ -8011,7 +6996,7 @@
           <section id="vel-home-empty-page" class="vel-home-empty-page" aria-label="Accueil">
             <div class="vel-home-header">
               <div class="vel-home-brand" aria-label="VeloraVIP">
-                <img class="vel-home-brand__icon" src="/logos/velora-brand-icon.svg" alt="" width="52"
+                <img class="vel-home-brand__icon" src="/logos/android-chrome-192x192.png" alt="" width="52"
                   height="52" />
                 <span class="vel-home-brand__name">Velora<span>VIP</span></span>
               </div>
@@ -8040,7 +7025,7 @@
             <div class="vel-adult-header">
               <div class="vel-adult-header__left">
                 <button type="button" id="btn-adult-back-home" class="vel-adult-back-btn" title="Retour à l'accueil"
-                  onclick="if(typeof window.veloraCloseAdultPortal==='function'){window.veloraCloseAdultPortal(true);}else if(typeof window.veloraCloseAdultView==='function'){window.veloraCloseAdultView(true);}else if(typeof window.veloraShowHome==='function'){window.veloraShowHome();}else{var h=document.getElementById('btn-logo-home');if(h){h.click();}else{document.dispatchEvent(new CustomEvent('velora-return-home'));}}">
+                  onclick="if(window.veloraCloseAdultPortal){window.veloraCloseAdultPortal();}else if(window.veloraCloseAdultView){window.veloraCloseAdultView();}else{document.getElementById('adult-view').classList.add('hidden');document.body.classList.remove('vel-adult-active');var h=document.getElementById('vel-home-empty-page');if(h){h.classList.remove('hidden');h.style.removeProperty('display');}document.body.classList.add('vel-home-empty-active');document.dispatchEvent(new CustomEvent('velora-return-home'));}">
                   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2">
                     <path d="M19 12H5M12 19l-7-7 7-7" />
                   </svg>
@@ -8069,38 +7054,36 @@
 
             <div id="vel-adult-packages-container" class="vel-adult-packages-container">
               <div class="vel-adult-portal-hub">
-                <div id="vel-adult-hub-live" class="vel-adult-hub-card vel-adult-hub-card--live" role="button" tabindex="0"
-                  aria-label="Accéder à la TV Adulte en Direct"
+                <div id="vel-adult-hub-live" class="vel-adult-hub-card vel-adult-hub-card--live"
                   onclick="if(window.veloraOpenAdultLiveDirectly)window.veloraOpenAdultLiveDirectly();">
-                  <div class="vel-adult-hub-card__visual">
-                    <img id="vel-adult-hub-live-img" class="vel-adult-hub-card__img hidden" alt="TV en Direct" />
-                    <div id="vel-adult-hub-live-fallback" class="vel-adult-hub-card__fallback">
-                      <div class="vel-adult-hub-card__icon">
-                        <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
-                          <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
-                          <polyline points="17 2 12 7 7 2"></polyline>
-                        </svg>
-                      </div>
-                      <h2 class="vel-adult-hub-card__title">TV en Direct</h2>
-                      <p class="vel-adult-hub-card__desc">Accéder aux chaînes de télévision adultes en direct</p>
-                    </div>
+                  <div class="vel-adult-hub-card__icon">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+                      <polyline points="17 2 12 7 7 2"></polyline>
+                    </svg>
+                  </div>
+                  <div class="vel-adult-hub-card__body">
+                    <h2 class="vel-adult-hub-card__title">TV en Direct</h2>
+                    <p class="vel-adult-hub-card__desc">Accéder aux chaînes de télévision adultes en direct.</p>
+                    <button type="button" id="btn-launch-adult-live" class="vel-adult-hub-card__btn">
+                      ▶ Lancer la TV en Direct
+                    </button>
                   </div>
                 </div>
 
-                <div id="vel-adult-hub-vod" class="vel-adult-hub-card vel-adult-hub-card--vod" role="button" tabindex="0"
-                  aria-label="Accéder aux Films & VOD Adultes"
+                <div id="vel-adult-hub-vod" class="vel-adult-hub-card vel-adult-hub-card--vod"
                   onclick="if(window.veloraOpenAdultMoviesDirectly)window.veloraOpenAdultMoviesDirectly();">
-                  <div class="vel-adult-hub-card__visual">
-                    <img id="vel-adult-hub-vod-img" class="vel-adult-hub-card__img hidden" alt="Films & VOD" />
-                    <div id="vel-adult-hub-vod-fallback" class="vel-adult-hub-card__fallback">
-                      <div class="vel-adult-hub-card__icon">
-                        <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
-                          <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                        </svg>
-                      </div>
-                      <h2 class="vel-adult-hub-card__title">Films & VOD</h2>
-                      <p class="vel-adult-hub-card__desc">Accéder au catalogue et au lecteur de films adultes</p>
-                    </div>
+                  <div class="vel-adult-hub-card__icon">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                  </div>
+                  <div class="vel-adult-hub-card__body">
+                    <h2 class="vel-adult-hub-card__title">Films & VOD</h2>
+                    <p class="vel-adult-hub-card__desc">Accéder au lecteur et au catalogue des films adultes.</p>
+                    <button type="button" id="btn-launch-adult-vod" class="vel-adult-hub-card__btn">
+                      ▶ Lancer les Films (VOD)
+                    </button>
                   </div>
                 </div>
               </div>
@@ -8195,17 +7178,17 @@
             </button>
             <button type="button" class="vel-global-search__tab" data-tab-filter="movies" role="tab"
               aria-selected="false">
-              <span class="vel-global-search__tab-label">🎬<span class="vel-tab-text"> Films</span></span>
+              <span class="vel-global-search__tab-label">🎬 Films</span>
               <span class="vel-global-search__tab-count" data-count-for="movies">0</span>
             </button>
             <button type="button" class="vel-global-search__tab" data-tab-filter="series" role="tab"
               aria-selected="false">
-              <span class="vel-global-search__tab-label">🍿<span class="vel-tab-text"> Séries</span></span>
+              <span class="vel-global-search__tab-label">🍿 Séries</span>
               <span class="vel-global-search__tab-count" data-count-for="series">0</span>
             </button>
             <button type="button" class="vel-global-search__tab" data-tab-filter="live" role="tab"
               aria-selected="false">
-              <span class="vel-global-search__tab-label">📺<span class="vel-tab-text"> Chaînes</span></span>
+              <span class="vel-global-search__tab-label">📺 Chaînes</span>
               <span class="vel-global-search__tab-count" data-count-for="live">0</span>
             </button>
           </div>
@@ -8782,9 +7765,8 @@
           typeof window.veloraIsStartupContentReady !== "function" ||
           window.veloraIsStartupContentReady(main)
         ) {
-          if (typeof window.veloraCheckInitialHomeReady === "function") {
-            window.veloraCheckInitialHomeReady();
-          }
+          document.body.classList.remove("vel-home-choice-loading");
+          document.body.classList.remove("vel-home-choice-catalog-pending");
         }
         return true;
       }
@@ -8909,20 +7891,16 @@
         }
 
         function hasPackageCards() {
-          var hasHero = !!document.querySelector("#velora-hero-slider-track .velora-hero-slide, #velora-hero-slider-container .velora-hero-slide, #vel-home-hero-slider .velora-hero-slide");
-          var hasHomeSections = !!document.querySelector("#vel-home-sections .vel-home-section__card");
-          var hasPrimeRows = !!document.querySelector("#vel-prime-carousels-container .UI3iHJ, #vel-prime-carousels-container [data-testid='navigation-carousel-wrapper']");
-          var hasPackages = !!document.querySelector("#packages-view .vel-package-card[data-package-id]");
-          return hasHero || hasHomeSections || hasPrimeRows || hasPackages;
+          var view = document.getElementById("packages-view");
+          var hasPackages = !!(view && view.querySelector(".vel-package-card[data-package-id]"));
+          var hasHomeFeed = !!(document.getElementById("vel-home-empty-page") || document.querySelector(".vel-prime-row-card") || document.getElementById("vel-prime-carousels-container"));
+          return hasPackages || hasHomeFeed;
         }
 
         function showHomeChoiceWhenReady() {
           if (document.body.classList.contains("vel-home-choice-picked")) {
-            if (typeof window.veloraDismissStartupLoader === "function") {
-              window.veloraDismissStartupLoader();
-            } else {
-              document.body.classList.remove("vel-home-choice-loading", "vel-home-choice-catalog-pending");
-            }
+            document.body.classList.remove("vel-home-choice-loading");
+            document.body.classList.remove("vel-home-choice-catalog-pending");
             return;
           }
 
@@ -8941,10 +7919,9 @@
             if (finished) return;
             finished = true;
             syncHomeCountryOptions();
-            if (typeof window.veloraDismissStartupLoader === "function") {
-              window.veloraDismissStartupLoader();
-            } else if (!document.body.classList.contains("vel-home-choice-picked")) {
-              document.body.classList.remove("vel-home-choice-loading", "vel-home-choice-catalog-pending");
+            if (!document.body.classList.contains("vel-home-choice-picked")) {
+              document.body.classList.remove("vel-home-choice-loading");
+              document.body.classList.remove("vel-home-choice-catalog-pending");
               window.scrollTo(0, 0);
             }
             if (readyTimer) window.clearTimeout(readyTimer);
@@ -8969,7 +7946,7 @@
             if (hasCountriesReady()) {
               window.setTimeout(function () {
                 finish();
-              }, 60);
+              }, 90);
               return;
             }
             if (Date.now() - started >= maxWait) {
@@ -9494,14 +8471,14 @@
             stopHomeMediaPlayback();
             homeChoiceRunId += 1;
             delete document.body.dataset.velTopLevel;
-            document.body.dataset.velActiveTab = "home";
+            delete document.body.dataset.velActiveTab;
             var homePage = document.getElementById("vel-home-empty-page");
             if (homePage) {
               homePage.classList.remove("hidden");
               homePage.setAttribute("aria-hidden", "false");
               homePage.style.removeProperty("display");
             }
-            ["content-view", "packages-view", "adult-view", "player-container", "vod-player-container", "now-playing", "now-playing-vod"].forEach(function (id) {
+            ["content-view", "packages-view", "adult-view"].forEach(function (id) {
               var view = document.getElementById(id);
               if (view) {
                 view.classList.add("hidden");
@@ -9517,11 +8494,7 @@
               "pkg-wheel-modal-open",
               "vel-vod-detail-active",
               "vel-netflix-modal-open",
-              "main--velora-series-detail-themed",
-              "body--velora-live-package",
-              "vel-favorites-open",
-              "vel-favorites-player-active",
-              "is-locked"
+              "main--velora-series-detail-themed"
             );
             var pkgModal = document.getElementById("vel-pkg-modal");
             if (pkgModal) pkgModal.classList.remove("is-open");
@@ -9530,62 +8503,23 @@
             var dl = document.getElementById("dynamic-list");
             if (dl) dl.classList.remove("item-list--vod-film-detail");
 
-            var banner = document.getElementById("vel-live-match-banner") || document.getElementById("velora-match-banner");
-            if (banner) banner.remove();
-
-            if (typeof window.veloraCleanupAllMedia === "function") {
-              try { window.veloraCleanupAllMedia(); } catch (_) { }
-            }
-            if (typeof window.veloraStopAllPlayback === "function") {
-              try { window.veloraStopAllPlayback(); } catch (_) { }
-            }
-            if (typeof window.veloraStopLive === "function") {
-              try { window.veloraStopLive(); } catch (_) { }
-            }
-            if (typeof window.veloraStopVod === "function") {
-              try { window.veloraStopVod(); } catch (_) { }
-            }
-
             delete document.body.dataset.veloraReturnAdult;
             delete document.body.dataset.veloraReturnFavorites;
             delete window._veloraFavoriteReturnTab;
             delete document.body.dataset.veloraReturnHome;
-            delete document.body.dataset.veloraSearchMediaOpen;
             document.body.classList.add("vel-home-choice-picked");
             document.body.classList.add("vel-home-empty-active");
-
-            document.documentElement.style.removeProperty("overflow");
-            document.documentElement.style.removeProperty("overflow-y");
-            document.documentElement.style.removeProperty("height");
-            document.body.style.removeProperty("overflow");
-            document.body.style.removeProperty("overflow-y");
-            document.body.style.removeProperty("height");
             var main = document.querySelector(".main--velora");
             if (main) {
-              main.classList.remove("main--velora-in-package", "main--velora-live-package", "main--velora-adult");
+              main.classList.remove("main--velora-in-package", "main--velora-live-package");
               main.scrollTop = 0;
-              main.style.removeProperty("overflow");
-              main.style.removeProperty("overflow-y");
-              main.style.removeProperty("height");
-            }
-            var app = document.querySelector(".app");
-            if (app) {
-              app.scrollTop = 0;
-              app.style.removeProperty("overflow");
-              app.style.removeProperty("overflow-y");
-              app.style.removeProperty("height");
             }
             window.scrollTo(0, 0);
-
             document.querySelectorAll("[data-bottom-nav]").forEach(function (button) {
               var active = button.getAttribute("data-bottom-nav") === "home";
               button.classList.toggle("is-active", active);
               if (active) button.setAttribute("aria-current", "page");
               else button.removeAttribute("aria-current");
-            });
-            document.querySelectorAll(".nav-item, .nav-link, [data-nav-view]").forEach(function (el) {
-              var isHome = el.id === "btn-header-home" || el.id === "btn-home" || el.getAttribute("data-nav-view") === "home";
-              el.classList.toggle("active", isHome);
             });
             try {
               document.dispatchEvent(new CustomEvent("velora-return-home"));
@@ -9673,13 +8607,7 @@
               });
               var contextTitle = document.getElementById("vel-header-context-title-text");
               if (contextTitle) contextTitle.textContent = "";
-              if (favoriteTab === "search") {
-                if (typeof window.veloraShowHome === "function") {
-                  window.veloraShowHome();
-                } else {
-                  document.dispatchEvent(new CustomEvent("velora-show-home"));
-                }
-              } else if (typeof window.veloraStopAndReturnFavorites === "function") {
+              if (typeof window.veloraStopAndReturnFavorites === "function") {
                 window.veloraStopAndReturnFavorites(favoriteTab);
               } else {
                 document.dispatchEvent(new CustomEvent("velora-return-favorites", {
@@ -9690,11 +8618,7 @@
             }
             if (document.body.dataset.veloraReturnHome === "true") {
               delete document.body.dataset.veloraReturnHome;
-              var curTab = document.body.dataset.velActiveTab;
-              var isHomeActive = !curTab || curTab === "home" || document.body.classList.contains("vel-home-empty-active");
-              if (isHomeActive) {
-                document.dispatchEvent(new CustomEvent("velora-return-home"));
-              }
+              document.dispatchEvent(new CustomEvent("velora-return-home"));
             }
           });
         });
@@ -9721,13 +8645,7 @@
             delete window._veloraFavoriteReturnTab;
             delete document.body.dataset.veloraReturnAdult;
             delete document.body.dataset.veloraReturnHome;
-            if (favoriteTab === "search") {
-              if (typeof window.veloraShowHome === "function") {
-                window.veloraShowHome();
-              } else {
-                document.dispatchEvent(new CustomEvent("velora-show-home"));
-              }
-            } else if (typeof window.veloraStopAndReturnFavorites === "function") {
+            if (typeof window.veloraStopAndReturnFavorites === "function") {
               window.veloraStopAndReturnFavorites(favoriteTab);
             } else {
               document.dispatchEvent(new CustomEvent("velora-return-favorites", {
@@ -9736,6 +8654,7 @@
             }
           }
         }, true);
+      }
 
       var headerContextTitle = document.getElementById("vel-header-context-title");
       var headerContextTitleText = document.getElementById("vel-header-context-title-text");
@@ -12676,14 +11595,8 @@
         }
 
         function setSearchLoading(loading) {
-          if (status) {
-            status.classList.toggle("is-loading", !!loading);
-          }
-          var submitBtn = form ? form.querySelector(".vel-global-search__submit") : null;
-          if (submitBtn) {
-            submitBtn.classList.toggle("is-loading", !!loading);
-            submitBtn.setAttribute("aria-busy", loading ? "true" : "false");
-          }
+          if (!status) return;
+          status.classList.toggle("is-loading", !!loading);
         }
 
         function updateSearchPlaceholder() {
@@ -13050,62 +11963,6 @@
           window.addEventListener("mouseup", onPointerUp);
         }
 
-        function escapeSearchHtml(str) {
-          return String(str || "").replace(/[&<>"']/g, function (m) {
-            return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m];
-          });
-        }
-
-        function renderSearchLoading(query) {
-          results.replaceChildren();
-          if (filterTabs) filterTabs.classList.add("hidden");
-
-          var wrap = document.createElement("div");
-          wrap.className = "vel-global-search__loading-view";
-          wrap.setAttribute("role", "status");
-          wrap.setAttribute("aria-live", "polite");
-
-          var cleanQ = String(query || "").trim();
-
-          wrap.innerHTML =
-            '<div class="vel-search-loader">' +
-              '<div class="vel-search-loader__visual">' +
-                '<div class="vel-search-loader__halo"></div>' +
-                '<div class="vel-search-loader__spinner"></div>' +
-                '<div class="vel-search-loader__icon" aria-hidden="true">' +
-                  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
-                    '<circle cx="11" cy="11" r="8"></circle>' +
-                    '<line x1="21" y1="21" x2="16.65" y2="16.65"></line>' +
-                  '</svg>' +
-                '</div>' +
-              '</div>' +
-              '<div class="vel-search-loader__text-wrap">' +
-                '<div class="vel-search-loader__badge">' +
-                  '<span class="vel-search-loader__pulse-dot"></span>' +
-                  '<span>EXPLORATION DU CATALOGUE</span>' +
-                '</div>' +
-                '<span class="vel-search-loader__label">' +
-                  'Recherche ' + (cleanQ ? 'de « <strong>' + escapeSearchHtml(cleanQ) + '</strong> »' : 'en cours') +
-                  '<span class="vel-search-loader__dots"><i></i><i></i><i></i></span>' +
-                '</span>' +
-                '<span class="vel-search-loader__sublabel">Scan en direct des films, séries et chaînes TV...</span>' +
-              '</div>' +
-            '</div>' +
-            '<div class="vel-search-skeleton-grid" aria-hidden="true">' +
-              [0, 1, 2, 3, 4, 5, 6, 7].map(function () {
-                return '<div class="vel-search-skeleton-card">' +
-                  '<div class="vel-search-skeleton-poster"></div>' +
-                  '<div class="vel-search-skeleton-body">' +
-                    '<div class="vel-search-skeleton-line vel-search-skeleton-line--title"></div>' +
-                    '<div class="vel-search-skeleton-line vel-search-skeleton-line--meta"></div>' +
-                  '</div>' +
-                '</div>';
-              }).join("") +
-            '</div>';
-
-          results.appendChild(wrap);
-        }
-
         function renderSuggestions() {
           results.replaceChildren();
           if (filterTabs) filterTabs.classList.add("hidden");
@@ -13430,8 +12287,7 @@
                 var grid = document.createElement("div");
                 grid.className = "vel-global-search__grid vel-global-search__grid--channels";
 
-                var defaultLiveLimit = currentFilterTab === "all" ? 5 : 10;
-                var currentLimit = getSectionLimit("live", defaultLiveLimit);
+                var currentLimit = getSectionLimit("live", 10);
                 var visibleItems = section.items.slice(0, currentLimit);
                 visibleItems.forEach(function (item) {
                   grid.appendChild(createResultButton(item, country, section.key));
@@ -13440,8 +12296,7 @@
 
                 if (section.items.length > currentLimit) {
                   var remaining = section.items.length - currentLimit;
-                  var step = currentFilterTab === "all" ? 5 : 10;
-                  group.appendChild(createLoadMoreButton("live", remaining, step, "Voir plus de chaînes"));
+                  group.appendChild(createLoadMoreButton("live", remaining, 10, "Voir plus de chaînes"));
                 }
               } else if (!isExpanded && currentFilterTab === "all") {
                 // VOD Slider Mode with Touch Swipe, Arrow Controls, and "Tout voir" end card
@@ -13561,7 +12416,6 @@
           }
           setStatus("Recherche en direct...", "RECHERCHE");
           setSearchLoading(true);
-          renderSearchLoading(query);
 
           function applyPayload(payload, loading) {
             if (thisRun !== runId) return;
@@ -13591,9 +12445,6 @@
             } else {
               setStatus(loading ? "Exploration du catalogue " + country + "..." : "Aucun résultat dans " + country, loading ? "SCAN" : "0");
             }
-            if (loading && totalCount === 0) {
-              return;
-            }
             if (loading && results.querySelector(".vel-global-search__result[data-search-result-id]")) {
               lastSearchPayload = filteredPayload;
               lastSearchQuery = query;
@@ -13614,7 +12465,7 @@
             if (thisRun !== runId) return;
             setSearchLoading(false);
             setStatus("Recherche momentanément indisponible.", "ERREUR");
-            clearResults("Une erreur est survenue lors de la recherche. Veuillez réessayer.");
+            clearResults("");
           });
         }
 
@@ -13675,18 +12526,6 @@
 
         var suppressTouchSearchCloseUntil = 0;
 
-        function resetFilterToAll() {
-          currentFilterTab = "all";
-          sectionLimits = {};
-          if (filterTabs) {
-            filterTabs.querySelectorAll(".vel-global-search__tab").forEach(function (t) {
-              var isAll = (t.dataset.tabFilter || "all") === "all";
-              t.classList.toggle("is-active", isAll);
-              t.setAttribute("aria-selected", isAll ? "true" : "false");
-            });
-          }
-        }
-
         function openSearch(event) {
           if (event) {
             if (typeof event.preventDefault === "function") event.preventDefault();
@@ -13699,7 +12538,6 @@
             primeSearchBtn.classList.add("is-hidden");
             primeSearchBtn.style.setProperty("display", "none", "important");
           }
-          resetFilterToAll();
           updateSearchPlaceholder();
           dialog.classList.remove("hidden");
           dialog.setAttribute("aria-hidden", "false");
@@ -13707,8 +12545,6 @@
           syncClearButton();
           if (!input.value.trim() && (!lastSearchPayload || !lastSearchPayload.sections)) {
             renderSuggestions();
-          } else if (lastSearchPayload && lastSearchQuery) {
-            renderResults(lastSearchPayload, lastSearchQuery);
           }
           window.setTimeout(function () {
             input.focus();
@@ -13719,7 +12555,6 @@
           if (Date.now() < suppressTouchSearchCloseUntil) return;
           runId += 1;
           deferredSearchUpdate = null;
-          resetFilterToAll();
           document.body.classList.remove("vel-search-open");
           var primeSearchBtn = document.getElementById("vel-prime-search-btn");
           if (primeSearchBtn) {
@@ -13780,7 +12615,6 @@
             input.value = "";
             syncClearButton();
             handleSearchInput();
-            resetFilterToAll();
             input.focus();
           });
         }
@@ -13791,7 +12625,6 @@
             if (!tabBtn || tabBtn.classList.contains("is-disabled")) return;
             var filter = tabBtn.dataset.tabFilter || "all";
             currentFilterTab = filter;
-            sectionLimits = {};
             filterTabs.querySelectorAll(".vel-global-search__tab").forEach(function (t) {
               var isActive = t === tabBtn;
               t.classList.toggle("is-active", isActive);
@@ -13807,19 +12640,16 @@
         input.addEventListener("keydown", function (event) {
           if (event.key !== "Enter") return;
           event.preventDefault();
-          resetFilterToAll();
           runSearch();
         });
         form.addEventListener("submit", function (event) {
           event.preventDefault();
-          resetFilterToAll();
           runSearch();
         });
         var submitBtn = form.querySelector(".vel-global-search__submit");
         if (submitBtn) {
           submitBtn.addEventListener("click", function (event) {
             event.preventDefault();
-            resetFilterToAll();
             runSearch();
           });
         }
@@ -13846,8 +12676,7 @@
             var secKey = loadMoreBtn.dataset.loadMoreSection;
             var step = parseInt(loadMoreBtn.dataset.loadMoreStep, 10) || 12;
             if (secKey) {
-              var defaultSecLimit = secKey === "live" ? (currentFilterTab === "all" ? 5 : 10) : (secKey === "general" ? 24 : 18);
-              var current = sectionLimits[secKey] || defaultSecLimit;
+              var current = sectionLimits[secKey] || (secKey === "live" ? 10 : (secKey === "general" ? 24 : 18));
               sectionLimits[secKey] = current + step;
               if (lastSearchPayload && lastSearchQuery) {
                 renderResults(lastSearchPayload, lastSearchQuery);
@@ -14102,12 +12931,10 @@
         video.setAttribute("x5-video-player-type", "h5-page");
         video.setAttribute("x5-video-player-fullscreen", "false");
         video.setAttribute("controlslist", "nofullscreen nodownload noplaybackrate");
-        video.removeAttribute("disablepictureinpicture");
-        video.setAttribute("autopictureinpicture", "true");
+        video.setAttribute("disablepictureinpicture", "");
         video.removeAttribute("disableremoteplayback");
         try {
-          video.disablePictureInPicture = false;
-          video.autoPictureInPicture = true;
+          video.disablePictureInPicture = true;
         } catch (err) { }
         try {
           video.disableRemotePlayback = false;
@@ -14261,10 +13088,7 @@
             if (target) target.click();
             window.setTimeout(syncEpisodeButtons, 0);
           });
-          return true;
         }
-
-        window.veloraPlayAdjacentEpisode = playAdjacent;
 
         previousButton.addEventListener("click", function (event) {
           event.preventDefault();
@@ -14350,7 +13174,16 @@
         var freezeCanvas = document.getElementById("vod-frame-freeze");
 
         function freezeVodFrame() {
-          return;
+          try {
+            if (!freezeCanvas || !video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return;
+            freezeCanvas.width = video.videoWidth;
+            freezeCanvas.height = video.videoHeight;
+            var ctx = freezeCanvas.getContext("2d");
+            if (ctx) {
+              ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+              freezeCanvas.classList.remove("hidden");
+            }
+          } catch (e) { }
         }
 
         function unfreezeVodFrame() {
@@ -14962,18 +13795,18 @@
       min-height: 66px;
       display: grid;
       grid-template-columns: repeat(6, minmax(0, 1fr));
-      gap: 4px;
+      gap: 3px;
       padding: 7px;
-      border: 1px solid rgba(168, 85, 247, 0.42);
+      border: 1px solid rgba(151, 135, 255, 0.28);
       border-radius: 22px;
       background:
-        linear-gradient(135deg, rgba(24, 18, 52, 0.96) 0%, rgba(10, 8, 24, 0.98) 100%);
+        linear-gradient(135deg, rgba(28, 24, 56, 0.93), rgba(8, 12, 29, 0.96));
       box-shadow:
-        0 22px 60px rgba(0, 0, 0, 0.85),
-        0 0 35px rgba(139, 92, 246, 0.28),
-        inset 0 1px 1px rgba(255, 255, 255, 0.16);
-      -webkit-backdrop-filter: blur(28px) saturate(160%);
-      backdrop-filter: blur(28px) saturate(160%);
+        0 20px 55px rgba(0, 0, 0, 0.48),
+        0 0 28px rgba(109, 77, 255, 0.13),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      -webkit-backdrop-filter: blur(22px) saturate(145%);
+      backdrop-filter: blur(22px) saturate(145%);
       transform: translateX(-50%);
       transition: opacity 180ms ease, transform 180ms ease, visibility 180ms ease;
     }
@@ -14990,32 +13823,32 @@
       padding: 4px 2px;
       border: 0;
       border-radius: 15px;
-      color: rgba(226, 232, 240, 0.72);
+      color: rgba(222, 222, 244, 0.66);
       background: transparent;
       font: inherit;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
-      transition: color 180ms ease, background 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+      transition: color 160ms ease, background 160ms ease, transform 160ms ease;
     }
 
     .vel-bottom-nav__button::before {
       content: "";
       position: absolute;
       top: 2px;
-      width: 26px;
-      height: 2.5px;
+      width: 24px;
+      height: 2px;
       border-radius: 999px;
-      background: linear-gradient(90deg, #c084fc, #f472b6);
-      box-shadow: 0 0 12px #c084fc, 0 0 4px #f472b6;
+      background: linear-gradient(90deg, #f59e0b, #fde68a);
+      box-shadow: 0 0 12px rgba(245, 158, 11, 0.8);
       opacity: 0;
       transform: scaleX(0.4);
-      transition: opacity 180ms ease, transform 180ms ease;
+      transition: opacity 160ms ease, transform 160ms ease;
     }
 
     .vel-bottom-nav__button:hover,
     .vel-bottom-nav__button:focus-visible {
-      color: #ffffff;
-      background: rgba(168, 85, 247, 0.18);
+      color: #fff;
+      background: rgba(125, 92, 255, 0.12);
       outline: none;
     }
 
@@ -15024,9 +13857,9 @@
     }
 
     .vel-bottom-nav__button.is-active {
-      color: #ffffff;
-      background: linear-gradient(135deg, rgba(147, 51, 234, 0.38) 0%, rgba(217, 70, 239, 0.24) 100%);
-      box-shadow: inset 0 0 0 1px rgba(216, 180, 254, 0.45), 0 4px 18px rgba(147, 51, 234, 0.45);
+      color: #fff7ed;
+      background: linear-gradient(145deg, rgba(245, 158, 11, 0.34), rgba(251, 191, 36, 0.16));
+      box-shadow: inset 0 0 0 1px rgba(253, 230, 138, 0.18), 0 5px 15px rgba(120, 53, 15, 0.2);
     }
 
     .vel-bottom-nav__button.is-active::before {
@@ -15036,13 +13869,7 @@
 
     .vel-bottom-nav__button.is-active .vel-bottom-nav__icon,
     .vel-bottom-nav__button.is-active .vel-bottom-nav__icon-frame {
-      filter: drop-shadow(0 0 10px rgba(192, 132, 252, 0.85));
-    }
-
-    .vel-bottom-nav__button.is-active .vel-bottom-nav__label {
-      color: #ffffff;
-      font-weight: 800;
-      text-shadow: 0 0 10px rgba(192, 132, 252, 0.7);
+      filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.58));
     }
 
     .vel-bottom-nav__icon {
@@ -15274,40 +14101,20 @@
       align-items: center;
       justify-content: space-between;
       width: 100%;
-      margin: 0 0 0.55rem;
-      padding: max(0.35rem, env(safe-area-inset-top, 0px)) max(0.85rem, env(safe-area-inset-right, 0px)) 0 max(0.85rem, env(safe-area-inset-left, 0px));
+      margin: 0.25rem 0 0.85rem;
+      padding: 0 max(0.75rem, env(safe-area-inset-left, 0px)) 0 max(0.75rem, env(safe-area-inset-right, 0px));
       box-sizing: border-box;
     }
 
     .vel-home-header .vel-home-brand {
       margin: 0;
       padding: 0;
-      gap: 0.55rem;
-    }
-
-    .vel-home-header .vel-home-brand__icon {
-      width: clamp(2rem, 3.4vw, 2.5rem);
-      height: clamp(2rem, 3.4vw, 2.5rem);
-      padding: clamp(3px, 0.4vw, 5px);
-      box-sizing: border-box;
-      border-radius: 10px !important;
-      background: linear-gradient(145deg, rgba(28, 20, 56, 0.92), rgba(12, 10, 26, 0.96)) !important;
-      border: 1px solid rgba(168, 85, 247, 0.32) !important;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5), 0 0 10px rgba(139, 92, 246, 0.18), inset 0 1px 1px rgba(255, 255, 255, 0.15) !important;
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      filter: none !important;
-      object-fit: contain;
-    }
-
-    .vel-home-header .vel-home-brand__name {
-      font-size: clamp(1.25rem, 2.5vw, 1.7rem);
     }
 
     .vel-home-header__actions {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.55rem;
     }
 
     .vel-home-profile-trigger,
@@ -15315,8 +14122,8 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 33px;
-      height: 33px;
+      width: 34px;
+      height: 34px;
       padding: 0;
       border-radius: 9px;
       border: 1px solid rgba(168, 85, 247, 0.35);
@@ -15356,8 +14163,8 @@
     }
 
     .vel-home-profile-trigger__icon {
-      width: 16px;
-      height: 16px;
+      width: 17px;
+      height: 17px;
       fill: currentColor;
       pointer-events: none;
       filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.4));
@@ -15366,7 +14173,7 @@
     .vel-bottom-profile-menu {
       position: fixed;
       z-index: 2600;
-      top: max(3.4rem, calc(env(safe-area-inset-top, 0px) + 3.1rem));
+      top: max(3.8rem, calc(env(safe-area-inset-top, 0px) + 3.4rem));
       right: max(0.85rem, env(safe-area-inset-right, 0px));
       left: auto !important;
       bottom: auto !important;
@@ -16027,7 +14834,7 @@
       --vel-search-bottom-space: calc(var(--vel-bottom-nav-height, 76px) + 20px + env(safe-area-inset-bottom, 0px));
       position: fixed;
       inset: 0;
-      z-index: 2147483640 !important;
+      z-index: 2600;
       box-sizing: border-box;
       display: flex;
       align-items: center;
@@ -16258,16 +15065,6 @@
       box-shadow: 0 4px 16px rgba(124, 58, 237, 0.6);
     }
 
-    .vel-global-search__submit.is-loading {
-      background: linear-gradient(135deg, #0ea5e9 0%, #7c3aed 100%);
-      box-shadow: 0 0 16px rgba(14, 165, 233, 0.65);
-      cursor: wait;
-    }
-
-    .vel-global-search__submit.is-loading svg {
-      animation: velGlobalSearchSpin 0.75s linear infinite;
-    }
-
     .vel-global-search__submit svg {
       width: 1.15rem;
       height: 1.15rem;
@@ -16471,253 +15268,6 @@
 
     .vel-global-search__results::-webkit-scrollbar-thumb:hover {
       background: rgba(255, 255, 255, 0.26);
-    }
-
-    /* Search Loading State */
-    .vel-global-search__loading-view {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 1.5rem;
-      width: 100%;
-      max-width: 100%;
-      min-width: 0;
-      padding: 0.6rem 0.2rem 1.2rem;
-      box-sizing: border-box;
-      animation: velGlobalSearchFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
-    }
-
-    @keyframes velGlobalSearchFadeIn {
-      from { opacity: 0; transform: translateY(6px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .vel-search-loader {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.75rem;
-      text-align: center;
-      width: 100%;
-    }
-
-    .vel-search-loader__visual {
-      position: relative;
-      width: 62px;
-      height: 62px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 0.15rem;
-    }
-
-    .vel-search-loader__halo {
-      position: absolute;
-      inset: -6px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(168, 85, 247, 0.35) 0%, transparent 70%);
-      filter: blur(8px);
-      animation: velSearchHaloPulse 2s ease-in-out infinite;
-      pointer-events: none;
-    }
-
-    @keyframes velSearchHaloPulse {
-      0%, 100% { opacity: 0.45; transform: scale(0.92); }
-      50% { opacity: 0.95; transform: scale(1.12); }
-    }
-
-    .vel-search-loader__spinner {
-      position: absolute;
-      inset: 0;
-      border-radius: 50%;
-      border: 2.5px solid transparent;
-      border-top-color: #a855f7;
-      border-right-color: #38bdf8;
-      border-bottom-color: rgba(168, 85, 247, 0.4);
-      box-shadow: 0 0 16px rgba(168, 85, 247, 0.4);
-      animation: velGlobalSearchSpin 0.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-    }
-
-    .vel-search-loader__spinner::before {
-      content: "";
-      position: absolute;
-      inset: 4px;
-      border-radius: 50%;
-      border: 1.5px dashed rgba(224, 195, 255, 0.45);
-      animation: velGlobalSearchSpinReverse 2s linear infinite;
-    }
-
-    @keyframes velGlobalSearchSpinReverse {
-      to { transform: rotate(-360deg); }
-    }
-
-    .vel-search-loader__icon {
-      position: relative;
-      z-index: 2;
-      width: 22px;
-      height: 22px;
-      color: #f3f0ff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      filter: drop-shadow(0 0 6px rgba(192, 132, 252, 0.8));
-    }
-
-    .vel-search-loader__icon svg {
-      width: 20px;
-      height: 20px;
-    }
-
-    .vel-search-loader__text-wrap {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.35rem;
-    }
-
-    .vel-search-loader__badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      padding: 0.2rem 0.75rem;
-      border-radius: 999px;
-      background: linear-gradient(135deg, rgba(168, 85, 247, 0.22), rgba(14, 165, 233, 0.18));
-      border: 1px solid rgba(192, 132, 252, 0.4);
-      box-shadow: 0 0 14px rgba(168, 85, 247, 0.25);
-      color: #f5f3ff;
-      font-size: 0.72rem;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    .vel-search-loader__pulse-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #38bdf8;
-      box-shadow: 0 0 8px #38bdf8, 0 0 4px #fff;
-      animation: velSearchPulse 1.2s ease-in-out infinite;
-    }
-
-    @keyframes velSearchPulse {
-      0%, 100% { transform: scale(0.85); opacity: 0.6; }
-      50% { transform: scale(1.25); opacity: 1; }
-    }
-
-    .vel-search-loader__label {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      color: #f3f0ff;
-      font-size: clamp(0.92rem, 2.5vw, 1.02rem);
-      font-weight: 700;
-      letter-spacing: -0.01em;
-    }
-
-    .vel-search-loader__label strong {
-      color: #c4b5fd;
-      font-weight: 800;
-    }
-
-    .vel-search-loader__dots {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-    }
-
-    .vel-search-loader__dots i {
-      display: inline-block;
-      width: 4px;
-      height: 4px;
-      border-radius: 50%;
-      background: #c084fc;
-      box-shadow: 0 0 6px rgba(192, 132, 252, 0.8);
-      animation: velSearchDot 0.9s ease-in-out infinite;
-    }
-
-    .vel-search-loader__dots i:nth-child(2) { animation-delay: 0.15s; }
-    .vel-search-loader__dots i:nth-child(3) { animation-delay: 0.3s; }
-
-    @keyframes velSearchDot {
-      0%, 100% { transform: translateY(0); opacity: 0.35; }
-      50% { transform: translateY(-4px); opacity: 1; }
-    }
-
-    .vel-search-loader__sublabel {
-      color: rgba(255, 255, 255, 0.48);
-      font-size: 0.78rem;
-      font-weight: 500;
-    }
-
-    /* Shimmer Skeleton Cards */
-    .vel-search-skeleton-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-      gap: 0.9rem;
-      width: 100%;
-      box-sizing: border-box;
-    }
-
-    @media (max-width: 640px) {
-      .vel-search-skeleton-grid {
-        grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-        gap: 0.65rem;
-      }
-    }
-
-    .vel-search-skeleton-card {
-      display: flex;
-      flex-direction: column;
-      gap: 0.45rem;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 12px;
-      padding: 0.5rem;
-      overflow: hidden;
-      position: relative;
-    }
-
-    .vel-search-skeleton-card::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      transform: translateX(-100%);
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
-      animation: velSearchShimmer 1.5s infinite;
-    }
-
-    @keyframes velSearchShimmer {
-      100% { transform: translateX(100%); }
-    }
-
-    .vel-search-skeleton-poster {
-      width: 100%;
-      aspect-ratio: 2 / 3;
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.06);
-    }
-
-    .vel-search-skeleton-body {
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-      padding: 0.2rem 0;
-    }
-
-    .vel-search-skeleton-line {
-      height: 10px;
-      border-radius: 5px;
-      background: rgba(255, 255, 255, 0.08);
-    }
-
-    .vel-search-skeleton-line--title {
-      width: 82%;
-    }
-
-    .vel-search-skeleton-line--meta {
-      width: 48%;
-      height: 8px;
     }
 
     /* Suggestions & Popular searches */
@@ -17512,21 +16062,6 @@
         gap: 0.45rem;
       }
 
-      .vel-global-search__filter-tabs {
-        gap: 0.35rem;
-        padding: 0.15rem 0 0.4rem;
-      }
-
-      .vel-global-search__tab {
-        padding: 0.35rem 0.65rem;
-        gap: 0.3rem;
-        font-size: 0.8rem;
-      }
-
-      .vel-global-search__tab .vel-tab-text {
-        display: none !important;
-      }
-
       .vel-global-search__bar {
         grid-template-columns: minmax(0, 1fr) 2.45rem;
         gap: 0.5rem;
@@ -17762,15 +16297,11 @@
     }
 
     body.vel-home-empty-active,
-    body.vel-adult-active:not(.vel-adult-player-active),
-    html:has(body.vel-home-empty-active),
-    html:has(body.vel-adult-active:not(.vel-adult-player-active)) {
-      overflow-x: clip !important;
+    html:has(body.vel-home-empty-active) {
+      overflow-x: hidden !important;
       overflow-y: auto !important;
       height: auto !important;
       min-height: 100% !important;
-      -webkit-overflow-scrolling: touch !important;
-      touch-action: pan-y !important;
     }
 
     body.vel-home-empty-active .app,
@@ -17778,19 +16309,12 @@
     body.vel-home-empty-active .main--velora .vel-dashboard,
     body.vel-home-empty-active .main--velora .vel-body,
     body.vel-home-empty-active #vel-home-empty-page,
-    body.vel-home-empty-active .vel-home-sections,
-    body.vel-adult-active:not(.vel-adult-player-active) .app,
-    body.vel-adult-active:not(.vel-adult-player-active) .main--velora,
-    body.vel-adult-active:not(.vel-adult-player-active) .main--velora .vel-dashboard,
-    body.vel-adult-active:not(.vel-adult-player-active) .main--velora .vel-body,
-    body.vel-adult-active:not(.vel-adult-player-active) #adult-view:not(.hidden),
-    body.vel-adult-active:not(.vel-adult-player-active) #vel-adult-packages-container {
+    body.vel-home-empty-active .vel-home-sections {
       height: auto !important;
       min-height: 100% !important;
       max-height: none !important;
       overflow-y: visible !important;
-      overflow-x: visible !important;
-      overflow: visible !important;
+      overflow-x: hidden !important;
     }
 
     body.vel-home-choice-loading .vel-bottom-nav,
@@ -17954,6 +16478,10 @@
       }
 
       function openTab(tab) {
+        stopHomeMedia();
+        setActive(tab);
+        closeBottomCountryMenu();
+        closeProfileMenu();
         delete document.body.dataset.veloraReturnHome;
         delete document.body.dataset.veloraReturnFavorites;
         delete window._veloraFavoriteReturnTab;
@@ -17961,10 +16489,6 @@
         delete document.body.dataset.veloraReturnAdult;
         document.body.classList.remove("vel-adult-active");
         document.body.classList.remove("vel-favorites-open", "vel-favorites-player-active");
-        stopHomeMedia();
-        setActive(tab);
-        closeBottomCountryMenu();
-        closeProfileMenu();
         if (typeof window.veloraCloseFavoritesPage === "function") {
           try { window.veloraCloseFavoritesPage(false); } catch (_) { }
         }
@@ -18050,19 +16574,10 @@
       window.veloraOpenTab = openTab;
 
       function stopHomeMedia() {
-        if (typeof window.veloraStopAllPlayback === "function") {
-          try { window.veloraStopAllPlayback(); } catch (error) { }
-        }
         ["video", "video-vod"].forEach(function (id) {
           var video = document.getElementById(id);
           if (!video) return;
-          try {
-            video.pause();
-            if (video.hls && typeof video.hls.destroy === "function") {
-              try { video.hls.destroy(); } catch (_) {}
-              video.hls = null;
-            }
-          } catch (error) { }
+          try { video.pause(); } catch (error) { }
         });
         ["player-container", "vod-player-container", "now-playing", "now-playing-vod"].forEach(function (id) {
           var element = document.getElementById(id);
@@ -18071,8 +16586,6 @@
             element.style.removeProperty("display");
           }
         });
-        var banner = document.getElementById("vel-live-match-banner") || document.getElementById("velora-match-banner");
-        if (banner) banner.remove();
         try {
           window.dispatchEvent(new CustomEvent("velora-home-media-stop"));
         } catch (error) { }
@@ -18096,26 +16609,15 @@
           "pkg-wheel-modal-open",
           "vel-vod-detail-active",
           "vel-netflix-modal-open",
-          "main--velora-series-detail-themed",
-          "body--velora-live-package"
+          "main--velora-series-detail-themed"
         );
         var pkgModal = document.getElementById("vel-pkg-modal");
         if (pkgModal) pkgModal.classList.remove("is-open");
         var cv = document.getElementById("content-view");
-        if (cv) {
-          cv.classList.remove("content-view--vod-film-detail");
-          cv.classList.add("hidden");
-          cv.setAttribute("aria-hidden", "true");
-        }
+        if (cv) cv.classList.remove("content-view--vod-film-detail");
         var dl = document.getElementById("dynamic-list");
         if (dl) dl.classList.remove("item-list--vod-film-detail");
 
-        var banner = document.getElementById("vel-live-match-banner") || document.getElementById("velora-match-banner");
-        if (banner) banner.remove();
-
-        if (typeof window.veloraStopAllPlayback === "function") {
-          try { window.veloraStopAllPlayback(); } catch (_) { }
-        }
         if (typeof window.veloraCloseFavoritesPage === "function") {
           try { window.veloraCloseFavoritesPage(false); } catch (_) { }
         }
@@ -18129,11 +16631,8 @@
         if (primeContainer) {
           primeContainer.style.removeProperty("display");
         }
-        if (typeof window.veloraSaveCurrentProgress === "function") {
-          try { window.veloraSaveCurrentProgress(); } catch (_) { }
-        }
         stopHomeMedia();
-        ["content-view", "packages-view", "adult-view", "player-container", "vod-player-container", "now-playing", "now-playing-vod"].forEach(function (id) {
+        ["content-view", "packages-view", "adult-view"].forEach(function (id) {
           var view = document.getElementById(id);
           if (view) {
             view.classList.add("hidden");
@@ -18150,16 +16649,11 @@
         if (main) {
           main.classList.remove("main--velora-in-package", "main--velora-live-package");
           main.scrollTop = 0;
-          main.style.overflow = "";
         }
-        document.body.style.overflow = "";
         window.scrollTo(0, 0);
         document.documentElement.scrollTop = 0;
         document.body.scrollTop = 0;
         setActive("home");
-        if (typeof window.veloraInjectResumeSection === "function") {
-          try { window.veloraInjectResumeSection(); } catch (_) { }
-        }
       }
 
       document.addEventListener("velora-return-home", showHome);
@@ -18354,14 +16848,6 @@
         if (lastNavTriggerAction === action && now - lastNavTriggerAt < 250) return;
         lastNavTriggerAt = now;
         lastNavTriggerAction = action;
-
-        if (action !== "home") {
-          delete document.body.dataset.veloraReturnHome;
-          delete document.body.dataset.veloraReturnFavorites;
-          delete window._veloraFavoriteReturnTab;
-          delete document.body.dataset.veloraSearchMediaOpen;
-          delete document.body.dataset.veloraReturnAdult;
-        }
 
         if (action === "home") showHome();
         else if (action === "live" || action === "movies" || action === "series") openTab(action);
@@ -18595,6 +17081,7 @@
       document.addEventListener("click", function (event) {
         if (event.target && event.target.closest("[data-settings-tab='prefixes']")) load();
       });
+      load();
     })();
   </script>
   <script>
@@ -18739,6 +17226,7 @@
       document.addEventListener("click", function (event) {
         if (event.target && event.target.closest("[data-settings-tab='prefixes']")) load();
       });
+      load();
     })();
   </script>
   <script>
@@ -18770,11 +17258,10 @@
       });
     })();
   </script>
-  <script defer src="/assets/cast-bridge.js?v=20260918-audio-fix-v13"></script>
-  <script defer src="/assets/velora-live-wheel.js?v=20260916-live-only-strict-v7"></script>
-  <link rel="stylesheet" href="/assets/velora-prime-carousel.css?v=20260914-exact-provider-order-v11" />
-  <script defer src="/assets/velora-prime-carousels.js?v=20260918-countries-restored-v4"></script>
-  <script defer src="/assets/velora-football-slider.js?v=20260918-no-youtube-matches-v1"></script>
+  <script defer src="/assets/cast-bridge.js?v=20260821-cast-airplay-v1"></script>
+  <script defer src="/assets/velora-live-wheel.js?v=20260911-fav-name-v11"></script>
+  <link rel="stylesheet" href="/assets/velora-prime-carousel.css?v=20260909-vertical-popup-v1" />
+  <script defer src="/assets/velora-prime-carousels.js?v=20260909-unify-popup-v3"></script>
   <script>
     (() => {
       document.addEventListener("click", function (e) {
@@ -18782,25 +17269,19 @@
           e.preventDefault();
           e.stopPropagation();
           if (typeof window.veloraCloseAdultPortal === "function") {
-            window.veloraCloseAdultPortal(true);
+            window.veloraCloseAdultPortal();
           } else if (typeof window.veloraCloseAdultView === "function") {
-            window.veloraCloseAdultView(true);
-          } else if (typeof window.veloraShowHome === "function") {
-            window.veloraShowHome();
+            window.veloraCloseAdultView();
           } else {
             var adultView = document.getElementById("adult-view");
             if (adultView) adultView.classList.add("hidden");
-            document.body.classList.remove("vel-adult-active", "vel-adult-player-active");
+            document.body.classList.remove("vel-adult-active");
             var home = document.getElementById("vel-home-empty-page");
             if (home) {
               home.classList.remove("hidden");
               home.style.removeProperty("display");
             }
-            document.body.classList.add("vel-home-empty-active", "vel-home-choice-picked");
-            document.body.dataset.velActiveTab = "home";
-            var logoH = document.getElementById("btn-logo-home");
-            if (logoH) logoH.click();
-            document.dispatchEvent(new CustomEvent("velora-show-home"));
+            document.body.classList.add("vel-home-empty-active");
             document.dispatchEvent(new CustomEvent("velora-return-home"));
           }
           return;
@@ -18824,12 +17305,9 @@
       }, true);
     })();
   </script>
-  <script defer src="/assets/velora-nav-controller.js?v=20260917-clean-nav-v9"></script>
-  <link rel="stylesheet" href="/assets/velora-adult.css?v=20260912-hub-images-v3" />
-  <script defer src="/assets/velora-adult.js?v=20260912-hub-images-v3"></script>
-  <script defer src="/assets/velora-football-admin.js?v=20260916-foot-admin-options-v10"></script>
-  <script defer src="/assets/tv-connect-bridge.js?v=20260918-smart-diffusion-v15"></script>
-  <script defer src="/assets/velora-pip-controller.js?v=20260918-auto-pip-v1"></script>
+  <script defer src="/assets/velora-nav-controller.js?v=20260909-teardown-v6"></script>
+  <link rel="stylesheet" href="/assets/velora-adult.css?v=20260911-mobile-controls-v1" />
+  <script defer src="/assets/velora-adult.js?v=20260911-landscape-fs-v1"></script>
 </body>
 
 </html>

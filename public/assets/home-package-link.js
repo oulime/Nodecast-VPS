@@ -37,13 +37,10 @@
     const payload = {
       id: packageId || (matchedPkg && matchedPkg.id) || secObj?.id || sectionTitle,
       name: sectionTitle,
-      category_id: matchedPkg?.category_id || secObj?.category_id,
-      categoryId: matchedPkg?.category_id || secObj?.category_id,
-      source_id: matchedPkg?.source_id || secObj?.source_id,
-      sourceId: matchedPkg?.source_id || secObj?.source_id,
+      category_id: matchedPkg?.category_id,
+      source_id: matchedPkg?.source_id,
       country_id: matchedPkg?.country_id || secObj?.country_id,
-      customItems: customList || undefined,
-      items: (Array.isArray(secObj?.entries) && secObj.entries.length > 0) ? secObj.entries : undefined
+      customItems: customList || undefined
     };
 
     if (typeof window.veloraOpenPrimePackageModal === "function") {
@@ -117,13 +114,10 @@
           window.veloraOpenPrimePackageModal(finalKind, {
             id: packageId || (matchedPkg && matchedPkg.id) || secObj?.id || sectionTitle,
             name: sectionTitle,
-            category_id: matchedPkg?.category_id || secObj?.category_id,
-            categoryId: matchedPkg?.category_id || secObj?.category_id,
-            source_id: matchedPkg?.source_id || secObj?.source_id,
-            sourceId: matchedPkg?.source_id || secObj?.source_id,
+            category_id: matchedPkg?.category_id,
+            source_id: matchedPkg?.source_id,
             country_id: matchedPkg?.country_id || secObj?.country_id,
-            customItems: customList || undefined,
-            items: (Array.isArray(secObj?.entries) && secObj.entries.length > 0) ? secObj.entries : undefined
+            customItems: customList || undefined
           });
         } else {
           openCustomSectionModal(sectionNode, sectionTitle, contentType, isHorizontal);

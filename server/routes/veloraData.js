@@ -1708,7 +1708,7 @@ function mediaItemsForCurations(curations, packageById, kind) {
     if (kind !== 'vod' && kind !== 'series') return [];
     const enabledSourceIds = getEnabledSourceIdSet();
     const findItem = getDb().prepare(`
-        SELECT item_id, name, stream_icon, container_extension, provider_order, rating, year, added_at, data
+        SELECT item_id, name, stream_icon, container_extension, provider_order
         FROM playlist_items
         WHERE source_id = ? AND type = ? AND item_id = ? AND is_hidden = 0
     `);
@@ -1724,12 +1724,8 @@ function mediaItemsForCurations(curations, packageById, kind) {
         const item = findItem.get(sourceId, itemType, streamId);
         if (!item) continue;
         seen.add(key);
-        let data = {};
-        try { data = JSON.parse(item.data || '{}'); } catch (_) {}
         items.push({
-            ...data,
             stream_id: streamId,
-            id: streamId,
             source_id: sourceId,
             kind,
             origin_package_id: String(curation.origin_package_id || ''),
@@ -1737,9 +1733,6 @@ function mediaItemsForCurations(curations, packageById, kind) {
             stream_icon: item.stream_icon || '',
             container_extension: item.container_extension || '',
             provider_order: item.provider_order,
-            rating: item.rating || data.rating || '',
-            year: item.year || data.year || '',
-            plot: data.plot || data.description || data.overview || '',
             package_id: packageId,
             package_name: packageById.get(packageId)?.name || packageId
         });
@@ -2018,89 +2011,30 @@ router.get('/admin/package-media-items', (req, res) => {
             ? (Array.isArray(packageRow.child_package_ids) ? packageRow.child_package_ids : []).map(String)
             : [packageId];
         const allowedPackageIds = new Set(childIds);
-        const countryMemberships = expandMemberships(cached.memberships).filter(row =>
-            (!effectiveCountryId || String(row.country_id || '') === effectiveCountryId)
-            && (row.kind === kind || (!row.kind && kind === 'vod'))
-        );
-        const hasCountryMemberships = countryMemberships.length > 0;
-
         let items = mediaItemsForCurations(
-            countryMemberships.filter(row => allowedPackageIds.has(String(row.target_package_id || ''))),
+            expandMemberships(cached.memberships).filter(row =>
+                (!effectiveCountryId || String(row.country_id || '') === effectiveCountryId)
+                && allowedPackageIds.has(String(row.target_package_id || ''))
+            ),
             packageById,
             kind
         );
-        if ((!items || items.length === 0) && !hasCountryMemberships) {
-            const db = getDb();
-            const enabledSourceIds = getEnabledSourceIdSet();
-            const itemType = kind === 'series' ? 'series' : 'movie';
-
-            const targets = [];
-            for (const id of allowedPackageIds) {
-                const pkg = packageById.get(id);
-                if (pkg) {
-                    const srcId = Number.parseInt(pkg.source_id, 10);
-                    const catId = String(pkg.category_id ?? '').trim();
-                    if (catId) {
-                        targets.push({
-                            sourceId: Number.isInteger(srcId) ? srcId : null,
-                            categoryId: catId,
-                            packageId: id,
-                            packageName: pkg.name || id
-                        });
-                    }
-                } else if (id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id))) {
-                    targets.push({ sourceId: null, categoryId: id, packageId: id, packageName: id });
-                }
-            }
-            if (targets.length === 0 && packageId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(packageId))) {
-                targets.push({ sourceId: null, categoryId: packageId, packageId: packageId, packageName: packageId });
-            }
-
-            const fallbackItems = [];
+        if (isParent) {
+            const childPosition = new Map(childIds.map((childId, index) => [childId, index]));
             const seen = new Set();
-            for (const target of targets) {
-                let query = `
-                    SELECT source_id, item_id, name, stream_icon, container_extension, provider_order, rating, year, added_at, data
-                    FROM playlist_items
-                    WHERE type = ? AND category_id = ? AND is_hidden = 0
-                `;
-                const params = [itemType, target.categoryId];
-                if (target.sourceId != null && enabledSourceIds.has(String(target.sourceId))) {
-                    query += ` AND source_id = ?`;
-                    params.push(target.sourceId);
-                }
-                query += ` ORDER BY provider_order ASC, rowid ASC`;
-
-                const rows = db.prepare(query).all(...params);
-                for (const row of rows) {
-                    const sid = row.source_id;
-                    if (!enabledSourceIds.has(String(sid))) continue;
-                    const key = `${sid}:${row.item_id}`;
-                    if (seen.has(key)) continue;
-                    seen.add(key);
-                    let data = {};
-                    try { data = JSON.parse(row.data || '{}'); } catch (_) {}
-                    fallbackItems.push({
-                        ...data,
-                        stream_id: row.item_id,
-                        id: row.item_id,
-                        source_id: sid,
-                        kind,
-                        name: row.name,
-                        stream_icon: row.stream_icon || '',
-                        container_extension: row.container_extension || '',
-                        provider_order: row.provider_order,
-                        rating: row.rating || data.rating || '',
-                        year: row.year || data.year || '',
-                        plot: data.plot || data.description || data.overview || '',
-                        package_id: target.packageId,
-                        package_name: target.packageName
-                    });
-                }
-            }
-            if (fallbackItems.length > 0) {
-                items = fallbackItems;
-            }
+            items = items.filter(item => {
+                const key = `${item.source_id}:${item.stream_id}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            }).sort((left, right) => {
+                const packageOrder = (childPosition.get(String(left.package_id)) ?? Number.MAX_SAFE_INTEGER)
+                    - (childPosition.get(String(right.package_id)) ?? Number.MAX_SAFE_INTEGER);
+                if (packageOrder) return packageOrder;
+                const a = Number.isFinite(left.provider_order) ? left.provider_order : Number.MAX_SAFE_INTEGER;
+                const b = Number.isFinite(right.provider_order) ? right.provider_order : Number.MAX_SAFE_INTEGER;
+                return a - b || String(left.name).localeCompare(String(right.name), 'fr');
+            });
         }
         res.set('Cache-Control', 'no-store');
         res.set('X-Velora-Country-Package-Cache', 'vps-local-derived');
@@ -2434,24 +2368,45 @@ function buildMediaFeedCache() {
 
         const key = `${countryId}:${packageId}`;
         if (!packageStreams.has(key)) {
-            packageStreams.set(key, []);
+            packageStreams.set(key, { keys: new Set(), sourceAware: false });
         }
-        packageStreams.get(key).push(row);
+        const membership = packageStreams.get(key);
+        const sourceId = String(row.source_id || '').trim();
+        if (sourceId) {
+            membership.sourceAware = true;
+            membership.keys.add(`${sourceId}:${streamId}`);
+        } else {
+            membership.keys.add(streamId);
+        }
         packageStreamCounts.set(key, (packageStreamCounts.get(key) || 0) + 1);
     }
 
-    const db = getDb();
-    const findItem = db.prepare(`
-        SELECT source_id, item_id, name, stream_icon, container_extension, provider_order, rating, year, added_at, data
-        FROM playlist_items
-        WHERE source_id = ? AND type = ? AND item_id = ? AND is_hidden = 0
-    `);
-    const enabledSourceIds = getEnabledSourceIdSet();
+    const snapshots = {
+        movies: veloraCatalogCache.getSnapshot('vod_streams') || [],
+        series: veloraCatalogCache.getSnapshot('series') || []
+    };
 
     let posterCache = {};
     try { posterCache = JSON.parse(fs.readFileSync(vodPosterCachePath, 'utf8')) || {}; } catch (_) {}
     let backdropCache = {};
     try { backdropCache = JSON.parse(fs.readFileSync(vodBackdropCachePath, 'utf8')) || {}; } catch (_) {}
+
+    const snapshotIndexes = {
+        movies: new Map(),
+        series: new Map()
+    };
+    for (const kind of ['movies', 'series']) {
+        const list = snapshots[kind];
+        const idx = snapshotIndexes[kind];
+        for (const item of list) {
+            const rawId = String(item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id ?? '');
+            const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
+            if (rawId) {
+                if (sourceId) idx.set(`${sourceId}:${rawId}`, item);
+                if (!idx.has(rawId)) idx.set(rawId, item);
+            }
+        }
+    }
 
     const countries = allRows('admin_countries');
     const orderRows = allRows('admin_country_package_order');
@@ -2471,7 +2426,6 @@ function buildMediaFeedCache() {
 
         for (const tab of ['movies', 'series']) {
             const kind = tab === 'movies' ? 'vod' : 'series';
-            const itemType = tab === 'movies' ? 'movie' : 'series';
             const countryPackages = resolvedPackages.filter(p => 
                 String(p.country_id) === countryId && (p.kind === kind || (kind === 'vod' && p.kind === 'movies'))
                 && p.is_hidden !== true && p.is_hidden !== 'true'
@@ -2492,124 +2446,132 @@ function buildMediaFeedCache() {
             for (const pkg of countryPackages) {
                 const pkgId = String(pkg.id);
                 const memKey = `${countryId}:${pkgId}`;
-                const curationList = packageStreams.get(memKey) || [];
-                const totalCount = packageStreamCounts.get(memKey) || curationList.length || 0;
+                const membership = packageStreams.get(memKey) || { keys: new Set(), sourceAware: false };
+                const totalCount = packageStreamCounts.get(memKey) || membership.keys.size || 0;
 
-                const seen = new Set();
-                const rawItems = [];
+                const providerSourceId = String(pkg.source_id ?? '').trim();
+                const providerCategoryId = String(pkg.category_id ?? '').trim();
+                const providerBacked = Boolean(providerSourceId && providerCategoryId);
 
-                for (const curation of curationList) {
-                    const sourceId = Number.parseInt(curation.source_id, 10);
-                    const streamId = String(curation.stream_id || '').trim();
-                    const key = `${sourceId}:${streamId}`;
-                    if (!Number.isInteger(sourceId) || !streamId || !enabledSourceIds.has(String(sourceId)) || seen.has(key)) continue;
-                    const item = findItem.get(sourceId, itemType, streamId);
-                    if (!item) continue;
-                    seen.add(key);
-
-                    let data = {};
-                    try { data = JSON.parse(item.data || '{}'); } catch (_) {}
-                    rawItems.push({
-                        ...data,
-                        ...item,
-                        raw_stream_id: item.item_id,
-                        raw_series_id: item.item_id,
-                        stream_id: item.item_id,
-                        series_id: item.item_id
-                    });
-                }
-
-                // If not in curations but provider-backed, query by category directly from SQLite
-                if (!rawItems.length) {
-                    const providerSourceId = Number.parseInt(pkg.source_id, 10);
-                    const providerCategoryId = String(pkg.category_id ?? '').trim();
-                    if (Number.isInteger(providerSourceId) && providerCategoryId && enabledSourceIds.has(String(providerSourceId))) {
-                        const catItems = db.prepare(`
-                            SELECT source_id, item_id, name, stream_icon, container_extension, provider_order, rating, year, added_at, data
-                            FROM playlist_items
-                            WHERE source_id = ? AND type = ? AND category_id = ? AND is_hidden = 0
-                            ORDER BY provider_order ASC, rowid ASC
-                        `).all(providerSourceId, itemType, providerCategoryId);
-                        for (const item of catItems) {
-                            let data = {};
-                            try { data = JSON.parse(item.data || '{}'); } catch (_) {}
-                            rawItems.push({
-                                ...data,
-                                ...item,
-                                raw_stream_id: item.item_id,
-                                raw_series_id: item.item_id,
-                                stream_id: item.item_id,
-                                series_id: item.item_id
-                            });
-                        }
-                    }
-                }
-
-                // Sort rawItems in the EXACT provider order (provider_order ASC)
-                rawItems.sort((left, right) => {
-                    const a = Number.isFinite(left.provider_order) ? left.provider_order : Number.MAX_SAFE_INTEGER;
-                    const b = Number.isFinite(right.provider_order) ? right.provider_order : Number.MAX_SAFE_INTEGER;
-                    return a - b || String(left.name).localeCompare(String(right.name), 'fr');
-                });
-
-                const topCandidates = rawItems.slice(0, MEDIA_FEED_ENTRIES_PER_PACKAGE);
                 const items = [];
+                const snapshotList = snapshots[tab];
+                const snapshotIdx = snapshotIndexes[tab];
 
-                for (const item of topCandidates) {
-                    const rawId = String(item.item_id ?? item.stream_id ?? item.series_id ?? '');
-                    const rawName = String(item.name || item.title || item.series_name || '').trim();
-                    const sourceId = String(item.source_id ?? pkg.source_id ?? '').trim();
-                    const itemKey = `${sourceId}:${rawId}`;
-                    const titleKey = normalizedPosterTitle(rawName);
+                if (membership.keys.size > 0) {
+                    for (const key of membership.keys) {
+                        const item = snapshotIdx.get(key);
+                        if (!item) continue;
+                        const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
+                        const rawName = String(item.name || item.title || item.series_name || '').trim();
+                        const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
+                        const itemKey = `${sourceId}:${String(rawId)}`;
+                        const titleKey = normalizedPosterTitle(rawName);
 
-                    let posterUrl = '';
-                    let posterCandidate = item.stream_icon ?? item.cover ?? item.cover_big ?? item.movie_image ?? item.series_image ?? item.poster_path ?? item.poster ?? '';
-                    if (Array.isArray(posterCandidate) && posterCandidate.length > 0) posterCandidate = posterCandidate[0];
-                    if (typeof posterCandidate === 'string' && posterCandidate.trim()) {
-                        let url = posterCandidate.trim();
-                        if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w500${url}`;
-                        if (!url.includes('/w1280/') && !url.includes('/backdrop')) {
-                            posterUrl = url;
+                        let posterUrl = '';
+                        let posterCandidate = item.stream_icon ?? item.cover ?? item.cover_big ?? item.movie_image ?? item.series_image ?? item.poster_path ?? item.poster ?? '';
+                        if (Array.isArray(posterCandidate) && posterCandidate.length > 0) posterCandidate = posterCandidate[0];
+                        if (typeof posterCandidate === 'string' && posterCandidate.trim()) {
+                            let url = posterCandidate.trim();
+                            if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w500${url}`;
+                            if (!url.includes('/w1280/') && !url.includes('/backdrop')) {
+                                posterUrl = url;
+                            }
+                        }
+                        if (!posterUrl) {
+                            posterUrl = posterCache[itemKey] || posterCache[titleKey] || '';
+                        }
+
+                        let backdropUrl = '';
+                        let backdropCandidate = item.backdrop_path ?? item.backdrop ?? item.backdrop_url ?? '';
+                        if (Array.isArray(backdropCandidate) && backdropCandidate.length > 0) backdropCandidate = backdropCandidate[0];
+                        if (typeof backdropCandidate === 'string' && backdropCandidate.trim()) {
+                            let url = backdropCandidate.trim();
+                            if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w780${url}`;
+                            backdropUrl = url;
+                        }
+                        if (!backdropUrl) {
+                            backdropUrl = backdropCache[itemKey] || backdropCache[titleKey] || '';
+                        }
+
+                        const finalPoster = posterUrl || backdropUrl;
+                        const finalBackdrop = backdropUrl || posterUrl;
+
+                        items.push({
+                            id: `feed:${pkgId}:${rawId}`,
+                            name: rawName,
+                            thumbUrl: finalPoster,
+                            posterUrl: finalPoster,
+                            backdropUrl: finalBackdrop,
+                            rating: item.rating || item.rating_5based || item.score || '',
+                            year: item.year || item.releaseDate || '',
+                            plot: item.plot || item.description || item.overview || '',
+                            streamId: rawId,
+                            sourceId: sourceId || pkg.source_id,
+                            globalStreamId: item.global_stream_id || item.nodecast_global_stream_id || rawId,
+                            containerExtension: item.container_extension || '',
+                            contentType: tab,
+                            packageId: pkgId
+                        });
+                        if (items.length >= MEDIA_FEED_ENTRIES_PER_PACKAGE) break;
+                    }
+                } else if (providerBacked) {
+                    for (const item of snapshotList) {
+                        const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
+                        if (sourceId === providerSourceId && String(item.raw_category_id ?? '') === providerCategoryId) {
+                            const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
+                            const rawName = String(item.name || item.title || item.series_name || '').trim();
+                            const itemKey = `${sourceId}:${String(rawId)}`;
+                            const titleKey = normalizedPosterTitle(rawName);
+
+                            let posterUrl = '';
+                            let posterCandidate = item.stream_icon ?? item.cover ?? item.cover_big ?? item.movie_image ?? item.series_image ?? item.poster_path ?? item.poster ?? '';
+                            if (Array.isArray(posterCandidate) && posterCandidate.length > 0) posterCandidate = posterCandidate[0];
+                            if (typeof posterCandidate === 'string' && posterCandidate.trim()) {
+                                let url = posterCandidate.trim();
+                                if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w500${url}`;
+                                if (!url.includes('/w1280/') && !url.includes('/backdrop')) {
+                                    posterUrl = url;
+                                }
+                            }
+                            if (!posterUrl) {
+                                posterUrl = posterCache[itemKey] || posterCache[titleKey] || '';
+                            }
+
+                            let backdropUrl = '';
+                            let backdropCandidate = item.backdrop_path ?? item.backdrop ?? item.backdrop_url ?? '';
+                            if (Array.isArray(backdropCandidate) && backdropCandidate.length > 0) backdropCandidate = backdropCandidate[0];
+                            if (typeof backdropCandidate === 'string' && backdropCandidate.trim()) {
+                                let url = backdropCandidate.trim();
+                                if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w780${url}`;
+                                backdropUrl = url;
+                            }
+                            if (!backdropUrl) {
+                                backdropUrl = backdropCache[itemKey] || backdropCache[titleKey] || '';
+                            }
+
+                            const finalPoster = posterUrl || backdropUrl;
+                            const finalBackdrop = backdropUrl || posterUrl;
+
+                            items.push({
+                                id: `feed:${pkgId}:${rawId}`,
+                                name: rawName,
+                                thumbUrl: finalPoster,
+                                posterUrl: finalPoster,
+                                backdropUrl: finalBackdrop,
+                                rating: item.rating || item.rating_5based || item.score || '',
+                                year: item.year || item.releaseDate || '',
+                                plot: item.plot || item.description || item.overview || '',
+                                streamId: rawId,
+                                sourceId: sourceId || pkg.source_id,
+                                globalStreamId: item.global_stream_id || item.nodecast_global_stream_id || rawId,
+                                containerExtension: item.container_extension || '',
+                                contentType: tab,
+                                packageId: pkgId
+                            });
+                            if (items.length >= MEDIA_FEED_ENTRIES_PER_PACKAGE) break;
                         }
                     }
-                    if (!posterUrl) {
-                        posterUrl = posterCache[itemKey] || posterCache[titleKey] || '';
-                    }
-
-                    let backdropUrl = '';
-                    let backdropCandidate = item.backdrop_path ?? item.backdrop ?? item.backdrop_url ?? '';
-                    if (Array.isArray(backdropCandidate) && backdropCandidate.length > 0) backdropCandidate = backdropCandidate[0];
-                    if (typeof backdropCandidate === 'string' && backdropCandidate.trim()) {
-                        let url = backdropCandidate.trim();
-                        if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w780${url}`;
-                        backdropUrl = url;
-                    }
-                    if (!backdropUrl) {
-                        backdropUrl = backdropCache[itemKey] || backdropCache[titleKey] || '';
-                    }
-
-                    const finalPoster = posterUrl || backdropUrl;
-                    const finalBackdrop = backdropUrl || posterUrl;
-
-                    items.push({
-                        id: `feed:${pkgId}:${rawId}`,
-                        name: rawName,
-                        thumbUrl: finalPoster,
-                        posterUrl: finalPoster,
-                        backdropUrl: finalBackdrop,
-                        rating: item.rating || item.rating_5based || item.score || '',
-                        year: item.year || item.releaseDate || '',
-                        plot: item.plot || item.description || item.overview || '',
-                        streamId: rawId,
-                        sourceId: sourceId || pkg.source_id,
-                        globalStreamId: item.global_stream_id || item.nodecast_global_stream_id || rawId,
-                        containerExtension: item.container_extension || '',
-                        contentType: tab,
-                        packageId: pkgId
-                    });
                 }
-
-                if (items.length < 3) continue;
 
                 totalCachedItems += items.length;
                 totalCachedPackages += 1;
@@ -2619,11 +2581,8 @@ function buildMediaFeedCache() {
                     name: pkg.name,
                     kind: pkg.kind,
                     countryId: pkg.country_id,
-                    country_id: pkg.country_id,
                     sourceId: pkg.source_id,
-                    source_id: pkg.source_id,
                     categoryId: pkg.category_id,
-                    category_id: pkg.category_id,
                     totalCount: Math.max(totalCount, items.length),
                     items
                 });
@@ -2705,32 +2664,22 @@ router.post('/admin/rebuild-media-feed', (req, res) => {
     }
 });
 
-// Nightly automatic feed & home cache rebuild (every 24 hours) & on snapshot ready
+// Nightly automatic feed cache rebuild (every 24 hours) & on snapshot ready
 try {
-    veloraCatalogCache.onSnapshotReady(async () => {
+    veloraCatalogCache.onSnapshotReady(() => {
         try {
             buildMediaFeedCache();
-            const homePayload = buildHomeCache();
-            await enrichHomeCacheMoviePosters(homePayload);
-            await enrichHomeCacheBackdrops(homePayload);
-            await enrichHomeCacheTitleLogos(homePayload);
-            writeJsonAtomic(homeCachePath, homePayload);
-            console.log('[Velora cache] Media feed and Home cache auto-refreshed on snapshot update.');
+            console.log('[Velora cache] Media feed cache auto-refreshed on snapshot update.');
         } catch (e) {
-            console.warn('[Velora cache] Post-build hook error:', e.message);
+            console.warn('[Velora cache] Media feed post-build hook error:', e.message);
         }
     });
 } catch (_) {}
 
-setInterval(async () => {
+setInterval(() => {
     try {
         buildMediaFeedCache();
-        const homePayload = buildHomeCache();
-        await enrichHomeCacheMoviePosters(homePayload);
-        await enrichHomeCacheBackdrops(homePayload);
-        await enrichHomeCacheTitleLogos(homePayload);
-        writeJsonAtomic(homeCachePath, homePayload);
-        console.log('[Velora cache] Nightly media feed and Home cache rebuild completed.');
+        console.log('[Velora cache] Nightly media feed cache rebuild completed.');
     } catch (e) {
         console.warn('[Velora cache] Nightly rebuild failed:', e.message);
     }
@@ -2745,39 +2694,48 @@ function buildHomeCache() {
         .filter(row => sectionPackageIds.has(String(row.target_package_id || '')));
     const resolvedPackages = countryPackageCache.packages;
     const packages = new Map(resolvedPackages.map(row => [String(row.id), row]));
-    const curationsByPkg = new Map();
+    const packageStreams = new Map();
     for (const row of curations) {
         const packageId = String(row.target_package_id || '').trim();
         const streamId = String(row.stream_id || '').trim();
         if (!packageId || !streamId) continue;
-        if (!curationsByPkg.has(packageId)) {
-            curationsByPkg.set(packageId, []);
+        const packageRow = packages.get(packageId) || {};
+        const sourceId = String(row.source_id ?? packageRow.source_id ?? '').trim();
+        const kind = String(row.kind ?? packageRow.kind ?? '').trim();
+        if (!packageStreams.has(packageId)) {
+            packageStreams.set(packageId, { keys: new Set(), sourceAware: false });
         }
-        curationsByPkg.get(packageId).push(row);
+        const membership = packageStreams.get(packageId);
+        if ((kind === 'vod' || kind === 'series') && sourceId) {
+            membership.sourceAware = true;
+            membership.keys.add(`${sourceId}:${streamId}`);
+        } else {
+            membership.keys.add(streamId);
+        }
     }
-
-    const db = getDb();
-    const enabledSourceIds = getEnabledSourceIdSet();
-    const findItem = db.prepare(`
-        SELECT source_id, item_id, name, stream_icon, container_extension, provider_order, rating, year, added_at, data
-        FROM playlist_items
-        WHERE source_id = ? AND type = ? AND item_id = ? AND is_hidden = 0
-    `);
-
+    const snapshots = {
+        live: veloraCatalogCache.getSnapshot('live_streams') || [],
+        movies: veloraCatalogCache.getSnapshot('vod_streams') || [],
+        series: veloraCatalogCache.getSnapshot('series') || []
+    };
     let backdropCache = {};
     try { backdropCache = JSON.parse(fs.readFileSync(vodBackdropCachePath, 'utf8')) || {}; } catch (_) {}
 
+    const enabledSourceIds = getEnabledSourceIdSet();
     const output = sections.map(section => {
         const type = ['live', 'movies', 'series'].includes(section.content_type)
             ? section.content_type : 'live';
-        const itemType = type === 'movies' ? 'movie' : type;
         const packageRow = packages.get(String(section.package_id)) || {};
-        const providerSourceId = Number.parseInt(packageRow.source_id, 10);
+        const providerSourceId = String(packageRow.source_id ?? '').trim();
         const providerCategoryId = String(packageRow.category_id ?? '').trim();
+        const providerKind = String(packageRow.kind ?? '').trim();
+        const expectedKind = type === 'movies' ? 'vod' : type;
+        const providerBacked = Boolean(providerSourceId && providerCategoryId && (!providerKind || providerKind === expectedKind));
+        const membership = packageStreams.get(String(section.package_id)) || { keys: new Set(), sourceAware: false };
         const orientation = String(section.card_orientation || 'vertical').toLowerCase() === 'horizontal' ? 'horizontal' : 'vertical';
         const isHorizontal = orientation === 'horizontal';
         let entries = [];
-        if (!section.package_id && Array.isArray(section.custom_entries) && section.custom_entries.length > 0) {
+        if (Array.isArray(section.custom_entries) && section.custom_entries.length > 0) {
             entries = section.custom_entries.map((item, a) => {
                 const rawName = String(item.name || item.title || '').trim();
                 const rawId = item.streamId ?? item.stream_id ?? item.raw_stream_id ?? a;
@@ -2832,75 +2790,29 @@ function buildHomeCache() {
                 };
             }).filter(item => item?.name).slice(0, HOME_CACHE_ENTRIES_PER_PACKAGE);
         } else {
-            const customVisuals = new Map();
-            if (Array.isArray(section.custom_entries)) {
-                for (const c of section.custom_entries) {
-                    const sId = String(c.streamId ?? c.stream_id ?? c.id ?? '').trim();
-                    const sName = normalizedPosterTitle(c.name || c.title || '');
-                    if (sId) customVisuals.set(`id:${sId}`, c);
-                    if (sName) customVisuals.set(`name:${sName}`, c);
+            entries = snapshots[type].filter(item => {
+                const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
+                const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
+                if (sourceId && !enabledSourceIds.has(sourceId)) return false;
+                if (membership.keys.size) {
+                    return membership.sourceAware
+                        ? membership.keys.has(`${sourceId}:${String(rawId)}`)
+                        : membership.keys.has(String(rawId));
                 }
-            }
-            const curationList = curationsByPkg.get(String(section.package_id)) || [];
-            const seen = new Set();
-            const rawItems = [];
-
-            for (const curation of curationList) {
-                const sourceId = Number.parseInt(curation.source_id, 10);
-                const streamId = String(curation.stream_id || '').trim();
-                const key = `${sourceId}:${streamId}`;
-                if (!Number.isInteger(sourceId) || !streamId || !enabledSourceIds.has(String(sourceId)) || seen.has(key)) continue;
-                const item = findItem.get(sourceId, itemType, streamId);
-                if (!item) continue;
-                seen.add(key);
-                let data = {};
-                try { data = JSON.parse(item.data || '{}'); } catch (_) {}
-                rawItems.push({
-                    ...data,
-                    ...item,
-                    raw_stream_id: item.item_id,
-                    raw_series_id: item.item_id,
-                    stream_id: item.item_id,
-                    series_id: item.item_id
-                });
-            }
-
-            if (!rawItems.length && Number.isInteger(providerSourceId) && providerCategoryId && enabledSourceIds.has(String(providerSourceId))) {
-                const catItems = db.prepare(`
-                    SELECT source_id, item_id, name, stream_icon, container_extension, provider_order, rating, year, added_at, data
-                    FROM playlist_items
-                    WHERE source_id = ? AND type = ? AND category_id = ? AND is_hidden = 0
-                    ORDER BY provider_order ASC, rowid ASC
-                `).all(providerSourceId, itemType, providerCategoryId);
-                for (const item of catItems) {
-                    let data = {};
-                    try { data = JSON.parse(item.data || '{}'); } catch (_) {}
-                    rawItems.push({
-                        ...data,
-                        ...item,
-                        raw_stream_id: item.item_id,
-                        raw_series_id: item.item_id,
-                        stream_id: item.item_id,
-                        series_id: item.item_id
-                    });
+                if (providerBacked) {
+                    return sourceId === providerSourceId
+                        && String(item.raw_category_id ?? '') === providerCategoryId;
                 }
-            }
-
-            // Sort in exact provider order
-            rawItems.sort((left, right) => {
-                const a = Number.isFinite(left.provider_order) ? left.provider_order : Number.MAX_SAFE_INTEGER;
-                const b = Number.isFinite(right.provider_order) ? right.provider_order : Number.MAX_SAFE_INTEGER;
-                return a - b || String(left.name).localeCompare(String(right.name), 'fr');
-            });
-
-            entries = rawItems.map(item => {
-                const rawId = item.item_id ?? item.raw_stream_id ?? item.stream_id;
+                return false;
+            }).map(item => {
+                const rawId = item.raw_stream_id ?? item.raw_series_id ?? item.stream_id ?? item.series_id;
                 const rawName = String(item.name || item.title || item.series_name || '').trim();
                 if (type === 'live' && isHomeChannelHidden(rawName, channelRules.hiddenFilters)) return null;
-                const sourceId = String(item.source_id ?? '').trim();
-                const customItem = customVisuals.get(`id:${rawId}`) || customVisuals.get(`name:${normalizedPosterTitle(rawName)}`) || {};
+                const sourceId = String(item.source_id ?? item.nodecast_source_id ?? '').trim();
+                const key = `${sourceId}:${String(rawId)}`;
+                const titleKey = normalizedPosterTitle(rawName);
 
-                let backdropCandidate = customItem.backdropUrl || customItem.backdrop || item.backdrop_path || item.backdrop || item.backdrop_url || '';
+                let backdropCandidate = item.backdrop_path ?? item.backdrop ?? item.backdrop_url ?? '';
                 if (Array.isArray(backdropCandidate) && backdropCandidate.length > 0) backdropCandidate = backdropCandidate[0];
                 let backdropUrl = '';
                 if (typeof backdropCandidate === 'string' && backdropCandidate.trim()) {
@@ -2910,25 +2822,23 @@ function buildHomeCache() {
                 }
                 const sectionPkgCover = String(packageRow.cover_url || section.logo_url || section.badge_logo_url || '').trim();
                 const standardThumb = type === 'live'
-                    ? sanitizeChannelIcon(rawName, customItem.thumbUrl || item.stream_icon || item.cover || '', sectionPkgCover, {
+                    ? sanitizeChannelIcon(rawName, item.stream_icon || item.cover || '', sectionPkgCover, {
                         package_id: section.package_id,
                         category_id: item.raw_category_id ?? item.category_id,
                         source_id: item.source_id,
                         item_id: rawId
                     })
-                    : String(customItem.thumbUrl || item.stream_icon || item.cover || '');
-                let horizontalThumb = customItem.horizontal_thumb || '';
-                let titleLogo = customItem.title_logo || customItem.titleLogo || customItem.logo || item.title_logo || item.titleLogo || item.logo || '';
-                let hasIntegratedTitle = Boolean(customItem.has_integrated_title);
+                    : String(item.stream_icon || item.cover || '');
+                let horizontalThumb = '';
+                let titleLogo = item.title_logo || item.titleLogo || item.logo || '';
+                let hasIntegratedTitle = false;
                 if (isHorizontal && (type === 'movies' || type === 'series')) {
                     const clean = cleanMediaTitleForSearch(rawName);
                     const k1 = `${type === 'movies' ? 'movie' : 'tv'}:${(clean.title || rawName).toLowerCase().trim()}`;
                     const k2 = `${type === 'movies' ? 'movie' : 'tv'}:${rawName.toLowerCase().trim()}`;
                     const hCache = getHorizontalThumbCache();
-                    if (!horizontalThumb) {
-                        if (hCache[k1] && hCache[k1] !== 'NONE') horizontalThumb = hCache[k1];
-                        else if (hCache[k2] && hCache[k2] !== 'NONE') horizontalThumb = hCache[k2];
-                    }
+                    if (hCache[k1] && hCache[k1] !== 'NONE') horizontalThumb = hCache[k1];
+                    else if (hCache[k2] && hCache[k2] !== 'NONE') horizontalThumb = hCache[k2];
                     if (horizontalThumb) {
                         hasIntegratedTitle = true;
                         titleLogo = '';
@@ -2958,7 +2868,7 @@ function buildHomeCache() {
             }).filter(item => item?.name).slice(0, HOME_CACHE_ENTRIES_PER_PACKAGE);
         }
         return { ...section, country_ids: Array.isArray(section.country_ids) ? section.country_ids : (section.country_id ? String(section.country_id).split(',').map(s => s.trim()).filter(Boolean) : ['default']), content_type: type, card_orientation: orientation, logo_url: String(section.logo_url || section.badge_logo_url || '').trim(), entries };
-    }).filter(section => section && Array.isArray(section.entries) && section.entries.length >= 3);
+    });
     const payload = { generatedAt: new Date().toISOString(), sections: output };
     writeJsonAtomic(homeCachePath, payload);
     return payload;
@@ -2973,7 +2883,7 @@ router.get('/home-cache', (req, res) => {
         const sectionId = String(req.query.section_id || '').trim();
         const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 10, 1), 100);
         const offset = Math.max(Number.parseInt(req.query.offset, 10) || 0, 0);
-        let sections = Array.isArray(payload.sections) ? payload.sections.filter(s => Array.isArray(s.entries) && s.entries.length >= 3) : [];
+        let sections = Array.isArray(payload.sections) ? payload.sections : [];
         if (countryId) {
             const countrySections = sections.filter(section => {
                 if (section.published === false) return false;

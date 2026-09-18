@@ -905,21 +905,13 @@
     }
   });
 
-  // Lazy load on first tab display rather than blocking startup
-  let logosLoaded = false;
-  function ensureLogosAdminLoaded() {
-    if (logosLoaded) return;
-    const panel = document.getElementById('settings-tab-logos');
-    if (panel && !panel.hidden && !panel.classList.contains('hidden')) {
-      logosLoaded = true;
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
       loadLogoToggles();
       loadCustomLogos();
-    }
+    }, { once: true });
+  } else {
+    loadLogoToggles();
+    loadCustomLogos();
   }
-
-  document.addEventListener('click', function(e) {
-    if (e.target && e.target.closest('#settings-tab-btn-logos, [data-settings-tab="logos"]')) {
-      ensureLogosAdminLoaded();
-    }
-  });
 })();

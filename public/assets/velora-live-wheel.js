@@ -166,19 +166,9 @@
       if (thumb) thumb.classList.add("vel-dark-logo-mode");
     };
 
-    const removeDark = () => {
-      target.classList.remove("vel-dark-logo-mode");
-      const card = target.closest(".vel-coverflow-card");
-      if (card) card.classList.remove("vel-dark-logo-mode");
-      const thumb = target.closest(".media-item__thumb");
-      if (thumb) thumb.classList.remove("vel-dark-logo-mode");
-    };
-
     if (logoToneCache.has(src)) {
       if (logoToneCache.get(src) === "dark") {
         applyDark();
-      } else {
-        removeDark();
       }
       return;
     }
@@ -197,8 +187,6 @@
         logoToneCache.set(src, result.tone);
         if (result.isDark) {
           applyDark();
-        } else {
-          removeDark();
         }
       } catch (_) {
         // If tainted canvas due to cross-origin, retry through image proxy
@@ -216,7 +204,6 @@
               const result = detectImageToneFromCanvas(imgData);
               logoToneCache.set(src, result.tone);
               if (result.isDark) applyDark();
-              else removeDark();
             } catch (e) {
               logoToneCache.set(src, "unknown");
             }
@@ -630,7 +617,6 @@
       this.packages = [];
       this.childPackagesMap = new Map();
       this.cachedApiPackages = [];
-      this.vodSeriesPackageIds = new Set();
       
       // Main Wheel State
       this.currentIndex = 0;
@@ -970,12 +956,6 @@
       const activeTab = String(body.dataset.velActiveTab || "").toLowerCase();
       const topLevel = String(body.dataset.velTopLevel || "").toLowerCase();
 
-      // NEVER active on Movies, Series, or Adult tabs
-      if (activeTab === "movies" || activeTab === "series" || activeTab === "adult" ||
-          topLevel === "movies" || topLevel === "series" || topLevel === "adult") {
-        return false;
-      }
-
       return (activeTab === "live" || topLevel === "live") && !body.dataset.veloraReturnFavorites;
     }
 
@@ -1050,68 +1030,31 @@
         const res = await fetch("/api/velora-db/country-package-cache");
         if (res.ok) {
           const data = await res.json();
-          const allPkgs = Array.isArray(data.packages) ? data.packages : [];
-          // STRICT RULE: Only Live TV bouquets allowed in the live wheel cache
-          this.cachedApiPackages = allPkgs.filter(p => p && (p.kind === "live" || p.type === "live"));
-          this.vodSeriesPackageIds = new Set(
-            allPkgs
-              .filter(p => p && (p.kind === "vod" || p.kind === "series" || p.type === "vod" || p.type === "series"))
-              .map(p => String(p.id))
-          );
+          this.cachedApiPackages = data.packages || [];
         }
       } catch (_) {}
-    }
-
-    isForbiddenVodOrSeries(id, title, card) {
-      const normId = String(id || "").trim();
-      const normTitle = String(title || "").trim().toUpperCase();
-
-      // 1. Matched known VOD or Series ID from catalog
-      if (this.vodSeriesPackageIds && this.vodSeriesPackageIds.has(normId)) return true;
-
-      // 2. Checked against DOM attributes
-      if (card) {
-        if (card.dataset.kind === "vod" || card.dataset.kind === "series" || card.dataset.type === "vod" || card.dataset.type === "series") return true;
-        if (card.classList.contains("vel-package-card--vod") || card.classList.contains("vel-package-card--series") || card.classList.contains("vel-package-card--movie")) return true;
-      }
-
-      // 3. Checked against packages-view grid context
-      const packagesView = document.getElementById("packages-view");
-      if (packagesView) {
-        const renderKey = String(packagesView.dataset.renderedGridKey || "");
-        if (renderKey.startsWith("movies|") || renderKey.startsWith("series|")) return true;
-      }
-
-      // 4. Common movie/series genre / VOD package indicators
-      if (/^(FR\s*[-–]\s*)?(BOX\s*OFFICE|ANCIEN\s*FILM|FILMS\s*20\d\d|S[ÉE]RIES\s*20\d\d|NETFLIX\s*FILMS|PRIME\s*FILMS|DISNEY\s*FILMS|CINEMA\s*A\s*LA\s*DEMANDE|TOP\s*FILMS)/i.test(normTitle)) {
-        return true;
-      }
-
-      return false;
     }
 
     refreshPackages() {
       if (!this.isLiveActive()) return;
 
-      const countryId = getActiveCountryId();
       const packagesView = document.getElementById("packages-view");
-      const renderKey = String(packagesView?.dataset.renderedGridKey || "");
-      const isPackagesViewStale = renderKey.startsWith("movies|") || renderKey.startsWith("series|");
+      if (!packagesView) return;
 
-      let rawCards = [];
-      if (packagesView && !isPackagesViewStale) {
-        rawCards = [...packagesView.querySelectorAll(":scope > .vel-package-card[data-package-id]")].filter(card => {
-          const id = String(card.dataset.packageId || "");
-          const title = card.querySelector(".vel-package-card__title")?.textContent || "";
-          return !this.isForbiddenVodOrSeries(id, title, card);
-        });
-      }
+      const rawCards = [...packagesView.querySelectorAll(":scope > .vel-package-card[data-package-id]")];
+      if (rawCards.length === 0 && this.cachedApiPackages.length === 0) return;
 
-      // If no valid live cards found in DOM or DOM has stale movie/series cards, fallback directly to curated live packages for this country!
-      let liveSourcePackages = [];
-      if (rawCards.length > 0) {
-        liveSourcePackages = rawCards.map((card, i) => {
+      const rawCardIds = rawCards.map(c => String(c.dataset.packageId || "")).join(",");
+      const currentPkgIds = this.packages.map(p => String(p.id || "")).join(",");
+      const packagesListChanged = rawCardIds !== currentPkgIds || this.packages.length === 0;
+
+      if (packagesListChanged) {
+        const list = [];
+        const childMap = new Map();
+
+        rawCards.forEach((card, i) => {
           const id = String(card.dataset.packageId || "");
+          const existingPkg = this.packages.find(p => p.id === id);
           const titleEl = card.querySelector(".vel-package-card__title");
           const title = titleEl ? titleEl.textContent.trim() : card.getAttribute("aria-label") || `Bouquet ${i+1}`;
           const apiPkg = this.cachedApiPackages.find(p => String(p.id) === id);
@@ -1131,85 +1074,25 @@
           const is_parent = card.classList.contains("vel-package-card--parent") || Boolean(apiPkg?.is_parent) || (Array.isArray(apiPkg?.child_package_ids) && apiPkg.child_package_ids.length > 0);
           const childIds = apiPkg?.child_package_ids || [];
 
-          return {
-            id,
-            name: title,
-            display_name: title,
-            catId,
-            rawCover,
-            is_parent,
-            childIds,
-            originalCard: card,
-            apiPkg
-          };
-        });
-      } else if (this.cachedApiPackages.length > 0) {
-        const countryLivePkgs = this.cachedApiPackages.filter(p => !p.country_id || p.country_id === countryId);
-        const candidatePkgs = countryLivePkgs.length > 0 ? countryLivePkgs : this.cachedApiPackages;
-
-        liveSourcePackages = candidatePkgs.map(apiPkg => {
-          const id = String(apiPkg.id);
-          const title = apiPkg.name || apiPkg.display_name || "Bouquet";
-          const catId = apiPkg.category_id || id;
-          const savedLogo = window.__veloraCustomPackageLogos?.[id]
-            || window.__veloraCustomPackageLogos?.[catId]
-            || window.__veloraCustomPackageLogos?.[title]
-            || (function () {
-              try {
-                const l = JSON.parse(localStorage.getItem("velora_package_covers") || "{}");
-                return l[id] || l[catId] || l[title] || "";
-              } catch (_) { return ""; }
-            })();
-          const rawCover = apiPkg.cover_url || savedLogo || "";
-          const is_parent = Boolean(apiPkg.is_parent) || (Array.isArray(apiPkg.child_package_ids) && apiPkg.child_package_ids.length > 0);
-          const childIds = apiPkg.child_package_ids || [];
-
-          return {
-            id,
-            name: title,
-            display_name: title,
-            catId,
-            rawCover,
-            is_parent,
-            childIds,
-            originalCard: null,
-            apiPkg
-          };
-        });
-      }
-
-      if (liveSourcePackages.length === 0) return;
-
-      const currentPkgIds = this.packages.map(p => String(p.id || "")).join(",");
-      const newPkgIds = liveSourcePackages.map(p => String(p.id || "")).join(",");
-      const packagesListChanged = newPkgIds !== currentPkgIds || this.packages.length === 0;
-
-      if (packagesListChanged) {
-        const list = [];
-        const childMap = new Map();
-
-        liveSourcePackages.forEach((srcPkg) => {
-          const id = srcPkg.id;
-          const existingPkg = this.packages.find(p => p.id === id);
           const tempPkg = {
             id,
-            name: srcPkg.name,
-            display_name: srcPkg.display_name,
-            category_id: srcPkg.catId,
-            cover_url: srcPkg.rawCover
+            name: title,
+            display_name: title,
+            category_id: catId,
+            cover_url: rawCover
           };
           const cover_url = this.resolvePackageCover(tempPkg);
 
           const pkgObj = {
             id,
-            name: srcPkg.name,
-            display_name: srcPkg.display_name,
+            name: title,
+            display_name: title,
             cover_url,
-            is_parent: srcPkg.is_parent,
-            child_package_ids: srcPkg.childIds,
-            originalCard: srcPkg.originalCard,
-            source_id: srcPkg.apiPkg?.source_id,
-            category_id: srcPkg.apiPkg?.category_id || srcPkg.catId,
+            is_parent,
+            child_package_ids: childIds,
+            originalCard: card,
+            source_id: apiPkg?.source_id,
+            category_id: apiPkg?.category_id || catId,
             _cachedChannels: (existingPkg && existingPkg._cachedChannels) || (typeof wheelChannelCache !== "undefined" ? wheelChannelCache.get(id) : null) || null,
             _cachedTheme: (existingPkg && existingPkg._cachedTheme) || null
           };
@@ -1217,8 +1100,8 @@
 
           // Build child packages list
           const children = [];
-          if (srcPkg.childIds.length > 0) {
-            srcPkg.childIds.forEach(cid => {
+          if (childIds.length > 0) {
+            childIds.forEach(cid => {
               const childApi = this.cachedApiPackages.find(p => String(p.id) === String(cid));
               if (childApi) {
                 const childTemp = {
@@ -1691,8 +1574,6 @@
           if (!isFlag) {
             if (logoToneCache.get(logo) === "dark") {
               thumbWrap.classList.add("vel-dark-logo-mode");
-            } else if (logoToneCache.has(logo)) {
-              thumbWrap.classList.remove("vel-dark-logo-mode");
             } else if (window.veloraDetectLogoDarkness) {
               window.veloraDetectLogoDarkness(img, thumbWrap);
             }
@@ -1841,27 +1722,18 @@
         el.querySelector(".vel-channel-playing-badge")?.classList.toggle("hidden", !match);
       });
 
-      const pkgCoverRaw = this.activePackage ? this.resolvePackageCover(this.activePackage) : "";
-      const pkgCover = (!isCountryFlagUrl(pkgCoverRaw)) ? pkgCoverRaw : "";
-      let safeIcon = String(ch.stream_icon || ch.logo || ch.cover || "").trim();
-      if (isCountryFlagUrl(safeIcon)) safeIcon = "";
-      if (!safeIcon && pkgCover) safeIcon = pkgCover;
-
-      // Keep player container visible and immediately display animated channel logo loading
+      // Keep player container visible
       const playerContainer = document.getElementById("player-container");
       if (playerContainer) {
         playerContainer.classList.remove("hidden");
         playerContainer.setAttribute("aria-hidden", "false");
       }
-      if (typeof window.veloraShowPlayerBuffering === "function") {
-        window.veloraShowPlayerBuffering(ch.name || ch.title || "Chaîne", safeIcon);
-      } else {
-        const buffering = document.getElementById("player-buffering");
-        if (buffering) {
-          buffering.classList.remove("hidden");
-          buffering.setAttribute("aria-hidden", "false");
-        }
-      }
+
+      const pkgCoverRaw = this.activePackage ? this.resolvePackageCover(this.activePackage) : "";
+      const pkgCover = (!isCountryFlagUrl(pkgCoverRaw)) ? pkgCoverRaw : "";
+      let safeIcon = String(ch.stream_icon || ch.logo || ch.cover || "").trim();
+      if (isCountryFlagUrl(safeIcon)) safeIcon = "";
+      if (!safeIcon && pkgCover) safeIcon = pkgCover;
 
       const item = {
         ...ch,
@@ -2136,495 +2008,4 @@
   } else {
     new LiveWheelEngine();
   }
-
-  // =========================================================================
-  // VELORA PPV / LIVE EVENTS NO-EVENT UX CONTROLLER
-  // =========================================================================
-  function isPpvOfflineStreamUrl(url) {
-    if (!url || typeof url !== "string") return false;
-    return /(?:^|[/?#&=:])(?:video\/)?(?:black|offline|standby|offair|noevent|placeholder|dummy)\.(?:ts|m3u8|mp4)|wdcdn\d*s?\.com\/video\/black|[\/=]black\.ts/i.test(url);
-  }
-
-  function isLikelyPpvChannel(name) {
-    if (!name || typeof name !== "string") return false;
-    return /\b(ppv|event|events|live\s*event|dazn\s*event|disney\+?\s*event|bein\s*max|canal\+\s*live|ufc|boxe|wwe|fight\s*pass|multisports|prime\s*event|rmc\s*live|eurosport\s*event)\b/i.test(name);
-  }
-
-  function getActiveChannelName() {
-    const activeMedia = document.querySelector(".media-item.is-active, .vel-media-item-row.is-active, .media-item[aria-selected='true']");
-    if (activeMedia) {
-      const h4 = activeMedia.querySelector("h4, .media-info h4, .vel-package-card__title");
-      const title = h4 ? (h4.getAttribute("title") || h4.textContent) : activeMedia.getAttribute("aria-label");
-      if (title && title.trim()) return title.trim();
-    }
-    const nowPlayingEl = document.getElementById("now-playing");
-    if (nowPlayingEl) {
-      const tickerTitle = nowPlayingEl.querySelector(".vel-live-ticker__title");
-      const rawText = tickerTitle ? tickerTitle.textContent : nowPlayingEl.textContent;
-      const clean = (rawText || "").replace(/^[▶🔴\s]+/, "").replace(/—\s*En attente.*$/i, "").replace(/\[.*?\]/g, "").trim();
-      if (clean && !clean.toLowerCase().includes("chargement") && !clean.toLowerCase().includes("erreur")) return clean;
-    }
-    return "";
-  }
-
-  const logoColorCache = new Map();
-
-  function applyBufferingColors(bufferingEl, colors) {
-    if (!bufferingEl) return;
-    const wrap = bufferingEl.querySelector(".player-buffering__logo-wrap");
-    if (wrap && colors) {
-      wrap.style.setProperty("--buffering-primary", colors.primary || "#38bdf8");
-      wrap.style.setProperty("--buffering-secondary", colors.secondary || "#818cf8");
-      wrap.style.setProperty("--buffering-glow", colors.glow || "rgba(56, 189, 248, 0.45)");
-    }
-  }
-
-  function extractLogoColors(src, callback) {
-    if (!src || typeof src !== "string") {
-      callback({ primary: "#38bdf8", secondary: "#818cf8", glow: "rgba(56, 189, 248, 0.45)" });
-      return;
-    }
-    const cleanSrc = src.trim();
-    if (logoColorCache.has(cleanSrc)) {
-      callback(logoColorCache.get(cleanSrc));
-      return;
-    }
-
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = function () {
-      try {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d", { willReadFrequently: true });
-        const size = 32;
-        canvas.width = size;
-        canvas.height = size;
-        ctx.drawImage(img, 0, 0, size, size);
-        const imgData = ctx.getImageData(0, 0, size, size).data;
-
-        const colors = [];
-        for (let i = 0; i < imgData.length; i += 4) {
-          const r = imgData[i];
-          const g = imgData[i + 1];
-          const b = imgData[i + 2];
-          const a = imgData[i + 3];
-
-          // Skip transparent or semi-transparent pixels
-          if (a < 80) continue;
-
-          const max = Math.max(r, g, b);
-          const min = Math.min(r, g, b);
-          const delta = max - min;
-          const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-          const saturation = max === 0 ? 0 : delta / max;
-
-          // Skip extreme black / extreme white unless dominant
-          const isNeutral = brightness < 25 || (brightness > 235 && saturation < 0.12);
-          const weight = isNeutral ? 0.1 : (saturation * 2.5 + (brightness > 50 && brightness < 210 ? 1.2 : 0.6));
-
-          colors.push({ r, g, b, weight, brightness, saturation });
-        }
-
-        if (colors.length === 0) {
-          const fallback = { primary: "#38bdf8", secondary: "#818cf8", glow: "rgba(56, 189, 248, 0.45)" };
-          logoColorCache.set(cleanSrc, fallback);
-          callback(fallback);
-          return;
-        }
-
-        // Sort by saturation and vibrant weight
-        colors.sort((c1, c2) => c2.weight - c1.weight);
-        const top = colors[0];
-
-        let r1 = top.r, g1 = top.g, b1 = top.b;
-        if (top.saturation < 0.2) {
-          // If the logo is monochromatic/white/gray (e.g. Canal+), boost slightly with a crisp silver/blue glow
-          r1 = Math.min(255, r1 + 35);
-          g1 = Math.min(255, g1 + 35);
-          b1 = Math.min(255, b1 + 55);
-        }
-
-        // Find a distinct secondary color for the gradient
-        let sec = colors.find(c => {
-          const diff = Math.abs(c.r - r1) + Math.abs(c.g - g1) + Math.abs(c.b - b1);
-          return diff > 80;
-        });
-
-        let r2, g2, b2;
-        if (sec) {
-          r2 = sec.r;
-          g2 = sec.g;
-          b2 = sec.b;
-        } else {
-          // Hue shift for harmonious gradient
-          r2 = Math.min(255, Math.round(g1 * 0.7 + b1 * 0.3));
-          g2 = Math.min(255, Math.round(b1 * 0.7 + r1 * 0.3));
-          b2 = Math.min(255, Math.round(r1 * 0.7 + g1 * 0.3));
-          if (r2 === r1 && g2 === g1 && b2 === b1) {
-            r2 = Math.min(255, r1 + 50);
-            b2 = Math.min(255, b1 + 90);
-          }
-        }
-
-        const primary = `rgb(${r1}, ${g1}, ${b1})`;
-        const secondary = `rgb(${r2}, ${g2}, ${b2})`;
-        const glow = `rgba(${r1}, ${g1}, ${b1}, 0.55)`;
-
-        const result = { primary, secondary, glow };
-        logoColorCache.set(cleanSrc, result);
-        callback(result);
-      } catch (err) {
-        const fallback = { primary: "#38bdf8", secondary: "#818cf8", glow: "rgba(56, 189, 248, 0.45)" };
-        logoColorCache.set(cleanSrc, fallback);
-        callback(fallback);
-      }
-    };
-    img.onerror = function () {
-      const fallback = { primary: "#38bdf8", secondary: "#818cf8", glow: "rgba(56, 189, 248, 0.45)" };
-      callback(fallback);
-    };
-    img.src = cleanSrc;
-  }
-
-  window.veloraShowPlayerBuffering = function (channelName, logoUrl) {
-    window.veloraHidePpvNoEvent();
-    const playerContainer = document.getElementById("player-container");
-    if (playerContainer) {
-      playerContainer.classList.remove("hidden");
-      playerContainer.setAttribute("aria-hidden", "false");
-    }
-    const buffering = document.getElementById("player-buffering");
-    if (buffering) {
-      buffering.classList.remove("hidden");
-      buffering.setAttribute("aria-hidden", "false");
-      const label = buffering.querySelector(".player-buffering__label");
-      if (label) label.textContent = "Chargement…";
-
-      const logoImg = buffering.querySelector("#player-buffering-logo");
-      const fallbackSpinner = buffering.querySelector("#player-buffering-fallback-spinner") || buffering.querySelector(".player-buffering__spinner");
-
-      let resolvedLogo = (logoUrl && typeof logoUrl === "string" ? logoUrl.trim() : "");
-      if (!resolvedLogo) {
-        const activeCard = document.querySelector(".media-item.is-active, .vel-media-item-row.is-active, .vel-media-item-row--active");
-        if (activeCard) {
-          const img = activeCard.querySelector("img.media-icon, img.vel-media-logo, img");
-          if (img && img.src && !isCountryFlagUrl(img.src)) resolvedLogo = img.src;
-        }
-      }
-
-      if (logoImg && fallbackSpinner) {
-        if (resolvedLogo && !isCountryFlagUrl(resolvedLogo)) {
-          extractLogoColors(resolvedLogo, function (colors) {
-            applyBufferingColors(buffering, colors);
-          });
-          logoImg.onload = function () {
-            logoImg.classList.remove("hidden");
-            fallbackSpinner.classList.add("hidden");
-          };
-          logoImg.onerror = function () {
-            logoImg.classList.add("hidden");
-            fallbackSpinner.classList.remove("hidden");
-            applyBufferingColors(buffering, { primary: "#38bdf8", secondary: "#818cf8", glow: "rgba(56, 189, 248, 0.45)" });
-          };
-          logoImg.src = resolvedLogo;
-          logoImg.classList.remove("hidden");
-          fallbackSpinner.classList.add("hidden");
-        } else {
-          logoImg.src = "";
-          logoImg.classList.add("hidden");
-          fallbackSpinner.classList.remove("hidden");
-          applyBufferingColors(buffering, { primary: "#38bdf8", secondary: "#818cf8", glow: "rgba(56, 189, 248, 0.45)" });
-        }
-      }
-    }
-    const chName = (channelName && typeof channelName === "string" ? channelName : getActiveChannelName()).trim();
-    const nowPlaying = document.getElementById("now-playing");
-    if (nowPlaying && chName) {
-      nowPlaying.innerHTML = `
-        <div class="vel-live-ticker">
-          <span class="vel-live-badge">CHARGEMENT</span>
-          <span class="vel-live-ticker__title" title="${chName}">${chName}</span>
-        </div>
-      `;
-      nowPlaying.classList.remove("hidden");
-    }
-  };
-
-  window.veloraHidePlayerBuffering = function () {
-    const buffering = document.getElementById("player-buffering");
-    if (buffering) {
-      buffering.classList.add("hidden");
-      buffering.setAttribute("aria-hidden", "true");
-      const logoImg = buffering.querySelector("#player-buffering-logo");
-      if (logoImg) logoImg.classList.add("hidden");
-    }
-  };
-
-  window.veloraShowPpvNoEvent = function (channelName, customDetails) {
-    window.veloraHidePlayerBuffering();
-    const overlay = document.getElementById("player-ppv-noevent-overlay");
-
-    let chName = "";
-    if (typeof channelName === "string" && channelName.trim()) {
-      chName = channelName.trim();
-    } else {
-      chName = getActiveChannelName();
-    }
-
-    if (overlay) {
-      const titleEl = overlay.querySelector("#vel-ppv-channel-name");
-      if (titleEl) {
-        titleEl.textContent = chName ? `Aucun événement en cours sur ${chName}` : "Aucun événement en cours de diffusion";
-      }
-      overlay.classList.remove("hidden");
-      overlay.setAttribute("aria-hidden", "false");
-    }
-
-    const nowPlaying = document.getElementById("now-playing");
-    if (nowPlaying) {
-      const clean = chName || "Canal Événementiel";
-      nowPlaying.innerHTML = `
-        <div class="vel-live-ticker">
-          <span class="vel-live-badge" style="background: rgba(244,63,94,0.18); color: #fb7185; border: 1px solid rgba(244,63,94,0.35);">
-            🔴 HORS DIRECT
-          </span>
-          <span class="vel-live-ticker__title" title="${clean}">${clean} — En attente d'événement</span>
-        </div>
-      `;
-      nowPlaying.classList.remove("hidden");
-    }
-
-    const video = document.getElementById("video");
-    if (video) {
-      try { video.pause(); } catch (_) {}
-    }
-  };
-
-  window.veloraHidePpvNoEvent = function () {
-    const overlay = document.getElementById("player-ppv-noevent-overlay");
-    if (overlay) {
-      overlay.classList.add("hidden");
-      overlay.setAttribute("aria-hidden", "true");
-    }
-  };
-
-  window.veloraIsPpvOfflineStreamUrl = isPpvOfflineStreamUrl;
-  window.veloraIsLikelyPpvChannel = isLikelyPpvChannel;
-
-  // Intercept window.veloraPlayLiveChannel to always show player loading immediately
-  function hookVeloraPlayLiveChannel() {
-    if (typeof window.veloraPlayLiveChannel === "function" && !window.veloraPlayLiveChannel._veloraLoadingHooked) {
-      const origPlayLive = window.veloraPlayLiveChannel;
-      const hooked = async function (item) {
-        try {
-          const chName = item ? (item.name || item.title || "") : "";
-          const logo = item ? (item.stream_icon || item.logo || item.cover || "") : "";
-          window.veloraShowPlayerBuffering(chName, logo);
-        } catch (_) {}
-        return origPlayLive.apply(this, arguments);
-      };
-      hooked._veloraLoadingHooked = true;
-      window.veloraPlayLiveChannel = hooked;
-    }
-  }
-  hookVeloraPlayLiveChannel();
-  document.addEventListener("DOMContentLoaded", hookVeloraPlayLiveChannel);
-  document.addEventListener("velora-app-ready", hookVeloraPlayLiveChannel);
-  window.setTimeout(hookVeloraPlayLiveChannel, 400);
-  window.setTimeout(hookVeloraPlayLiveChannel, 1200);
-
-  // Global click delegator for Channel Selection & PPV actions
-  document.addEventListener("click", function (e) {
-    // Show instant player buffering spinner when clicking on any channel item in the app
-    const channelRow = e.target && e.target.closest(".vel-media-item-row, .media-item, [data-stream-id]");
-    if (channelRow && !e.target.closest("#btn-close-player, .vel-channel-fav-btn, .vel-package-card")) {
-      const titleEl = channelRow.querySelector("h4, .media-info h4, .media-item__title, .vel-media-title, .vel-package-card__title");
-      const chName = titleEl ? (titleEl.getAttribute("title") || titleEl.textContent) : (channelRow.getAttribute("aria-label") || "");
-      const img = channelRow.querySelector("img.media-icon, img.vel-media-logo, img");
-      const logoUrl = img ? img.src : "";
-      window.veloraShowPlayerBuffering(chName, logoUrl);
-    }
-
-    const retryBtn = e.target && e.target.closest("#vel-ppv-btn-retry");
-    if (retryBtn) {
-      e.preventDefault();
-      e.stopPropagation();
-      window.veloraHidePpvNoEvent();
-      window.veloraShowPlayerBuffering();
-      const activeCard = document.querySelector(".media-item.is-active, .vel-media-item-row.is-active");
-      if (activeCard) {
-        const btn = activeCard.querySelector("button, .media-item__main") || activeCard;
-        btn.click();
-      } else {
-        const video = document.getElementById("video");
-        if (video && video.src) {
-          video.load();
-          video.play().catch(() => {});
-        }
-      }
-      return;
-    }
-
-    const closeBtn = e.target && e.target.closest("#vel-ppv-btn-close");
-    if (closeBtn) {
-      e.preventDefault();
-      e.stopPropagation();
-      window.veloraHidePpvNoEvent();
-      window.veloraHidePlayerBuffering();
-      const closePlayer = document.getElementById("btn-close-player");
-      if (closePlayer) {
-        closePlayer.click();
-      } else if (typeof window.veloraStopAllPlayback === "function") {
-        window.veloraStopAllPlayback();
-      }
-      return;
-    }
-
-    // Hide PPV overlay on clicking any media item card or package card
-    if (e.target && e.target.closest(".media-item, .vel-media-item-row, .vel-package-card, #btn-close-player, #btn-logo-home")) {
-      window.veloraHidePpvNoEvent();
-    }
-  }, true);
-
-  // Monitor video events on #video
-  function bindVideoPpvWatchdog() {
-    const video = document.getElementById("video");
-    if (!video || video.dataset.veloraPpvBound === "1") return;
-    video.dataset.veloraPpvBound = "1";
-
-    const checkStreamOffline = function () {
-      const src = video.currentSrc || video.src || "";
-      if (isPpvOfflineStreamUrl(src)) {
-        window.veloraShowPpvNoEvent();
-      }
-    };
-
-    video.addEventListener("loadstart", function () {
-      const src = video.currentSrc || video.src || "";
-      if (isPpvOfflineStreamUrl(src)) {
-        window.veloraShowPpvNoEvent();
-      } else {
-        window.veloraShowPlayerBuffering();
-      }
-    });
-
-    video.addEventListener("waiting", function () {
-      const src = video.currentSrc || video.src || "";
-      if (isPpvOfflineStreamUrl(src)) {
-        window.veloraShowPpvNoEvent();
-      } else {
-        window.veloraShowPlayerBuffering();
-      }
-    });
-
-    video.addEventListener("seeking", function () {
-      window.veloraShowPlayerBuffering();
-    });
-
-    video.addEventListener("playing", function () {
-      const src = video.currentSrc || video.src || "";
-      if (isPpvOfflineStreamUrl(src)) {
-        window.veloraShowPpvNoEvent();
-      } else {
-        window.veloraHidePpvNoEvent();
-        window.veloraHidePlayerBuffering();
-      }
-    });
-
-    video.addEventListener("canplay", function () {
-      const src = video.currentSrc || video.src || "";
-      if (!isPpvOfflineStreamUrl(src) && !video.paused) {
-        window.veloraHidePlayerBuffering();
-      }
-    });
-
-    video.addEventListener("timeupdate", function () {
-      if (video.currentTime > 0.1 && !video.paused) {
-        const src = video.currentSrc || video.src || "";
-        if (!isPpvOfflineStreamUrl(src)) {
-          window.veloraHidePlayerBuffering();
-        }
-      }
-    });
-
-    video.addEventListener("error", function () {
-      window.veloraHidePlayerBuffering();
-      const src = video.currentSrc || video.src || "";
-      if (isPpvOfflineStreamUrl(src) || isLikelyPpvChannel(getActiveChannelName())) {
-        window.veloraShowPpvNoEvent();
-      }
-    });
-
-    video.addEventListener("loadedmetadata", checkStreamOffline);
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", bindVideoPpvWatchdog);
-  } else {
-    bindVideoPpvWatchdog();
-  }
-
-  // Global fetch & XHR response interceptors for PPV offline status and black.ts detection
-  if (typeof window.fetch === "function") {
-    const originalFetch = window.fetch;
-    window.fetch = function () {
-      const args = arguments;
-      const urlArg = typeof args[0] === "string" ? args[0] : (args[0] && args[0].url ? args[0].url : "");
-      return originalFetch.apply(this, args).then(function (response) {
-        try {
-          if (response) {
-            const ppvHeader = response.headers ? response.headers.get("X-Velora-PPV-Status") : null;
-            if (ppvHeader === "offline" || isPpvOfflineStreamUrl(urlArg) || (response.status === 404 && isLikelyPpvChannel(getActiveChannelName()))) {
-              const livePlayer = document.getElementById("player-container");
-              if (livePlayer && !livePlayer.classList.contains("hidden")) {
-                window.veloraShowPpvNoEvent();
-              }
-              return response;
-            }
-            if (response.ok && (urlArg.includes(".m3u8") || urlArg.includes("/stream") || urlArg.includes("/proxy/"))) {
-              response.clone().text().then(function (text) {
-                if (isPpvOfflineStreamUrl(text)) {
-                  const livePlayer = document.getElementById("player-container");
-                  if (livePlayer && !livePlayer.classList.contains("hidden")) {
-                    window.veloraShowPpvNoEvent();
-                  }
-                }
-              }).catch(function () {});
-            }
-          }
-        } catch (_) {}
-        return response;
-      });
-    };
-  }
-
-  if (typeof window.XMLHttpRequest === "function") {
-    const origOpen = XMLHttpRequest.prototype.open;
-    const origSend = XMLHttpRequest.prototype.send;
-
-    XMLHttpRequest.prototype.open = function (method, url) {
-      this._veloraUrl = typeof url === "string" ? url : "";
-      return origOpen.apply(this, arguments);
-    };
-
-    XMLHttpRequest.prototype.send = function () {
-      this.addEventListener("load", function () {
-        try {
-          const url = this._veloraUrl || "";
-          const ppvHeader = this.getResponseHeader ? this.getResponseHeader("X-Velora-PPV-Status") : null;
-          if (ppvHeader === "offline" || isPpvOfflineStreamUrl(url)) {
-            window.veloraShowPpvNoEvent();
-            return;
-          }
-          if (typeof this.responseText === "string" && (url.includes(".m3u8") || url.includes("/stream") || url.includes("/proxy/"))) {
-            if (isPpvOfflineStreamUrl(this.responseText)) {
-              window.veloraShowPpvNoEvent();
-            }
-          }
-        } catch (_) {}
-      });
-      return origSend.apply(this, arguments);
-    };
-  }
 })();
-

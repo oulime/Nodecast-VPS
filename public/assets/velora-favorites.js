@@ -789,22 +789,9 @@
     window._veloraNavLock = true;
     setTimeout(function () { window._veloraNavLock = false; }, 600);
 
-    if (tab === "search" || !tab || (tab !== "channel" && tab !== "movie" && tab !== "series")) {
-      delete document.body.dataset.veloraReturnFavorites;
-      delete window._veloraFavoriteReturnTab;
-      delete document.body.dataset.veloraReturnAdult;
-      delete document.body.dataset.veloraReturnHome;
-      delete document.body.dataset.veloraSearchMediaOpen;
-      closeActivePlayers();
-      if (typeof window.veloraShowHome === "function") {
-        window.veloraShowHome();
-      } else {
-        document.dispatchEvent(new CustomEvent("velora-show-home"));
-      }
-      return;
-    }
-
-    var targetTab = tab;
+    var targetTab = tab && (tab === "channel" || tab === "movie" || tab === "series")
+      ? tab
+      : state.activeType || "channel";
 
     delete document.body.dataset.veloraReturnFavorites;
     delete window._veloraFavoriteReturnTab;

@@ -5,57 +5,15 @@
   var timer = null;
   var renderedCountry = null;
 
-  function shuffleHomeCards(array) {
-    if (!Array.isArray(array) || array.length <= 1) return Array.isArray(array) ? array.slice() : [];
-    var copy = array.slice();
-    for (var i = copy.length - 1; i > 0; i--) {
-      var j = Math.floor(Math.random() * (i + 1));
-      var temp = copy[i];
-      copy[i] = copy[j];
-      copy[j] = temp;
-    }
-    return copy;
-  }
-
   function sectionsForCountry(data) {
-    var countrySelect = document.getElementById("country-select") || document.getElementById("home-country-select");
-    var country = String(countrySelect?.value || "").toLowerCase().trim();
-    var countryName = String(countrySelect?.selectedOptions?.[0]?.textContent || "").toLowerCase().trim();
-    if (!country) {
-      try {
-        var savedId = localStorage.getItem("lumina_selected_country_id") || sessionStorage.getItem("lumina_selected_country_id");
-        if (savedId) country = String(savedId).toLowerCase().trim();
-        var savedName = localStorage.getItem("velora_selected_country_name_v1") || sessionStorage.getItem("velora_selected_country_name_v1");
-        if (savedName) countryName = String(savedName).toLowerCase().trim();
-      } catch (_) {}
-    }
-    var normCountry = country.replace(/^country_/, "");
-    var normName = countryName.replace(/^country_/, "");
+    var country = String(document.getElementById("country-select")?.value || "");
     var sections = Array.isArray(data?.sections) ? data.sections : [];
-    function hasEnoughItems(row) {
-      if (Array.isArray(row.custom_entries) && row.custom_entries.length > 0) {
-        return row.custom_entries.length >= 3;
-      }
-      if (Array.isArray(row.entries) && row.entries.length > 0) {
-        return row.entries.length >= 3;
-      }
-      return true;
-    }
     var rows = sections.filter(function (row) {
-      if (row.published === false || !hasEnoughItems(row)) return false;
-      var ids = Array.isArray(row.country_ids) && row.country_ids.length ? row.country_ids : String(row.country_id || "").split(",").map(function(s){return s.trim()}).filter(Boolean);
-      if (ids.includes("default") || ids.includes("all") || (!country && !countryName)) return true;
-      if (ids.includes(country)) return true;
-      return ids.some(function(id) {
-        var n = String(id).toLowerCase().replace(/^country_/, "");
-        if (normCountry && (n === normCountry || normCountry.includes(n) || n.includes(normCountry))) return true;
-        if (normName && (n === normName || normName.includes(n) || n.includes(normName))) return true;
-        return false;
-      });
+      return row.published !== false && String(row.country_id || "") === country;
     });
     if (!rows.length) {
       rows = sections.filter(function (row) {
-        return row.published !== false && hasEnoughItems(row);
+        return row.published !== false && (!row.country_id || row.country_id === "default");
       });
     }
     return rows.sort(function (a, b) {
@@ -88,21 +46,6 @@
     name.className = "vel-home-section__name";
     name.textContent = entry.name || "";
     button.append(media, name);
-    var isMediaCard = section.content_type === "movies" || section.content_type === "series" || entry.contentType === "movies" || entry.contentType === "series";
-    if (isMediaCard) {
-      var rawR = entry.rating || entry.vod_rating || entry.vote_average || entry.score || entry.rating_5based;
-      if (rawR != null && rawR !== "") {
-        var numR = typeof rawR === "number" ? rawR : parseFloat(String(rawR).replace(",", "."));
-        if (Number.isFinite(numR) && numR > 0) {
-          var dispR = numR <= 5 ? (numR * 2).toFixed(1) : numR.toFixed(1);
-          var ratingEl = document.createElement("span");
-          ratingEl.className = "vel-home-section__rating-badge vel-media-rating-badge";
-          ratingEl.textContent = "★ " + dispR;
-          ratingEl.setAttribute("aria-label", "Note " + dispR);
-          button.appendChild(ratingEl);
-        }
-      }
-    }
     if (typeof window.veloraBindHomeCardActivation === "function") {
       window.veloraBindHomeCardActivation(button, section, entry);
     }
@@ -116,32 +59,12 @@
 
   function renderIfEmpty() {
     var root = document.getElementById("vel-home-sections");
-    var countrySelect = document.getElementById("country-select") || document.getElementById("home-country-select");
-    var country = String(countrySelect?.value || "");
-    if (!country) {
-      try {
-        country = String(localStorage.getItem("lumina_selected_country_id") || sessionStorage.getItem("lumina_selected_country_id") || "");
-      } catch (_) {}
-    }
+    var country = String(document.getElementById("country-select")?.value || "");
     if (!payload || !root) return;
-    if (root.querySelector(".vel-home-section:not(.vel-home-section--resume) .vel-home-section__card") && renderedCountry === country) return;
+    if (root.querySelector(".vel-home-section__card") && renderedCountry === country) return;
     var sections = sectionsForCountry(payload);
     if (!sections.length) return;
-    var fragment = document.createDocumentFragment();
-    var existingResume = root.querySelector(".vel-home-section--resume");
-    if (existingResume) {
-      fragment.appendChild(existingResume);
-    } else if (typeof window.veloraRenderResumeSection === "function") {
-      var resumeBlock = window.veloraRenderResumeSection();
-      if (resumeBlock) fragment.appendChild(resumeBlock);
-    }
-    var existingFootball = root.querySelector(".vel-home-section--football");
-    if (existingFootball) {
-      fragment.appendChild(existingFootball);
-    } else if (typeof window.veloraRenderFootballSectionDirect === "function") {
-      var footBlock = window.veloraRenderFootballSectionDirect();
-      if (footBlock) fragment.appendChild(footBlock);
-    }
+    root.replaceChildren();
     sections.forEach(function (section) {
       var isHorizontal = section.card_orientation === "horizontal";
       var block = document.createElement("div");
@@ -173,28 +96,11 @@
         var customList = Array.isArray(section.custom_entries) && section.custom_entries.length > 0
           ? section.custom_entries
           : null;
-        var matchedPkg = null;
-        if (window.veloraHomeSectionsState && Array.isArray(window.veloraHomeSectionsState.packages)) {
-          if (section.package_id) {
-            matchedPkg = window.veloraHomeSectionsState.packages.find(function (p) { return String(p.id) === String(section.package_id); });
-          }
-          if (!matchedPkg && section.title) {
-            var sTitle = String(section.title).trim().toLowerCase();
-            matchedPkg = window.veloraHomeSectionsState.packages.find(function (p) { return String(p.name || "").trim().toLowerCase() === sTitle; });
-          }
-        }
         if (typeof window.veloraOpenPrimePackageModal === "function") {
-          var effectiveKind = section.content_type || (matchedPkg && matchedPkg.kind === "series" ? "series" : "movies");
-          window.veloraOpenPrimePackageModal(effectiveKind, {
-            id: section.package_id || (matchedPkg && matchedPkg.id) || section.id || section.title,
+          window.veloraOpenPrimePackageModal(section.content_type || "movies", {
+            id: section.package_id || section.id || section.title,
             name: section.title,
-            category_id: matchedPkg ? matchedPkg.category_id : undefined,
-            categoryId: matchedPkg ? matchedPkg.category_id : undefined,
-            source_id: matchedPkg ? matchedPkg.source_id : undefined,
-            sourceId: matchedPkg ? matchedPkg.source_id : undefined,
-            country_id: matchedPkg ? matchedPkg.country_id : (section.country_id || "country_france"),
-            customItems: customList || undefined,
-            items: (Array.isArray(section.entries) && section.entries.length > 0) ? section.entries : undefined
+            customItems: customList || undefined
           });
         } else if (typeof window.veloraOpenHomeCustomSectionModal === "function") {
           window.veloraOpenHomeCustomSectionModal(block, section.title, section.content_type, section.card_orientation === "horizontal");
@@ -213,35 +119,23 @@
       rail.dataset.testid = "card-container-list";
       railWrap.appendChild(rail);
 
-      var entries = Array.isArray(section.entries) && section.entries.length ? section.entries : (Array.isArray(section.custom_entries) ? section.custom_entries : []);
+      var entries = Array.isArray(section.entries) ? section.entries : [];
       if (typeof window.veloraApplyHomeChannelRules === "function") entries = window.veloraApplyHomeChannelRules(section, entries);
-      entries = shuffleHomeCards(entries);
-      if (entries.length < 3) return;
-      entries.slice(0, 20).forEach(function (entry) {
+      entries.forEach(function (entry) {
         rail.appendChild(card(section, entry));
       });
       block.append(headerSec, railWrap);
-      fragment.appendChild(block);
+      root.appendChild(block);
     });
-    root.replaceChildren(fragment);
-    if (typeof window.veloraInjectFootballSection === "function") window.veloraInjectFootballSection();
     renderedCountry = country;
     document.dispatchEvent(new CustomEvent("velora-home-country-rendered", {
-      detail: { countryId: String(document.getElementById("country-select")?.value || country || "") }
+      detail: { countryId: String(document.getElementById("country-select")?.value || "") }
     }));
   }
 
   async function load() {
     try {
-      var countrySelect = document.getElementById("country-select") || document.getElementById("home-country-select");
-      var cId = countrySelect?.value || "";
-      if (!cId) {
-        try {
-          cId = localStorage.getItem("lumina_selected_country_id") || sessionStorage.getItem("lumina_selected_country_id") || "";
-        } catch (_) {}
-      }
-      var url = "/api/velora-db/home-cache?" + (cId ? "country_id=" + encodeURIComponent(cId) + "&" : "") + "t=" + Date.now();
-      var response = await fetch(url, { cache: "no-store" });
+      var response = await fetch("/api/velora-db/home-cache?t=" + Date.now(), { cache: "no-store" });
       if (!response.ok) return;
       payload = await response.json();
       renderIfEmpty();
@@ -250,19 +144,12 @@
   }
 
   window.addEventListener("load", load, { once: true });
-  document.addEventListener("velora-countries-ready", function() { renderedCountry = null; load(); });
-  document.addEventListener("velora-country-change", function() { renderedCountry = null; load(); });
-  document.addEventListener("velora-country-changed", function() { renderedCountry = null; load(); });
-  window.addEventListener("velora-countries-ready", function() { renderedCountry = null; load(); });
-  window.addEventListener("velora-country-change", function() { renderedCountry = null; load(); });
+  document.addEventListener("velora-countries-ready", load);
   document.addEventListener("velora-home-cache-ready", renderIfEmpty);
   window.setTimeout(load, 1200);
-  document.addEventListener("change", function (e) {
-    if (e.target && (e.target.id === "country-select" || e.target.id === "home-country-select")) {
-      window.setTimeout(function () {
-        renderedCountry = null;
-        load();
-      }, 50);
-    }
-  }, true);
+  window.setTimeout(function () {
+    document.getElementById("country-select")?.addEventListener("change", function () {
+      window.setTimeout(renderIfEmpty, 50);
+    });
+  }, 0);
 })();

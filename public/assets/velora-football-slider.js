@@ -1530,7 +1530,7 @@
     'liga ea sports': 'https://media.api-sports.io/football/leagues/140.png',
     'primera division': 'https://media.api-sports.io/football/leagues/140.png',
     'copa del rey': 'https://media.api-sports.io/football/leagues/143.png',
-    'ligue 1': 'https://media.api-sports.io/football/leagues/61.png',
+    'ligue 1': 'https://r2.thesportsdb.com/images/media/league/badge/9f7z9d1742983155.png',
     'coupe de france': 'https://media.api-sports.io/football/leagues/66.png',
     'ligue 2': 'https://media.api-sports.io/football/leagues/62.png',
     'serie a': 'https://media.api-sports.io/football/leagues/135.png',

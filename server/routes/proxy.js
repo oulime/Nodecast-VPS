@@ -1804,9 +1804,9 @@ router.get('/stream', async (req, res) => {
             currentEntry.activeResponse = response;
             console.log(`[Proxy Stream] OPEN: Range: ${rangeHeader || 'None'} -> ${cleanUrl.substring(0, 80)}`);
 
-            // If upstream returns 458/429/5xx for an m3u8 and we have a cached manifest, serve it IMMEDIATELY
+            // If upstream returns 458/460/429/5xx for an m3u8 and we have a cached manifest, serve it IMMEDIATELY
             // without slamming upstream or sleeping 800ms
-            if ((response.status === 458 || response.status === 429 || response.status >= 500) && isM3u8Url && liveManifestCache.has(url)) {
+            if ((response.status === 458 || response.status === 460 || response.status === 429 || response.status >= 500) && isM3u8Url && liveManifestCache.has(url)) {
                 const cached = liveManifestCache.get(url);
                 if (Date.now() - cached.timestamp < LIVE_MANIFEST_STALE_TTL_MS) {
                     cleanupListeners();
@@ -1822,8 +1822,8 @@ router.get('/stream', async (req, res) => {
                 }
             }
 
-            // Retry on 5xx errors or transient burst rate limits (458, 429) when client is still connected
-            if ((response.status >= 500 || response.status === 458 || response.status === 429) && attempt < maxRetries) {
+            // Retry on 5xx errors or transient burst rate limits (458, 460, 429) when client is still connected
+            if ((response.status >= 500 || response.status === 458 || response.status === 460 || response.status === 429) && attempt < maxRetries) {
                 cleanupListeners();
                 try { abortController.abort(); } catch {}
                 try { response.body?.cancel?.().catch?.(() => {}); } catch {}
@@ -1854,7 +1854,7 @@ router.get('/stream', async (req, res) => {
                 if (activeStreamControllersByAccount.get(accountKey)?.requestId === requestId) {
                     activeStreamControllersByAccount.delete(accountKey);
                 }
-                // If upstream failed with 458/429/5xx and we have a cached manifest, serve it to prevent player stutter
+                // If upstream failed with 458/460/429/5xx and we have a cached manifest, serve it to prevent player stutter
                 if (isM3u8Url && liveManifestCache.has(url)) {
                     const cached = liveManifestCache.get(url);
                     res.set('Access-Control-Allow-Origin', '*');
@@ -1869,7 +1869,7 @@ router.get('/stream', async (req, res) => {
                     const errorBody = await response.text().catch(() => 'N/A');
                     console.error(`403 Response body: ${errorBody.substring(0, 200)}`);
                 }
-                const clientStatus = (response.status === 458 || response.status === 429) ? 503 : response.status;
+                const clientStatus = (response.status === 458 || response.status === 460 || response.status === 429) ? 503 : response.status;
                 if (clientStatus === 503) {
                     res.set('Retry-After', '2');
                 }

@@ -2315,9 +2315,9 @@
   top: 50% !important;
   left: 50% !important;
   transform: translate(-50%, -50%) rotate(-8deg) !important;
-  width: 140px !important;
-  height: 140px !important;
-  opacity: 0.32 !important;
+  width: 130px !important;
+  height: 130px !important;
+  opacity: 0.35 !important;
   pointer-events: none !important;
   z-index: 0 !important;
   transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
@@ -2331,12 +2331,12 @@
   width: 100% !important;
   height: 100% !important;
   object-fit: contain !important;
-  filter: brightness(1.75) contrast(1.15) drop-shadow(0 0 14px var(--comp-theme-glow, rgba(255, 255, 255, 0.4))) !important;
+  filter: brightness(2) contrast(1.2) drop-shadow(0 0 16px var(--comp-theme-glow, rgba(255, 255, 255, 0.45))) !important;
 }
 
 .vel-football-card:hover .vel-football-card__watermark {
-  opacity: 0.5 !important;
-  transform: translate(-50%, -50%) rotate(-3deg) scale(1.08) !important;
+  opacity: 0.55 !important;
+  transform: translate(-50%, -50%) rotate(-3deg) scale(1.05) !important;
 }
 
 /* Lueur radiale supérieure */
@@ -2375,23 +2375,25 @@
 .vel-football-card__comp-pill {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 0.45rem !important;
+  gap: 0.4rem !important;
   background: var(--comp-theme-pill-bg, rgba(255, 255, 255, 0.08)) !important;
   border: 1px solid var(--comp-theme-pill-border, rgba(255, 255, 255, 0.14)) !important;
-  padding: 0.22rem 0.65rem 0.22rem 0.45rem !important;
+  padding: 0.2rem 0.55rem 0.2rem 0.4rem !important;
   border-radius: 9999px !important;
-  max-width: 65% !important;
+  max-width: 68% !important;
   min-width: 0 !important;
+  min-height: 22px !important;
   backdrop-filter: blur(10px) !important;
   -webkit-backdrop-filter: blur(10px) !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
 }
 
 .vel-football-card__comp-logo {
-  width: 20px !important;
-  height: 20px !important;
+  width: 16px !important;
+  height: 16px !important;
+  max-width: 16px !important;
   object-fit: contain !important;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7)) !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7)) !important;
   flex-shrink: 0 !important;
   display: block !important;
 }

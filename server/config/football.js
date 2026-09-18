@@ -64,7 +64,7 @@ const MAJOR_COMPETITIONS = [
         ],
         theSportsDbLeagueIds: ['4334'],
         apiFootballLeagueIds: [61],
-        logo: 'https://media.api-sports.io/football/leagues/61.png',
+        logo: 'https://r2.thesportsdb.com/images/media/league/badge/9f7z9d1742983155.png',
         defaultBroadcasters: ['DAZN', 'beIN Sports 1'],
         order: 4
     },

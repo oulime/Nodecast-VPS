@@ -1488,14 +1488,6 @@
     const globalSearch = document.getElementById("vel-global-search");
     const primeContainer = document.getElementById("vel-prime-carousels-container");
 
-    if (isHome) {
-      if (primeContainer) primeContainer.style.setProperty("display", "none", "important");
-      if (primeSearchBtn) primeSearchBtn.style.setProperty("display", "none", "important");
-      if (velHeader) velHeader.style.setProperty("display", "none", "important");
-      if (stickyTop && !isDetailOrPlayerOpen) stickyTop.style.setProperty("display", "none", "important");
-      return;
-    }
-
     if (isMedia && !isDetailOrPlayerOpen) {
       if (primeContainer) primeContainer.style.removeProperty("display");
       if (stickyTop) stickyTop.style.setProperty("display", "none", "important");

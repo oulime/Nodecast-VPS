@@ -881,8 +881,8 @@
       context.setOptions({
         receiverApplicationId: RECEIVER_APP_ID,
         autoJoinPolicy: window.chrome && window.chrome.cast && window.chrome.cast.AutoJoinPolicy
-          ? window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
-          : "origin_scoped",
+          ? window.chrome.cast.AutoJoinPolicy.TAB_AND_ORIGIN_SCOPED
+          : "tab_and_origin_scoped",
         resumeSavedSession: true
       });
 

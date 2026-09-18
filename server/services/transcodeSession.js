@@ -297,13 +297,11 @@ class TranscodeSession extends EventEmitter {
             args.push('-c:v', 'copy');
 
             // Critical for MKV/MP4 -> TS copy: Convert bitstream from AVCC/HVCC to Annex B
-            if (this.options.videoCodec === 'hevc' || this.options.videoCodec === 'h265') {
+            const vCodec = String(this.options.videoCodec || '').toLowerCase();
+            if (vCodec === 'hevc' || vCodec === 'h265' || vCodec.includes('hvc') || vCodec.includes('hev')) {
                 args.push('-bsf:v', 'hevc_mp4toannexb');
-            } else if (this.options.videoCodec === 'h264' || this.options.videoCodec === 'avc') {
+            } else if (vCodec === 'h264' || vCodec === 'avc' || vCodec.includes('avc1') || !vCodec || vCodec === 'unknown') {
                 args.push('-bsf:v', 'h264_mp4toannexb');
-            } else {
-                // Fallback (e.g. unknown codec), try strict extraction
-                args.push('-bsf:v', 'dump_extra');
             }
         } else {
             this.addVideoEncoderArgs(args, encoder);
@@ -314,7 +312,7 @@ class TranscodeSession extends EventEmitter {
         const audioCodec = this.options.audioCodec?.toLowerCase() || 'unknown';
         const audioChannels = Number(this.options.audioChannels) || 0;
         const audioMixPreset = this.options.audioMixPreset || 'auto';
-        const isStereoAac = audioCodec.includes('aac') && audioChannels === 2;
+        const isStereoAac = (audioCodec.includes('aac') || audioCodec.includes('mp4a')) && audioChannels === 2;
 
         // Define pan filter presets for 5.1 -> Stereo downmix
         const AUDIO_MIX_FILTERS = {

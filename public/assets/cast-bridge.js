@@ -93,6 +93,14 @@
       }
       showCastToast("Diffusion automatique vers la TV activée");
     } else {
+      document.querySelectorAll("video, audio").forEach(function (v) {
+        if (v) {
+          try {
+            v.muted = false;
+            v.volume = 1;
+          } catch (_) {}
+        }
+      });
       showCastToast("Prochaines vidéos sur le téléphone (la TV continue)");
     }
   }
@@ -790,11 +798,13 @@
     state.currentMedia = null;
     state.activeVideo = null;
     window.__veloraCurrentStreamUrl = "";
-    document.querySelectorAll("video").forEach(function (v) {
+    document.querySelectorAll("video, audio").forEach(function (v) {
       if (v) {
         try {
           v.pause();
           v.__veloraCastUrl = "";
+          v.muted = false;
+          v.volume = 1;
         } catch (_) {}
       }
     });
@@ -845,6 +855,9 @@
           url: rawUrl,
           mode: media.isLive ? "live" : "vod",
           videoMode: "copy",
+          videoCodec: media.videoCodec,
+          audioCodec: media.audioCodec,
+          audioChannels: media.audioChannels,
           seekOffset: Math.max(0, Math.floor(media.position || 0)),
           startAt: Math.max(0, Math.floor(media.position || 0))
         })

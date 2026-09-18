@@ -608,6 +608,12 @@
         castSession.endSession(true);
       } catch (_) {}
     }
+    var media = state.currentMedia;
+    if (media && media.castSessionId) {
+      try {
+        fetch("/api/transcode/" + encodeURIComponent(media.castSessionId), { method: "DELETE", keepalive: true }).catch(function () {});
+      } catch (_) {}
+    }
     if (state.airPlayConnected && state.activeVideo) {
       state.airPlayConnected = false;
     }
@@ -651,17 +657,60 @@
     return request;
   }
 
+  async function prepareCastPlayableMedia(media) {
+    if (!media || !media.url) return media;
+    var rawUrl = media.sourceUrl || media.url;
+
+    // If already an internal transcode stream, keep it
+    if (isInternalTranscode(rawUrl)) {
+      media.castUrl = resolveFullPublicUrl(rawUrl);
+      media.castContentType = "application/x-mpegURL";
+      return media;
+    }
+
+    // For raw streams (MP4/MKV/TS/upstream live), request an audio-compatible stream with -c:v copy
+    try {
+      var token = getAuthToken();
+      var headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = "Bearer " + token;
+
+      var res = await fetch("/api/transcode/session", {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify({
+          url: rawUrl,
+          mode: media.isLive ? "live" : "vod",
+          videoMode: "copy",
+          seekOffset: Math.max(0, Math.floor(media.position || 0)),
+          startAt: Math.max(0, Math.floor(media.position || 0))
+        })
+      });
+
+      if (res.ok) {
+        var data = await res.json();
+        if (data && data.playlistUrl) {
+          media.castUrl = resolveFullPublicUrl(data.playlistUrl);
+          media.castContentType = "application/x-mpegURL";
+          media.castSessionId = data.sessionId;
+          return media;
+        }
+      }
+    } catch (err) {
+      console.warn("[VeloraCast] Failed to create audio-safe transcode session, falling back to direct URL", err);
+    }
+
+    // Fallback: direct public URL
+    media.castUrl = resolveFullPublicUrl(media.url);
+    media.castContentType = contentTypeFor(media.castUrl);
+    return media;
+  }
+
   async function loadMediaOnCast(media, options) {
     if (!canUseGoogleCast()) return false;
     var castSession = session();
     if (!castSession) return false;
     if (!media) return false;
-    
-    var castUrl = resolveFullPublicUrl(media.castUrl || media.url);
-    if (!castUrl) {
-      window.alert("L'URL du flux n'est pas accessible par la TV.");
-      return false;
-    }
+
     var key = mediaKey(media);
     if (!options || !options.force) {
       if (state.lastLoadedKey === key) return true;
@@ -672,9 +721,14 @@
       if (typeof window.veloraStopTvAssociationDiffusion === "function") {
         try { window.veloraStopTvAssociationDiffusion(); } catch (_) {}
       }
-      await castSession.loadMedia(buildMediaRequest(media));
+
+      // Ensure audio-compatible stream with universal AAC stereo
+      var castReadyMedia = await prepareCastPlayableMedia(media);
+      var request = buildMediaRequest(castReadyMedia);
+
+      await castSession.loadMedia(request);
       state.lastLoadedKey = key;
-      state.currentMedia = media;
+      state.currentMedia = castReadyMedia;
       rememberSessionActive(true);
       setPhase("PLAYING");
       showCastActiveBar();
@@ -682,6 +736,7 @@
     } catch (error) {
       console.warn("[VeloraCast] loadMedia failed", error);
       setPhase("CONNECTED");
+      showCastActiveBar();
       return false;
     }
   }
@@ -1367,3 +1422,4 @@
     boot();
   }
 })();
+

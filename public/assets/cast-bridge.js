@@ -403,6 +403,16 @@
       try {
         var remoteMedia = castSess.getMediaSession();
         if (remoteMedia) {
+          if (!remoteMedia.__veloraListenerAttached && typeof remoteMedia.addUpdateListener === "function") {
+            remoteMedia.__veloraListenerAttached = true;
+            remoteMedia.addUpdateListener(function () {
+              syncFromRemoteSession(castSess);
+              updateCastBarTime();
+            });
+          }
+          if (!state.currentMedia || !state.currentMedia.title || state.currentMedia.title === "Diffusion TV") {
+            syncFromRemoteSession(castSess);
+          }
           curr = typeof remoteMedia.getEstimatedTime === "function" ? remoteMedia.getEstimatedTime() : (Number(remoteMedia.currentTime) || 0);
           dur = (remoteMedia.media && Number(remoteMedia.media.duration)) || (state.currentMedia && Number(state.currentMedia.duration)) || 0;
           isLive = (remoteMedia.media && remoteMedia.media.streamType === (window.chrome && window.chrome.cast && window.chrome.cast.media ? window.chrome.cast.media.StreamType.LIVE : "LIVE")) || (state.currentMedia && !!state.currentMedia.isLive);
@@ -435,8 +445,10 @@
       var label = durStr ? currStr + " / " + durStr : currStr;
 
       if (timeBadge) {
-        timeBadge.textContent = label;
-        timeBadge.classList.remove("hidden", "is-live");
+        if (curr > 0 || dur > 0) {
+          timeBadge.textContent = label;
+          timeBadge.classList.remove("hidden", "is-live");
+        }
       }
       if (progressFill && Number.isFinite(dur) && dur > 0) {
         var pct = Math.min(100, Math.max(0, (curr / dur) * 100));
@@ -530,15 +542,20 @@
       castSession.addMediaListener(function (mediaSession) {
         if (mediaSession) {
           syncFromRemoteSession(castSession);
+          updateCastBarTime();
           mediaSession.addUpdateListener(function () {
             syncFromRemoteSession(castSession);
+            updateCastBarTime();
           });
         }
       });
       var currentMedia = castSession.getMediaSession();
       if (currentMedia) {
+        syncFromRemoteSession(castSession);
+        updateCastBarTime();
         currentMedia.addUpdateListener(function () {
           syncFromRemoteSession(castSession);
+          updateCastBarTime();
         });
       }
     } catch (_) {}
@@ -546,9 +563,10 @@
 
   function scheduleRemoteSync(castSession) {
     if (!castSession) return;
-    [100, 350, 800, 1800].forEach(function (delay) {
+    [100, 300, 600, 1000, 1500, 2500, 4000, 6000].forEach(function (delay) {
       setTimeout(function () {
         syncFromRemoteSession(castSession);
+        updateCastBarTime();
         showCastActiveBar();
       }, delay);
     });

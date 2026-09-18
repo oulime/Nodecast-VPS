@@ -8,6 +8,8 @@
   const MEDIA_TABS = new Set(["movies", "series"]);
   let isRendering = false;
   let lastFeedKey = "";
+  let lastRenderedTab = "";
+  let lastRenderedCountry = "";
   const feedCache = new Map(); // key: `${countryId}:${tab}` -> feedData
   const packageFullItemsCache = new Map(); // key: `${tab}:${pkgId}` -> full item array
   function shuffleArray(arr) {
@@ -1367,7 +1369,7 @@
     container.style.removeProperty("display");
 
     const feedKey = `${country}:${tab}`;
-    if (!force && feedKey === lastFeedKey && container.children.length > 0) {
+    if (!force && (feedKey === lastFeedKey || (lastRenderedTab === tab && lastRenderedCountry === country)) && container.children.length > 0) {
       return;
     }
 
@@ -1437,6 +1439,8 @@
       }
 
       lastFeedKey = feedKey;
+      lastRenderedTab = tab;
+      lastRenderedCountry = country;
       container.innerHTML = "";
 
       // 1. Randomize package order on each visit across Movies & Series pages
@@ -1578,16 +1582,6 @@
     }
   });
 
-  document.addEventListener("velora-country-change", () => {
-    lastFeedKey = "";
-    lastHomeCountry = null;
-    homeFeedInitialized = false;
-    feedCache.clear();
-    packageFullItemsCache.clear();
-    syncHeaderForMediaTabs();
-    render(true);
-  });
-
   // When background catalog completes loading, do NOT destroy and re-shuffle already rendered carousels
   window.addEventListener("velora-vod-ready", () => {
     const tab = activeTab();
@@ -1606,7 +1600,12 @@
     render(false);
   });
 
-  function onCountryChanged() {
+  function onCountryChanged(force = false) {
+    const currentCountry = getActiveCountryId();
+    if (!force && lastRenderedCountry && currentCountry === lastRenderedCountry) {
+      return; // Same country, ignore startup/watchdog re-triggers
+    }
+    lastRenderedCountry = currentCountry;
     lastFeedKey = "";
     lastHomeCountry = null;
     homeFeedInitialized = false;
@@ -1618,15 +1617,15 @@
 
   document.addEventListener("change", (e) => {
     if (e.target && (e.target.id === "country-select" || e.target.id === "home-country-select")) {
-      onCountryChanged();
+      onCountryChanged(true);
     }
   }, true);
 
-  document.addEventListener("velora-country-change", onCountryChanged);
-  document.addEventListener("velora-country-changed", onCountryChanged);
-  document.addEventListener("velora-countries-ready", onCountryChanged);
-  window.addEventListener("velora-country-change", onCountryChanged);
-  window.addEventListener("velora-countries-ready", onCountryChanged);
+  document.addEventListener("velora-country-change", () => onCountryChanged(false));
+  document.addEventListener("velora-country-changed", () => onCountryChanged(false));
+  document.addEventListener("velora-countries-ready", () => onCountryChanged(false));
+  window.addEventListener("velora-country-change", () => onCountryChanged(false));
+  window.addEventListener("velora-countries-ready", () => onCountryChanged(false));
 
   document.addEventListener("velora-return-home", () => {
     setTimeout(() => initHomeMixedFeed(false), 50);
@@ -1638,10 +1637,9 @@
     const tabChanged = tab !== prevObservedTab;
     if (tabChanged) {
       prevObservedTab = tab;
-      lastFeedKey = "";
       syncHeaderForMediaTabs();
       if (MEDIA_TABS.has(tab)) {
-        render(true);
+        render(false);
       } else if (tab === "home") {
         const c = document.getElementById("vel-prime-carousels-container");
         if (c) c.style.display = "none";

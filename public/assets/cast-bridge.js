@@ -971,7 +971,14 @@
           var sess = context.getCurrentSession();
           if (sess) {
             attachRemoteMediaListeners(sess);
-            scheduleRemoteSync(sess);
+            var localMedia = state.pendingInitialMedia || (isCastAutoDiffuseOn() ? (state.currentMedia || normalizeMedia({})) : null);
+            if (localMedia && localMedia.url) {
+              state.pendingInitialMedia = null;
+              haltMobilePlayersForCast();
+              loadMediaOnCast(localMedia, { force: true });
+            } else {
+              scheduleRemoteSync(sess);
+            }
           }
           showCastActiveBar();
         }

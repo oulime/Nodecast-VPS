@@ -378,6 +378,12 @@
       body.vel-tv-active-bar-open .vel-floating-search {
         top: calc(12px + var(--vel-tv-bar-height, 62px)) !important;
       }
+      body.vel-search-open .vel-tv-active-bar-wrap {
+        opacity: 0 !important;
+        pointer-events: none !important;
+        transform: translateY(-120%) !important;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+      }
 
       .vel-tv-capsule-left {
         display: flex;

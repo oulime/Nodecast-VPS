@@ -97,21 +97,6 @@
   }
 
   function haltMobilePlayersForCast() {
-    try {
-      if (typeof window.veloraCloseActiveTranscodeSession === "function") {
-        window.veloraCloseActiveTranscodeSession();
-      }
-    } catch (_) {}
-
-    var closeVodBtn = document.getElementById("btn-close-vod-player");
-    if (closeVodBtn) {
-      try { closeVodBtn.click(); } catch (_) {}
-    }
-    var closeLiveBtn = document.getElementById("btn-close-player");
-    if (closeLiveBtn) {
-      try { closeLiveBtn.click(); } catch (_) {}
-    }
-
     var liveContainer = document.getElementById("player-container");
     if (liveContainer) liveContainer.classList.add("hidden");
     var vodContainer = document.getElementById("vod-player-container");
@@ -861,12 +846,14 @@
     state.requestPending = false;
     syncButton();
 
-    if (!castSession || token !== state.pendingInitialToken) {
+    if (!castSession) {
       clearLocalCastSessionState();
       syncButton();
       return;
     }
 
+    rememberSessionActive(true);
+    setPhase("CONNECTED");
     attachRemoteMediaListeners(castSession);
     scheduleRemoteSync(castSession);
 
@@ -1163,6 +1150,12 @@
       body.vel-cast-active-bar-open #vel-floating-search,
       body.vel-cast-active-bar-open .vel-floating-search {
         top: calc(12px + var(--vel-cast-bar-height, 62px)) !important;
+      }
+      body.vel-search-open .vel-cast-active-bar-wrap {
+        opacity: 0 !important;
+        pointer-events: none !important;
+        transform: translateY(-120%) !important;
+        transition: opacity 0.2s ease, transform 0.2s ease;
       }
       .vel-cast-capsule-left {
         display: flex;

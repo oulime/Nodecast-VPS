@@ -732,7 +732,14 @@
 
   async function requestUniversalCast() {
     var video = activeVideo();
-    var media = state.currentMedia || normalizeMedia({});
+    var media = normalizeMedia({}) || state.currentMedia;
+    var hasActiveVideo = !!(media && media.url) || !!(video && (video.currentSrc || video.src || !video.paused));
+
+    // If no video is playing/selected, notify the user and do not open cast dialog
+    if (!hasActiveVideo) {
+      showCastToast("Lancez d'abord une vidéo pour la diffuser sur votre TV.");
+      return;
+    }
 
     // 1. iPhone / iPad / Safari: Native WebKit AirPlay Target Picker
     if (isIosOrSafari() || (video && typeof video.webkitShowPlaybackTargetPicker === "function")) {
@@ -744,10 +751,6 @@
           console.warn("[VeloraCast] webkitShowPlaybackTargetPicker failed", err);
         }
       }
-      if (!video && !media) {
-        showCastToast("Lancez d'abord une vidéo pour la diffuser.");
-        return;
-      }
       window.alert(
         "Pour diffuser sur votre TV avec AirPlay :\n\n" +
         "1. Ouvrez le Centre de contrôle iOS (glissez depuis le coin supérieur droit)\n" +
@@ -758,12 +761,12 @@
 
     // 2. Google Cast Sender Framework if available
     if (canUseGoogleCast()) {
-      return requestGoogleCast();
+      return requestGoogleCast(media);
     }
 
     // 3. Try initializing CastContext if cast object already injected
     if (window.cast && window.cast.framework && initCastContext()) {
-      return requestGoogleCast();
+      return requestGoogleCast(media);
     }
 
     // 4. If Paired Smart TV is connected via /api/tv, diffuse to it!
@@ -779,13 +782,7 @@
       return;
     }
 
-    // 6. If no video is active
-    if (!video && !media) {
-      showCastToast("Lancez d'abord une vidéo pour la diffuser.");
-      return;
-    }
-
-    // 7. Otherwise inform the user of options
+    // 6. Otherwise inform the user of options
     window.alert(
       "Diffusion TV (Cast & AirPlay) :\n\n" +
       "• Utilisez Google Chrome sur PC/Android pour caster directement sur Chromecast ou TV Android.\n" +
@@ -794,8 +791,7 @@
     );
   }
 
-  async function requestGoogleCast() {
-    if (state.requestPending) return;
+  async function requestGoogleCast(mediaToCast) {
     if (!canUseGoogleCast()) {
       initCastContext();
       if (!canUseGoogleCast()) {
@@ -806,30 +802,25 @@
 
     var context = window.cast.framework.CastContext.getInstance();
     var castSession = context.getCurrentSession();
-    var currentLocalMedia = normalizeMedia({});
+    var targetMedia = mediaToCast || normalizeMedia({}) || state.currentMedia;
 
-    // If session is already connected
+    if (!targetMedia || !targetMedia.url) {
+      showCastToast("Lancez d'abord une vidéo pour la diffuser sur votre TV.");
+      return;
+    }
+
+    // If session is already connected: perform immediate takeover
     if (castSession) {
       attachRemoteMediaListeners(castSession);
-      // If a local video was active/selected, diffuse it to TV
-      if (currentLocalMedia && currentLocalMedia.url) {
-        haltMobilePlayersForCast();
-        showCastToast("Diffusion vers " + getCastDeviceName() + "…");
-        await loadMediaOnCast(currentLocalMedia, { force: true });
-        return;
-      }
-      // Otherwise sync existing playback from TV and ensure bar is visible
-      syncFromRemoteSession(castSession);
-      showCastActiveBar();
-      showCastToast("Connecté à " + getCastDeviceName());
+      haltMobilePlayersForCast();
+      showCastToast("Diffusion vers " + getCastDeviceName() + "…");
+      await loadMediaOnCast(targetMedia, { force: true });
       return;
     }
 
     // No session connected yet: request session via Chrome Cast prompt
-    var selectedMedia = currentLocalMedia || state.currentMedia;
     state.requestPending = true;
-    state.pendingInitialMedia = selectedMedia;
-    var token = ++state.pendingInitialToken;
+    state.pendingInitialMedia = targetMedia;
     syncButton();
     setPhase("CONNECTING");
 
@@ -840,10 +831,11 @@
       syncButton();
       console.warn("[VeloraCast] requestSession cancelled or failed", error);
       return;
+    } finally {
+      state.requestPending = false;
     }
 
     castSession = context.getCurrentSession();
-    state.requestPending = false;
     syncButton();
 
     if (!castSession) {
@@ -857,18 +849,18 @@
     attachRemoteMediaListeners(castSession);
     scheduleRemoteSync(castSession);
 
-    var mediaToLoad = state.pendingInitialMedia || normalizeMedia({});
+    var mediaToLoad = state.pendingInitialMedia || targetMedia;
     state.pendingInitialMedia = null;
 
     if (mediaToLoad && mediaToLoad.url) {
       haltMobilePlayersForCast();
+      showCastToast("Diffusion vers " + getCastDeviceName() + "…");
       if (!(await loadMediaOnCast(mediaToLoad, { force: true }))) {
         showCastToast("Connecté à la TV. Erreur de chargement du flux.");
       }
     } else {
       syncFromRemoteSession(castSession);
       showCastActiveBar();
-      showCastToast("Connecté à " + getCastDeviceName());
     }
   }
 

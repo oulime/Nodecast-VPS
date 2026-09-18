@@ -1570,10 +1570,12 @@
   }
 
   // Listeners & Lifecycle
-  document.addEventListener("velora-home-tab", () => {
-    lastFeedKey = "";
+  document.addEventListener("velora-home-tab", (e) => {
+    const tab = (e && e.detail && e.detail.tab) || activeTab();
     syncHeaderForMediaTabs();
-    setTimeout(() => render(false), 30);
+    if (MEDIA_TABS.has(tab)) {
+      render(false);
+    }
   });
 
   document.addEventListener("velora-country-change", () => {
@@ -1583,25 +1585,25 @@
     feedCache.clear();
     packageFullItemsCache.clear();
     syncHeaderForMediaTabs();
-    setTimeout(() => render(true), 30);
+    render(true);
   });
 
-  // When Xtream catalog data finishes loading in background, refresh posters if needed
+  // When background catalog completes loading, do NOT destroy and re-shuffle already rendered carousels
   window.addEventListener("velora-vod-ready", () => {
-    if (activeTab() === "home") {
-      return;
-    }
-    lastFeedKey = "";
+    const tab = activeTab();
+    if (tab !== "movies") return;
+    const container = getContainer();
+    if (container && container.children.length > 0) return; // Already rendered cleanly, do not reload!
     syncHeaderForMediaTabs();
-    render();
+    render(false);
   });
   window.addEventListener("velora-series-ready", () => {
-    if (activeTab() === "home") {
-      return;
-    }
-    lastFeedKey = "";
+    const tab = activeTab();
+    if (tab !== "series") return;
+    const container = getContainer();
+    if (container && container.children.length > 0) return; // Already rendered cleanly, do not reload!
     syncHeaderForMediaTabs();
-    render();
+    render(false);
   });
 
   function onCountryChanged() {
@@ -1611,7 +1613,7 @@
     feedCache.clear();
     packageFullItemsCache.clear();
     syncHeaderForMediaTabs();
-    setTimeout(() => render(true), 30);
+    render(true);
   }
 
   document.addEventListener("change", (e) => {
@@ -1628,14 +1630,6 @@
 
   document.addEventListener("velora-return-home", () => {
     setTimeout(() => initHomeMixedFeed(false), 50);
-  });
-
-  document.addEventListener("click", (e) => {
-    const tabBtn = e.target && e.target.closest("[data-tab='movies'], [data-tab='series'], [data-tab='vod'], #tab-movies, #tab-series, [data-tab-filter='movies'], [data-tab-filter='series']");
-    if (tabBtn) {
-      lastFeedKey = "";
-      setTimeout(() => render(true), 40);
-    }
   });
 
   let prevObservedTab = "";

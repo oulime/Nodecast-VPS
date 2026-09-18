@@ -166,11 +166,6 @@
       localStorage.setItem("velora_tv_auto_diffuse", enabled ? "true" : "false");
     } catch (_) {}
     if (enabled) {
-      if (window.VeloraCast && typeof window.VeloraCast.isConnected === "function" && window.VeloraCast.isConnected()) {
-        if (typeof window.VeloraCast.stop === "function") {
-          window.VeloraCast.stop(false);
-        }
-      }
       haltMobilePlayers();
     }
     syncActiveTvBar();
@@ -1176,13 +1171,6 @@
   // Send media to play on TV
   async function sendToTv(media) {
     try {
-      // 0. Stop Google Cast / AirPlay if currently active
-      if (window.VeloraCast && typeof window.VeloraCast.isConnected === "function" && window.VeloraCast.isConnected()) {
-        if (typeof window.VeloraCast.stop === "function") {
-          window.VeloraCast.stop(false);
-        }
-      }
-
       // 1. Close mobile transcode session if running
       try {
         if (typeof window.veloraCloseActiveTranscodeSession === "function") {

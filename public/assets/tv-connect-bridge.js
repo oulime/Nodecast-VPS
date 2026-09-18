@@ -36,10 +36,138 @@
     }
   }
 
+  function shouldSuppressMobilePlayback() {
+    return !!(tvState.hasPairedTv && tvState.isOnline && isAutoDiffuseOn());
+  }
+
+  function isMobilePlayerElement(el) {
+    if (!el || !(el instanceof Element)) return false;
+    var tag = el.tagName ? el.tagName.toUpperCase() : "";
+    if (tag !== "VIDEO" && tag !== "AUDIO") return false;
+    if (el.id === "video" || el.id === "video-vod") return true;
+    return !!(el.closest && (el.closest("#player-container") || el.closest("#vod-player-container") || el.closest(".video-wrapper")));
+  }
+
+  function haltMobilePlayers() {
+    try {
+      if (typeof window.veloraCloseActiveTranscodeSession === "function") {
+        window.veloraCloseActiveTranscodeSession();
+      }
+    } catch (_) {}
+
+    var closeVodBtn = document.getElementById("btn-close-vod-player");
+    if (closeVodBtn) {
+      try { closeVodBtn.click(); } catch (_) {}
+    }
+    var closeLiveBtn = document.getElementById("btn-close-player");
+    if (closeLiveBtn) {
+      try { closeLiveBtn.click(); } catch (_) {}
+    }
+
+    var liveContainer = document.getElementById("player-container");
+    if (liveContainer) liveContainer.classList.add("hidden");
+    var vodContainer = document.getElementById("vod-player-container");
+    if (vodContainer) vodContainer.classList.add("hidden");
+
+    var vElements = [document.getElementById("video-vod"), document.getElementById("video")];
+    document.querySelectorAll("video, audio").forEach(function (v) {
+      if (vElements.indexOf(v) === -1) vElements.push(v);
+    });
+
+    vElements.forEach(function (v) {
+      if (!v) return;
+      try {
+        v.pause();
+        v.muted = true;
+        if (shouldSuppressMobilePlayback()) {
+          v.removeAttribute("src");
+          v.load();
+        }
+      } catch (_) {}
+    });
+  }
+
+  function installPlaybackProtections() {
+    if (window.__veloraTvPlaybackProtectionsInstalled) return;
+    window.__veloraTvPlaybackProtectionsInstalled = true;
+
+    // 1. Intercept HTMLMediaElement.prototype.play
+    var origPlay = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function () {
+      if (shouldSuppressMobilePlayback() && isMobilePlayerElement(this)) {
+        try {
+          this.pause();
+          this.muted = true;
+          this.removeAttribute("src");
+          this.load();
+        } catch (_) {}
+        return Promise.resolve();
+      }
+      return origPlay.apply(this, arguments);
+    };
+
+    // 2. Intercept HTMLMediaElement.prototype.src
+    try {
+      var srcDesc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, "src");
+      if (srcDesc && srcDesc.set && srcDesc.get) {
+        Object.defineProperty(HTMLMediaElement.prototype, "src", {
+          get: function () {
+            return srcDesc.get.call(this);
+          },
+          set: function (val) {
+            if (shouldSuppressMobilePlayback() && isMobilePlayerElement(this) && val) {
+              try {
+                this.pause();
+                this.muted = true;
+              } catch (_) {}
+              return;
+            }
+            return srcDesc.set.call(this, val);
+          },
+          configurable: true,
+          enumerable: true
+        });
+      }
+    } catch (_) {}
+
+    // 3. Intercept Element.prototype.setAttribute for 'src'
+    try {
+      var origSetAttr = Element.prototype.setAttribute;
+      Element.prototype.setAttribute = function (name, value) {
+        if (name && String(name).toLowerCase() === "src" && shouldSuppressMobilePlayback() && isMobilePlayerElement(this) && value) {
+          try {
+            this.pause();
+            this.muted = true;
+          } catch (_) {}
+          return;
+        }
+        return origSetAttr.apply(this, arguments);
+      };
+    } catch (_) {}
+
+    // 4. Capture media playback events on window to immediately silence background mobile decoding
+    var captureMediaEvents = ["play", "playing", "loadstart", "loadeddata", "canplay"];
+    captureMediaEvents.forEach(function (evt) {
+      window.addEventListener(evt, function (e) {
+        if (shouldSuppressMobilePlayback() && isMobilePlayerElement(e.target)) {
+          try {
+            e.target.pause();
+            e.target.muted = true;
+            e.target.removeAttribute("src");
+            e.target.load();
+          } catch (_) {}
+        }
+      }, true);
+    });
+  }
+
   function setAutoDiffuse(enabled) {
     try {
       localStorage.setItem("velora_tv_auto_diffuse", enabled ? "true" : "false");
     } catch (_) {}
+    if (enabled) {
+      haltMobilePlayers();
+    }
     syncActiveTvBar();
     renderTvSettingsSection();
     showTvToast(enabled ? "Diffusion vers la Smart TV activée" : "Lecture locale sur téléphone activée");
@@ -462,19 +590,36 @@
     } catch (_) {}
   }
 
+  function updateTvTabDot() {
+    var dot = document.getElementById("vel-tab-tv-dot");
+    if (!dot) return;
+    if (tvState.hasPairedTv) {
+      dot.classList.remove("hidden");
+      dot.style.background = tvState.isOnline ? "#4ade80" : "#94a3b8";
+      dot.style.boxShadow = tvState.isOnline ? "0 0 8px #4ade80" : "none";
+    } else {
+      dot.classList.add("hidden");
+    }
+  }
+
   function updateTvBadgeOnly() {
     var badge = document.querySelector(".vel-profile-tv-status-badge");
     if (badge) {
       badge.className = "vel-profile-tv-status-badge " + (tvState.isOnline ? "is-online" : "");
       badge.textContent = tvState.isOnline ? "● En ligne" : "○ Hors ligne";
     }
+    updateTvTabDot();
   }
 
   function removeActiveTvBar() {
     var wrap = document.getElementById("vel-tv-active-bar-wrap");
     if (wrap) wrap.remove();
-    document.body.classList.remove("vel-tv-active-bar-open");
-    document.documentElement.style.removeProperty("--vel-tv-bar-height");
+    if (document.body && document.body.classList) {
+      document.body.classList.remove("vel-tv-active-bar-open");
+    }
+    if (document.documentElement && document.documentElement.style) {
+      document.documentElement.style.removeProperty("--vel-tv-bar-height");
+    }
   }
 
   // Synchronize the upper active diffusion bar
@@ -578,11 +723,13 @@
     document.body.appendChild(wrap);
     document.body.classList.add("vel-tv-active-bar-open");
 
-    requestAnimationFrame(function () {
+    (window.requestAnimationFrame || window.setTimeout)(function () {
       var barEl = wrap.querySelector(".vel-tv-active-bar");
       var h = (barEl ? barEl.offsetHeight : 48) + 14;
-      document.documentElement.style.setProperty("--vel-tv-bar-height", h + "px");
-    });
+      if (document.documentElement && document.documentElement.style) {
+        document.documentElement.style.setProperty("--vel-tv-bar-height", h + "px");
+      }
+    }, 16);
 
     var phoneBtn = wrap.querySelector(".vel-tv-segment-btn[data-mode='phone']");
     if (phoneBtn) {
@@ -649,7 +796,51 @@
         tvState.isOnline = Boolean(data.isOnline);
         tvState.deviceId = data.deviceId || null;
         tvState.deviceName = data.deviceName || "Smart TV";
-        tvState.currentMedia = (data.isOnline && data.currentMedia && data.currentMedia.state !== "stopped") ? data.currentMedia : null;
+
+        if (data.isOnline && data.currentMedia && data.currentMedia.state !== "stopped") {
+          tvState.currentMedia = data.currentMedia;
+          try {
+            var curPos = Number(data.currentMedia.position) || 0;
+            var curDur = Number(data.currentMedia.duration) || 0;
+            var cmId = String(data.currentMedia.id || data.currentMedia.streamId || data.currentMedia.mediaId || "");
+            var cmTitle = (data.currentMedia.title || data.currentMedia.name || "").trim().toLowerCase();
+
+            if (curPos > 3 && (cmId || cmTitle)) {
+              var uid = getCurrentUserId();
+              var histKey = "velora_resume_v13_" + uid;
+              var histRaw = localStorage.getItem(histKey);
+              var list = histRaw ? JSON.parse(histRaw) : [];
+              if (Array.isArray(list)) {
+                var foundIdx = list.findIndex(function (it) {
+                  return (cmId && (String(it.id) === cmId || String(it.streamId) === cmId || String(it.episodeStreamId) === cmId)) ||
+                         (cmTitle && it.name && it.name.trim().toLowerCase() === cmTitle);
+                });
+                if (foundIdx >= 0) {
+                  list[foundIdx].currentTime = curPos;
+                  if (curDur > 0) list[foundIdx].duration = curDur;
+                  if (curDur > 0) list[foundIdx].progressPercent = Math.min(100, Math.max(0, (curPos / curDur) * 100));
+                  list[foundIdx].updatedAt = Date.now();
+                  localStorage.setItem(histKey, JSON.stringify(list));
+                  document.dispatchEvent(new CustomEvent("velora-watch-history-updated", { detail: { items: list } }));
+                  if (typeof window.veloraRenderResumeSection === "function") {
+                    var rootEl = document.getElementById("vel-home-sections");
+                    if (rootEl) {
+                      var exEl = rootEl.querySelector(".vel-home-section--resume");
+                      var freshBlock = window.veloraRenderResumeSection();
+                      if (freshBlock) {
+                        if (exEl) exEl.replaceWith(freshBlock);
+                        else rootEl.prepend(freshBlock);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          } catch (_) {}
+        } else {
+          tvState.currentMedia = null;
+        }
+
         tvState.lastChecked = Date.now();
         saveCachedTvStatus();
 
@@ -689,21 +880,26 @@
     } catch (_) {}
   }
 
-  // Render TV Section into Profile Modal
-  function renderTvSettingsSection() {
+  // Render TV Section into Profile Modal (Tab: Smart TV)
+  function renderTvSettingsSection(force) {
     var modal = document.getElementById("vel-profile-account-modal");
     if (!modal) return;
-    var card = modal.querySelector(".vel-profile-account__card");
-    if (!card) return;
+    var mountPoint = document.getElementById("vel-tv-panel-mount");
+    var target = mountPoint || modal.querySelector(".vel-profile-account__card");
+    if (!target) return;
 
     var existing = document.getElementById("vel-profile-tv-card");
     if (existing) {
-      var pinInput = document.getElementById("vel-tv-pin-input");
-      if (pinInput && (document.activeElement === pinInput || pinInput.value.length > 0)) {
-        return;
+      if (!force) {
+        var pinInput = document.getElementById("vel-tv-pin-input");
+        if (pinInput && document.activeElement === pinInput && pinInput.value.length < 4) {
+          return;
+        }
       }
       existing.remove();
     }
+
+    updateTvTabDot();
 
     var section = document.createElement("div");
     section.id = "vel-profile-tv-card";
@@ -715,44 +911,62 @@
       var isOn = isAutoDiffuseOn();
 
       section.innerHTML = `
-        <div class="vel-profile-tv-header">
-          <span class="vel-profile-tv-title">Smart TV Connectée</span>
-          <span class="vel-profile-tv-status-badge ${tvState.isOnline ? "is-online" : ""}">
-            ${tvState.isOnline ? "● En ligne" : "○ Hors ligne"}
-          </span>
-        </div>
-        <p class="vel-profile-tv-desc">
-          Appareil : <strong>${tvState.deviceName}</strong><br />
-          ${tvState.isOnline 
-            ? (isDiffusionActive 
-                ? `Diffusion active : <strong class="vel-profile-tv-now-playing">${currentTitle}</strong>` 
-                : "Prête pour la diffusion depuis votre mobile.") 
-            : "Ouvrez <em>nodecast.veloravip.net/tv</em> sur votre TV pour diffuser."}
-        </p>
-        ${tvState.isOnline ? `
-          <div class="vel-profile-tv-switch-row">
-            <div class="vel-profile-tv-switch-info">
-              <span class="vel-profile-tv-switch-title">Destination de lecture</span>
-              <span class="vel-profile-tv-switch-desc">${isOn ? "Diffusion automatique vers la TV" : "Lecture locale sur le téléphone"}</span>
+        <div class="vel-tv-connected-card">
+          <div class="vel-tv-connected-header">
+            <div class="vel-tv-connected-icon">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 6L9 17l-5-5"/>
+              </svg>
             </div>
-            <div class="vel-tv-segmented-switch" role="group">
-              <button type="button" class="vel-tv-segment-btn ${!isOn ? "is-active" : ""}" id="vel-profile-mode-phone" title="Téléphone">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="3" ry="3"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
-              </button>
-              <button type="button" class="vel-tv-segment-btn ${isOn ? "is-active" : ""}" id="vel-profile-mode-tv" title="Smart TV">
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-              </button>
+            <div class="vel-tv-connected-meta">
+              <div class="vel-tv-connected-title-row">
+                <h3 class="vel-tv-connected-title">Smart TV Connectée</h3>
+                <span class="vel-profile-tv-status-badge ${tvState.isOnline ? "is-online" : ""}">
+                  ${tvState.isOnline ? "● En ligne" : "○ Hors ligne"}
+                </span>
+              </div>
+              <p class="vel-tv-connected-device">Appareil : <strong>${tvState.deviceName || "Smart TV"}</strong></p>
             </div>
           </div>
-        ` : ""}
-        <div style="display:flex; justify-content:flex-end;">
-          <button type="button" id="vel-tv-unlink-btn" class="vel-profile-tv-btn vel-profile-tv-btn--danger">
-            Dissocier cette TV
-          </button>
+
+          <div class="vel-tv-connected-status-desc">
+            ${tvState.isOnline 
+              ? (isDiffusionActive 
+                  ? `Diffusion active : <strong class="vel-profile-tv-now-playing">${currentTitle}</strong>` 
+                  : "Prête pour la diffusion depuis votre téléphone.") 
+              : "Ouvrez <strong>veloravip.net/tv</strong> sur votre TV pour diffuser."}
+          </div>
+
+          ${tvState.isOnline ? `
+            <div class="vel-profile-tv-switch-row">
+              <div class="vel-profile-tv-switch-info">
+                <span class="vel-profile-tv-switch-title">Destination de lecture</span>
+                <span class="vel-profile-tv-switch-desc">${isOn ? "Diffusion automatique vers la TV" : "Lecture locale sur le téléphone"}</span>
+              </div>
+              <div class="vel-tv-segmented-switch" role="group">
+                <button type="button" class="vel-tv-segment-btn ${!isOn ? "is-active" : ""}" id="vel-profile-mode-phone" title="Téléphone">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="3" ry="3"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+                </button>
+                <button type="button" class="vel-tv-segment-btn ${isOn ? "is-active" : ""}" id="vel-profile-mode-tv" title="Smart TV">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                </button>
+              </div>
+            </div>
+          ` : ""}
+
+          <div class="vel-tv-connected-actions">
+            <button type="button" id="vel-tv-unlink-btn" class="vel-profile-tv-btn vel-profile-tv-btn--danger">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                <line x1="12" y1="2" x2="12" y2="12"></line>
+              </svg>
+              <span>Déconnecter la TV</span>
+            </button>
+          </div>
+          <p id="vel-tv-pair-status" class="vel-profile-tv-msg"></p>
         </div>
-        <p id="vel-tv-pair-status" class="vel-profile-tv-msg"></p>
       `;
-      card.appendChild(section);
+      target.appendChild(section);
 
       var phoneBtn = document.getElementById("vel-profile-mode-phone");
       if (phoneBtn) {
@@ -775,7 +989,7 @@
       var unlinkBtn = document.getElementById("vel-tv-unlink-btn");
       if (unlinkBtn) {
         unlinkBtn.addEventListener("click", async function () {
-          if (!window.confirm("Voulez-vous vraiment dissocier votre TV ?")) return;
+          if (!window.confirm("Voulez-vous vraiment déconnecter votre TV ?")) return;
           unlinkBtn.disabled = true;
           try {
             var res = await fetch("/api/tv/unlink", {
@@ -787,11 +1001,16 @@
               tvState.hasPairedTv = false;
               tvState.isOnline = false;
               tvState.currentMedia = null;
+              saveCachedTvStatus();
               removeActiveTvBar();
-              renderTvSettingsSection();
+              updateTvTabDot();
+              renderTvSettingsSection(true);
+              showTvToast("TV déconnectée");
+            } else {
+              window.alert("Erreur lors de la déconnexion");
             }
           } catch (e) {
-            window.alert("Erreur lors de la dissociation");
+            window.alert("Erreur lors de la déconnexion");
           } finally {
             unlinkBtn.disabled = false;
           }
@@ -799,36 +1018,56 @@
       }
     } else {
       section.innerHTML = `
-        <div class="vel-profile-tv-header">
-          <span class="vel-profile-tv-title">📺 Connexion Smart TV</span>
+        <div class="vel-tv-tab-box">
+          <div class="vel-tv-tab-hero">
+            <div class="vel-tv-tab-icon-wrap">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+                <polyline points="17 2 12 7 7 2"></polyline>
+              </svg>
+            </div>
+            <h3 class="vel-tv-tab-title">Diffuser sur Smart TV</h3>
+          </div>
+
+          <div class="vel-tv-instructions">
+            <div class="vel-tv-step">
+              <span class="vel-tv-step-num">1</span>
+              <div class="vel-tv-step-text">
+                Sur votre TV, ouvrez le navigateur web et accédez à :
+                <div><span class="vel-tv-url-pill">veloravip.net/tv</span></div>
+              </div>
+            </div>
+            <div class="vel-tv-step">
+              <span class="vel-tv-step-num">2</span>
+              <div class="vel-tv-step-text">
+                Entrez le code à 4 chiffres affiché sur votre TV :
+              </div>
+            </div>
+          </div>
+
+          <div class="vel-tv-pin-entry">
+            <input type="text" id="vel-tv-pin-input" class="vel-tv-pin-input" placeholder="••••" maxlength="4" inputmode="numeric" autocomplete="off" />
+          </div>
+          <p id="vel-tv-pair-status" class="vel-profile-tv-msg"></p>
         </div>
-        <p class="vel-profile-tv-desc">
-          Ouvrez <strong>nodecast.veloravip.net/tv</strong> sur votre TV et entrez le code à 4 chiffres affiché :
-        </p>
-        <div class="vel-profile-tv-pair-row">
-          <input type="text" id="vel-tv-pin-input" class="vel-profile-tv-input" placeholder="0000" maxlength="4" inputmode="numeric" />
-          <button type="button" id="vel-tv-submit-pin" class="vel-profile-tv-btn vel-profile-tv-btn--primary">
-            Connecter
-          </button>
-        </div>
-        <p id="vel-tv-pair-status" class="vel-profile-tv-msg"></p>
       `;
-      card.appendChild(section);
+      target.appendChild(section);
 
       var pinInput = document.getElementById("vel-tv-pin-input");
-      var submitBtn = document.getElementById("vel-tv-submit-pin");
       var statusMsg = document.getElementById("vel-tv-pair-status");
+      var isSubmitting = false;
 
       async function submitPin() {
-        var pin = pinInput.value.trim();
-        if (pin.length !== 4) {
-          statusMsg.className = "vel-profile-tv-msg is-error";
-          statusMsg.textContent = "Entrez un code à 4 chiffres.";
-          return;
+        if (isSubmitting || !pinInput) return;
+        var pin = pinInput.value.replace(/\D/g, "").slice(0, 4);
+        if (pin.length !== 4) return;
+
+        isSubmitting = true;
+        pinInput.disabled = true;
+        if (statusMsg) {
+          statusMsg.className = "vel-profile-tv-msg";
+          statusMsg.textContent = "Connexion en cours…";
         }
-        submitBtn.disabled = true;
-        statusMsg.className = "vel-profile-tv-msg";
-        statusMsg.textContent = "Connexion en cours…";
 
         try {
           var res = await fetch("/api/tv/pair", {
@@ -838,72 +1077,76 @@
           });
           var data = await res.json();
           if (data.ok) {
-            statusMsg.className = "vel-profile-tv-msg is-success";
-            statusMsg.textContent = "TV connectée avec succès !";
-            setTimeout(checkTvStatus, 600);
+            tvState.hasPairedTv = true;
+            tvState.deviceName = data.deviceName || "Smart TV";
+            tvState.isOnline = true;
+            saveCachedTvStatus();
+            updateTvTabDot();
+            syncActiveTvBar();
+            showTvToast("🎉 Smart TV connectée avec succès !");
+            renderTvSettingsSection(true);
           } else {
-            statusMsg.className = "vel-profile-tv-msg is-error";
-            statusMsg.textContent = data.error || "Code invalide ou expiré.";
+            if (statusMsg) {
+              statusMsg.className = "vel-profile-tv-msg is-error";
+              statusMsg.textContent = data.error || "Code invalide ou expiré.";
+            }
+            pinInput.disabled = false;
+            pinInput.value = "";
+            pinInput.focus();
           }
         } catch (e) {
-          statusMsg.className = "vel-profile-tv-msg is-error";
-          statusMsg.textContent = "Erreur de connexion au serveur.";
+          if (statusMsg) {
+            statusMsg.className = "vel-profile-tv-msg is-error";
+            statusMsg.textContent = "Erreur de connexion au serveur.";
+          }
+          pinInput.disabled = false;
+          pinInput.value = "";
+          pinInput.focus();
         } finally {
-          submitBtn.disabled = false;
+          isSubmitting = false;
         }
       }
 
-      if (submitBtn) submitBtn.addEventListener("click", submitPin);
       if (pinInput) {
-        pinInput.addEventListener("keydown", function (e) {
-          if (e.key === "Enter") submitPin();
-        });
         pinInput.addEventListener("input", function () {
-          if (pinInput.value.trim().length === 4) submitPin();
+          pinInput.value = pinInput.value.replace(/\D/g, "").slice(0, 4);
+          if (pinInput.value.length === 4) {
+            submitPin();
+          }
+        });
+        pinInput.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" && pinInput.value.trim().length === 4) {
+            submitPin();
+          }
         });
       }
     }
   }
 
+  window.veloraRenderTvTab = function () {
+    renderTvSettingsSection(false);
+    updateTvTabDot();
+  };
+
   // Send media to play on TV
   async function sendToTv(media) {
     try {
-      // 1. Close mobile transcode session if running
-      try {
-        if (typeof window.veloraCloseActiveTranscodeSession === "function") {
-          window.veloraCloseActiveTranscodeSession();
-        }
-      } catch (_) {}
+      // 1. Immediately halt mobile players on phone
+      haltMobilePlayers();
 
-      // 2. Trigger native mobile player close buttons
-      var closeVodBtn = document.getElementById("btn-close-vod-player");
-      if (closeVodBtn) {
-        try { closeVodBtn.click(); } catch (_) {}
-      }
-      var closeLiveBtn = document.getElementById("btn-close-player");
-      if (closeLiveBtn) {
-        try { closeLiveBtn.click(); } catch (_) {}
-      }
-
-      // 3. Completely pause and unload all mobile video players
-      document.querySelectorAll("video").forEach(function (videoEl) {
-        try {
-          videoEl.pause();
-          videoEl.removeAttribute("src");
-          videoEl.load();
-        } catch (_) {}
+      // Schedule staggered suppression sweeps to neutralize delayed async player invocations
+      [50, 150, 300, 600, 1200, 2000].forEach(function (delay) {
+        setTimeout(function () {
+          if (shouldSuppressMobilePlayback()) {
+            haltMobilePlayers();
+          }
+        }, delay);
       });
 
-      // Hide mobile player containers so phone stops displaying the player
-      var liveContainer = document.getElementById("player-container");
-      if (liveContainer) liveContainer.classList.add("hidden");
-      var vodContainer = document.getElementById("vod-player-container");
-      if (vodContainer) vodContainer.classList.add("hidden");
-
-      // 4. Cool-down pause (400ms)
+      // 2. Cool-down pause (400ms)
       await new Promise(function (resolve) { setTimeout(resolve, 400); });
 
-      // 5. Resolve best stream URL for the TV
+      // 3. Resolve best stream URL for the TV
       var targetUrl = media.url || media.castUrl || media.direct_source || media.sourceUrl;
 
       if (targetUrl) {
@@ -921,8 +1164,45 @@
         }
       }
 
+      // 4. Resolve resume position from pending seek or local watch history
+      var targetPosition = Number(media.position ?? media.currentTime) || 0;
+      if (targetPosition <= 0 && window.__veloraPendingResumeSeek && window.__veloraPendingResumeSeek.targetSeconds > 3) {
+        targetPosition = window.__veloraPendingResumeSeek.targetSeconds;
+      }
+      if (targetPosition <= 0) {
+        try {
+          var uid = getCurrentUserId();
+          var histKey = "velora_resume_v13_" + uid;
+          var histRaw = localStorage.getItem(histKey);
+          if (!histRaw) {
+            for (var ki = 0; ki < localStorage.length; ki++) {
+              var lk = localStorage.key(ki);
+              if (lk && lk.startsWith("velora_resume_v13_")) {
+                histRaw = localStorage.getItem(lk);
+                if (histRaw) break;
+              }
+            }
+          }
+          if (histRaw) {
+            var list = JSON.parse(histRaw);
+            if (Array.isArray(list)) {
+              var mId = String(media.id || media.streamId || media.stream_id || "");
+              var mTitle = (media.title || media.name || "").trim().toLowerCase();
+              var found = list.find(function (it) {
+                return (mId && (String(it.id) === mId || String(it.streamId) === mId || String(it.episodeStreamId) === mId)) ||
+                       (mTitle && it.name && it.name.trim().toLowerCase() === mTitle);
+              });
+              if (found && Number(found.currentTime) > 5) {
+                targetPosition = Math.max(0, Number(found.currentTime) - 3);
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
       var payload = {
         ...media,
+        position: targetPosition,
         url: targetUrl
       };
 
@@ -956,7 +1236,11 @@
         showTvToast("La TV semble en veille — Lecture lancée sur votre téléphone");
 
         var v = media.video || document.getElementById("video") || document.getElementById("video-vod");
-        if (v && v.paused) {
+        if (v) {
+          var restoreUrl = media.url || media.castUrl || media.direct_source || media.sourceUrl;
+          if (restoreUrl && (!v.src || v.src === "")) {
+            v.src = restoreUrl;
+          }
           v.play().catch(function () {});
         }
       }
@@ -968,7 +1252,11 @@
       syncActiveTvBar();
       showTvToast("Connexion TV interrompue — Lecture sur votre téléphone");
       var v = media.video || document.getElementById("video") || document.getElementById("video-vod");
-      if (v && v.paused) {
+      if (v) {
+        var restoreUrl = media.url || media.castUrl || media.direct_source || media.sourceUrl;
+        if (restoreUrl && (!v.src || v.src === "")) {
+          v.src = restoreUrl;
+        }
         v.play().catch(function () {});
       }
     }
@@ -978,9 +1266,7 @@
   function interceptPlayback(mediaData) {
     if (tvState.hasPairedTv && tvState.isOnline) {
       if (isAutoDiffuseOn()) {
-        document.querySelectorAll("video").forEach(function (v) {
-          try { v.pause(); } catch (_) {}
-        });
+        haltMobilePlayers();
         sendToTv(mediaData);
         return true;
       }
@@ -989,53 +1275,70 @@
     return false;
   }
 
-  // Observe Profile Modal opening to render TV settings IMMEDIATELY
+  // Ensure TV settings are rendered into Profile Modal when needed
   function observeProfileModal() {
     function tryInstantRender() {
       var modal = document.getElementById("vel-profile-account-modal");
       if (modal && !modal.hidden) {
-        var card = modal.querySelector(".vel-profile-account__card");
-        if (card && !document.getElementById("vel-profile-tv-card")) {
-          renderTvSettingsSection();
+        var mount = document.getElementById("vel-tv-panel-mount") || modal.querySelector(".vel-profile-account__card");
+        if (mount && !document.getElementById("vel-profile-tv-card")) {
+          renderTvSettingsSection(false);
         }
+        updateTvTabDot();
       }
     }
 
     document.addEventListener("click", function (e) {
-      var btn = e.target && e.target.closest && e.target.closest("#vel-profile-account-open, [data-bottom-nav='profile']");
+      var btn = e.target && e.target.closest && e.target.closest("#vel-profile-account-open, #vel-tab-btn-tv, [data-bottom-nav='profile']");
       if (btn) {
+        tryInstantRender();
         setTimeout(function () {
           tryInstantRender();
           checkTvStatus();
-        }, 0);
-        setTimeout(tryInstantRender, 50);
+        }, 20);
       }
     }, true);
-
-    var bodyObserver = new MutationObserver(function () {
-      tryInstantRender();
-    });
-    bodyObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
 
     tryInstantRender();
   }
 
   // Hook into unified Velora events
   function initPlaybackListeners() {
-    var origSetMedia = window.VeloraCast && window.VeloraCast.setMedia;
-    if (window.VeloraCast) {
-      window.VeloraCast.setMedia = function (media) {
-        if (origSetMedia) origSetMedia.call(window.VeloraCast, media);
-        if (media && media.url) {
-          interceptPlayback(media);
-        }
-      };
+    function attachHooks() {
+      if (!window.VeloraCast) {
+        window.VeloraCast = {};
+      }
+      if (!window.VeloraCast.__tvBridgeHooked) {
+        window.VeloraCast.__tvBridgeHooked = true;
+        var origSetMedia = window.VeloraCast.setMedia;
+        window.VeloraCast.setMedia = function (media) {
+          if (origSetMedia) {
+            try { origSetMedia.call(window.VeloraCast, media); } catch (_) {}
+          }
+          if (media && media.url) {
+            interceptPlayback(media);
+          }
+        };
+
+        var origIsConnected = window.VeloraCast.isConnected;
+        window.VeloraCast.isConnected = function () {
+          if (shouldSuppressMobilePlayback()) {
+            return true;
+          }
+          return origIsConnected ? origIsConnected.call(window.VeloraCast) : false;
+        };
+      }
     }
+
+    attachHooks();
+    setTimeout(attachHooks, 500);
+    setTimeout(attachHooks, 2000);
   }
 
   // Initialize
   function init() {
     loadCachedTvStatus();
+    installPlaybackProtections();
     injectStyles();
     observeProfileModal();
     initPlaybackListeners();
@@ -1043,7 +1346,10 @@
     checkTvStatus();
 
     // Check TV online status and sync active broadcasting bar every 8s
-    tvState.checkInterval = setInterval(checkTvStatus, 8000);
+    tvState.checkInterval = setInterval(function () {
+      checkTvStatus();
+      initPlaybackListeners();
+    }, 8000);
   }
 
   if (document.readyState === "loading") {

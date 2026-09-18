@@ -2234,47 +2234,6 @@
   // Polling silencieux des scores en direct toutes les 45s
   setInterval(refreshLiveScoresSilently, 45000);
 
-  function renderFootballSkeletonSection(country) {
-    var block = document.createElement('div');
-    block.className = 'UI3iHJ vel-home-section vel-home-section--football vel-home-section--football-skeleton vel-home-section--horizontal vel-home-section--compact';
-    block.dataset.testid = 'navigation-carousel-wrapper';
-    block.dataset.sectionId = 'velora-home-football-matches';
-    block.dataset.footballCountry = country;
-    block.dataset.isSkeleton = '1';
-
-    var railWrap = document.createElement('div');
-    railWrap.className = 'vJYTdI LiEb2X UEOrk2 CHGlLt OH_E2I vel-home-section__rail-wrap';
-    var rail = document.createElement('div');
-    rail.className = 'lw1NJZ vel-home-section__rail';
-    rail.dataset.testid = 'card-container-list';
-
-    for (var i = 0; i < 4; i++) {
-      var card = document.createElement('div');
-      card.className = 'vel-football-card vel-football-card--skeleton';
-      card.innerHTML =
-        '<div class="vel-football-card__top">' +
-          '<div class="vel-football-skeleton-pill"></div>' +
-          '<div class="vel-football-skeleton-time"></div>' +
-        '</div>' +
-        '<div class="vel-football-card__match">' +
-          '<div class="vel-football-card__team vel-football-card__team--home">' +
-            '<div class="vel-football-skeleton-logo"></div>' +
-            '<div class="vel-football-skeleton-text"></div>' +
-          '</div>' +
-          '<div class="vel-football-skeleton-vs"></div>' +
-          '<div class="vel-football-card__team vel-football-card__team--away">' +
-            '<div class="vel-football-skeleton-logo"></div>' +
-            '<div class="vel-football-skeleton-text"></div>' +
-          '</div>' +
-        '</div>';
-      rail.appendChild(card);
-    }
-
-    railWrap.appendChild(rail);
-    block.appendChild(railWrap);
-    return block;
-  }
-
   function renderFootballSection(matches, country) {
     if (!Array.isArray(matches) || matches.length === 0) return null;
 
@@ -2350,8 +2309,8 @@
       return;
     }
 
-    // Si la section existe déjà avec le BON pays et de vraies cartes (pas un skeleton), vérifier uniquement sa position
-    if (existingFootball && existingFootball.dataset.footballCountry === country && !existingFootball.dataset.isSkeleton && existingFootball.querySelectorAll('.vel-football-card:not(.vel-football-card--skeleton)').length > 0) {
+    // Si la section existe déjà avec le BON pays et du contenu, vérifier uniquement sa position
+    if (existingFootball && existingFootball.dataset.footballCountry === country && existingFootball.querySelectorAll('.vel-football-card').length > 0) {
       var resumeSec = root.querySelector('.vel-home-section--resume');
       if (resumeSec && resumeSec.parentNode === root && existingFootball.previousElementSibling !== resumeSec) {
         resumeSec.insertAdjacentElement('afterend', existingFootball);
@@ -2360,26 +2319,10 @@
       return;
     }
 
-    // Si pas encore de section existante, insérer un skeleton pour préserver l'espace visuel sans saut
-    if (!existingFootball) {
-      var skeletonBlock = renderFootballSkeletonSection(country);
-      var resumeSecInit = root.querySelector('.vel-home-section--resume');
-      if (resumeSecInit && resumeSecInit.parentNode === root) {
-        resumeSecInit.insertAdjacentElement('afterend', skeletonBlock);
-      } else {
-        root.prepend(skeletonBlock);
-      }
-      existingFootball = skeletonBlock;
-    }
-
     var matches = await fetchTodayMatches(country);
     if (!matches || matches.length === 0) {
       if (existingFootball) {
-        existingFootball.style.transition = 'opacity 0.25s ease';
-        existingFootball.style.opacity = '0';
-        setTimeout(function () {
-          if (existingFootball && existingFootball.parentNode) existingFootball.remove();
-        }, 250);
+        existingFootball.remove();
       }
       return;
     }
@@ -2430,25 +2373,13 @@
         }
       }
     }
-    // Lance le fetch en tâche de fond pour remplacer le placeholder dès que prêt
+    // Lance le fetch en tâche de fond pour l'injection seulement si des matchs existent
     fetchTodayMatches(country).then(function (matches) {
       if (matches && matches.length > 0) {
-        scheduleInjection(0, country);
-      } else {
-        var root = document.getElementById('vel-home-sections');
-        var skel = root && root.querySelector('.vel-home-section--football[data-is-skeleton="1"]');
-        if (skel) {
-          skel.style.transition = 'opacity 0.25s ease';
-          skel.style.opacity = '0';
-          setTimeout(function () {
-            if (skel && skel.parentNode) skel.remove();
-          }, 250);
-        }
+        scheduleInjection(20, country);
       }
     });
-    // Retourne immédiatement le placeholder skeleton pour combler l'espace visuel sans saut
-    lastInjectedCountry = country;
-    return renderFootballSkeletonSection(country);
+    return null;
   };
 
   window.veloraInjectFootballSection = function (hintCountry) {

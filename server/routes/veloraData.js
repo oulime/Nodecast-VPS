@@ -1708,7 +1708,7 @@ function mediaItemsForCurations(curations, packageById, kind) {
     if (kind !== 'vod' && kind !== 'series') return [];
     const enabledSourceIds = getEnabledSourceIdSet();
     const findItem = getDb().prepare(`
-        SELECT item_id, name, stream_icon, container_extension, provider_order
+        SELECT item_id, name, stream_icon, container_extension, provider_order, rating, year, added_at, data
         FROM playlist_items
         WHERE source_id = ? AND type = ? AND item_id = ? AND is_hidden = 0
     `);
@@ -1724,8 +1724,12 @@ function mediaItemsForCurations(curations, packageById, kind) {
         const item = findItem.get(sourceId, itemType, streamId);
         if (!item) continue;
         seen.add(key);
+        let data = {};
+        try { data = JSON.parse(item.data || '{}'); } catch (_) {}
         items.push({
+            ...data,
             stream_id: streamId,
+            id: streamId,
             source_id: sourceId,
             kind,
             origin_package_id: String(curation.origin_package_id || ''),
@@ -1733,6 +1737,9 @@ function mediaItemsForCurations(curations, packageById, kind) {
             stream_icon: item.stream_icon || '',
             container_extension: item.container_extension || '',
             provider_order: item.provider_order,
+            rating: item.rating || data.rating || '',
+            year: item.year || data.year || '',
+            plot: data.plot || data.description || data.overview || '',
             package_id: packageId,
             package_name: packageById.get(packageId)?.name || packageId
         });
@@ -2011,30 +2018,89 @@ router.get('/admin/package-media-items', (req, res) => {
             ? (Array.isArray(packageRow.child_package_ids) ? packageRow.child_package_ids : []).map(String)
             : [packageId];
         const allowedPackageIds = new Set(childIds);
+        const countryMemberships = expandMemberships(cached.memberships).filter(row =>
+            (!effectiveCountryId || String(row.country_id || '') === effectiveCountryId)
+            && (row.kind === kind || (!row.kind && kind === 'vod'))
+        );
+        const hasCountryMemberships = countryMemberships.length > 0;
+
         let items = mediaItemsForCurations(
-            expandMemberships(cached.memberships).filter(row =>
-                (!effectiveCountryId || String(row.country_id || '') === effectiveCountryId)
-                && allowedPackageIds.has(String(row.target_package_id || ''))
-            ),
+            countryMemberships.filter(row => allowedPackageIds.has(String(row.target_package_id || ''))),
             packageById,
             kind
         );
-        if (isParent) {
-            const childPosition = new Map(childIds.map((childId, index) => [childId, index]));
+        if ((!items || items.length === 0) && !hasCountryMemberships) {
+            const db = getDb();
+            const enabledSourceIds = getEnabledSourceIdSet();
+            const itemType = kind === 'series' ? 'series' : 'movie';
+
+            const targets = [];
+            for (const id of allowedPackageIds) {
+                const pkg = packageById.get(id);
+                if (pkg) {
+                    const srcId = Number.parseInt(pkg.source_id, 10);
+                    const catId = String(pkg.category_id ?? '').trim();
+                    if (catId) {
+                        targets.push({
+                            sourceId: Number.isInteger(srcId) ? srcId : null,
+                            categoryId: catId,
+                            packageId: id,
+                            packageName: pkg.name || id
+                        });
+                    }
+                } else if (id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id))) {
+                    targets.push({ sourceId: null, categoryId: id, packageId: id, packageName: id });
+                }
+            }
+            if (targets.length === 0 && packageId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(packageId))) {
+                targets.push({ sourceId: null, categoryId: packageId, packageId: packageId, packageName: packageId });
+            }
+
+            const fallbackItems = [];
             const seen = new Set();
-            items = items.filter(item => {
-                const key = `${item.source_id}:${item.stream_id}`;
-                if (seen.has(key)) return false;
-                seen.add(key);
-                return true;
-            }).sort((left, right) => {
-                const packageOrder = (childPosition.get(String(left.package_id)) ?? Number.MAX_SAFE_INTEGER)
-                    - (childPosition.get(String(right.package_id)) ?? Number.MAX_SAFE_INTEGER);
-                if (packageOrder) return packageOrder;
-                const a = Number.isFinite(left.provider_order) ? left.provider_order : Number.MAX_SAFE_INTEGER;
-                const b = Number.isFinite(right.provider_order) ? right.provider_order : Number.MAX_SAFE_INTEGER;
-                return a - b || String(left.name).localeCompare(String(right.name), 'fr');
-            });
+            for (const target of targets) {
+                let query = `
+                    SELECT source_id, item_id, name, stream_icon, container_extension, provider_order, rating, year, added_at, data
+                    FROM playlist_items
+                    WHERE type = ? AND category_id = ? AND is_hidden = 0
+                `;
+                const params = [itemType, target.categoryId];
+                if (target.sourceId != null && enabledSourceIds.has(String(target.sourceId))) {
+                    query += ` AND source_id = ?`;
+                    params.push(target.sourceId);
+                }
+                query += ` ORDER BY provider_order ASC, rowid ASC`;
+
+                const rows = db.prepare(query).all(...params);
+                for (const row of rows) {
+                    const sid = row.source_id;
+                    if (!enabledSourceIds.has(String(sid))) continue;
+                    const key = `${sid}:${row.item_id}`;
+                    if (seen.has(key)) continue;
+                    seen.add(key);
+                    let data = {};
+                    try { data = JSON.parse(row.data || '{}'); } catch (_) {}
+                    fallbackItems.push({
+                        ...data,
+                        stream_id: row.item_id,
+                        id: row.item_id,
+                        source_id: sid,
+                        kind,
+                        name: row.name,
+                        stream_icon: row.stream_icon || '',
+                        container_extension: row.container_extension || '',
+                        provider_order: row.provider_order,
+                        rating: row.rating || data.rating || '',
+                        year: row.year || data.year || '',
+                        plot: data.plot || data.description || data.overview || '',
+                        package_id: target.packageId,
+                        package_name: target.packageName
+                    });
+                }
+            }
+            if (fallbackItems.length > 0) {
+                items = fallbackItems;
+            }
         }
         res.set('Cache-Control', 'no-store');
         res.set('X-Velora-Country-Package-Cache', 'vps-local-derived');
@@ -2553,8 +2619,11 @@ function buildMediaFeedCache() {
                     name: pkg.name,
                     kind: pkg.kind,
                     countryId: pkg.country_id,
+                    country_id: pkg.country_id,
                     sourceId: pkg.source_id,
+                    source_id: pkg.source_id,
                     categoryId: pkg.category_id,
+                    category_id: pkg.category_id,
                     totalCount: Math.max(totalCount, items.length),
                     items
                 });

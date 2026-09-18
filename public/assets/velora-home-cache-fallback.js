@@ -602,11 +602,28 @@
         var customList = Array.isArray(section.custom_entries) && section.custom_entries.length > 0
           ? section.custom_entries
           : null;
+        var matchedPkg = null;
+        if (window.veloraHomeSectionsState && Array.isArray(window.veloraHomeSectionsState.packages)) {
+          if (section.package_id) {
+            matchedPkg = window.veloraHomeSectionsState.packages.find(function (p) { return String(p.id) === String(section.package_id); });
+          }
+          if (!matchedPkg && section.title) {
+            var sTitle = String(section.title).trim().toLowerCase();
+            matchedPkg = window.veloraHomeSectionsState.packages.find(function (p) { return String(p.name || "").trim().toLowerCase() === sTitle; });
+          }
+        }
         if (typeof window.veloraOpenPrimePackageModal === "function") {
-          window.veloraOpenPrimePackageModal(section.content_type || "movies", {
-            id: section.package_id || section.id || section.title,
+          var effectiveKind = section.content_type || (matchedPkg && matchedPkg.kind === "series" ? "series" : "movies");
+          window.veloraOpenPrimePackageModal(effectiveKind, {
+            id: section.package_id || (matchedPkg && matchedPkg.id) || section.id || section.title,
             name: section.title,
-            customItems: customList || undefined
+            category_id: matchedPkg ? matchedPkg.category_id : undefined,
+            categoryId: matchedPkg ? matchedPkg.category_id : undefined,
+            source_id: matchedPkg ? matchedPkg.source_id : undefined,
+            sourceId: matchedPkg ? matchedPkg.source_id : undefined,
+            country_id: matchedPkg ? matchedPkg.country_id : (section.country_id || "country_france"),
+            customItems: customList || undefined,
+            items: (Array.isArray(section.entries) && section.entries.length > 0) ? section.entries : undefined
           });
         } else if (typeof window.veloraOpenHomeCustomSectionModal === "function") {
           window.veloraOpenHomeCustomSectionModal(block, section.title, section.content_type, section.card_orientation === "horizontal");

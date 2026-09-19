@@ -16,11 +16,13 @@ const PORT = Number.parseInt(process.env.PORT, 10) || 3000;
 // Strong / World 8K and all other providers route 100% DIRECTLY to prevent multi-IP 458 collisions.
 try {
     const { Agent, ProxyAgent, Dispatcher, setGlobalDispatcher } = require('undici');
-    const proxyUrl = process.env.DINO_PROXY || process.env.UPSTREAM_PROXY || 'http://127.0.0.1:8118';
+    const configuredProxy = process.env.DINO_PROXY || process.env.UPSTREAM_PROXY;
+    const isProduction = process.env.NODE_ENV === 'production';
+    const proxyUrl = configuredProxy || (isProduction ? 'http://127.0.0.1:8118' : null);
     const directAgent = new Agent({
         connect: { timeout: 15000 }
     });
-    const proxyAgent = new ProxyAgent(proxyUrl);
+    const proxyAgent = proxyUrl ? new ProxyAgent(proxyUrl) : null;
 
     function isDinoTarget(target) {
         if (!target) return false;
@@ -31,21 +33,29 @@ try {
     class SelectiveRoutingDispatcher extends Dispatcher {
         dispatch(opts, handler) {
             const target = String(opts.origin || '') + String(opts.path || '');
-            if (isDinoTarget(target)) {
+            if (proxyAgent && isDinoTarget(target)) {
                 return proxyAgent.dispatch(opts, handler);
             }
             return directAgent.dispatch(opts, handler);
         }
         close() {
-            return Promise.all([directAgent.close(), proxyAgent.close()]);
+            const promises = [directAgent.close()];
+            if (proxyAgent) promises.push(proxyAgent.close());
+            return Promise.all(promises);
         }
         destroy() {
-            return Promise.all([directAgent.destroy(), proxyAgent.destroy()]);
+            const promises = [directAgent.destroy()];
+            if (proxyAgent) promises.push(proxyAgent.destroy());
+            return Promise.all(promises);
         }
     }
 
     setGlobalDispatcher(new SelectiveRoutingDispatcher());
-    console.log(`[Proxy] Selective routing dispatcher enabled: Dino -> ${proxyUrl}, Strong/others -> direct VPS IP`);
+    if (proxyAgent) {
+        console.log(`[Proxy] Selective routing dispatcher enabled: Dino -> ${proxyUrl}, Strong/others -> direct VPS IP`);
+    } else {
+        console.log(`[Proxy] Direct routing dispatcher enabled (local dev mode, direct upstream connection)`);
+    }
 } catch (e) {
     console.warn('[Proxy] Failed to configure selective undici dispatcher:', e.message);
 }
@@ -195,6 +205,9 @@ const VPS_DATA_API_PATHS = [
 ];
 
 function isVpsDataApiRequest(requestPath) {
+    if (requestPath === '/api/proxy/stream' || requestPath.startsWith('/api/proxy/stream') || requestPath.includes('/stream/')) {
+        return false;
+    }
     return VPS_DATA_API_PATHS.some(prefix => (
         requestPath === prefix || requestPath.startsWith(`${prefix}/`)
     ));

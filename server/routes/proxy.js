@@ -15,6 +15,8 @@ const https = require('https');
 const { spawn } = require('child_process');
 const { Readable } = require('stream');
 const crypto = require('crypto');
+const streamSecurity = require('../services/streamSecurity');
+const auth = require('../auth');
 
 // Default cache max age in hours
 const DEFAULT_MAX_AGE_HOURS = 24;
@@ -158,12 +160,18 @@ let streamProxySettingsCache = {
     userAgent: ''
 };
 
-function shouldUseRemoteCatalog() {
+function shouldUseRemoteCatalog(req) {
+    if (req) {
+        const urlStr = req.originalUrl || req.url || '';
+        if (urlStr.includes('/stream')) return false;
+    }
     return !REMOTE_CATALOG_DISABLED && Boolean(REMOTE_CATALOG_BASE);
 }
 
 async function proxyRemoteCatalog(req, res) {
     if (!shouldUseRemoteCatalog(req)) return false;
+    const urlStr = req.originalUrl || req.url || '';
+    if (urlStr.includes('/stream')) return false;
     let target;
     try {
         target = new URL(req.originalUrl || req.url, REMOTE_CATALOG_BASE);
@@ -259,17 +267,18 @@ function decodeGlobalId(globalId) {
     return null;
 }
 
-function buildXtreamStreamUrl(source, streamId, type = 'live', container = 'm3u8') {
+function buildXtreamStreamUrl(source, streamId, type = 'live', container = null) {
     const baseUrl = source.url.replace(/\/$/, '');
+    const cleanExt = (container || (type === 'live' ? 'm3u8' : 'mp4')).replace(/^\.+/, '');
 
     if (type === 'live') {
-        return `${baseUrl}/live/${source.username}/${source.password}/${streamId}.${container}`;
+        return `${baseUrl}/live/${source.username}/${source.password}/${streamId}.${cleanExt}`;
     }
     if (type === 'movie' || type === 'vod') {
-        return `${baseUrl}/movie/${source.username}/${source.password}/${streamId}.${container}`;
+        return `${baseUrl}/movie/${source.username}/${source.password}/${streamId}.${cleanExt}`;
     }
     if (type === 'series') {
-        return `${baseUrl}/series/${source.username}/${source.password}/${streamId}.${container}`;
+        return `${baseUrl}/series/${source.username}/${source.password}/${streamId}.${cleanExt}`;
     }
 
     return null;
@@ -381,7 +390,19 @@ function getStreamsFromDb(sourceId, type, categoryId = null, includeHidden = fal
             series_id: type === 'series' ? item.item_id : undefined,
             name: item.name,
             stream_icon: icon || item.stream_icon,
-            stream_url: item.stream_url || data.stream_url || data.url,
+            stream_url: (() => {
+                const raw = item.stream_url || data.stream_url || data.url;
+                if (!raw || !/^https?:\/\//i.test(raw)) return undefined;
+                try {
+                    const ticket = streamSecurity.createStreamTicket({
+                        url: raw,
+                        sourceId: item.source_id,
+                        streamId: item.item_id,
+                        type
+                    });
+                    return `/api/proxy/stream?t=${ticket}&format=${type}.${(item.container_extension || (type === 'live' ? 'm3u8' : 'mp4')).replace(/^\.+/, '')}`;
+                } catch (_) { return undefined; }
+            })(),
             cover: icon || item.stream_icon, // series/vod often use cover
             added: item.added_at,
             rating: item.rating,
@@ -542,8 +563,6 @@ router.get('/xtream/stream/:globalStreamId/:type?', async (req, res) => {
 
         const type = req.params.type || 'live';
         const dbType = type === 'movie' || type === 'vod' ? 'movie' : type;
-        const container = req.query.container || 'm3u8';
-
         const db = getDb();
         const item = db.prepare(`
             SELECT source_id, item_id, stream_url, container_extension
@@ -560,28 +579,34 @@ router.get('/xtream/stream/:globalStreamId/:type?', async (req, res) => {
             return res.status(404).json({ error: 'Source not found or disabled' });
         }
 
+        const container = req.query.container || (type === 'live' ? 'm3u8' : (item.container_extension || 'mp4'));
+        const ext = container.replace(/^\.+/, '');
+        let targetRawUrl;
         if (source.type === 'm3u') {
             if (!item.stream_url) {
                 return res.status(404).json({ error: 'Direct stream URL not found' });
             }
-            return res.json({
-                url: item.stream_url,
-                stream_id: req.params.globalStreamId,
-                raw_stream_id: item.item_id
-            });
-        }
-
-        if (source.type !== 'xtream') {
+            targetRawUrl = item.stream_url;
+        } else if (source.type === 'xtream') {
+            targetRawUrl = buildXtreamStreamUrl(source, item.item_id, type, ext);
+            if (!targetRawUrl) {
+                return res.status(400).json({ error: 'Invalid stream type' });
+            }
+        } else {
             return res.status(404).json({ error: 'Playable source not found' });
         }
 
-        const streamUrl = buildXtreamStreamUrl(source, item.item_id, type, container || item.container_extension);
-        if (!streamUrl) {
-            return res.status(400).json({ error: 'Invalid stream type' });
-        }
+        const ticket = streamSecurity.createStreamTicket({
+            url: targetRawUrl,
+            sourceId: source.id,
+            streamId: item.item_id,
+            type,
+            userId: req.user?.id
+        });
+        const maskedUrl = `${req.protocol}://${req.get('host')}/api/proxy/stream?t=${ticket}&format=${encodeURIComponent(type)}.${ext}`;
 
         res.json({
-            url: streamUrl,
+            url: maskedUrl,
             stream_id: req.params.globalStreamId,
             raw_stream_id: item.item_id
         });
@@ -856,7 +881,18 @@ router.get('/xtream/:sourceId/stream/:streamId/:type', async (req, res) => {
         }
 
         const type = req.params.type || 'live';
-        const container = req.query.container || 'm3u8';
+        const defaultContainer = type === 'live' ? 'm3u8' : 'mp4';
+        let container = req.query.container;
+        if (!container) {
+            try {
+                const db = getDb();
+                const dbItem = db.prepare('SELECT container_extension FROM playlist_items WHERE source_id = ? AND item_id = ?').get(source.id, streamId);
+                container = dbItem?.container_extension || defaultContainer;
+            } catch (_) {
+                container = defaultContainer;
+            }
+        }
+        const ext = container.replace(/^\.+/, '');
 
         // Construct the Xtream stream URL
         // Format: http://server:port/live/username/password/streamId.container (for live)
@@ -867,16 +903,25 @@ router.get('/xtream/:sourceId/stream/:streamId/:type', async (req, res) => {
         const baseUrl = source.url.replace(/\/$/, ''); // Remove trailing slash
 
         if (type === 'live') {
-            streamUrl = `${baseUrl}/live/${source.username}/${source.password}/${streamId}.${container}`;
+            streamUrl = `${baseUrl}/live/${source.username}/${source.password}/${streamId}.${ext}`;
         } else if (type === 'movie' || type === 'vod') {
-            streamUrl = `${baseUrl}/movie/${source.username}/${source.password}/${streamId}.${container}`;
+            streamUrl = `${baseUrl}/movie/${source.username}/${source.password}/${streamId}.${ext}`;
         } else if (type === 'series') {
-            streamUrl = `${baseUrl}/series/${source.username}/${source.password}/${streamId}.${container}`;
+            streamUrl = `${baseUrl}/series/${source.username}/${source.password}/${streamId}.${ext}`;
         } else {
             return res.status(400).json({ error: 'Invalid stream type' });
         }
 
-        res.json({ url: streamUrl });
+        const ticket = streamSecurity.createStreamTicket({
+            url: streamUrl,
+            sourceId: source.id,
+            streamId,
+            type,
+            userId: req.user?.id
+        });
+        const maskedUrl = `${req.protocol}://${req.get('host')}/api/proxy/stream?t=${ticket}&format=${encodeURIComponent(type)}.${ext}`;
+
+        res.json({ url: maskedUrl });
     } catch (err) {
         console.error('Error getting stream URL:', err);
         res.status(500).json({ error: 'Failed to get stream URL' });
@@ -1112,10 +1157,21 @@ router.get('/xtream/:sourceId/stream/:streamId/:type?', async (req, res) => {
 
         const api = xtreamApi.createFromSource(source);
         const { type = 'live' } = req.params;
-        const { container = 'm3u8' } = req.query;
+        const defaultContainer = type === 'live' ? 'm3u8' : 'mp4';
+        const container = req.query.container || defaultContainer;
 
-        const url = api.buildStreamUrl(streamId, type, container);
-        res.json({ url });
+        const rawUrl = api.buildStreamUrl(streamId, type, container);
+        const ext = container.replace(/^\.+/, '');
+        const ticket = streamSecurity.createStreamTicket({
+            url: rawUrl,
+            sourceId: source.id,
+            streamId,
+            type,
+            userId: req.user?.id
+        });
+        const maskedUrl = `${req.protocol}://${req.get('host')}/api/proxy/stream?t=${ticket}&format=${encodeURIComponent(type)}.${ext}`;
+
+        res.json({ url: maskedUrl });
     } catch (err) {
         console.error('Stream URL error:', err);
         res.status(500).json({ error: err.message });
@@ -1553,9 +1609,31 @@ router.get('/stream', async (req, res) => {
     const retryDelays = [1500, 2500, 3500];
     let lastError = null;
 
-    let { url } = req.query;
-    if (!url) {
-        return res.status(400).json({ error: 'URL required' });
+    let { url, t } = req.query;
+    let ticketPayload = null;
+
+    if (!t && url) {
+        try {
+            const parsed = new URL(url, 'http://localhost');
+            const innerT = parsed.searchParams.get('t');
+            if (innerT) {
+                t = innerT;
+            }
+        } catch (_) {}
+    }
+
+    if (t) {
+        ticketPayload = streamSecurity.decryptTicket(t);
+        if (!ticketPayload || !ticketPayload.u) {
+            return res.status(403).json({ error: 'Jeton de flux invalide ou expiré' });
+        }
+        const access = await streamSecurity.verifyStreamAccess(ticketPayload);
+        if (!access.allowed) {
+            return res.status(403).json({ error: access.reason || 'Accès au flux refusé' });
+        }
+        url = ticketPayload.u;
+    } else if (!url) {
+        return res.status(400).json({ error: 'Paramètre t ou URL requis' });
     }
 
     if (isPpvOfflineStreamUrl(url)) {
@@ -1968,7 +2046,7 @@ router.get('/stream', async (req, res) => {
                 const finalUrlObj = new URL(finalUrl);
                 const baseUrl = finalUrlObj.origin + finalUrlObj.pathname.substring(0, finalUrlObj.pathname.lastIndexOf('/') + 1);
 
-                const baseUrlPrefix = `${req.baseUrl || '/api/proxy'}/stream?url=`;
+                const baseUrlPrefix = `${req.baseUrl || '/api/proxy'}/stream`;
 
                 manifest = manifest.split('\n').map(line => {
                     const trimmed = line.trim();
@@ -1978,7 +2056,12 @@ router.get('/stream', async (req, res) => {
                             return line.replace(/URI=["']([^"']+)["']/g, (match, p1) => {
                                 try {
                                     const absoluteUrl = new URL(p1, baseUrl).href;
-                                    return `URI="${baseUrlPrefix}${encodeURIComponent(absoluteUrl)}"`;
+                                    const segTicket = streamSecurity.createStreamTicket({
+                                        url: absoluteUrl,
+                                        userId: ticketPayload?.uid,
+                                        ttlMs: 4 * 60 * 60 * 1000
+                                    });
+                                    return `URI="${baseUrlPrefix}?t=${segTicket}&format=key"`;
                                 } catch (e) {
                                     return match;
                                 }
@@ -1995,7 +2078,12 @@ router.get('/stream', async (req, res) => {
                         } else {
                             absoluteUrl = new URL(trimmed, baseUrl).href;
                         }
-                        return `${baseUrlPrefix}${encodeURIComponent(absoluteUrl)}`;
+                        const segTicket = streamSecurity.createStreamTicket({
+                            url: absoluteUrl,
+                            userId: ticketPayload?.uid,
+                            ttlMs: 4 * 60 * 60 * 1000
+                        });
+                        return `${baseUrlPrefix}?t=${segTicket}&format=chunk.ts`;
                     } catch (e) { return line; }
                 }).join('\n');
 

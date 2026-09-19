@@ -26,10 +26,23 @@ router.options('/', (req, res) => {
 });
 
 router.get('/', async (req, res) => {
-    const { url } = req.query;
+    let { url } = req.query;
     if (!url) {
         return res.status(400).json({ error: 'URL parameter is required' });
     }
+
+    // Resolve encrypted stream ticket if present
+    try {
+        const streamSecurity = require('../services/streamSecurity');
+        const parsed = new URL(url, 'http://localhost');
+        const t = parsed.searchParams.get('t');
+        if (t) {
+            const payload = streamSecurity.decryptTicket(t);
+            if (payload?.u) {
+                url = payload.u;
+            }
+        }
+    } catch (_) {}
 
     if (/(?:^|[/?#&=:])(?:video\/)?(?:black|offline|standby|offair|noevent|placeholder|dummy)\.(?:ts|m3u8|mp4)|wdcdn\d*s?\.com\/video\/black|[\/=]black\.ts/i.test(url)) {
         res.setHeader('Access-Control-Allow-Origin', '*');

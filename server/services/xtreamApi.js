@@ -147,14 +147,17 @@ class XtreamApi {
     /**
      * Build stream URL for playback
      */
-    buildStreamUrl(streamId, type = 'live', container = 'ts') {
+    buildStreamUrl(streamId, type = 'live', container = null) {
         const typeMap = {
             live: 'live',
             vod: 'movie',
+            movie: 'movie',
             series: 'series'
         };
         const streamType = typeMap[type] || 'live';
-        return `${this.baseUrl}/${streamType}/${this.username}/${this.password}/${streamId}.${container}`;
+        const defaultContainer = streamType === 'live' ? 'm3u8' : 'mp4';
+        const cleanExt = (container || defaultContainer).replace(/^\.+/, '');
+        return `${this.baseUrl}/${streamType}/${this.username}/${this.password}/${streamId}.${cleanExt}`;
     }
 
     /**

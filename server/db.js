@@ -111,26 +111,18 @@ function getUpstreamProxy(settings = {}, targetUrl = '') {
   const urlLower = String(targetUrl || '').toLowerCase();
   const isDino = urlLower.includes('playmodx') || urlLower.includes('185.245.') || urlLower.includes('103.176.90.');
   if (isDino) {
-    return process.env.DINO_PROXY || process.env.UPSTREAM_PROXY || 'http://127.0.0.1:8118';
+    if (process.env.DINO_PROXY || process.env.UPSTREAM_PROXY) {
+      return process.env.DINO_PROXY || process.env.UPSTREAM_PROXY;
+    }
+    if (process.env.NODE_ENV === 'production') {
+      return 'http://127.0.0.1:8118';
+    }
+    return null;
   }
   return process.env.UPSTREAM_PROXY || process.env.HTTP_PROXY || process.env.http_proxy || null;
 }
 
 function resolveStreamUrl(url) {
-  if (!url || typeof url !== 'string') return url;
-
-  const isDevelopment = process.env.NODE_ENV !== 'production';
-  const vpsDisabled = /^(1|true|yes)$/i.test(String(process.env.VPS_DATA_API_DISABLED || '').trim());
-  const vpsBase = String(process.env.VPS_DATA_API_BASE || 'https://nodecast.veloravip.net').trim().replace(/\/+$/, '');
-
-  if (!isDevelopment || vpsDisabled || url.includes('/api/proxy/stream')) {
-    return url;
-  }
-
-  if (/^https?:\/\//i.test(url) && !url.startsWith(vpsBase)) {
-    return `${vpsBase}/api/proxy/stream?url=${encodeURIComponent(url)}`;
-  }
-
   return url;
 }
 

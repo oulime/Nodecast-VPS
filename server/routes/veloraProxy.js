@@ -93,10 +93,16 @@ function cookieHeaderForUpstreamUrl(requestUrl) {
 
 function buildProxyUrl(req, target, fromPlaylist) {
     const base = `${req.protocol}://${req.get('host')}${req.baseUrl}`;
-    const p = new URLSearchParams();
-    p.set('target', target);
-    p.set('from', fromPlaylist || target);
-    return `${base}?${p.toString()}`;
+    try {
+        const streamSecurity = require('../services/streamSecurity');
+        const ticket = streamSecurity.generateTicket(target, { expMinutes: 30 });
+        return `${base}?t=${ticket}`;
+    } catch (_) {
+        const p = new URLSearchParams();
+        p.set('target', target);
+        p.set('from', fromPlaylist || target);
+        return `${base}?${p.toString()}`;
+    }
 }
 
 function buildUpstreamHeaders(req, targetUrl, fromPlaylist) {
@@ -330,6 +336,25 @@ function parseProxyTarget(req, res) {
         }
     }
 
+    // Check for stream ticket
+    let ticket = req.query.t;
+    if (!ticket && target) {
+        try {
+            const u = new URL(target, 'http://localhost');
+            ticket = u.searchParams.get('t');
+        } catch (_) {}
+    }
+    let ticketPayload = null;
+    if (ticket) {
+        try {
+            const streamSecurity = require('../services/streamSecurity');
+            ticketPayload = streamSecurity.decryptTicket(ticket);
+            if (ticketPayload?.u) {
+                target = ticketPayload.u;
+            }
+        } catch (_) {}
+    }
+
     if (!from && target) from = target;
     if (target && typeof target === 'string') {
         target = resolveProxyTargetUrl(target);
@@ -356,7 +381,7 @@ function parseProxyTarget(req, res) {
         }
     }
 
-    return { target, from };
+    return { target, from, ticketPayload };
 }
 
 router.options('/', (req, res) => {
@@ -375,15 +400,31 @@ router.all('/', async (req, res) => {
     const parsed = parseProxyTarget(req, res);
     if (!parsed) return;
 
-    const { target, from } = parsed;
+    const { target, from, ticketPayload } = parsed;
     const method = (req.method || 'GET').toUpperCase();
     const targetUrl = new URL(target);
     const targetPath = targetUrl.pathname;
     const isPlaylistRequest = /\.m3u8$/i.test(targetPath);
-    const isImageRequest = /\.(?:avif|gif|heic|jpeg|jpg|png|svg|webp)$/i.test(targetPath);
+    const isImageRequest = /\.(?:avif|gif|heic|jpeg|jpg|png|svg|webp)$/i.test(targetPath) ||
+        target.includes('upload.wikimedia.org') ||
+        target.includes('imgur.com') ||
+        target.includes('tmdb.org');
     const isMediaSegmentRequest =
         /\.(ts|m4s|mp4|m4v|aac|mp3|webm|mkv)$/i.test(targetPath) ||
         /\/segment\//i.test(targetPath);
+
+    // If request is not for an image, require a valid stream ticket or authenticated user
+    if (!isImageRequest) {
+        const isTicketValid = ticketPayload && (!ticketPayload.exp || ticketPayload.exp > Date.now());
+        if (!isTicketValid) {
+            const auth = require('../auth');
+            const token = req.query.token || req.query.authToken || req.headers.authorization?.replace(/^Bearer\s+/i, '');
+            const user = req.user || (token ? auth.verifyToken(token) : null);
+            if (!user) {
+                return res.status(401).json({ error: 'Unauthorized - valid ticket or login required' });
+            }
+        }
+    }
 
     // Fast-path for images: Check persistent on-disk VPS cache or fetch and cache locally
     if (isImageRequest && (method === 'GET' || method === 'HEAD')) {

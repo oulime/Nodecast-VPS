@@ -238,8 +238,20 @@
       notifyParentHeight();
     }));
 
+    function getAdminToken() {
+      try {
+        return localStorage.getItem('authToken') || window.parent?.localStorage?.getItem('authToken') || '';
+      } catch(_) { return ''; }
+    }
+
     async function api(path, opts = {}) {
-      const r = await fetch(`/api${path}`, { headers: { 'content-type': 'application/json' }, ...opts });
+      const token = getAdminToken();
+      const headers = {
+        'content-type': 'application/json',
+        ...(token ? { 'authorization': `Bearer ${token}` } : {}),
+        ...(opts.headers || {})
+      };
+      const r = await fetch(`/api${path}`, { ...opts, headers });
       const text = await r.text();
       const body = text ? JSON.parse(text) : null;
       if (!r.ok) throw new Error(body?.error || r.statusText);

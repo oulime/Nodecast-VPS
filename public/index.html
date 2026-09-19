@@ -9933,23 +9933,34 @@
         if (tab !== "live" && tab !== "movies" && tab !== "series") return;
         delete document.body.dataset.veloraReturnHome;
         document.body.dataset.velTopLevel = tab;
-        document.body.classList.remove("vel-home-empty-active");
+        document.body.classList.remove("vel-home-empty-active", "vel-home-choice-loading", "vel-country-switch-loading", "vel-home-choice-catalog-pending");
         var homePage = document.getElementById("vel-home-empty-page");
         if (homePage) {
           homePage.classList.add("hidden");
           homePage.setAttribute("aria-hidden", "true");
         }
-        ["content-view", "player-container", "vod-player-container", "adult-view"].forEach(function (id) {
+        var isLive = tab === "live";
+        ["vod-player-container", "adult-view"].forEach(function (id) {
           var view = document.getElementById(id);
           if (view) {
             view.classList.add("hidden");
             view.setAttribute("aria-hidden", "true");
           }
         });
+        var contentView = document.getElementById("content-view");
+        if (contentView) {
+          contentView.classList.toggle("hidden", !isLive);
+          contentView.setAttribute("aria-hidden", isLive ? "false" : "true");
+        }
+        var playerContainer = document.getElementById("player-container");
+        if (playerContainer) {
+          playerContainer.classList.toggle("hidden", !isLive);
+          playerContainer.setAttribute("aria-hidden", isLive ? "false" : "true");
+        }
         var packagesView = document.getElementById("packages-view");
         if (packagesView) {
-          packagesView.classList.remove("hidden");
-          packagesView.setAttribute("aria-hidden", "false");
+          packagesView.classList.toggle("hidden", isLive);
+          packagesView.setAttribute("aria-hidden", isLive ? "true" : "false");
         }
         packageContextTitle = "";
         mediaContextTitle = "";
@@ -18095,8 +18106,13 @@
 
         document.body.dataset.velTopLevel = tab;
         document.body.dataset.velActiveTab = tab;
-        document.body.classList.remove("vel-home-empty-active", "vel-home-choice-loading");
+        document.body.classList.remove("vel-home-empty-active", "vel-home-choice-loading", "vel-country-switch-loading", "vel-home-choice-catalog-pending");
         document.body.classList.add("vel-home-choice-picked");
+        var catalogOverlay = document.getElementById("catalog-loading-overlay");
+        if (catalogOverlay) {
+          catalogOverlay.classList.add("hidden");
+          catalogOverlay.setAttribute("aria-hidden", "true");
+        }
         var homePage = document.getElementById("vel-home-empty-page");
         if (homePage) {
           homePage.classList.add("hidden");
@@ -18123,11 +18139,14 @@
             packagesView.setAttribute("aria-hidden", "false");
           }
         }
-        if (isLive) {
-          var livePlayerContainer = document.getElementById("player-container");
-          if (livePlayerContainer) {
+        var livePlayerContainer = document.getElementById("player-container");
+        if (livePlayerContainer) {
+          if (isLive) {
             livePlayerContainer.classList.remove("hidden");
             livePlayerContainer.setAttribute("aria-hidden", "false");
+          } else {
+            livePlayerContainer.classList.add("hidden");
+            livePlayerContainer.setAttribute("aria-hidden", "true");
           }
         }
         try {
@@ -18146,10 +18165,6 @@
           window.veloraBlockCountryPickerAfterPageChange();
         }
         document.dispatchEvent(new CustomEvent("velora-home-tab", { detail: { tab: tab } }));
-        var homeControl = document.querySelector('#vel-home-choice [data-home-tab="' + tab + '"]');
-        if (homeControl) {
-          homeControl.click();
-        }
       }
       window.veloraOpenTab = openTab;
 
@@ -18161,10 +18176,14 @@
           var video = document.getElementById(id);
           if (!video) return;
           try {
-            video.pause();
-            if (video.hls && typeof video.hls.destroy === "function") {
-              try { video.hls.destroy(); } catch (_) {}
-              video.hls = null;
+            if (!video.paused || video.src || video.currentSrc || video.hls) {
+              video.pause();
+              if (video.hls && typeof video.hls.destroy === "function") {
+                try { video.hls.destroy(); } catch (_) {}
+                video.hls = null;
+              }
+              video.removeAttribute("src");
+              try { video.load(); } catch (_) {}
             }
           } catch (error) { }
         });
@@ -18244,8 +18263,12 @@
             view.setAttribute("aria-hidden", "true");
           }
         });
-        document.body.classList.remove("vel-home-choice-loading");
-        document.body.classList.remove("vel-home-choice-catalog-pending");
+        document.body.classList.remove("vel-home-choice-loading", "vel-country-switch-loading", "vel-home-choice-catalog-pending");
+        var catalogOverlay = document.getElementById("catalog-loading-overlay");
+        if (catalogOverlay) {
+          catalogOverlay.classList.add("hidden");
+          catalogOverlay.setAttribute("aria-hidden", "true");
+        }
         document.body.classList.remove("vel-adult-active", "vel-adult-player-active");
         delete document.body.dataset.veloraReturnAdult;
         document.body.classList.add("vel-home-choice-picked");
@@ -18265,6 +18288,7 @@
           try { window.veloraInjectResumeSection(); } catch (_) { }
         }
       }
+      window.veloraShowHome = showHome;
 
       document.addEventListener("velora-return-home", showHome);
 

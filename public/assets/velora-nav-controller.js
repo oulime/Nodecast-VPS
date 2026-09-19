@@ -24,14 +24,12 @@
         try { window.veloraStopAllStreams(); } catch (_) {}
       }
 
-      // 2. Forcefully abort all HTML5 <video> and <audio> elements in the document
+      // 2. Forcefully abort active HTML5 <video> and <audio> elements in the document
       document.querySelectorAll("video, audio").forEach(function (v) {
         try {
-          if (v) {
-            if (!v.paused || v.src || v.currentSrc) {
-              hasActiveMedia = true;
-            }
-            v.pause();
+          if (v && (!v.paused || v.src || v.currentSrc || v.hls)) {
+            hasActiveMedia = true;
+            try { v.pause(); } catch (_) {}
             if (v.hls && typeof v.hls.destroy === "function") {
               try { v.hls.stopLoad(); } catch (_) {}
               try { v.hls.destroy(); } catch (_) {}

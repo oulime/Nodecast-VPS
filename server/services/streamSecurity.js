@@ -201,17 +201,35 @@ function rewriteM3u8WithTickets(manifest, playlistUrl, { baseUrlPrefix = '/api/p
                 userId,
                 ttlMs
             });
-            return `${baseUrlPrefix}?t=${segTicket}&format=chunk.ts`;
+            const isVariantPlaylist = /\.m3u8(\?|$)/i.test(trimmed) || /m3u8/i.test(trimmed);
+            const fmt = isVariantPlaylist ? 'playlist.m3u8' : 'chunk.ts';
+            return `${baseUrlPrefix}?t=${segTicket}&format=${fmt}`;
         } catch (_) {
             return line;
         }
     }).join('\n');
 }
 
+/**
+ * Convenient alias for generating tickets with either expMinutes or ttlMs
+ */
+function generateTicket(url, options = {}) {
+    const ttlMs = (options.expMinutes ? options.expMinutes * 60 * 1000 : undefined) || options.ttlMs || (24 * 60 * 60 * 1000);
+    return createStreamTicket({
+        url,
+        sourceId: options.sourceId,
+        streamId: options.streamId,
+        type: options.type,
+        userId: options.userId,
+        ttlMs
+    });
+}
+
 module.exports = {
     encryptTicket,
     decryptTicket,
     createStreamTicket,
+    generateTicket,
     verifyStreamAccess,
     rewriteM3u8WithTickets
 };

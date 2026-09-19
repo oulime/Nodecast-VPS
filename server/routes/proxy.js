@@ -2083,7 +2083,9 @@ router.get('/stream', async (req, res) => {
                             userId: ticketPayload?.uid,
                             ttlMs: 4 * 60 * 60 * 1000
                         });
-                        return `${baseUrlPrefix}?t=${segTicket}&format=chunk.ts`;
+                        const isVariantPlaylist = /\.m3u8(\?|$)/i.test(trimmed) || /m3u8/i.test(trimmed);
+                        const fmt = isVariantPlaylist ? 'playlist.m3u8' : 'chunk.ts';
+                        return `${baseUrlPrefix}?t=${segTicket}&format=${fmt}`;
                     } catch (e) { return line; }
                 }).join('\n');
 

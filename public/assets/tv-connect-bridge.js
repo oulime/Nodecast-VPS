@@ -1471,14 +1471,26 @@
               if (found && Number(found.currentTime) > 5) {
                 targetPosition = Math.max(0, Number(found.currentTime) - 3);
               }
+              if (found && Number(found.duration) > 0 && !media.duration) {
+                media.duration = Number(found.duration);
+              }
             }
           }
         } catch (_) {}
       }
 
+      var targetDuration = Number(media.duration || media.duration_secs || media.totalDuration || media.total_duration) || 0;
+      if (targetDuration <= 0 && window.__veloraLastPlayingMedia && Number(window.__veloraLastPlayingMedia.duration) > 0) {
+        targetDuration = Number(window.__veloraLastPlayingMedia.duration);
+      }
+
       var payload = {
         ...media,
+        duration: targetDuration,
+        duration_secs: targetDuration,
+        totalDuration: targetDuration,
         position: targetPosition,
+        currentTime: targetPosition,
         url: targetUrl
       };
 

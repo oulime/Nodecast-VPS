@@ -76,6 +76,319 @@
     document.cookie = name + "=" + encodeURIComponent(value) + expires + "; path=/; SameSite=Lax";
   }
 
+  /* =========================================================================
+     WATCH HISTORY & "REPRENDRE LA LECTURE" (SYNC WITH APP & DB)
+     ========================================================================= */
+  var MIN_WATCH_SECONDS = 2;
+  var FINISHED_WATCH_PERCENT = 90;
+
+  var sessionTracker = {
+    mediaId: null,
+    continuousSeconds: 0,
+    lastTick: null,
+    qualified: false,
+    lastDbSync: 0
+  };
+
+  var cachedUserHistory = [];
+  var resumeMinWatchMinutes = 3;
+
+  function getEffectiveDuration() {
+    var v = dom.video;
+    if (v && Number.isFinite(v.duration) && v.duration > 0 && v.duration !== Infinity) {
+      return v.duration;
+    }
+    var m = state.currentMedia;
+    if (m) {
+      var d = Number(m.duration || m.duration_secs || m.totalDuration || m.total_duration);
+      if (Number.isFinite(d) && d > 0) return d;
+    }
+    return 0;
+  }
+
+  function getResumeMinWatchSeconds() {
+    var m = resumeMinWatchMinutes;
+    try {
+      var cached = localStorage.getItem("velora_resume_min_watch_minutes");
+      if (cached != null && !isNaN(parseFloat(cached))) {
+        m = parseFloat(cached);
+      }
+    } catch (_) {}
+    return Math.max(0, m * 60);
+  }
+
+  async function syncResumeMinWatchSetting() {
+    try {
+      var res = await fetch("/api/velora-db/rest/v1/admin_settings?key=eq.resume_min_watch_minutes", { cache: "no-store" });
+      if (res.ok) {
+        var rows = await res.json();
+        if (Array.isArray(rows) && rows.length > 0 && rows[0].value != null) {
+          var val = parseFloat(rows[0].value);
+          if (!isNaN(val) && val >= 0) {
+            resumeMinWatchMinutes = val;
+            try { localStorage.setItem("velora_resume_min_watch_minutes", String(val)); } catch (_) {}
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  function getAuthToken() {
+    try {
+      return localStorage.getItem("authToken") || state.token || "";
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function getActiveUserId() {
+    if (state.user && state.user.id) return String(state.user.id);
+    if (state.user && state.user.username) return String(state.user.username);
+    return "guest";
+  }
+
+  function getLocalHistory() {
+    try {
+      var uid = getActiveUserId();
+      var raw = localStorage.getItem("velora_resume_v13_" + uid);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (_) {}
+    return cachedUserHistory || [];
+  }
+
+  function saveLocalHistory(items) {
+    if (!Array.isArray(items)) return;
+    cachedUserHistory = items;
+    try {
+      var uid = getActiveUserId();
+      localStorage.setItem("velora_resume_v13_" + uid, JSON.stringify(items.slice(0, 60)));
+    } catch (_) {}
+  }
+
+  async function loadUserHistoryFromDb() {
+    var token = getAuthToken();
+    if (!token) return;
+    try {
+      var res = await fetch("/api/history?limit=60", {
+        headers: { Authorization: "Bearer " + token },
+        cache: "no-store"
+      });
+      if (res.ok) {
+        var rows = await res.json();
+        if (Array.isArray(rows)) {
+          var items = rows.map(function (r) {
+            var d = r.data || {};
+            var dur = r.duration || d.duration || 0;
+            var prog = r.progress || d.currentTime || 0;
+            var pct = dur > 0 ? Math.round((prog / dur) * 100) : (d.progressPercent || 0);
+            return Object.assign({}, d, {
+              id: r.item_id ? (r.item_type === "series" ? "series:" + (r.parent_id || r.item_id) + ":ep:" + r.item_id : "movie:" + r.item_id) : d.id,
+              type: r.item_type === "series" ? "series" : "movie",
+              currentTime: prog,
+              duration: dur,
+              progressPercent: Math.min(100, Math.max(0, pct)),
+              isFinished: pct >= FINISHED_WATCH_PERCENT,
+              updatedAt: r.updated_at ? Number(r.updated_at) : (d.updatedAt || Date.now())
+            });
+          });
+          saveLocalHistory(items);
+        }
+      }
+    } catch (_) {}
+  }
+
+  function normalizeTitle(s) {
+    return String(s || "")
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .toLowerCase();
+  }
+
+  function isMediaAlreadyInResume(media) {
+    if (!media) return false;
+    var history = getLocalHistory();
+    if (!history || !history.length) return false;
+
+    var mId = String(media.id || media.streamId || media.episodeStreamId || "");
+    var mSeriesId = String(media.seriesId || "");
+    var mEpId = String(media.episodeStreamId || media.streamId || "");
+    var mNameNorm = normalizeTitle(media.name || media.title || media.seriesName || "");
+    var mSeason = Number(media.seasonNumber) || null;
+    var mEpisode = Number(media.episodeNumber) || null;
+
+    return history.some(function (it) {
+      if (!it) return false;
+      var itId = String(it.id || "");
+      var itStreamId = String(it.streamId || "");
+      var itEpId = String(it.episodeStreamId || "");
+      var itSeriesId = String(it.seriesId || "");
+      var itNameNorm = normalizeTitle(it.name || it.seriesName || it.title || "");
+
+      if (mId && (itId === mId || itStreamId === mId || itEpId === mId)) return true;
+      if (media.type === "series" || mSeriesId) {
+        if (mSeriesId && (itSeriesId === mSeriesId || itStreamId === mSeriesId)) {
+          if (mEpId && (itEpId === mEpId || itStreamId === mEpId)) return true;
+          if (mSeason != null && mEpisode != null && it.seasonNumber === mSeason && it.episodeNumber === mEpisode) return true;
+        }
+      }
+      if (mNameNorm && itNameNorm === mNameNorm) {
+        if (media.type === "series") {
+          if (mSeason != null && mEpisode != null && it.seasonNumber === mSeason && it.episodeNumber === mEpisode) return true;
+        } else {
+          return true;
+        }
+      }
+      return false;
+    });
+  }
+
+  function updateSessionTrackerMedia(media) {
+    if (!media) {
+      sessionTracker.mediaId = null;
+      sessionTracker.continuousSeconds = 0;
+      sessionTracker.lastTick = null;
+      sessionTracker.qualified = false;
+      return;
+    }
+
+    var mId = String(media.id || media.streamId || media.episodeStreamId || media.url || "");
+    var alreadyInResume = isMediaAlreadyInResume(media);
+
+    sessionTracker.mediaId = mId;
+    sessionTracker.continuousSeconds = 0;
+    sessionTracker.lastTick = Date.now();
+    sessionTracker.qualified = alreadyInResume;
+    sessionTracker.lastDbSync = 0;
+  }
+
+  function recordWatchProgress(isEnd) {
+    var v = dom.video;
+    var media = state.currentMedia;
+    if (!media || media.isLive) return; // Strictly skip Live TV channels
+    var mediaType = media.type || (media.seasonNumber ? "series" : "movie");
+    if (mediaType !== "movie" && mediaType !== "series") return;
+
+    var cur = (v && Number.isFinite(v.currentTime)) ? v.currentTime : (media.currentTime || 0);
+    var dur = getEffectiveDuration();
+    if (dur <= 0 && Number(media.duration) > 0) dur = Number(media.duration);
+
+    if (cur < MIN_WATCH_SECONDS && !isEnd) return;
+
+    var duration = Math.round(dur);
+    var currentPos = isEnd ? duration : Math.max(0, Math.round(cur));
+    var percent = isEnd ? 100 : (duration > 0 ? Math.round((currentPos / duration) * 100) : 5);
+    var isFinished = isEnd || (duration > 0 && percent >= FINISHED_WATCH_PERCENT);
+
+    var minSec = getResumeMinWatchSeconds();
+    var isQualified = isFinished || sessionTracker.qualified || (sessionTracker.continuousSeconds >= minSec);
+
+    // Enforce minimum watch duration for first-time viewing
+    if (!isQualified) {
+      return;
+    }
+
+    sessionTracker.qualified = true;
+
+    var isSeries = mediaType === "series" || !!media.seriesId || !!media.episodeStreamId || !!media.seasonNumber;
+    var sId = media.seriesId || media.streamId || "";
+    var epId = media.episodeStreamId || media.streamId || "";
+    var mediaId = isSeries ? ("series:" + (sId || "series") + ":ep:" + (epId || "ep")) : ("movie:" + (media.streamId || sId || "vod"));
+
+    var entry = {
+      id: String(mediaId),
+      type: isSeries ? "series" : "movie",
+      streamId: media.streamId || epId || null,
+      seriesId: sId || null,
+      episodeStreamId: isSeries ? (epId || null) : null,
+      seasonNumber: media.seasonNumber != null ? Number(media.seasonNumber) : (isSeries ? 1 : null),
+      episodeNumber: media.episodeNumber != null ? Number(media.episodeNumber) : (isSeries ? 1 : null),
+      name: media.name || media.title || "Vidéo",
+      seriesName: media.seriesName || media.name || media.title || null,
+      episodeTitle: media.episodeTitle || null,
+      thumbUrl: media.thumbUrl || media.poster || "",
+      backdropUrl: media.backdropUrl || media.poster || media.thumbUrl || "",
+      horizontal_thumb: media.horizontal_thumb || "",
+      title_logo: media.title_logo || "",
+      has_integrated_title: Boolean(media.has_integrated_title),
+      packageId: media.packageId || "",
+      sourceId: media.sourceId || "",
+      containerExtension: media.containerExtension || "mp4",
+      currentTime: isFinished ? duration : currentPos,
+      duration: duration,
+      progressPercent: isFinished ? 100 : Math.min(100, Math.max(1, percent)),
+      isFinished: isFinished,
+      updatedAt: Date.now()
+    };
+
+    // Update local history
+    var list = getLocalHistory().filter(function (it) {
+      return String(it.id) !== String(entry.id);
+    });
+    list.unshift(entry);
+    saveLocalHistory(list);
+
+    // Sync to DB
+    var token = getAuthToken();
+    if (token) {
+      try {
+        var itemId = entry.type === "series" ? (entry.episodeStreamId || entry.streamId) : entry.streamId;
+        var parentId = entry.type === "series" ? (entry.seriesId || entry.streamId) : null;
+        fetch("/api/history", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token
+          },
+          body: JSON.stringify({
+            id: String(itemId),
+            type: entry.type === "series" ? "series" : "movie",
+            parentId: parentId ? String(parentId) : null,
+            progress: entry.currentTime || 0,
+            duration: entry.duration || 0,
+            sourceId: entry.sourceId || null,
+            data: entry
+          }),
+          keepalive: isEnd
+        }).catch(function () {});
+      } catch (_) {}
+    }
+  }
+
+  var lastHistoryTick = Date.now();
+  var lastHistorySyncTime = 0;
+
+  function onHistoryTimeUpdate() {
+    var v = dom.video;
+    if (!v || v.paused || v.seeking || v.ended) {
+      lastHistoryTick = Date.now();
+      return;
+    }
+
+    var now = Date.now();
+    var delta = (now - lastHistoryTick) / 1000;
+    lastHistoryTick = now;
+
+    if (delta > 0 && delta < 5) {
+      sessionTracker.continuousSeconds += delta;
+    }
+
+    var minSec = getResumeMinWatchSeconds();
+    if (!sessionTracker.qualified && sessionTracker.continuousSeconds >= minSec) {
+      sessionTracker.qualified = true;
+      recordWatchProgress(false);
+      lastHistorySyncTime = now;
+    } else if (sessionTracker.qualified) {
+      if (now - lastHistorySyncTime >= 12000) {
+        lastHistorySyncTime = now;
+        recordWatchProgress(false);
+      }
+    }
+  }
+
   // Fetch or renew TV session with multi-layer permanent identity
   async function initSession() {
     try {
@@ -110,6 +423,8 @@
         state.user = data.user;
         if (data.token) localStorage.setItem("authToken", data.token);
         renderLinkedState(data.user, data.pin);
+        syncResumeMinWatchSetting();
+        loadUserHistoryFromDb();
       } else {
         state.isLinked = false;
         renderPin(data.pin);
@@ -208,6 +523,8 @@
           setCookie("velora_tv_token", event.tvToken, 3650);
         }
         renderLinkedState(state.user, state.currentPin);
+        syncResumeMinWatchSetting();
+        loadUserHistoryFromDb();
         break;
 
       case "UNLINK":
@@ -449,6 +766,8 @@
     state.nextCancelled = false;
     cancelNextCountdown();
 
+    updateSessionTrackerMedia(media);
+
     if (dom.standby) dom.standby.classList.add("hidden");
     if (dom.playerWrap) dom.playerWrap.classList.remove("hidden");
     if (dom.buffering) {
@@ -489,6 +808,13 @@
 
     var isHls = /\.m3u8(?:[?#]|$)/i.test(streamUrl) || /\/stream\.m3u8/i.test(streamUrl);
     var resumePos = Number(media.position ?? media.currentTime) || 0;
+    var initialDur = getEffectiveDuration();
+
+    if (dom.timeCurrent) dom.timeCurrent.textContent = formatTime(resumePos);
+    if (dom.timeTotal) dom.timeTotal.textContent = (initialDur > 0) ? formatTime(initialDur) : "--:--";
+    if (dom.progressBar && initialDur > 0) {
+      dom.progressBar.style.width = ((resumePos / initialDur) * 100) + "%";
+    }
 
     if (isHls && window.Hls && window.Hls.isSupported()) {
       var hls = new window.Hls({
@@ -517,7 +843,19 @@
         }
       });
 
+      hls.on(window.Hls.Events.LEVEL_LOADED, function (e, data) {
+        if (data && data.details && data.details.totalduration && data.details.totalduration > 0) {
+          if (!state.currentMedia.duration || state.currentMedia.duration <= 0) {
+            state.currentMedia.duration = data.details.totalduration;
+          }
+          var d = getEffectiveDuration();
+          if (dom.timeTotal && d > 0) dom.timeTotal.textContent = formatTime(d);
+        }
+      });
+
       hls.on(window.Hls.Events.MANIFEST_PARSED, function () {
+        var d = getEffectiveDuration();
+        if (dom.timeTotal && d > 0) dom.timeTotal.textContent = formatTime(d);
         if (resumePos > 0) {
           try { v.currentTime = resumePos; } catch (_) {}
         }
@@ -601,7 +939,7 @@
     if (!state.deviceId) return;
     var v = dom.video;
     var cur = (v && Number.isFinite(v.currentTime)) ? v.currentTime : 0;
-    var dur = (v && Number.isFinite(v.duration)) ? v.duration : 0;
+    var dur = getEffectiveDuration();
     var m = state.currentMedia || {};
     var mId = m.id || m.streamId || m.stream_id || null;
     var mTitle = m.title || m.name || null;
@@ -634,7 +972,7 @@
   function seekBy(seconds) {
     var v = dom.video;
     if (!v) return;
-    var dur = Number.isFinite(v.duration) ? v.duration : 0;
+    var dur = getEffectiveDuration();
     var cur = (Number.isFinite(v.currentTime) ? v.currentTime : 0) + seconds;
     var newTime = dur > 0 ? Math.max(0, Math.min(dur, cur)) : Math.max(0, cur);
 
@@ -655,9 +993,11 @@
     }
     wakeOsd();
     reportTvState(v.paused ? "paused" : "playing");
+    recordWatchProgress(false);
   }
 
   function stopPlayback() {
+    recordWatchProgress(false);
     stopTvStreamTracking(true);
     reportTvState("stopped");
     var v = dom.video;
@@ -746,7 +1086,9 @@
     e.stopPropagation();
     e.preventDefault();
     var v = dom.video;
-    if (!v || !Number.isFinite(v.duration) || v.duration <= 0) return;
+    if (!v) return;
+    var dur = getEffectiveDuration();
+    if (dur <= 0) return;
     var track = dom.progressTrack || dom.progressRow;
     if (!track) return;
     var rect = track.getBoundingClientRect();
@@ -756,11 +1098,15 @@
     }
     if (clientX === undefined) return;
     var ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    v.currentTime = ratio * v.duration;
+    var targetTime = ratio * dur;
+    try {
+      v.currentTime = targetTime;
+    } catch (_) {}
     if (dom.progressBar) dom.progressBar.style.width = (ratio * 100) + "%";
-    if (dom.timeCurrent) dom.timeCurrent.textContent = formatTime(v.currentTime);
+    if (dom.timeCurrent) dom.timeCurrent.textContent = formatTime(targetTime);
     wakeOsd();
     reportTvState(v.paused ? "paused" : "playing");
+    recordWatchProgress(false);
   }
 
   // Autoplay countdown for series next episode
@@ -942,6 +1288,11 @@
       wakeOsd();
       stopTvStreamTracking(true);
       reportTvState("paused");
+      recordWatchProgress(false);
+    });
+
+    v.addEventListener("seeked", function () {
+      recordWatchProgress(false);
     });
 
     v.addEventListener("play", function () {
@@ -949,6 +1300,20 @@
       wakeOsd();
       startTvStreamTracking();
       reportTvState("playing");
+    });
+
+    v.addEventListener("durationchange", function () {
+      var dur = getEffectiveDuration();
+      if (dur > 0 && dom.timeTotal) {
+        dom.timeTotal.textContent = formatTime(dur);
+      }
+    });
+
+    v.addEventListener("loadedmetadata", function () {
+      var dur = getEffectiveDuration();
+      if (dur > 0 && dom.timeTotal) {
+        dom.timeTotal.textContent = formatTime(dur);
+      }
     });
 
     v.addEventListener("canplay", function () {
@@ -978,23 +1343,24 @@
     });
 
     v.addEventListener("timeupdate", function () {
-      if (!Number.isFinite(v.duration)) return;
-      var cur = v.currentTime || 0;
-      var dur = v.duration || 0;
+      var cur = (v && Number.isFinite(v.currentTime)) ? v.currentTime : 0;
+      var dur = getEffectiveDuration();
 
       if (dom.timeCurrent) dom.timeCurrent.textContent = formatTime(cur);
-      if (dom.timeTotal) dom.timeTotal.textContent = formatTime(dur);
+      if (dom.timeTotal) dom.timeTotal.textContent = (dur > 0) ? formatTime(dur) : "--:--";
 
       if (dom.progressBar && dur > 0) {
         var pct = (cur / dur) * 100;
-        dom.progressBar.style.width = pct + "%";
+        dom.progressBar.style.width = Math.min(100, Math.max(0, pct)) + "%";
       }
 
       // Check buffered progress
       if (dom.progressBuffered && v.buffered.length > 0 && dur > 0) {
         var end = v.buffered.end(v.buffered.length - 1);
-        dom.progressBuffered.style.width = (end / dur) * 100 + "%";
+        dom.progressBuffered.style.width = Math.min(100, Math.max(0, (end / dur) * 100)) + "%";
       }
+
+      onHistoryTimeUpdate();
 
       var now = Date.now();
       if (!v.paused && now - lastReportedTime >= 5000) {
@@ -1011,6 +1377,7 @@
     });
 
     v.addEventListener("ended", function () {
+      recordWatchProgress(true);
       if (state.currentMedia && state.currentMedia.nextEpisode) {
         playMedia(state.currentMedia.nextEpisode);
       } else {
@@ -1181,8 +1548,14 @@
   window.addEventListener("keydown", handleRemoteKey, true);
   window.addEventListener("mousemove", wakeOsd);
   window.addEventListener("pointermove", wakeOsd);
-  window.addEventListener("pagehide", function () { stopTvStreamTracking(true); });
-  window.addEventListener("beforeunload", function () { stopTvStreamTracking(true); });
+  window.addEventListener("pagehide", function () {
+    recordWatchProgress(false);
+    stopTvStreamTracking(true);
+  });
+  window.addEventListener("beforeunload", function () {
+    recordWatchProgress(false);
+    stopTvStreamTracking(true);
+  });
   bindVideoEvents();
   initAspectRatio();
   initSession();

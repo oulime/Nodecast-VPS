@@ -564,20 +564,40 @@ router.post('/play', tvRequireAuth, express.json(), async (req, res) => {
         });
 
         // Push PLAY command to TV along with user token so proxy segments authenticate
+        const mediaDuration = Number(media.duration || media.duration_secs || media.totalDuration || media.total_duration) || 0;
+        const isSeries = media.type === 'series' || !!media.seriesId || !!media.episodeStreamId || !!media.seasonNumber;
+
         const dispatched = sendTvEvent(deviceId, {
             type: 'PLAY',
             token: userToken,
             media: {
-                id: media.id || media.streamId || media.stream_id || null,
+                id: media.id || (isSeries ? (`series:${media.seriesId || media.streamId || 'series'}:ep:${media.episodeStreamId || media.streamId || 'ep'}`) : (media.streamId || media.stream_id || null)),
+                streamId: media.streamId || media.stream_id || media.id || null,
+                seriesId: media.seriesId || media.series_id || null,
+                episodeStreamId: media.episodeStreamId || media.episode_stream_id || null,
                 url: playUrl,
-                title: media.title || 'Vidéo',
-                poster: media.poster || '',
+                title: media.title || media.name || 'Vidéo',
+                name: media.name || media.title || 'Vidéo',
+                seriesName: media.seriesName || media.series_name || media.name || media.title || null,
+                poster: media.poster || media.thumbUrl || media.cover || '',
+                thumbUrl: media.thumbUrl || media.poster || media.cover || '',
+                backdropUrl: media.backdropUrl || media.thumbUrl || media.poster || media.cover || '',
+                horizontal_thumb: media.horizontal_thumb || media.horizontalThumb || '',
+                title_logo: media.title_logo || media.titleLogo || '',
+                has_integrated_title: Boolean(media.has_integrated_title),
+                packageId: media.packageId || media.package_id || '',
+                sourceId: media.sourceId || media.source_id || '',
+                containerExtension: media.containerExtension || media.container_extension || 'mp4',
                 isLive: Boolean(media.isLive),
-                type: media.type || 'vod',
+                type: isSeries ? 'series' : (media.type || 'movie'),
                 position: startPos,
-                episodeTitle: media.episodeTitle || null,
-                seasonNumber: media.seasonNumber || null,
-                episodeNumber: media.episodeNumber || null,
+                currentTime: startPos,
+                duration: mediaDuration,
+                duration_secs: mediaDuration,
+                totalDuration: mediaDuration,
+                episodeTitle: media.episodeTitle || media.episode_title || null,
+                seasonNumber: media.seasonNumber != null ? Number(media.seasonNumber) : null,
+                episodeNumber: media.episodeNumber != null ? Number(media.episodeNumber) : null,
                 nextEpisode: media.nextEpisode || null
             }
         });

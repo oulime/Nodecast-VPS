@@ -1,4 +1,5 @@
 const express = require('express');
+const compression = require('compression');
 require('dotenv').config();
 const path = require('path');
 const fs = require('fs');
@@ -157,6 +158,22 @@ async function enrichVpsHomePosterMatches(entries, headers) {
 // Trust proxy headers (X-Forwarded-Proto, X-Forwarded-For, etc.)
 // Required for correct protocol detection behind reverse proxies (nginx, Caddy, etc.)
 app.set('trust proxy', true);
+
+// HTTP Compression (Gzip / Deflate) - reduces JSON and static text sizes by up to 85%
+app.use(compression({
+    filter: (req, res) => {
+        if (req.headers['x-no-compression']) {
+            return false;
+        }
+        // Do not re-compress binary video/audio streams or raw media chunks
+        const p = req.path.toLowerCase();
+        if (p.includes('/stream') || p.includes('/transcode') || p.endsWith('.ts') || p.endsWith('.m4s') || p.endsWith('.mp4') || p.endsWith('.mkv')) {
+            return false;
+        }
+        return compression.filter(req, res);
+    },
+    threshold: 1024
+}));
 
 // Middleware
 app.use(express.json({ limit: '50mb' }));

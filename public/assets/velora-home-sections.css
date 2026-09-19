@@ -1746,6 +1746,25 @@
   background: rgba(0, 0, 0, 0.75);
   color: #cbd5e1;
   backdrop-filter: blur(4px);
+  transition: all 0.2s ease;
+}
+.vel-stored-media-card__size-badge--heavy {
+  background: rgba(220, 38, 38, 0.85);
+  color: #fee2e2;
+  font-weight: 700;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+}
+.vel-stored-media-card__size-badge--medium {
+  background: rgba(217, 119, 6, 0.85);
+  color: #fef3c7;
+  font-weight: 700;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+.vel-stored-media-card__size-badge--light {
+  background: rgba(16, 185, 129, 0.85);
+  color: #ecfdf5;
+  font-weight: 700;
+  border: 1px solid rgba(52, 211, 153, 0.4);
 }
 .vel-stored-media-card__info {
   padding: 0.65rem 0.75rem 0.4rem;
@@ -1793,6 +1812,16 @@
 .vel-stored-media-card__btn:hover {
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
+}
+.vel-stored-media-card__btn--optimize {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #6ee7b7;
+}
+.vel-stored-media-card__btn--optimize:hover {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: rgba(16, 185, 129, 0.6);
+  color: #a7f3d0;
 }
 .vel-stored-media-card__btn--delete:hover {
   background: rgba(239, 68, 68, 0.2);

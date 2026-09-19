@@ -126,9 +126,6 @@ router.delete('/:itemId', (req, res) => {
                 OR id = ?
                 OR item_id = ? 
                 OR parent_id = ? 
-                OR id LIKE ?
-                OR id LIKE ?
-                OR id LIKE ?
                 OR json_extract(data, '$.streamId') = ?
                 OR json_extract(data, '$.seriesId') = ?
                 OR json_extract(data, '$.episodeStreamId') = ?
@@ -140,9 +137,6 @@ router.delete('/:itemId', (req, res) => {
             itemId,
             itemId,
             itemId,
-            `${userId}:%:${itemId}`,
-            `${userId}:%:${itemId}:%`,
-            `%${itemId}%`,
             itemId,
             itemId,
             itemId,
@@ -153,21 +147,10 @@ router.delete('/:itemId', (req, res) => {
             query += `
                 OR parent_id = ?
                 OR item_id = ?
-                OR id LIKE ?
                 OR json_extract(data, '$.seriesId') = ?
                 OR json_extract(data, '$.streamId') = ?
             `;
-            params.push(seriesId, seriesId, `%${seriesId}%`, seriesId, seriesId);
-        }
-
-        if (name || seriesName) {
-            const targetName = (seriesName || name).toLowerCase();
-            query += `
-                OR LOWER(json_extract(data, '$.name')) = ?
-                OR LOWER(json_extract(data, '$.seriesName')) = ?
-                OR LOWER(json_extract(data, '$.title')) = ?
-            `;
-            params.push(targetName, targetName, targetName);
+            params.push(seriesId, seriesId, seriesId, seriesId);
         }
 
         query += `)`;

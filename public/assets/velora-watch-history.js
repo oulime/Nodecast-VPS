@@ -495,15 +495,12 @@
     if (!item) return;
     try {
       var list = getTombstones();
-      var norm = normalizeTitle(item.seriesName || item.name || "");
       var entry = {
         id: item.id ? String(item.id) : null,
         streamId: item.streamId ? String(item.streamId) : null,
         episodeStreamId: item.episodeStreamId ? String(item.episodeStreamId) : null,
         seriesId: item.seriesId ? String(item.seriesId) : null,
-        name: item.name ? String(item.name).trim() : null,
-        seriesName: item.seriesName ? String(item.seriesName).trim() : null,
-        normTitle: norm || null,
+        packageId: item.packageId ? String(item.packageId) : null,
         type: item.type || "movie",
         timestamp: Date.now()
       };
@@ -519,13 +516,11 @@
     try {
       var list = getTombstones();
       if (!list.length) return;
-      var norm = normalizeTitle(media.seriesName || media.name || "");
       var mId = String(media.id || "");
       var sId = String(media.seriesId || media.streamId || "");
       var filtered = list.filter(function (t) {
         if (mId && t.id && t.id === mId) return false;
-        if (sId && (t.seriesId === sId || t.streamId === sId)) return false;
-        if (norm && t.normTitle && t.normTitle === norm) return false;
+        if (sId && (t.seriesId === sId || t.streamId === sId || t.id === sId)) return false;
         return true;
       });
       localStorage.setItem(getTombstoneKey(), JSON.stringify(filtered));
@@ -540,19 +535,12 @@
     var itStreamId = item.streamId ? String(item.streamId) : "";
     var itEpId = item.episodeStreamId ? String(item.episodeStreamId) : "";
     var itSeriesId = item.seriesId ? String(item.seriesId) : "";
-    var itNorm = normalizeTitle(item.seriesName || item.name || "");
 
     return list.some(function (t) {
       if (itId && t.id && t.id === itId) return true;
-      if (t.type === "series" || item.type === "series") {
-        if (itSeriesId && t.seriesId && itSeriesId === t.seriesId) return true;
-        if (itSeriesId && t.streamId && itSeriesId === t.streamId) return true;
-        if (itStreamId && t.seriesId && itStreamId === t.seriesId) return true;
-        if (itNorm && t.normTitle && itNorm === t.normTitle) return true;
-      }
-      if (itStreamId && t.streamId && itStreamId === t.streamId) return true;
-      if (itEpId && t.episodeStreamId && itEpId === t.episodeStreamId) return true;
-      if (itNorm && itNorm.length >= 2 && t.normTitle && itNorm === t.normTitle) return true;
+      if (itSeriesId && (t.seriesId === itSeriesId || t.streamId === itSeriesId || t.id === itSeriesId)) return true;
+      if (itStreamId && (t.streamId === itStreamId || t.seriesId === itStreamId || t.id === itStreamId)) return true;
+      if (itEpId && (t.episodeStreamId === itEpId || t.streamId === itEpId || t.id === itEpId)) return true;
       return false;
     });
   }
@@ -603,7 +591,6 @@
     var sId = item.streamId ? String(item.streamId) : "";
     var epId = item.episodeStreamId ? String(item.episodeStreamId) : "";
     var seriesId = item.seriesId ? String(item.seriesId) : "";
-    var normTitle = normalizeTitle(item.seriesName || item.name || "");
     var isSeries = item.type === "series";
 
     return list.filter(function (it) {
@@ -614,19 +601,18 @@
       var itSeriesId = it.seriesId ? String(it.seriesId) : "";
       var itStreamId = it.streamId ? String(it.streamId) : "";
       var itEpId = it.episodeStreamId ? String(it.episodeStreamId) : "";
-      var itNormTitle = normalizeTitle(it.seriesName || it.name || "");
       var itIsSeries = it.type === "series";
 
-      // If item is a series, completely wipe ALL episodes of this series from history
+      // If item is a series, completely wipe episodes belonging to THIS exact series ID
       if (isSeries || itIsSeries) {
-        if (seriesId && (itSeriesId === seriesId || itStreamId === seriesId)) return false;
+        if (seriesId && (itSeriesId === seriesId || itStreamId === seriesId || String(it.id) === seriesId)) return false;
         if (itSeriesId && (itSeriesId === sId || itSeriesId === targetId)) return false;
-        if (normTitle && normTitle.length >= 2 && itNormTitle && normTitle === itNormTitle) return false;
+        if (sId && (itStreamId === sId || itSeriesId === sId || String(it.id) === sId)) return false;
       }
 
-      if (sId && (itStreamId === sId || itEpId === sId)) return false;
-      if (epId && (itEpId === epId || itStreamId === epId)) return false;
-      if (normTitle && normTitle.length >= 2 && itNormTitle && normTitle === itNormTitle) return false;
+      if (sId && (itStreamId === sId || itEpId === sId || String(it.id) === sId)) return false;
+      if (epId && (itEpId === epId || itStreamId === epId || String(it.id) === epId)) return false;
+      if (targetId && (itStreamId === targetId || itSeriesId === targetId || itEpId === targetId)) return false;
 
       return isValidMediaEntry(it);
     });
@@ -640,14 +626,11 @@
 
     // 2. Clear any active playback / session state for this item
     if (state.currentPlaying) {
-      var curNorm = normalizeTitle(state.currentPlaying.seriesName || state.currentPlaying.name || "");
-      var itemNorm = normalizeTitle(item.seriesName || item.name || "");
       var curSId = String(state.currentPlaying.seriesId || state.currentPlaying.streamId || "");
       var itemSId = String(item.seriesId || item.streamId || "");
       if (
         String(state.currentPlaying.id) === String(item.id) ||
-        (curSId && curSId === itemSId) ||
-        (curNorm && itemNorm && curNorm === itemNorm)
+        (curSId && curSId === itemSId)
       ) {
         state.currentPlaying = null;
         sessionTracker.mediaId = null;
@@ -694,8 +677,6 @@
 
       var qParams = new URLSearchParams();
       if (item.seriesId) qParams.set("seriesId", String(item.seriesId));
-      if (item.name) qParams.set("name", String(item.name));
-      if (item.seriesName) qParams.set("seriesName", String(item.seriesName));
       var queryString = qParams.toString() ? ("?" + qParams.toString()) : "";
 
       idsToDelete.forEach(function (id) {

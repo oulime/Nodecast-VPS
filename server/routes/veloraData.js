@@ -91,7 +91,7 @@ function fetchTmdbBackdrop(name, isSeries = false) {
                     const json = JSON.parse(data);
                     const item = json.results?.find(r => r.backdrop_path) || json.results?.[0];
                     if (item?.backdrop_path) {
-                        return resolve(`https://image.tmdb.org/t/p/w780${item.backdrop_path}`);
+                        return resolve(`https://image.tmdb.org/t/p/w500${item.backdrop_path}`);
                     }
                 } catch (_) {}
                 resolve('');
@@ -118,7 +118,7 @@ function fetchTmdbPoster(name, isSeries = false) {
                     const json = JSON.parse(data);
                     const item = json.results?.find(r => r.poster_path) || json.results?.[0];
                     if (item?.poster_path) {
-                        return resolve(`https://image.tmdb.org/t/p/w500${item.poster_path}`);
+                        return resolve(`https://image.tmdb.org/t/p/w342${item.poster_path}`);
                     }
                 } catch (_) {}
                 resolve('');
@@ -2905,7 +2905,7 @@ function buildHomeCache() {
                 let backdropUrl = '';
                 if (typeof backdropCandidate === 'string' && backdropCandidate.trim()) {
                     let url = backdropCandidate.trim();
-                    if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w1280${url}`;
+                    if (url.startsWith('/')) url = `https://image.tmdb.org/t/p/w500${url}`;
                     backdropUrl = url;
                 }
                 const sectionPkgCover = String(packageRow.cover_url || section.logo_url || section.badge_logo_url || '').trim();
@@ -3171,6 +3171,16 @@ const STORED_MEDIA_DIRECTORIES = {
         dir: SECTION_LOGO_UPLOAD_DIR,
         publicPath: SECTION_LOGO_PUBLIC_PATH,
         label: 'Logos de Sections'
+    },
+    'country-logos': {
+        dir: path.join(__dirname, '..', '..', 'public', 'uploads', 'country-logos'),
+        publicPath: '/uploads/country-logos',
+        label: 'Logos de Pays'
+    },
+    'package-covers': {
+        dir: path.join(__dirname, '..', '..', 'public', 'uploads', 'package-covers'),
+        publicPath: '/uploads/package-covers',
+        label: 'Logos de Packages'
     }
 };
 
@@ -3800,37 +3810,143 @@ router.get('/stored-media', async (req, res) => {
     }
 });
 
-router.post('/stored-media/upload-replace', async (req, res) => {
+function optimizeImageFile(filePath, category = '') {
+    return new Promise((resolve) => {
+        if (!filePath || !fs.existsSync(filePath)) return resolve(null);
+        const ext = path.extname(filePath).toLowerCase();
+        const isLogo = String(category).includes('logo');
+        const maxW = isLogo ? 380 : (String(category).includes('hero-backdrop') ? 640 : 480);
+        const tmpPath = `${filePath}.opt.tmp${ext}`;
+        const vf = `scale=min(${maxW}\\,iw):-2`;
+        const args = ['-y', '-i', filePath, '-vf', vf];
+
+        if (ext === '.jpg' || ext === '.jpeg') {
+            args.push('-q:v', '5');
+        } else if (ext === '.webp') {
+            args.push('-c:v', 'libwebp', '-q:v', '78');
+        } else if (ext === '.png') {
+            args.push('-compression_level', '6');
+        }
+        args.push(tmpPath);
+
+        const { spawn } = require('child_process');
+        const proc = spawn('ffmpeg', args, { windowsHide: true });
+        proc.on('close', code => {
+            if (code === 0 && fs.existsSync(tmpPath)) {
+                const oldSize = fs.statSync(filePath).size;
+                const newSize = fs.statSync(tmpPath).size;
+                if (newSize < oldSize) {
+                    fs.copyFileSync(tmpPath, filePath);
+                }
+                try { fs.unlinkSync(tmpPath); } catch (_) {}
+                resolve({
+                    oldSize,
+                    newSize: Math.min(oldSize, newSize),
+                    saved: Math.max(0, oldSize - newSize),
+                    optimized: newSize < oldSize
+                });
+            } else {
+                try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch (_) {}
+                resolve(null);
+            }
+        });
+        proc.on('error', () => {
+            try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch (_) {}
+            resolve(null);
+        });
+    });
+}
+
+router.post('/stored-media/optimize', async (req, res) => {
     try {
         const category = String(req.body?.category || '').trim();
         const filename = String(req.body?.filename || '').trim();
-        const encoded = String(req.body?.dataBase64 || '').trim();
         if (!category || !STORED_MEDIA_DIRECTORIES[category]) {
             return res.status(400).json({ error: 'Catégorie invalide' });
         }
         if (!filename) {
             return res.status(400).json({ error: 'Nom de fichier requis' });
         }
-        if (!encoded) {
-            return res.status(400).json({ error: 'Données image requises' });
-        }
 
         const safeFilename = path.basename(filename);
         const conf = STORED_MEDIA_DIRECTORIES[category];
         const destPath = path.join(conf.dir, safeFilename);
 
-        const buffer = Buffer.from(encoded.replace(/^data:[^;]+;base64,/, ''), 'base64');
-        if (!buffer.length || buffer.length > 10 * 1024 * 1024) {
-            return res.status(413).json({ error: 'L\'image doit faire moins de 10 Mo.' });
+        if (!fs.existsSync(destPath)) {
+            return res.status(404).json({ error: 'Fichier introuvable sur le disque.' });
         }
 
-        await fs.promises.mkdir(conf.dir, { recursive: true });
-        await fs.promises.writeFile(destPath, buffer);
+        const result = await optimizeImageFile(destPath, category);
+        if (!result) {
+            return res.status(500).json({ error: 'Échec de l\'optimisation de l\'image.' });
+        }
 
         const url = `${conf.publicPath}/${safeFilename}?t=${Date.now()}`;
-        return res.json({ ok: true, url, filename: safeFilename });
+        return res.json({
+            ok: true,
+            url,
+            filename: safeFilename,
+            oldSize: result.oldSize,
+            newSize: result.newSize,
+            saved: result.saved,
+            optimized: result.optimized
+        });
     } catch (err) {
-        console.error('[veloraData] replace stored-media error:', err);
+        console.error('[veloraData] optimize stored-media error:', err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/stored-media/optimize-all', async (req, res) => {
+    try {
+        const targetCategory = String(req.body?.category || 'all').trim();
+        const categoriesToProcess = (targetCategory === 'all' || !STORED_MEDIA_DIRECTORIES[targetCategory])
+            ? Object.keys(STORED_MEDIA_DIRECTORIES)
+            : [targetCategory];
+
+        let totalProcessed = 0;
+        let totalOptimized = 0;
+        let totalBytesSaved = 0;
+        const updatedFiles = [];
+
+        for (const catKey of categoriesToProcess) {
+            const conf = STORED_MEDIA_DIRECTORIES[catKey];
+            if (!conf.dir || !fs.existsSync(conf.dir)) continue;
+
+            const files = await fs.promises.readdir(conf.dir, { withFileTypes: true });
+            for (const file of files) {
+                if (!file.isFile()) continue;
+                const filePath = path.join(conf.dir, file.name);
+                const stat = await fs.promises.stat(filePath);
+
+                // Only optimize if larger than 40 KB or if explicitly requested
+                if (stat.size > 40 * 1024) {
+                    totalProcessed++;
+                    const result = await optimizeImageFile(filePath, catKey);
+                    if (result && result.optimized) {
+                        totalOptimized++;
+                        totalBytesSaved += result.saved;
+                        updatedFiles.push({
+                            category: catKey,
+                            filename: file.name,
+                            oldSize: result.oldSize,
+                            newSize: result.newSize,
+                            saved: result.saved
+                        });
+                    }
+                }
+            }
+        }
+
+        return res.json({
+            ok: true,
+            totalProcessed,
+            totalOptimized,
+            totalBytesSaved,
+            updatedFiles
+        });
+    } catch (err) {
+        console.error('[veloraData] optimize-all stored-media error:', err);
         return res.status(500).json({ error: err.message });
     }
 });

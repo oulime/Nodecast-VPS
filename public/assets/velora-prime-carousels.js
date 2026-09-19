@@ -351,7 +351,7 @@
 
     let backdrop = it.backdrop_path || it.backdrop || it.backdrop_url || it.backdropUrl || it.horizontal_thumb || "";
     if (Array.isArray(backdrop) && backdrop.length > 0) backdrop = backdrop[0];
-    if (typeof backdrop === "string" && backdrop.startsWith("/")) backdrop = "https://image.tmdb.org/t/p/w780" + backdrop;
+    if (typeof backdrop === "string" && backdrop.startsWith("/")) backdrop = "https://image.tmdb.org/t/p/w500" + backdrop;
 
     // If poster is a horizontal thumb, look for an actual vertical poster
     if (typeof poster === "string" && (poster.includes("/horizontal-thumbs/") || poster.includes("/w1280/") || poster.includes("/backdrop/"))) {

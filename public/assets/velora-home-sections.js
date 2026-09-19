@@ -23,7 +23,7 @@ window.veloraApplyHomeChannelRules=applyHomeChannelRules;
 async function loadChannelNameRules(){var results=await Promise.all([req("/admin_channel_name_prefixes?select=prefix,sort_order&order=sort_order.asc,prefix.desc").catch(function(){return[]}),req("/admin_channel_name_suffixes?select=suffix,sort_order&order=sort_order.asc,suffix.desc").catch(function(){return[]}),req("/admin_hidden_filters?select=needle&order=needle.asc").catch(function(){return[]})]);homePrefixes=[...new Set((Array.isArray(results[0])?results[0]:[]).map(function(row){return String(row.prefix||"").trim()}).filter(Boolean))].sort(function(left,right){return right.length-left.length});homeSuffixes=[...new Set((Array.isArray(results[1])?results[1]:[]).map(function(row){return String(row.suffix||"").trim()}).filter(Boolean))].sort(function(left,right){return right.length-left.length});homeHiddenFilters=[...new Set(defaultChannelHiddenFilters.concat((Array.isArray(results[2])?results[2]:[]).map(function(row){return String(row.needle||"").trim()}).filter(Boolean)))].sort(function(left,right){return right.length-left.length})}
 function getRowCountryIds(row){if(!row)return["default"];if(Array.isArray(row.country_ids)&&row.country_ids.length)return row.country_ids;if(!row.country_id||row.country_id==="default")return["default"];return String(row.country_id).split(",").map(function(s){return s.trim()}).filter(Boolean)}
 function sectionMatchesCountry(row,active){if(!row)return false;var ids=getRowCountryIds(row);if(ids.includes("default")||ids.includes("all"))return true;if(!active||(!active.id&&!active.name))return true;var actId=String(active.id||"").trim(),actName=String(active.name||"").trim();if(actId&&ids.includes(actId))return true;var normActId=countryKey(actId).replace(/^country_/,""),normActName=countryKey(actName).replace(/^country_/,"");var matched=ids.some(function(id){var normId=countryKey(id).replace(/^country_/,"");if(normActId&&(normId===normActId||normActId.includes(normId)||normId.includes(normActId)))return true;if(normActName&&(normId===normActName||normActName.includes(normId)||normId.includes(normActName)))return true;return false});if(matched)return true;if(Array.isArray(state.countries)&&state.countries.length>0){var configured=state.countries.filter(function(c){return ids.includes(String(c.id))});return configured.some(function(c){return countryKey(c.name)===countryKey(active.name)})}return false}
-function homeImageUrl(value,forceProxy){var url=String(value||"").trim();if(!url)return "";if(/^\/api\/proxy\/image\?/i.test(url))return url;var absolute=url;if(/^\/\//.test(url))absolute=location.protocol+url;else if(!/^https?:\/\//i.test(url))return url;return forceProxy||location.protocol==="https:"&&/^http:\/\//i.test(absolute)?"/api/proxy/image?url="+encodeURIComponent(absolute):absolute}
+function homeImageUrl(value,forceProxy){var url=String(value||"").trim();if(!url)return "";url=url.replace(/image\.tmdb\.org\/t\/p\/(?:w1280|w780|original)\//i,"image.tmdb.org/t/p/w500/");if(/^\/api\/proxy\/image\?/i.test(url))return url;var absolute=url;if(/^\/\//.test(url))absolute=location.protocol+url;else if(!/^https?:\/\//i.test(url))return url;return forceProxy||location.protocol==="https:"&&/^http:\/\//i.test(absolute)?"/api/proxy/image?url="+encodeURIComponent(absolute):absolute}
 window.veloraSetHomeImageSource=window.veloraSetHomeImageSource||function(image,value,onFailure){var direct=homeImageUrl(value,false),proxied=homeImageUrl(value,true),retried=false;function failed(){if(!retried&&proxied&&proxied!==direct){retried=true;image.src=proxied;return}image.removeEventListener("error",failed);if(typeof onFailure==="function")onFailure()}image.addEventListener("error",failed);image.src=direct};
 function warmHomeMovie(){return Promise.resolve()}
 function prewarmHomeMovies(sections){var entries=[];(sections||[]).forEach(function(section){if(section.content_type==="movies"&&Array.isArray(section.entries))entries.push.apply(entries,section.entries)});entries=entries.slice(0,10);window.setTimeout(async function(){for(var i=0;i<entries.length;i+=2)await Promise.all(entries.slice(i,i+2).map(warmHomeMovie))},350)}
@@ -981,15 +981,18 @@ window.veloraRenderStoredMediaGrid = function() {
     var img = document.createElement("img");
     img.alt = item.filename;
     img.loading = "lazy";
+    img.decoding = "async";
     img.src = item.url;
 
     var catBadge = document.createElement("span");
     catBadge.className = "vel-stored-media-card__category-badge";
     catBadge.textContent = item.categoryLabel || item.category;
 
+    var sizeKo = item.sizeBytes ? (item.sizeBytes / 1024) : 0;
     var sizeBadge = document.createElement("span");
-    sizeBadge.className = "vel-stored-media-card__size-badge";
-    sizeBadge.textContent = item.sizeBytes ? (item.sizeBytes / 1024).toFixed(1) + " Ko" : "";
+    var badgeModifier = sizeKo > 200 ? " vel-stored-media-card__size-badge--heavy" : (sizeKo > 75 ? " vel-stored-media-card__size-badge--medium" : " vel-stored-media-card__size-badge--light");
+    sizeBadge.className = "vel-stored-media-card__size-badge" + badgeModifier;
+    sizeBadge.textContent = sizeKo ? sizeKo.toFixed(1) + " Ko" : "";
 
     preview.append(img, catBadge, sizeBadge);
 
@@ -1020,6 +1023,41 @@ window.veloraRenderStoredMediaGrid = function() {
 
     var actions = document.createElement("div");
     actions.className = "vel-stored-media-card__actions";
+
+    var optBtn = document.createElement("button");
+    optBtn.type = "button";
+    optBtn.className = "vel-stored-media-card__btn vel-stored-media-card__btn--optimize";
+    optBtn.innerHTML = "⚡ Réduire";
+    optBtn.title = "Convertir cette image en vignette légère optimisée";
+    optBtn.addEventListener("click", async function(e) {
+      e.stopPropagation();
+      optBtn.disabled = true;
+      optBtn.innerHTML = "⏳";
+      if (statusText) statusText.textContent = "Optimisation de " + item.filename + "...";
+      try {
+        var res = await fetch("/api/velora-db/stored-media/optimize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ category: item.category, filename: item.filename })
+        });
+        var data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || "Erreur lors de l'optimisation");
+        item.sizeBytes = data.newSize;
+        item.url = data.url;
+        img.src = data.url;
+        var newKo = data.newSize / 1024;
+        sizeBadge.textContent = newKo.toFixed(1) + " Ko";
+        sizeBadge.className = "vel-stored-media-card__size-badge" + (newKo > 200 ? " vel-stored-media-card__size-badge--heavy" : (newKo > 75 ? " vel-stored-media-card__size-badge--medium" : " vel-stored-media-card__size-badge--light"));
+        var savedKo = (data.saved / 1024).toFixed(1);
+        if (statusText) statusText.textContent = "✅ « " + item.filename + " » : " + (data.oldSize / 1024).toFixed(1) + " Ko ➔ " + newKo.toFixed(1) + " Ko (Économie : " + savedKo + " Ko)";
+        optBtn.innerHTML = "⚡ OK";
+        setTimeout(function() { optBtn.innerHTML = "⚡ Réduire"; optBtn.disabled = false; }, 2000);
+      } catch (err) {
+        alert("Erreur optimisation : " + err.message);
+        optBtn.disabled = false;
+        optBtn.innerHTML = "⚡ Réduire";
+      }
+    });
 
     var replaceBtn = document.createElement("button");
     replaceBtn.type = "button";
@@ -1076,7 +1114,7 @@ window.veloraRenderStoredMediaGrid = function() {
       }
     });
 
-    actions.append(replaceBtn, viewBtn, delBtn);
+    actions.append(optBtn, replaceBtn, viewBtn, delBtn);
     card.append(preview, info, actions);
     grid.appendChild(card);
   });
@@ -1403,6 +1441,53 @@ document.addEventListener("click", function(event) {
       fileReplacer.value = "";
       fileReplacer.click();
     }
+  } else if (target.closest("#stored-media-refresh-btn")) {
+    event.preventDefault();
+    window.veloraLoadStoredMedia();
+  } else if (target.closest("#stored-media-optimize-all-btn")) {
+    event.preventDefault();
+    var optAllBtn = target.closest("#stored-media-optimize-all-btn");
+    var catSelect = document.getElementById("stored-media-category-select");
+    var cat = catSelect ? catSelect.value : "all";
+    var catLabel = cat === "all" ? "toutes les catégories" : "la catégorie sélectionnée";
+    if (!confirm("⚡ Convertir et compresser toutes les images stockées en vignettes légères (" + catLabel + ") ?\nLes images lourdes seront redimensionnées et optimisées.")) return;
+    var statusText = document.getElementById("stored-media-status-text");
+    if (statusText) statusText.textContent = "⚡ Optimisation globale en cours... Veuillez patienter.";
+    if (optAllBtn) {
+      optAllBtn.disabled = true;
+      optAllBtn.textContent = "⏳ Optimisation...";
+    }
+    fetch("/api/velora-db/stored-media/optimize-all", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category: cat })
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data || !data.ok) throw new Error(data && data.error || "Erreur optimisation");
+        var savedMo = (data.totalBytesSaved / (1024 * 1024)).toFixed(2);
+        if (statusText) statusText.textContent = "✨ Terminé ! " + data.totalOptimized + " image(s) réduite(s) sur " + data.totalProcessed + " analysée(s). Économie : " + savedMo + " Mo !";
+        window.veloraLoadStoredMedia();
+        if (typeof window.veloraInvalidateHomeCache === "function") {
+          window.veloraInvalidateHomeCache();
+        }
+        if (window.__veloraFetchingLogos) {
+          window.__veloraFetchingLogos.clear();
+        }
+        if (typeof loadHomeCache === "function") {
+          loadHomeCache(true).then(function() { if (typeof renderHome === "function") renderHome(); }).catch(function(){});
+        }
+      })
+      .catch(function(err) {
+        alert("Erreur : " + err.message);
+        if (statusText) statusText.textContent = "Erreur : " + err.message;
+      })
+      .finally(function() {
+        if (optAllBtn) {
+          optAllBtn.disabled = false;
+          optAllBtn.textContent = "⚡ Tout convertir en vignettes";
+        }
+      });
   } else if (target.closest("#stored-media-delete-all-btn")) {
     event.preventDefault();
     var catSelect = document.getElementById("stored-media-category-select");

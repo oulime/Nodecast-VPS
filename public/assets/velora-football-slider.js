@@ -2089,9 +2089,9 @@
   function updateSliderRealTime() {
     if (isUserTouching) return;
 
-    var root = document.getElementById('vel-home-sections');
-    if (!root) return;
-    var section = root.querySelector('.vel-home-section--football');
+    var slot = document.getElementById('vel-home-football-slot');
+    var section = (slot && slot.querySelector('.vel-home-section--football')) ||
+      document.querySelector('.vel-home-section--football');
     if (!section) return;
     var rail = section.querySelector('.vel-home-section__rail');
     if (!rail) return;
@@ -2207,9 +2207,9 @@
       var freshMatches = await fetchTodayMatches(country, true);
       if (!Array.isArray(freshMatches) || freshMatches.length === 0) return;
 
-      var root = document.getElementById('vel-home-sections');
-      if (!root) return;
-      var section = root.querySelector('.vel-home-section--football');
+      var slot = document.getElementById('vel-home-football-slot');
+      var section = (slot && slot.querySelector('.vel-home-section--football')) ||
+        document.querySelector('.vel-home-section--football');
       if (!section) return;
       var rail = section.querySelector('.vel-home-section__rail');
       if (!rail) return;
@@ -2295,12 +2295,45 @@
       return;
     }
 
+    var slot = document.getElementById('vel-home-football-slot');
+    var country = detectActiveCountry(hintCountry);
+
+    if (slot) {
+      if (!isCountryFootballEnabled(country)) {
+        slot.replaceChildren();
+        return;
+      }
+      var existingFootballInSlot = slot.querySelector('.vel-home-section--football');
+      if (existingFootballInSlot && existingFootballInSlot.dataset.footballCountry === country && existingFootballInSlot.querySelectorAll('.vel-football-card').length > 0) {
+        lastInjectedCountry = country;
+        return;
+      }
+      var matches = await fetchTodayMatches(country);
+      if (!matches || matches.length === 0) {
+        slot.replaceChildren();
+        return;
+      }
+      var block = renderFootballSection(matches, country);
+      if (!block) {
+        slot.replaceChildren();
+        return;
+      }
+      var oldRail = slot.querySelector('.vel-home-section__rail');
+      var oldScroll = (oldRail && Number.isFinite(oldRail.scrollLeft)) ? oldRail.scrollLeft : 0;
+      slot.replaceChildren(block);
+      if (oldScroll > 0) {
+        var newRail = block.querySelector('.vel-home-section__rail');
+        if (newRail) newRail.scrollLeft = oldScroll;
+      }
+      lastInjectedCountry = country;
+      return;
+    }
+
     var root = document.getElementById('vel-home-sections');
     if (!root) return;
 
     cleanupDuplicateFootballs(root);
 
-    var country = detectActiveCountry(hintCountry);
     var existingFootball = root.querySelector('.vel-home-section--football');
 
     // Si le module football est désactivé pour ce pays, supprimer immédiatement toute section existante

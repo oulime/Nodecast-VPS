@@ -252,6 +252,11 @@
           entry.backdropUrl = data.backdropUrl;
           entry.thumbUrl = data.backdropUrl;
           if (media.tagName === "IMG") {
+            var onImgReady = function () {
+              media.classList.add("is-loaded", "vel-image-loaded");
+              media.classList.remove("vel-home-section__fallback");
+            };
+            media.addEventListener("load", onImgReady, { once: true });
             if (typeof window.veloraSetHomeImageSource === "function") {
               window.veloraSetHomeImageSource(media, data.backdropUrl, function() {
                 media.removeAttribute("src");
@@ -261,6 +266,7 @@
               media.src = data.backdropUrl;
               media.classList.remove("vel-home-section__fallback");
             }
+            if (media.complete && media.naturalWidth > 0) onImgReady();
           }
         }
       })
@@ -566,14 +572,6 @@
     var version = ++renderVersion;
     var matching = matchingSections(payload);
     var fragment = document.createDocumentFragment();
-    if (typeof window.veloraRenderResumeSection === "function") {
-      var resumeBlock = window.veloraRenderResumeSection();
-      if (resumeBlock) fragment.appendChild(resumeBlock);
-    }
-    if (typeof window.veloraRenderFootballSectionDirect === "function") {
-      var footBlock = window.veloraRenderFootballSectionDirect();
-      if (footBlock) fragment.appendChild(footBlock);
-    }
     matching.forEach(function (section) {
       var isHorizontal = section.card_orientation === "horizontal";
       var block = document.createElement("div");
@@ -659,6 +657,7 @@
     });
     if (version !== renderVersion) return false;
     root.replaceChildren(fragment);
+    if (typeof window.veloraInjectResumeSection === "function") window.veloraInjectResumeSection();
     if (typeof window.veloraInjectFootballSection === "function") window.veloraInjectFootballSection();
     document.dispatchEvent(new CustomEvent("velora-home-country-rendered", {
       detail: { countryId: activeCountryId() }

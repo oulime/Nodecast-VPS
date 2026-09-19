@@ -111,8 +111,13 @@
         object-fit: cover !important;
         border-radius: inherit !important;
         background: #090811 !important;
-        transition: none !important;
+        opacity: 0 !important;
+        transition: opacity 0.22s ease-in-out !important;
         transform: none !important;
+      }
+      .vel-home-section__card--resume .vel-home-section__media.is-loaded,
+      .vel-home-section__card--resume .vel-home-section__media.vel-image-loaded {
+        opacity: 1 !important;
       }
       .vel-home-section__card--resume:hover .vel-home-section__media,
       .vel-home-section__card--resume:focus .vel-home-section__media,
@@ -2367,22 +2372,58 @@
       media.loading = "lazy";
       media.decoding = "async";
       media.className = "vel-home-section__media";
-      var imgSrc = item.horizontal_thumb || item.backdropUrl || item.backdrop || item.thumbUrl || item.cover || "";
-      if (imgSrc && typeof window.veloraSetHomeImageSource === "function") {
-        window.veloraSetHomeImageSource(media, imgSrc, function () {
-          if (imgSrc !== item.thumbUrl && item.thumbUrl) {
-            media.src = item.thumbUrl;
+
+      function isKnownHorizontalUrl(u) {
+        if (!u || typeof u !== "string") return false;
+        var s = u.trim();
+        if (!s) return false;
+        if (s.includes("/uploads/horizontal-thumbs/")) return true;
+        if (s.includes("/w1280") || s.includes("/w780") || s.includes("backdrop")) return true;
+        if (item.horizontal_thumb && s === item.horizontal_thumb) return true;
+        if (item.thumbUrl && s !== item.thumbUrl) return true;
+        return false;
+      }
+
+      var bCacheKey = String(item.sourceId || "") + ":" + String(item.streamId || item.seriesId || "") + ":" + String(item.name || item.seriesName || "");
+      var confirmedBackdrop = "";
+      if (item.horizontal_thumb && isKnownHorizontalUrl(item.horizontal_thumb)) {
+        confirmedBackdrop = item.horizontal_thumb;
+      } else if (item.backdropUrl && isKnownHorizontalUrl(item.backdropUrl)) {
+        confirmedBackdrop = item.backdropUrl;
+      } else if (item.backdrop && isKnownHorizontalUrl(item.backdrop)) {
+        confirmedBackdrop = item.backdrop;
+      } else if (typeof clientBackdropCache !== "undefined" && clientBackdropCache.has(bCacheKey)) {
+        confirmedBackdrop = clientBackdropCache.get(bCacheKey);
+      }
+
+      var finalImageLoaded = false;
+      function applyFinalMediaImage(srcUrl) {
+        if (!srcUrl || finalImageLoaded) return;
+        finalImageLoaded = true;
+        var preloader = new Image();
+        preloader.onload = function () {
+          if (typeof window.veloraSetHomeImageSource === "function") {
+            window.veloraSetHomeImageSource(media, srcUrl);
           } else {
-            media.removeAttribute("src");
+            media.src = srcUrl;
+          }
+          media.classList.add("is-loaded", "vel-image-loaded");
+          media.classList.remove("vel-home-section__fallback");
+        };
+        preloader.onerror = function () {
+          if (item.thumbUrl && srcUrl !== item.thumbUrl) {
+            media.src = item.thumbUrl;
+            media.classList.add("is-loaded", "vel-image-loaded");
+          } else {
             media.classList.add("vel-home-section__fallback");
             media.textContent = "▶";
           }
-        });
-      } else if (imgSrc) {
-        media.src = imgSrc;
-      } else {
-        media.classList.add("vel-home-section__fallback");
-        media.textContent = "▶";
+        };
+        preloader.src = srcUrl;
+      }
+
+      if (confirmedBackdrop) {
+        applyFinalMediaImage(confirmedBackdrop);
       }
 
       // Dynamic Title Logo (Transparent PNG) or Integrated Title resolution
@@ -2415,19 +2456,27 @@
               window.veloraDetectDarkLogo(logoImg, card);
             }
           }
-          logoImg.onload = smartScale;
+          logoImg.onload = function () {
+            logoImg.classList.add("is-loaded");
+            smartScale();
+          };
           logoImg.onerror = function () {
             card.classList.remove("has-title-logo");
             logoImg.remove();
           };
           logoImg.src = url;
-          if (logoImg.complete) smartScale();
+          if (logoImg.complete) {
+            logoImg.classList.add("is-loaded");
+            smartScale();
+          }
           card.appendChild(logoImg);
         }
 
         if (titleLogoUrl) {
           applyTitleLogo(titleLogoUrl);
-        } else if (cleanTitle) {
+        }
+
+        if (cleanTitle) {
           var cType = isSeries ? "series" : "movies";
           if (!window.__veloraFetchingLogos) window.__veloraFetchingLogos = new Map();
           var logoKey = cType + ":" + cleanTitle.toLowerCase();
@@ -2441,10 +2490,16 @@
                   item.backdropUrl = data.thumbUrl;
                   item.thumbUrl = data.thumbUrl;
                   delete item.title_logo;
+                  try {
+                    saveLocalHistory(getLocalHistory(), true);
+                  } catch (_) {}
                   return { type: "thumb", url: data.thumbUrl };
                 }
                 if (data && data.url) {
                   item.title_logo = data.url;
+                  try {
+                    saveLocalHistory(getLocalHistory(), true);
+                  } catch (_) {}
                   return { type: "logo", url: data.url };
                 }
                 return null;
@@ -2453,26 +2508,43 @@
             window.__veloraFetchingLogos.set(logoKey, p);
           }
           window.__veloraFetchingLogos.get(logoKey).then(function (res) {
-            if (!res) return;
+            if (!res) {
+              if (!finalImageLoaded) {
+                applyFinalMediaImage(item.backdropUrl || item.backdrop || item.thumbUrl || item.cover || "");
+              }
+              return;
+            }
             if (res.type === "thumb" && res.url) {
               card.classList.add("has-integrated-title");
               card.classList.remove("has-title-logo");
               var exLogo = card.querySelector(".vel-home-section__title-logo");
               if (exLogo) exLogo.remove();
-              if (media.tagName === "IMG") {
-                if (typeof window.veloraSetHomeImageSource === "function") {
-                  window.veloraSetHomeImageSource(media, res.url);
-                } else {
-                  media.src = res.url;
-                }
-              }
+              applyFinalMediaImage(res.url);
             } else if (res.type === "logo" && res.url) {
               if (!card.classList.contains("has-integrated-title")) {
                 applyTitleLogo(res.url);
               }
+              if (!finalImageLoaded) {
+                applyFinalMediaImage(item.backdropUrl || item.backdrop || item.thumbUrl || item.cover || "");
+              }
             }
           });
         }
+      }
+
+      // Safety fallback timer: if no confirmed backdrop was available and network took > 1.2s, reveal fallback gracefully
+      if (!confirmedBackdrop) {
+        setTimeout(function () {
+          if (!finalImageLoaded) {
+            var fallbackSrc = item.horizontal_thumb || item.backdropUrl || item.backdrop || item.thumbUrl || item.cover || "";
+            if (fallbackSrc) {
+              applyFinalMediaImage(fallbackSrc);
+            } else {
+              media.classList.add("vel-home-section__fallback");
+              media.textContent = "▶";
+            }
+          }
+        }, 1200);
       }
 
       // Center Glass Play Button
@@ -2579,6 +2651,23 @@
   };
 
   function injectResumeSectionDirectly() {
+    var slot = document.getElementById("vel-home-resume-slot");
+    if (slot) {
+      var block = window.veloraRenderResumeSection();
+      if (!block) {
+        slot.replaceChildren();
+        return;
+      }
+      var oldRail = slot.querySelector(".vel-home-section__rail");
+      var savedScrollLeft = (oldRail && Number.isFinite(oldRail.scrollLeft)) ? oldRail.scrollLeft : 0;
+      slot.replaceChildren(block);
+      if (savedScrollLeft > 0) {
+        var newRail = block.querySelector(".vel-home-section__rail");
+        if (newRail) newRail.scrollLeft = savedScrollLeft;
+      }
+      return;
+    }
+
     var root = document.getElementById("vel-home-sections");
     if (!root) return;
     var existing = root.querySelector(".vel-home-section--resume");

@@ -112,6 +112,8 @@ router.get('/type/:type', async (req, res) => {
     }
 });
 
+const auth = require('../auth');
+
 // Get single source
 router.get('/:id', async (req, res) => {
     try {
@@ -119,15 +121,20 @@ router.get('/:id', async (req, res) => {
         if (!source) {
             return res.status(404).json({ error: 'Source not found' });
         }
-        res.json(source);
+        // Never expose plaintext passwords to clients
+        const sanitized = {
+            ...source,
+            password: source.password ? '••••••••' : null
+        };
+        res.json(sanitized);
     } catch (err) {
         console.error('Error getting source:', err);
         res.status(500).json({ error: 'Failed to get source' });
     }
 });
 
-// Create source
-router.post('/', async (req, res) => {
+// Create source (admin only)
+router.post('/', auth.requireAuth, auth.requireAdmin, async (req, res) => {
     try {
         const { type, name, url, username, password } = req.body;
 
@@ -142,15 +149,18 @@ router.post('/', async (req, res) => {
         const source = await sources.create({ type, name, url, username, password });
         // Trigger Nodecast sync, then rebuild the Velora local catalog snapshot.
         syncSourceAndWarm(source.id, 'source-create');
-        res.status(201).json(source);
+        res.status(201).json({
+            ...source,
+            password: source.password ? '••••••••' : null
+        });
     } catch (err) {
         console.error('Error creating source:', err);
         res.status(500).json({ error: 'Failed to create source' });
     }
 });
 
-// Update source
-router.put('/:id', async (req, res) => {
+// Update source (admin only)
+router.put('/:id', auth.requireAuth, auth.requireAdmin, async (req, res) => {
     try {
         const existing = await sources.getById(req.params.id);
         if (!existing) {
@@ -169,24 +179,30 @@ router.put('/:id', async (req, res) => {
             return res.status(400).json({ error: 'Type, name, and URL are required' });
         }
 
+        // If password is blank or the masked placeholder, keep existing password
+        const nextPassword = (password && password !== '••••••••') ? password : existing.password;
+
         const updated = await sources.update(req.params.id, {
             type: nextType,
             name: nextName,
             url: nextUrl,
             username: username !== undefined ? username : existing.username,
-            password: password !== undefined ? password : existing.password
+            password: nextPassword
         });
         // Trigger Sync (if critical fields changed? safely just trigger it)
         syncSourceAndWarm(parseInt(req.params.id), 'source-update');
-        res.json(updated);
+        res.json({
+            ...updated,
+            password: updated.password ? '••••••••' : null
+        });
     } catch (err) {
         console.error('Error updating source:', err);
         res.status(500).json({ error: 'Failed to update source' });
     }
 });
 
-// Delete source
-router.delete('/:id', async (req, res) => {
+// Delete source (admin only)
+router.delete('/:id', auth.requireAuth, auth.requireAdmin, async (req, res) => {
     try {
         const sourceId = parseInt(req.params.id);
         const existing = await sources.getById(sourceId);
@@ -221,8 +237,8 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
-// Toggle source enabled/disabled
-router.post('/:id/toggle', async (req, res) => {
+// Toggle source enabled/disabled (admin only)
+router.post('/:id/toggle', auth.requireAuth, auth.requireAdmin, async (req, res) => {
     try {
         const updated = await sources.toggleEnabled(req.params.id);
         if (!updated) {
@@ -243,8 +259,8 @@ router.post('/:id/toggle', async (req, res) => {
     }
 });
 
-// Manual Sync
-router.post('/:id/sync', async (req, res) => {
+// Manual Sync (admin only)
+router.post('/:id/sync', auth.requireAuth, auth.requireAdmin, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         const source = await sources.getById(id);

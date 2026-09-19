@@ -230,10 +230,23 @@ function analyzeProbeResult(probeResult, url, rangeInfo = {}) {
 }
 
 router.get('/', async (req, res) => {
-    const { url, ua } = req.query;
+    let { url, ua } = req.query;
     if (!url) {
         return res.status(400).json({ error: 'URL parameter is required' });
     }
+
+    // Resolve encrypted stream ticket if present
+    try {
+        const streamSecurity = require('../services/streamSecurity');
+        const parsed = new URL(url, 'http://localhost');
+        const t = parsed.searchParams.get('t');
+        if (t) {
+            const payload = streamSecurity.decryptTicket(t);
+            if (payload?.u) {
+                url = payload.u;
+            }
+        }
+    } catch (_) {}
 
     const ffprobePath = req.app.locals.ffprobePath;
     let settings = {};

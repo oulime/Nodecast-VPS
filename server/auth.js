@@ -10,8 +10,38 @@ const { Strategy: LocalStrategy } = require('passport-local');
  * Using Passport.js with JWT tokens
  */
 
-// JWT Secret - In production, use environment variable
-const JWT_SECRET = process.env.JWT_SECRET || 'nodecast-tv-secret-key-change-in-production';
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+
+// JWT Secret resolution:
+// If process.env.JWT_SECRET is set and not the default fallback, use it.
+// Otherwise, load or generate a persistent random secret from data/.jwt_secret.
+const dataDir = path.join(__dirname, '..', 'data');
+const JWT_SECRET_FILE = path.join(dataDir, '.jwt_secret');
+
+function getOrCreateJwtSecret() {
+    if (process.env.JWT_SECRET && process.env.JWT_SECRET !== 'nodecast-tv-secret-key-change-in-production') {
+        return process.env.JWT_SECRET;
+    }
+    try {
+        if (fs.existsSync(JWT_SECRET_FILE)) {
+            const secret = fs.readFileSync(JWT_SECRET_FILE, 'utf8').trim();
+            if (secret.length >= 32) return secret;
+        }
+    } catch (_) {}
+
+    const newSecret = crypto.randomBytes(32).toString('hex');
+    try {
+        if (!fs.existsSync(dataDir)) {
+            fs.mkdirSync(dataDir, { recursive: true });
+        }
+        fs.writeFileSync(JWT_SECRET_FILE, newSecret, { encoding: 'utf8', mode: 0o600 });
+    } catch (_) {}
+    return newSecret;
+}
+
+const JWT_SECRET = getOrCreateJwtSecret();
 const JWT_EXPIRY = process.env.JWT_EXPIRY || process.env.VELORA_JWT_EXPIRY || '30d';
 
 /**
@@ -87,7 +117,11 @@ function configureLocalStrategy(getUserByUsername, verifyUserPassword) {
  */
 function configureJwtStrategy(getUserById) {
     const options = {
-        jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+        jwtFromRequest: ExtractJwt.fromExtractors([
+            ExtractJwt.fromAuthHeaderAsBearerToken(),
+            ExtractJwt.fromUrlQueryParameter('token'),
+            ExtractJwt.fromUrlQueryParameter('authToken')
+        ]),
         secretOrKey: JWT_SECRET
     };
 

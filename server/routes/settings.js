@@ -3,6 +3,8 @@ const router = express.Router();
 const { settings, getDefaultSettings } = require('../db');
 const syncService = require('../services/syncService');
 
+const auth = require('../auth');
+
 /**
  * Get all settings
  * GET /api/settings
@@ -10,6 +12,10 @@ const syncService = require('../services/syncService');
 router.get('/', async (req, res) => {
     try {
         const currentSettings = await settings.get();
+        // Mask upstream proxy password for non-admin viewers
+        if (currentSettings?.upstreamProxy) {
+            currentSettings.upstreamProxy = currentSettings.upstreamProxy.replace(/(https?:\/\/)([^:@]+):([^@]+)@/i, '$1$2:••••••••@');
+        }
         res.json(currentSettings);
     } catch (err) {
         console.error('Error getting settings:', err);
@@ -18,12 +24,17 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * Update settings (partial update)
+ * Update settings (partial update, admin only)
  * PUT /api/settings
  */
-router.put('/', async (req, res) => {
+router.put('/', auth.requireAuth, auth.requireAdmin, async (req, res) => {
     try {
         const updates = req.body;
+        // If upstreamProxy contains the masked placeholder, do not overwrite existing proxy password
+        if (updates.upstreamProxy && updates.upstreamProxy.includes(':••••••••@')) {
+            const existing = await settings.get();
+            updates.upstreamProxy = existing.upstreamProxy;
+        }
         const updatedSettings = await settings.update(updates);
 
         // If sync interval changed, restart the server-side sync timer
@@ -39,10 +50,10 @@ router.put('/', async (req, res) => {
 });
 
 /**
- * Reset settings to defaults
+ * Reset settings to defaults (admin only)
  * DELETE /api/settings
  */
-router.delete('/', async (req, res) => {
+router.delete('/', auth.requireAuth, auth.requireAdmin, async (req, res) => {
     try {
         const defaultSettings = await settings.reset();
         res.json(defaultSettings);

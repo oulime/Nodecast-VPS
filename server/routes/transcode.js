@@ -246,6 +246,22 @@ function markEncoderFailure(encoder) {
     encoderFailureUntil.set(encoder, Date.now() + ENCODER_FAILURE_COOLDOWN_MS);
 }
 
+function resolveTicketUrl(inputUrl) {
+    if (!inputUrl) return inputUrl;
+    try {
+        const streamSecurity = require('../services/streamSecurity');
+        const parsed = new URL(inputUrl, 'http://localhost');
+        const t = parsed.searchParams.get('t') || (inputUrl.length > 50 && !inputUrl.includes('://') && !inputUrl.startsWith('/') ? inputUrl : null);
+        if (t) {
+            const payload = streamSecurity.decryptTicket(t);
+            if (payload?.u) {
+                return payload.u;
+            }
+        }
+    } catch (_) {}
+    return inputUrl;
+}
+
 /**
  * Transcode Routes
  * 
@@ -292,7 +308,7 @@ function checkSessionRateLimit(key, maxRequests = 3, windowMs = 5000) {
  * Body: { url: string, seekOffset?: number }
  */
 router.post('/session', async (req, res) => {
-    const {
+    let {
         url,
         seekOffset,
         startAt,
@@ -307,6 +323,8 @@ router.post('/session', async (req, res) => {
     if (!url) {
         return res.status(400).json({ error: 'URL is required' });
     }
+
+    url = resolveTicketUrl(url);
 
     const ffmpegPath = req.app.locals.ffmpegPath || 'ffmpeg';
     const ffprobePath = req.app.locals.ffprobePath;
@@ -535,10 +553,12 @@ router.get('/sessions', (req, res) => {
  * This fixes playback issues with Dolby/AC3/EAC3 audio that browsers can't decode.
  */
 router.get('/', async (req, res) => {
-    const { url } = req.query;
+    let { url } = req.query;
     if (!url) {
         return res.status(400).json({ error: 'URL parameter is required' });
     }
+
+    url = resolveTicketUrl(url);
 
     const ffmpegPath = req.app.locals.ffmpegPath || 'ffmpeg';
 
